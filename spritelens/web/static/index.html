@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>小洛探探 SpriteLens</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div id="startup" class="startup" role="status" aria-live="polite">
+    <strong>小洛探探 SpriteLens</strong>
+    <p>正在启动…</p>
+  </div>
+
+  <div id="app" class="app-shell" hidden>
+    <!-- 侧栏 -->
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark">S</span>
+        <div class="brand-copy">
+          <strong>小洛探探</strong>
+          <span>SpriteLens</span>
+        </div>
+      </div>
+      <nav id="main-nav" aria-label="主导航">
+        <button class="nav-item active" data-page="overview">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v7H3ZM14 3h7v7h-7ZM3 14h7v7H3ZM14 14h7v7h-7Z"/></svg>
+          概览
+        </button>
+        <button class="nav-item" data-page="pets">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6V4h8v2M6 6h12l2 5v9H4v-9ZM8 13h8v5H8Z"/></svg>
+          宠物仓库
+        </button>
+        <button class="nav-item" data-page="handbook">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18H5ZM9 7h6M9 11h6M9 15h4"/></svg>
+          精灵图鉴
+        </button>
+        <button class="nav-item" data-page="events">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+          协议流
+        </button>
+        <button class="nav-item" data-page="capture">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9M12 7v5l3 3M17.5 3.5 21 7l-3.5 3.5"/></svg>
+          采集与设置
+        </button>
+      </nav>
+      <div class="sidebar-foot">
+        <span class="privacy-dot"></span>
+        <div><strong>纯本地运行</strong><span>数据不出本机</span></div>
+      </div>
+    </aside>
+
+    <!-- 主区 -->
+    <main class="main-shell">
+      <header class="topbar">
+        <div class="role-block">
+          <span class="role-label">当前角色</span>
+          <strong id="role-name">等待识别角色</strong>
+          <small id="role-uid">UID —</small>
+        </div>
+        <div class="capture-summary">
+          <span id="pill-listen" class="status-pill idle">采集：未启动</span>
+          <span id="pill-key" class="status-pill idle">密钥：未获取</span>
+          <span id="pill-record" class="status-pill idle">录制：关</span>
+          <span id="pill-pets" class="status-pill idle">宠物：0 只</span>
+          <span id="capture-message" class="status-copy">准备就绪</span>
+        </div>
+        <div class="top-actions">
+          <button id="btn-start" class="primary-button">开始采集</button>
+          <button id="btn-stop" class="ghost-button" disabled>停止</button>
+        </div>
+      </header>
+
+      <!-- 概览 -->
+      <section id="page-overview" class="page active">
+        <div class="stat-grid">
+          <article class="stat-card"><span>宠物总数</span><strong id="ov-total">0</strong></article>
+          <article class="stat-card"><span>首捕</span><strong id="ov-first">0</strong></article>
+          <article class="stat-card"><span>满级（60）</span><strong id="ov-maxed">0</strong></article>
+          <article class="stat-card"><span>最高等级</span><strong id="ov-maxlv">0</strong></article>
+          <article class="stat-card"><span>协议事件</span><strong id="ov-events">0</strong></article>
+        </div>
+        <div class="overview-lower">
+          <section class="panel">
+            <div class="panel-head"><h2>系别分布</h2><span class="muted">按主系别统计</span></div>
+            <div id="ov-types" class="type-dist"></div>
+          </section>
+          <div class="overview-side">
+            <section class="panel">
+              <div class="panel-head"><h2>当前账号</h2></div>
+              <p class="info-line" id="ov-account">尚未识别账号</p>
+              <p class="muted" id="ov-account-hint">登录游戏进入世界后自动识别</p>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h2>采集状态</h2></div>
+              <p class="info-line" id="ov-capture">未启动</p>
+              <p class="muted" id="ov-capture-hint">在「采集与设置」页选择网卡并开始采集</p>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h2>本地账号</h2><span class="muted">来自本地库（离线可见）</span></div>
+              <div id="ov-accounts" class="account-list"></div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <!-- 宠物仓库 -->
+      <section id="page-pets" class="page">
+        <div class="workspace split">
+          <aside class="filter-rail" id="pet-filters">
+            <div class="filter-head"><h2>筛选</h2><button id="btn-reset-filters" class="ghost-button small">重置</button></div>
+            <label class="field">
+              <span>搜索（名字 / gid / 图鉴 ID）</span>
+              <input id="f-search" type="text" placeholder="输入关键字">
+            </label>
+            <label class="field">
+              <span>等级范围 <b id="f-level-label">1 – 100</b></span>
+              <div class="range-row">
+                <input id="f-level-min" type="range" min="1" max="100" value="1">
+                <input id="f-level-max" type="range" min="1" max="100" value="100">
+              </div>
+            </label>
+            <div class="field">
+              <span>性格</span>
+              <div id="f-natures" class="chip-group"></div>
+            </div>
+            <div class="field">
+              <span>系别</span>
+              <div id="f-types" class="chip-group"></div>
+            </div>
+            <label class="field">
+              <span>天赋阶下限</span>
+              <select id="f-talent"></select>
+            </label>
+            <label class="check-row">
+              <input id="f-first" type="checkbox"><span>只看首捕</span>
+            </label>
+          </aside>
+
+          <section class="content-panel">
+            <div class="panel-toolbar">
+              <span id="pet-count" class="count-badge">共 0 只</span>
+              <div class="segmented" id="pet-view">
+                <button data-view="card" class="active">卡片</button>
+                <button data-view="table">表格</button>
+              </div>
+              <label class="inline-field">排序
+                <select id="f-sort"></select>
+              </label>
+              <label class="check-row compact">
+                <input id="f-desc" type="checkbox"><span>降序</span>
+              </label>
+              <button id="btn-clear-snapshot" class="ghost-button small danger-ghost">清空快照</button>
+            </div>
+            <div class="table-wrap">
+              <div id="pet-grid" class="pet-grid" hidden></div>
+              <table class="pet-table" id="pet-table">
+                <thead>
+                  <tr>
+                    <th class="col-pet">宠物</th>
+                    <th class="col-types">系别</th>
+                    <th class="col-nature">性格</th>
+                    <th class="col-stats">六维</th>
+                    <th class="col-talent">天赋</th>
+                    <th class="col-body">体型 / 声音</th>
+                    <th class="col-skills">技能</th>
+                    <th class="col-first">首捕</th>
+                    <th class="col-gid">编号</th>
+                  </tr>
+                </thead>
+                <tbody id="pet-rows"></tbody>
+              </table>
+              <div id="pet-empty" class="empty-hint">暂无宠物数据：开始采集后进入游戏，或等待登录推送</div>
+            </div>
+            <div id="pet-pager" class="pager" hidden></div>
+          </section>
+
+          <aside id="pet-detail" class="detail-panel">
+            <div class="empty-hint">点击宠物卡片查看详情</div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- 精灵图鉴 -->
+      <section id="page-handbook" class="page">
+        <div class="workspace split">
+          <section class="content-panel">
+            <div class="panel-toolbar">
+              <span id="hb-count" class="count-badge">收录 0 / 0 种</span>
+              <label class="inline-field">搜索
+                <input id="hb-search" type="text" placeholder="名字 / 图鉴 ID">
+              </label>
+              <label class="inline-field">系别
+                <select id="hb-type"></select>
+              </label>
+              <div class="segmented" id="hb-mode">
+                <button data-mode="all" class="active">全部</button>
+                <button data-mode="collected">已收集</button>
+                <button data-mode="uncollected">未收集</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <div id="hb-grid" class="hb-grid"></div>
+              <div id="hb-empty" class="empty-hint" hidden>没有符合筛选条件的物种</div>
+            </div>
+          </section>
+          <aside id="hb-detail" class="detail-panel">
+            <div class="empty-hint">点击左侧图鉴卡片查看详情</div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- 协议流 -->
+      <section id="page-events" class="page">
+        <div class="workspace split">
+          <section class="content-panel">
+            <div class="panel-toolbar">
+              <span id="event-count" class="count-badge">0 条</span>
+              <span class="muted">最近 500 条（opcode / 方向 / 载荷长度）</span>
+            </div>
+            <div class="table-wrap">
+              <table class="event-table">
+                <thead>
+                  <tr><th>时间</th><th>方向</th><th>opcode</th><th>消息</th><th>载荷</th></tr>
+                </thead>
+                <tbody id="event-rows"></tbody>
+              </table>
+              <div id="event-empty" class="empty-hint">暂无事件：开始采集并进入游戏</div>
+            </div>
+          </section>
+          <aside id="event-detail" class="detail-panel">
+            <div class="empty-hint">点击左侧事件查看解码详情</div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- 采集与设置 -->
+      <section id="page-capture" class="page">
+        <div class="stack">
+          <section id="npcap-banner" class="banner warn" hidden>
+            <div class="banner-copy">
+              <strong id="npcap-title">抓包环境未就绪</strong>
+              <p id="npcap-message"></p>
+              <div id="npcap-progress" class="progress-bar" hidden><i></i></div>
+            </div>
+            <div class="banner-actions">
+              <button id="btn-npcap-install" class="primary-button small">一键安装 Npcap</button>
+              <button id="btn-rsc" class="ghost-button small" hidden>一键禁用 RSC</button>
+              <button id="btn-recheck" class="ghost-button small">重新检测</button>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head"><h2>采集控制</h2><span class="muted">抓包只读旁听，不修改报文</span></div>
+            <div class="form-grid">
+              <label class="field">
+                <span>抓包网卡</span>
+                <select id="c-iface"><option value="">（默认路由网卡）</option></select>
+              </label>
+              <label class="check-row">
+                <input id="c-autostart" type="checkbox"><span>打开即采集（启动时自动开始）</span>
+              </label>
+              <label class="check-row">
+                <input id="c-record" type="checkbox"><span>启动时自动录制原始流</span>
+              </label>
+            </div>
+            <div class="button-row">
+              <button id="btn-capture-start" class="primary-button">开始采集</button>
+              <button id="btn-capture-stop" class="ghost-button">停止采集</button>
+              <button id="btn-record-toggle" class="ghost-button">切换录制</button>
+            </div>
+            <p id="capture-hint" class="muted"></p>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head"><h2>手动密钥</h2><span class="muted">连接早于采集时用来续解；支持 16 字节 ASCII（32 hex 字符）</span></div>
+            <div class="button-row">
+              <input id="c-key" type="text" class="grow" placeholder="粘贴密钥文本">
+              <button id="btn-key-apply" class="ghost-button">应用密钥</button>
+            </div>
+            <p id="key-message" class="muted"></p>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head"><h2>会话与统计</h2><span id="capture-stats" class="muted"></span></div>
+            <div class="table-wrap short">
+              <table class="event-table">
+                <thead><tr><th>会话</th><th>密钥</th><th>数据帧</th></tr></thead>
+                <tbody id="session-rows"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head"><h2>关于</h2></div>
+            <p class="muted" id="about-line">SpriteLens 小洛探探 · 纯本地数据观测 · 不做云同步/账号/交易市场</p>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast-layer" class="toast-layer"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

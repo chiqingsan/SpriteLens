@@ -1,0 +1,10 @@
+{
+  "_comment": "宠物列表容器：field 1 为 repeated 宠物对象（每个元素一个字段头）。实测该元素的 55 个字段号全部落在 PetData（88 字段）定义内，而 PetBriefInfo 仅覆盖 31 个，故指向 PetData。",
+  "messages": {
+    "PetDataInfoList": {
+      "fields": {
+        "1": { "name": "pet_data", "type": "PetData" }
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# 运行时产物：日志 / 录制帧 / 密钥均含本地敏感信息
+logs/
+data/recordings/
+data/keys/
+*.local.json
+
+# 测试临时产物
+tests/fixtures/recordings/
+
+# 编辑器/代理工具产物
+.zcode/
+
+# GUI 截图校验产物（guishot）
+.guishot/
+.guishot_demo.log

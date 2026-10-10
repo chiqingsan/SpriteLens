@@ -1,0 +1,13 @@
+{
+  "_comment": "宠物仓库分页响应（字段结构来自真实流量的实测观察）。",
+  "messages": {
+    "ZoneGetPetInfoByPageRsp": {
+      "fields": {
+        "2": { "name": "total_page", "type": "uint32" },
+        "3": { "name": "req_page", "type": "uint32" },
+        "4": { "name": "pet_info", "type": "PetDataInfoList" },
+        "5": { "name": "page_num", "type": "uint32" }
+      }
+    }
+  }
+}

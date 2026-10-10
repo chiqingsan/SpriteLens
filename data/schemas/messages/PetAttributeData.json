@@ -1,0 +1,16 @@
+{
+  "_comment": "消息字段定义示例。fields 键为十进制字段号，name/type 来自游戏客户端 protobuf 描述的实测观察；type 可指向另一个 messages/*.json 的消息名以实现嵌套命名。",
+  "messages": {
+    "PetAttributeData": {
+      "fields": {
+        "1": { "name": "total_race", "type": "uint32" },
+        "2": { "name": "talent", "type": "uint32" },
+        "3": { "name": "base_value", "type": "uint32" },
+        "4": { "name": "effort_exp", "type": "uint32" },
+        "5": { "name": "effort_lv", "type": "uint32" },
+        "6": { "name": "effort_add", "type": "uint32" },
+        "7": { "name": "talent_add_value", "type": "int32" }
+      }
+    }
+  }
+}

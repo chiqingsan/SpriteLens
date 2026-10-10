@@ -1,0 +1,28 @@
+{
+  "generated_at": "2026-10-10T11:15:08+00:00",
+  "sources": {
+    "pet_icons": "https://wegame.shallow.ink/api/v1/resources/wiki/assets/pets/{pid}/small.png",
+    "type_icons": "C:\\Users\\chiqingsan\\AppData\\Local\\Temp\\ds\\out\\蛋神助手电脑版-v1.1.6-b49823778e99.exe_extracted\\assets\\reference\\roco-helper-v3.8.1\\TypeIcon",
+    "handbook_meta": "C:\\Users\\chiqingsan\\AppData\\Local\\Temp\\ds\\out\\蛋神助手电脑版-v1.1.6-b49823778e99.exe_extracted\\assets\\catalog\\petBaseData.json",
+    "type_chart": "C:\\Users\\chiqingsan\\AppData\\Local\\Temp\\roco_research\\rocom-helper-innovationb1ue\\data\\game\\type_chart.json"
+  },
+  "type_icons": {
+    "copied": 2
+  },
+  "handbook_meta": {
+    "merged": 601,
+    "total": 1015,
+    "egg_groups": 15
+  },
+  "type_chart": {
+    "imported": 18,
+    "relations": 18
+  },
+  "pet_icons": {
+    "downloaded": 788,
+    "missing": 227,
+    "failed": 0,
+    "available": 788,
+    "total": 1015
+  }
+}

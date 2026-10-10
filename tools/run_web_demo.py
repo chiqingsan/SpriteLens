@@ -1,0 +1,132 @@
+"""启动带合成数据的 Web 版 SpriteLens（供浏览器/截图工具做视觉验收）。
+
+合成数据 + 真实本地服务：起服务后用系统
+浏览器打开，便于人工核对布局或由 browser-use 类工具截图。
+数据为合成，不依赖游戏在线。
+
+用法：
+    python tools/run_web_demo.py [--pets 12]
+按 Ctrl+C 退出。
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import random
+import sys
+import tempfile
+import webbrowser
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from spritelens.app_context import AppContext
+from spritelens.capture.key_store import KeyStore
+from spritelens.domain.identity import PlayerIdentity
+from spritelens.domain.pets import Pet, PetAttribute, PetSkill
+from spritelens.domain.static_data import load_static_data
+from spritelens.logs import setup_logger
+from spritelens.paths import logs_dir, schema_dir, static_dir
+from spritelens.protocol.opcodes import OpcodeCatalog
+from spritelens.protocol.schema import load_library
+from spritelens.repositories.settings import SettingsRepository
+from spritelens.services.monitor_service import MonitorService
+from spritelens.services.pet_repository import PetRepository
+from spritelens.view_models import CaptureViewModel, EventsViewModel, PetViewModel
+from spritelens.web.server import LocalServer
+
+_SAMPLE = (
+    ("迪莫", 3004, 60), ("火神", 3006, 60), ("水灵", 3005, 55), ("彩蝶鲨", 3117, 48),
+    ("燃薪虫", 3437, 42), ("小独角兽", 3062, 35), ("菊花梨", 3227, 28), ("恶魔叮", 3010, 22),
+    ("皇家狮鹫", 3469, 58), ("治愈兔", 3081, 44), ("机械方方", 3200, 39), ("乖乖鹄", 3344, 31),
+)
+
+
+def build_demo_context(tmp: Path, count: int) -> AppContext:
+    """合成 AppContext：内存快照 + 临时配置，不落库、不抓包。"""
+    load_library(schema_dir())
+    static = load_static_data(static_dir())
+    monitor = MonitorService(
+        catalog=OpcodeCatalog.load(Path(__file__).resolve().parent.parent / "data" / "schemas" / "opcodes.json"),
+        key_store=KeyStore(tmp / "keys"),
+    )
+    repository = PetRepository(store=None)
+    rng = random.Random(11)
+    names = _SAMPLE * ((count // len(_SAMPLE)) + 1)
+    from spritelens.domain.pets import _ATTR_SLOTS  # noqa: PLC0415 - demo 专用
+
+    for i in range(count):
+        name, base_conf, level = names[i]
+        repository._pets[1000 + i] = Pet(
+            gid=1000 + i, conf_id=2000000 + i, name=name, level=level, exp=1000 * i,
+            nature=rng.randint(1, 25), gender=rng.randint(1, 2), blood_id=(i % 5) + 1,
+            talent_rank=rng.randint(1, 5), is_first_catch=rng.random() < 0.35,
+            base_conf_id=base_conf,
+            attributes=tuple(
+                PetAttribute(total_race=rng.randint(70, 130), talent=rng.choice([0, 24, 48]),
+                             base_value=rng.randint(120, 220), effort_add=rng.randint(0, 30))
+                for _ in _ATTR_SLOTS
+            ),
+            height=rng.randint(70, 200), weight=rng.randint(20000, 100000),
+            voice=rng.randint(-100, 100), mutation_type=1 if i % 4 == 0 else 0,
+            classis=i % 18, breakthrough_lv=level // 10, speciality_id=100 + i,
+            ball_id=(i % 5) + 1,
+            skills=tuple(
+                PetSkill(skill_id=sid, conf_idx=10 + k, is_learned=True, is_equipped=k < 2, pos=k)
+                for k, sid in enumerate((7050210 + i * 10, 7050190, 7050270, 200107))
+            ),
+        )
+    repository._version += 1
+    repository._identity = PlayerIdentity(uid=101384922, name="话绵雨", level=60)
+
+    settings = SettingsRepository(tmp / "config.json")
+    capture_vm = CaptureViewModel(
+        monitor=monitor,
+        settings=settings,
+        keys_dir=tmp / "keys",
+        recordings_dir=tmp / "recordings",
+        port=8195,
+    )
+    return AppContext(
+        settings=settings,
+        static_data=static,
+        monitor=monitor,
+        pet_repository=repository,
+        capture_vm=capture_vm,
+        events_vm=EventsViewModel(monitor=monitor),
+        pet_vm=PetViewModel(repository, static_data=static),
+    )
+
+
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--pets", type=int, default=12)
+    parser.add_argument("--no-open", action="store_true", help="不开浏览器，只打印 URL")
+    args = parser.parse_args(argv)
+
+    setup_logger(logs_dir())
+    tmp = Path(tempfile.mkdtemp())
+    context = build_demo_context(tmp, args.pets)
+    server = LocalServer(context, port=0)
+    server.start()
+
+    info = {"url": server.url, "port": server.port, "pets": args.pets}
+    print("[web-demo] " + json.dumps(info, ensure_ascii=False), flush=True)
+
+    if not args.no_open:
+        webbrowser.open(server.url)
+    try:
+        while server.running:
+            try:
+                __import__("time").sleep(0.5)
+            except KeyboardInterrupt:
+                break
+    finally:
+        server.stop()
+        context.close()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

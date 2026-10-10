@@ -1,0 +1,20 @@
+{
+  "_comment": "宠物对象实测确认的字段名修正（字段级合并：只覆盖下列字段，all.json 的其余字段保留）。",
+  "messages": {
+    "PetBriefInfo": {
+      "fields": {
+        "1": { "name": "gid", "type": "uint32" },
+        "2": { "name": "conf_id", "type": "uint32" },
+        "3": { "name": "name", "type": "bytes" },
+        "7": { "name": "nature", "type": "uint32" },
+        "8": { "name": "gender", "type": "uint32" },
+        "9": { "name": "exp", "type": "uint32" },
+        "10": { "name": "level", "type": "uint32" },
+        "15": { "name": "base_conf_id", "type": "uint32" },
+        "39": { "name": "is_first_catch", "type": "bool" },
+        "47": { "name": "blood_id", "type": "uint32" },
+        "55": { "name": "talent_rank", "type": "uint32" }
+      }
+    }
+  }
+}

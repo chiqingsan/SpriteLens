@@ -1,0 +1,18 @@
+{
+  "source": "innovationb1ue/rocom-helper data/game (rkpp-data-bundle-v1)",
+  "source_dir": "roco_research/rocom-helper-innovationb1ue/data/game（本机临时解包目录；重新导入用 tools/import_static_data.py 指定路径）",
+  "generated_at": "2026-10-10T18:40:00+00:00",
+  "counts": {
+    "species.json": 1015,
+    "natures.json": 31,
+    "types.json": 18,
+    "skills.json": 1378
+  },
+  "mapping": "协议 pet.base_conf_id(字段15) → species.json key（实测 105/107 命中）",
+  "notes": [
+    "species name 仅作兜底：协议直带的宠物名优先（实测二者一致）",
+    "不要用 pet.conf_id(字段2) 查物种表：它是实例 ID，会得到错误物种",
+    "types/natures/技能名为版本稳定字段，可直接展示",
+    "evolutions 取源数据 evolution_pet_ids（物种 ID，可解析为 species key）；勿用 evolution_ids——那是小整数标记，实测不是物种 ID（2026-10-10 修正）"
+  ]
+}
