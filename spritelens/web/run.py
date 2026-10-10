@@ -15,7 +15,7 @@ import webbrowser
 import spritelens
 from spritelens.app_context import build_app_context
 from spritelens.logs import get_logger, setup_logger
-from spritelens.paths import logs_dir
+from spritelens.paths import logs_dir, project_root
 from spritelens.system.single_instance import SingleInstanceGuard
 
 logger = get_logger("web_run")
@@ -117,10 +117,16 @@ def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> None:
         stop_flag = None
 
     try:
-        webview.start(debug=False)  # 阻塞至窗口关闭
+        webview.start(debug=False, icon=str(_icon_path()))  # 阻塞至窗口关闭
     finally:
         if stop_flag is not None:
             stop_flag.set()
+
+
+def _icon_path() -> str:
+    """窗口/任务栏图标（resources/app.ico，随包分发；缺失时回落空串）。"""
+    icon = project_root() / "resources" / "app.ico"
+    return str(icon) if icon.is_file() else ""
 
 
 def _window_handle() -> int:

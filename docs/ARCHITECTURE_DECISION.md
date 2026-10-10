@@ -267,14 +267,19 @@ PyQt6 裁剪+打包后约 30–35 MB（`TAURI_SIZE_EVALUATION.md` §4），
 
 ## 6. 无条件工程前置（与是否迁移无关，都该做）
 
-| # | 项 | 现状证据 | 为什么 |
-|---|---|---|---|
-| 1 | `paths.py` frozen 适配 | `project_root()` 假定源码树（`paths.py:64-76`），无 `sys._MEIPASS` 分支 | **PyInstaller 打包必炸**；任何打包动作的前置 |
-| 2 | DPI 感知 | 全项目 `Dpi/HighDpi` 零命中 | 高分屏渲染只靠 Qt6 默认兜底，无显式声明 |
-| 3 | `excepthook` + 启动日志 | 无 `sys.excepthook`/`faulthandler`/`startup-error.log` | `start.bat` 用 pythonw，未捕获异常**静默消失** |
-| 4 | `setWindowIcon` | `app.ico` 只被标题栏 logo 用（`widgets.py:705`） | 任务栏图标未设置 |
-| 5 | 架构测试 | 文档承诺"业务层无 Qt"但只有手工命令（`TECH_EVALUATION.md` 列为待办） | 竞品的 import 图污染正是缺此测试；建议仿 innovationb1ue `test_architecture.py`，同时把 §2.3 的反向 import 变红灯 |
-| 6 | 本地服务安全组合 | 尚无 HTTP 服务 | 一旦引入：随机端口 + 每次启动随机 token + `compare_digest` + 仅 127.0.0.1（约 30 行） |
+推进状态见末尾「处理记录」列；已完成项保留原始判据作为决策依据。
+
+| # | 项 | 现状证据 | 为什么 | 处理记录 |
+|---|---|---|---|---|
+| 1 | `paths.py` frozen 适配 | `project_root()` 假定源码树（`paths.py:64-76`），无 `sys._MEIPASS` 分支 | **PyInstaller 打包必炸**；任何打包动作的前置 | ✅ 已适配（2026-10-10）：覆盖 `_MEIPASS` / Nuitka-frozen / 源码态三分支，`tests/test_paths.py` 锁死 |
+| 2 | DPI 感知 | 全项目 `Dpi/HighDpi` 零命中 | 高分屏渲染只靠 Qt6 默认兜底，无显式声明 | ⛔ 已失效：PyQt 退役后渲染全在 WebView2，pywebview 自带 DPI 处理，应用层无需声明 |
+| 3 | `excepthook` + 启动日志 | 无 `sys.excepthook`/`faulthandler`/`startup-error.log` | `start.bat` 用 pythonw，未捕获异常**静默消失** | ✅ 已实现（2026-10-10）：`logs/spritelens.crash.log` + 启动致命失败弹对话框，`tests/test_crash_log.py` 覆盖 |
+| 4 | `setWindowIcon` | `app.ico` 只被标题栏 logo 用（`widgets.py:705`） | 任务栏图标未设置 | ✅ 已实现（2026-10-10）：`tools/make_icon.py` 生成多尺寸 `resources/app.ico`，接 `webview.start(icon=...)` 与 favicon |
+| 5 | 架构测试 | 文档承诺"业务层无 Qt"但只有手工命令（`TECH_EVALUATION.md` 列为待办） | 竞品的 import 图污染正是缺此测试；建议仿 innovationb1ue `test_architecture.py`，同时把 §2.3 的反向 import 变红灯 | ✅ 已实现（2026-10-10）：`tests/test_architecture.py`，约束改为「业务层无 Web 依赖 + 无反向分层 + protocol 纯函数」 |
+| 6 | 本地服务安全组合 | 尚无 HTTP 服务 | 一旦引入：随机端口 + 每次启动随机 token + `compare_digest` + 仅 127.0.0.1（约 30 行） | ✅ 已实现（B1 阶段） |
+
+打包仍剩的实质工作：PyInstaller/Nuitka spec（含 `data/` 与 `resources/` 附带清单）、
+体积与冷启动实测（§5.3 判据）。
 
 ---
 

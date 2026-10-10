@@ -2,11 +2,14 @@
 
 测试与便携场景用环境变量 SPRITELENS_DATA_ROOT 覆盖，默认写用户目录
 （%LOCALAPPDATA%\\SpriteLens），与 meow toolkit 的存储策略保持一致。
+
+同时提供打包后的只读资源定位（frozen/_MEIPASS 分支），见 `project_root()`。
 """
 
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 from pathlib import Path
 
@@ -62,9 +65,25 @@ def logs_dir() -> Path:
     return path
 
 
-def project_root() -> Path:
-    """仓库根目录（源码态），用于定位 docs / data 等随仓库分发的资源。"""
+def _bundle_root() -> Path:
+    """随程序分发的只读资源（data/）所在根目录。
+
+    源码态是仓库根；打包后（PyInstaller 的 `sys._MEIPASS`、Nuitka 的
+    `__compiled__`）资源被释放到临时目录，必须走这个分支，否则
+    `project_root()` 指到 exe 所在位置，静态数据全部找不到。
+    """
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        return Path(meipass)
+    if "__compiled__" in globals() or getattr(sys, "frozen", False):
+        # Nuitka standalone：资源随 exe 同目录；onefile 亦解包到 exe 旁
+        return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent.parent
+
+
+def project_root() -> Path:
+    """资源根目录：源码态为仓库根，打包态为资源释放目录。"""
+    return _bundle_root()
 
 
 def schema_dir() -> Path:

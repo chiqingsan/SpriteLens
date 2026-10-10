@@ -94,6 +94,19 @@ web（aiohttp/pywebview）；protocol 不反向依赖 services/capture；线程�
   worker 线程批量执行（登录突发实测：同步 flush 会让轮询等待 57ms）。
 - 改表结构后跑 `tests.test_persistence`；损坏恢复路径已覆盖（备份重建）。
 
+## 资源与打包兼容
+
+- **只读资源**（`data/`、`resources/`）一律经 `paths.project_root()` 定位，
+  禁止在模块里手写 `Path(__file__).parent.parent`——打包后 `__file__` 语义
+  不同，会全部找不到。`project_root()` 已覆盖源码态 / PyInstaller `_MEIPASS` /
+  Nuitka-frozen 三条分支（`tests/test_paths.py` 锁死）
+- **用户数据**（配置/日志/SQLite/录制）走 `data_root()`，与打包状态无关；
+  打包后仍写 `%LOCALAPPDATA%`，绝不写进安装目录（Program Files 无写权限）
+- 包内自带的静态前端（`web/static/`）用 `Path(__file__).parent / "static"` 定位，
+  打包器会把整个包目录搬走，这是唯一允许不经过 `project_root()` 的场景
+- **图标**：改设计后跑 `python tools/make_icon.py` 重新生成，
+  产物（`resources/app.ico`、`web/static/favicon.png`）随仓库提交
+
 ## 错误处理
 
 - 捕获具体异常并降级（配置脏值归一默认；key 写失败告警不阻断采集）

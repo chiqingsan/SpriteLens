@@ -258,7 +258,11 @@ class LocalServer:
         return web.FileResponse(path, headers={"Cache-Control": "no-cache"})
 
     async def _favicon(self, request: web.Request) -> web.Response:
-        return web.Response(status=204)
+        """浏览器标签页图标；缺图时回 204 不留 404 噪声。"""
+        icon = self._static_dir / "favicon.png"
+        if not icon.is_file():
+            return web.Response(status=204)
+        return web.FileResponse(icon, headers={"Cache-Control": "no-cache"})
 
     @web.middleware
     async def _no_cache_middleware(self, request: web.Request, handler):

@@ -20,9 +20,11 @@
 | `tools/import_assets.py` | 导入图鉴元数据 + 精灵图 + 系别图标 + 系别克制表 |
 | `tools/analyze_recording.py` | 录制文件离线分析（帧分类/opcode 分布/宠物形状） |
 | `tools/run_web_demo.py` | 带合成数据的界面实例（浏览器打开，视觉验收用） |
+| `tools/make_icon.py` | 生成 `resources/app.ico` 多尺寸图标与 favicon（PIL，产物入库） |
+| `resources/app.ico` | 应用图标（窗口/任务栏用，打包时随包分发） |
 | `data/schemas/` | 外挂 schema：`opcodes.json` + `messages/*.json`（字段级合并） |
 | `data/static/` | 静态映射：`species/natures/types/skills/type_chart.json` + 各 `_meta.json` |
-| `spritelens/web/static/` | 前端资源：`index.html` / `app.css` / `app.js` / `pets/*.webp` / `type-icons/` |
+| `spritelens/web/static/` | 前端资源：`index.html` / `app.css` / `app.js` / `favicon.png` / `pets/*.webp` / `type-icons/` |
 | `data/recordings/` | 运行时录制产物（gitignore；本地回放样例不在版本库） |
 
 ## spritelens/
@@ -31,7 +33,7 @@
 | --- | --- |
 | `__init__.py` | 版本、APP_NAME、APP_DISPLAY_NAME |
 | `__main__.py` | `python -m spritelens` 入口（转发到 `main:main`） |
-| `paths.py` | 数据目录解析（SPRITELENS_DATA_ROOT 可覆盖） |
+| `paths.py` | 数据目录解析（SPRITELENS_DATA_ROOT 可覆盖）+ 打包态资源根（frozen/_MEIPASS） |
 | `main.py` | CLI：--smoke-test / --list-ifaces / --replay / --diagnose-net / --web-browser / 界面启动 |
 | `app_context.py` | **装配根**：管线/库/VM/清理的一次性组装（autostart 在此触发） |
 | `protocol/frames.py` | GCP 21B 大端头切帧、假 magic 同步、FrameStream |
@@ -91,6 +93,7 @@
 | `test_view_models.py` | VM 状态与命令（Capture/Events + 自动采集开关） |
 | `test_architecture.py` | 架构边界：业务层无 Web 依赖、无反向分层、protocol 纯函数约束 |
 | `test_crash_log.py` | 崩溃日志：主线程/后台线程异常落盘、Ctrl+C 不记录、写入失败静默 |
+| `test_paths.py` | 打包态资源定位：源码/frozen/_MEIPASS 三分支、数据目录不受打包影响 |
 | `test_web_server.py` | 本地服务：token 鉴权（REST/WS）、随机端口、宠物/图鉴/采集 API、载荷构造 |
 | `test_environment.py` | Npcap 检测与安装引导状态机 |
 | `test_event_logger.py` | 事件日志落盘与分片 |
