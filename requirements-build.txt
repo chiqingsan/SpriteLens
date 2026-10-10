@@ -1,0 +1,5 @@
+# 打包构建依赖（运行程序本身不需要）。
+# 安装：.venv\Scripts\pip install -r requirements-build.txt
+nuitka>=2.6
+ordered-set>=4.1
+zstandard>=0.23

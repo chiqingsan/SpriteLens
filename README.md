@@ -144,6 +144,34 @@ python tools\run_build_tests.py
 
 协议层测试使用合成帧生成器（`tests/_synth.py`），全链路不依赖游戏客户端。
 
+## 打包（Nuitka）
+
+生成单文件 exe（含静态数据与图标，用户机无需装 Python）：
+
+```powershell
+# 首次先装打包依赖
+.venv\Scripts\pip install -r requirements-build.txt
+
+# 打包（首次会下载 MinGW 编译器，耗时较长）
+.venv\Scripts\python.exe build.py
+# 或双击 build.bat
+
+# 只打印命令不编译
+.venv\Scripts\python.exe build.py --dry-run
+```
+
+产物在 `build\SpriteLens_<版本>.exe`（约 22 MB）。打包选项（含带哪些资源、
+排除哪些库）都在 `build_config.toml` 里改，不写死在脚本中。
+
+> **杀毒软件会干扰打包**：Nuitka 后处理阶段用微软 `rc.exe` 写 exe 图标与
+> 版本信息，产生 `build/RCX*.tmp`。部分杀软（实测火绒）会把该临时文件误报
+> 为病毒并锁住它，导致打包以 `Failed to add resources` 失败。打包前把项目
+> 目录加入杀软白名单，或临时关闭实时防护。产物可用 Windows Defender 独立
+> 复检（本机对 0.1.0 产物零检出）。
+
+用户数据仍写 `%LOCALAPPDATA%\SpriteLens`，与源码运行共用同一份；
+exe 放在哪都不影响配置与历史数据。
+
 ## 文档
 
 - [docs/README.md](docs/README.md) 文档索引（全部文档的阅读顺序与用途）

@@ -45,6 +45,9 @@ wheels/
 # ----- ↑ 以上为 ZCode 默认排除规则（自定义规则请写在本行下方，不会被同步/恢复改动）-----
 # 编辑器/代理工具产物
 .zcode/
+# 打包产物（Nuitka）
+build/
+nuitka-crash-report.xml
 # GUI 截图校验产物（guishot）
 .guishot/
 .guishot_demo.log

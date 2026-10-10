@@ -106,6 +106,12 @@ web（aiohttp/pywebview）；protocol 不反向依赖 services/capture；线程�
   打包器会把整个包目录搬走，这是唯一允许不经过 `project_root()` 的场景
 - **图标**：改设计后跑 `python tools/make_icon.py` 重新生成，
   产物（`resources/app.ico`、`web/static/favicon.png`）随仓库提交
+- **打包**：`build.bat` / `python build.py`（配置在 `build_config.toml`）。
+  **不要排除 scapy 的任何子模块**——scapy 内部动态 import 多，静态排除会
+  在打包产物里才暴露为运行时失败（实测排除 `as_resolvers` 让网卡枚举直接挂）
+- **杀软干扰**：Nuitka 后处理调 `rc.exe` 写图标/版本资源，临时文件
+  `build/RCX*.tmp` 会被部分杀软（火绒实测）误报并锁定，导致
+  `Failed to add resources` 打包失败。打包前给项目目录加白名单
 
 ## 错误处理
 

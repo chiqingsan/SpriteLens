@@ -12,9 +12,11 @@
 | `main.py` | 入口转发到 `spritelens.main:main` |
 | `start.bat` | 双击启动界面（pythonw，无控制台窗口） |
 | `start_debug.bat` | 前台控制台启动（看错误输出用） |
+| `build.bat` + `build.py` + `build_config.toml` | Nuitka 打包（配置驱动；`--dry-run` 只打印命令） |
+| `requirements-build.txt` | 打包依赖（nuitka / ordered-set / zstandard），运行程序不需要 |
 | `tools/create_shortcut.bat` + `ps1` | 创建桌面快捷方式（幂等，ps1 用 $PSScriptRoot 自定位） |
 | `requirements.txt` | scapy / pycryptodome / aiohttp / pywebview（无 UI 框架之外的额外依赖） |
-| `tools/run_build_tests.py` | 全量测试（unittest discover + 噪声过滤） |
+| `tools/run_build_tests.py` | 全量测试（unittest discover） |
 | `tools/import_schema.py` | 导入外部 schema 全集到 data/schemas（本地目录或 GitHub） |
 | `tools/import_static_data.py` | 导入基础静态表（物种/性格/系别/技能）到 data/static |
 | `tools/import_assets.py` | 导入图鉴元数据 + 精灵图 + 系别图标 + 系别克制表 |

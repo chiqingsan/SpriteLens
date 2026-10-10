@@ -1,0 +1,90 @@
+# Nuitka 打包配置（SpriteLens）。
+# 常用命令：
+#   build.bat
+#   build.bat --dry-run
+#   .venv\Scripts\python.exe build.py
+#   .venv\Scripts\python.exe build.py --dry-run
+
+app_name = "SpriteLens"
+product_name = "小洛探探 SpriteLens"
+file_description = "洛克王国：世界 数据观测工具"
+company_name = "SpriteLens"
+
+entry = "main.py"
+
+# 留空时读取 spritelens.__version__。
+version = ""
+file_version = ""
+
+# 打包产物名称模板。可用变量：app_name、version、timestamp。
+output_name_template = "{app_name}_{version}"
+timestamp_format = "%H%M"
+
+# GUI 程序：隐藏控制台窗口。
+windowed = true
+
+# 抓包需要 Npcap 驱动；驱动安装由程序内引导（UAC 提权），
+# exe 本身不请求管理员权限（避免每次启动弹 UAC）。
+uac_admin = false
+
+# 产物形态：单文件 exe（体积换便携）。
+onefile = true
+standalone = true
+
+remove_output = true
+assume_yes_for_downloads = true
+mingw64 = true
+
+show_progress = true
+show_memory = false
+
+output_dir = "build"
+
+icon = "resources/app.ico"
+
+# Nuitka 插件：pywebview 插件是「强制启用」的（standalone 模式自动生效），
+# 不能也不需要手动 --enable-plugin，否则会与其内部决策冲突：
+# Nuitka 自行决定 webview.platforms.* 只收 Windows 相关分支，
+# 若再用 --include-package=webview 强制全收，会报 "Conflict between user
+# and plugin decision for module 'webview.platforms.android'"。
+plugins = []
+
+# pythonnet（clr）由 pywebview 的 Windows 后端动态 import；
+# 显式带上确保运行时能加载 WebView2 程序集。
+include_packages = [
+  "clr_loader",
+]
+
+include_modules = [
+  "clr",
+  "pythonnet",
+]
+
+# 静态资源随包分发。`paths.project_root()` 在冻结态指向 exe 的解包目录，
+# 所以 dest 必须与源码态的相对路径一致（data/、resources/）。
+include_data_dirs = [
+  "data=data",
+  "resources=resources",
+]
+
+# 排除确定用不到的大件，控制体积。
+# 注意：不要排除 scapy 的任何子模块。实测排除 scapy.as_resolvers 后，
+# 打包产物网卡枚举直接失败（"Module was actively excluded"），
+# 而它其实在 scapy.arch.windows 的调用链上——scapy 内部动态 import 多，
+# 静态排除极易误伤，体积收益也不值这个风险。
+nofollow_imports = [
+  "tkinter",
+  "pytest",
+  "IPython",
+  "PyQt5",
+  "PyQt6",
+  "PySide2",
+  "PySide6",
+  "matplotlib",
+  "pandas",
+  "scipy",
+  "notebook",
+]
+
+# 额外原样传给 Nuitka 的参数。
+additional_args = []

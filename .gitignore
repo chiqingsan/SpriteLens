@@ -17,6 +17,10 @@ tests/fixtures/recordings/
 # 编辑器/代理工具产物
 .zcode/
 
+# 打包产物（Nuitka）
+build/
+nuitka-crash-report.xml
+
 # GUI 截图校验产物（guishot）
 .guishot/
 .guishot_demo.log

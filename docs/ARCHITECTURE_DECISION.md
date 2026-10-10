@@ -298,3 +298,37 @@ PyQt6 裁剪+打包后约 30–35 MB（`TAURI_SIZE_EVALUATION.md` §4），
 
 这是一份**决策记录**，不是排期。执行与否、何时执行，由 §5.3 的垂直切片判据决定。
 在此之前，优先级最高的是 §6 的工程前置——成本低、收益确定、不依赖任何架构选择。
+
+---
+
+## 8. 打包（Nuitka，2026-10-11 落地）
+
+**为什么 Nuitka 而非 PyInstaller**：与姊妹项目 meow toolkit 同款工具链，构建
+配置可复用；Nuitka 编译为 C 后启动更快、内存更省。代价是首次构建需下载
+MinGW 编译器，且单次打包约 20 分钟（增量构建快得多）。
+
+**产物**：`build/SpriteLens_0.1.0.exe`，单文件 **22.3 MB**
+（源码态 12MB 是静态数据 + 精灵图 7.2MB，编译后运行时约 15MB）。
+
+**构建入口**：`build.bat` / `build.py`（配置驱动，选项在 `build_config.toml`）：
+
+```powershell
+.venv\Scripts\pip install -r requirements-build.txt   # 一次性
+.venv\Scripts\python.exe build.py                     # 打包
+.venv\Scripts\python.exe build.py --dry-run           # 只看命令
+```
+
+**打包踩坑记录**（都是实测，改配置前务必先读）：
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| `Conflict between user and plugin decision for module 'webview.platforms.android'` | Nuitka 4.x 内置 `pywebview` 插件且**强制启用**，自行决定只收 Windows 平台分支；手动 `--enable-plugin=pywebview` 或 `--include-package=webview` 都会与之冲突 | 两者都不加，交给插件自动处理 |
+| exe 里网卡枚举失败：`Module 'scapy.as_resolvers' was actively excluded` | 曾把 `scapy.as_resolvers` 当无用模块排除，实际它在 `scapy.arch.windows` 的调用链上（scapy 动态 import 多，静态排除极易误伤） | **不要排除 scapy 任何子模块** |
+| 资源（`data/`、`resources/`）在 exe 内定位不到 | 冻结态 `project_root()` 需指向解包目录 | 已由 `paths.project_root()` 的 `_MEIPASS` 分支处理，`include_data_dirs` 的 dest 保持与源码态相对路径一致 |
+| `Failed to add resources to file ...exe`（重试 5 次后失败） | **杀毒软件实时扫描锁住 Nuitka 后处理写入的临时文件**；本机火绒会报 `build/RCX*.tmp` 为病毒。`RCX*.tmp` 是微软 `rc.exe` 资源编译器的标准临时文件，用于给 exe 写入图标与版本信息——属**误报** | 打包前给项目目录加杀软白名单；或临时关闭实时防护。成品可用 `Start-MpScan` 独立复检：本机 Defender 对产物零检出 |
+
+**产物指纹**（0.1.0，供比对）：22.3 MB，
+SHA256 `178581d050796bd7bbe90373700efa6a1276ce77d2444a474203fa2bde352576`。
+
+**尚未做**：主程序体积/冷启动的正式实测（§5.3 判据：≤60MB / ≤1.5s）——
+22.3MB 已满足体积判据，冷启动待正式计时。
