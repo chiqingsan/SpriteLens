@@ -26,17 +26,28 @@ WEBVIEW2_HINT = (
     "请安装 Microsoft Edge WebView2 Runtime 后重试：\n"
     "https://developer.microsoft.com/microsoft-edge/webview2/"
 )
+# 与前端 index.html 启动遮罩同款配色（.startup 渐变起始色）
+SPLASH_BG = "#074f5d"
 
 
 def run_web(*, open_browser: bool = False) -> int:
     """启动 Web 界面；返回进程退出码。"""
     setup_logger(logs_dir())
+    _enable_dpi_awareness()
 
     guard = SingleInstanceGuard()
     if not guard.acquire():
         notified = guard.notify_existing()
         logger.info("检测到已有实例在运行（唤醒已有窗口=%s），本次启动退出", notified)
         return 0
+
+    # 开壳前预检测 WebView2：缺失时弹原生对话框引导安装，避免白屏式失败
+    from spritelens.system.webview_guard import ensure_webview2
+
+    if not ensure_webview2(logs_dir()):
+        logger.warning("WebView2 不可用，已按用户选择退出")
+        guard.close()
+        return 1
 
     context = build_app_context()
     server = LocalServer(context)
@@ -82,9 +93,34 @@ def _fatal(title: str, message: str) -> None:
         pass
 
 
+def _enable_dpi_awareness() -> None:
+    """声明 DPI 感知，高分屏按真实分辨率渲染（三级降级，Win8.1 起全覆盖）。"""
+    import ctypes
+
+    try:
+        user32 = ctypes.windll.user32
+        if hasattr(user32, "SetProcessDpiAwarenessContext"):
+            # DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+            if user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4)):
+                return
+        shcore = ctypes.windll.shcore
+        shcore.SetProcessDpiAwareness(2)  # PER_MONITOR_DPI_AWARE
+        return
+    except Exception:  # noqa: BLE001 - 旧系统无此 API
+        pass
+    try:
+        ctypes.windll.user32.SetProcessDPIAware()
+    except Exception as exc:  # noqa: BLE001 - 全部失败则保持系统默认
+        logger.debug("DPI 感知声明失败: %s", exc)
+
+
 def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> None:
     """开 pywebview 窗口并阻塞到用户关闭它。"""
     import webview
+
+    from spritelens.system.window_geometry import initial_window_size
+
+    width, height = initial_window_size()
 
     # 唤醒句柄交给 WebView2 的窗口做前台置顶（重复启动时）
     activation_handle = guard.create_activation_event()
@@ -92,10 +128,12 @@ def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> None:
     window = webview.create_window(
         WINDOW_TITLE,
         server.url,
-        width=1440,
-        height=900,
+        width=width,
+        height=height,
         min_size=(1024, 640),
         text_select=True,
+        # WebView2 渲染前的空窗默认白色；用启动页同款深青色，消除白屏观感
+        background_color=SPLASH_BG,
     )
 
     if activation_handle:

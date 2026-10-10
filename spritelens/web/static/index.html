@@ -10,7 +10,8 @@
 <body>
   <div id="startup" class="startup" role="status" aria-live="polite">
     <strong>小洛探探 SpriteLens</strong>
-    <p>正在启动…</p>
+    <p data-startup-message>正在启动…</p>
+    <button type="button" hidden onclick="window.location.reload()">重新加载</button>
   </div>
 
   <div id="app" class="app-shell" hidden>
@@ -28,22 +29,73 @@
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v7H3ZM14 3h7v7h-7ZM3 14h7v7H3ZM14 14h7v7h-7Z"/></svg>
           概览
         </button>
-        <button class="nav-item" data-page="pets">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6V4h8v2M6 6h12l2 5v9H4v-9ZM8 13h8v5H8Z"/></svg>
-          宠物仓库
-        </button>
-        <button class="nav-item" data-page="handbook">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18H5ZM9 7h6M9 11h6M9 15h4"/></svg>
-          精灵图鉴
-        </button>
-        <button class="nav-item" data-page="events">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
-          协议流
-        </button>
-        <button class="nav-item" data-page="capture">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9M12 7v5l3 3M17.5 3.5 21 7l-3.5 3.5"/></svg>
-          采集与设置
-        </button>
+        <div class="nav-group" data-nav-group="collection">
+          <div class="nav-group-title">仓库与图鉴</div>
+          <button class="nav-item nav-subitem" data-page="pets">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6V4h8v2M6 6h12l2 5v9H4v-9ZM8 13h8v5H8Z"/></svg>
+            精灵背包
+          </button>
+          <button class="nav-item nav-subitem" data-page="handbook">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18H5ZM9 7h6M9 11h6M9 15h4"/></svg>
+            精灵图鉴
+          </button>
+          <button class="nav-item nav-subitem" data-page="egg-dex">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18H5ZM15 13a3 3 0 0 1-6 0c0-2 2-5 3-5s3 3 3 5Z"/></svg>
+            蛋图鉴
+          </button>
+        </div>
+        <div class="nav-group" data-nav-group="breeding">
+          <div class="nav-group-title">孵蛋工具</div>
+          <button class="nav-item nav-subitem" data-page="egg-box">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 15a8 8 0 0 1-16 0C4 9 9 3 12 3s8 6 8 12ZM7 14h10"/></svg>
+            蛋蛋仓库
+          </button>
+          <button class="nav-item nav-subitem" data-page="male-matrix">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v7H3ZM14 3h7v7h-7ZM3 14h7v7H3ZM14 14h7v7h-7Z"/></svg>
+            种公阵列
+          </button>
+          <button class="nav-item nav-subitem" data-page="breeder-library">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h7l2 2 2-2h7v16h-7l-2 1-2-1H3ZM12 6v15"/></svg>
+            种公母库
+          </button>
+          <button class="nav-item nav-subitem" data-page="planner">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v5M5 21v-5h14v5M12 12v9M7 8h10v4H7Z"/></svg>
+            智能配窝
+          </button>
+          <button class="nav-item nav-subitem" data-page="collection-lines">
+            <span class="nav-icon nav-icon-text" aria-hidden="true">▦</span>
+            产线收集
+          </button>
+        </div>
+        <div class="nav-group" data-nav-group="home">
+          <div class="nav-group-title">家园信息</div>
+          <button class="nav-item nav-subitem" data-page="home">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-7h6v7"/></svg>
+            我的家园
+          </button>
+        </div>
+        <div class="nav-group" data-nav-group="colors">
+          <div class="nav-group-title">炫彩</div>
+          <button class="nav-item nav-subitem" data-page="colors">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5ZM3 12l9 5 9-5M3 16l9 5 9-5"/></svg>
+            炫彩色卡
+          </button>
+          <button class="nav-item nav-subitem" data-page="flowers">
+            <span class="nav-icon nav-icon-text" aria-hidden="true">❀</span>
+            炫彩花种
+          </button>
+        </div>
+        <div class="nav-group" data-nav-group="system">
+          <div class="nav-group-title">系统</div>
+          <button class="nav-item nav-subitem" data-page="events">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+            协议流
+          </button>
+          <button class="nav-item nav-subitem" data-page="capture">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9M12 7v5l3 3M17.5 3.5 21 7l-3.5 3.5"/></svg>
+            采集与设置
+          </button>
+        </div>
       </nav>
       <div class="sidebar-foot">
         <span class="privacy-dot"></span>
@@ -105,7 +157,7 @@
         </div>
       </section>
 
-      <!-- 宠物仓库 -->
+      <!-- 精灵背包（宠物仓库） -->
       <section id="page-pets" class="page">
         <div class="workspace split">
           <aside class="filter-rail" id="pet-filters">
@@ -211,6 +263,52 @@
         </div>
       </section>
 
+      <!-- 蛋图鉴 -->
+      <section id="page-egg-dex" class="page">
+        <div class="workspace split">
+          <section class="content-panel">
+            <div class="panel-toolbar">
+              <span id="ed-count" class="count-badge">收录 0 种蛋</span>
+              <label class="inline-field">搜索
+                <input id="ed-search" type="text" placeholder="名字 / 蛋编号">
+              </label>
+              <label class="inline-field">蛋组
+                <select id="ed-group"></select>
+              </label>
+              <label class="inline-field">类型
+                <select id="ed-type"></select>
+              </label>
+              <label class="inline-field">孵化时长
+                <select id="ed-hatch">
+                  <option value="">全部</option>
+                  <option value="8">≤ 8 小时</option>
+                  <option value="12">≤ 12 小时</option>
+                  <option value="16">≤ 16 小时</option>
+                  <option value="20">≤ 20 小时</option>
+                </select>
+              </label>
+            </div>
+            <div class="table-wrap">
+              <div id="ed-grid" class="hb-grid eggdex-grid"></div>
+              <div id="ed-empty" class="empty-hint" hidden>没有符合筛选条件的蛋</div>
+            </div>
+          </section>
+          <aside id="ed-detail" class="detail-panel">
+            <div class="empty-hint">点击蛋卡片查看孵化详情</div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- 待实现页面（对标蛋神助手对应页，随协议数据域逐批开放） -->
+      <section id="page-egg-box" class="page feature-page"><div class="feature-page-root" data-feature="蛋蛋仓库" data-hint="需要采集到蛋仓快照协议帧（0x… 蛋仓域）后自动积累数据"></div></section>
+      <section id="page-male-matrix" class="page feature-page"><div class="feature-page-root" data-feature="种公阵列" data-hint="基于宠物库与性格×蛋组覆盖矩阵，静态数据就绪后开放"></div></section>
+      <section id="page-breeder-library" class="page feature-page"><div class="feature-page-root" data-feature="种公母库" data-hint="基于宠物库按配种价值分组，随孵蛋工具链一起开放"></div></section>
+      <section id="page-planner" class="page feature-page"><div class="feature-page-root" data-feature="智能配窝" data-hint="需要家园场景与繁育范围协议帧"></div></section>
+      <section id="page-collection-lines" class="page feature-page"><div class="feature-page-root" data-feature="产线收集" data-hint="需要蛋仓与孵化事件的长期积累"></div></section>
+      <section id="page-home" class="page feature-page"><div class="feature-page-root" data-feature="我的家园" data-hint="需要家园场景协议帧（居民 / 家具 / 产蛋窝）"></div></section>
+      <section id="page-colors" class="page feature-page"><div class="feature-page-root" data-feature="炫彩色卡" data-hint="需要玻璃（glass）信息协议帧"></div></section>
+      <section id="page-flowers" class="page feature-page"><div class="feature-page-root" data-feature="炫彩花种" data-hint="需要花种协议帧与花种等级静态表"></div></section>
+
       <!-- 协议流 -->
       <section id="page-events" class="page">
         <div class="workspace split">
@@ -301,7 +399,9 @@
     </main>
   </div>
 
+  <div id="modal-layer" class="modal-layer" aria-hidden="true"></div>
   <div id="toast-layer" class="toast-layer"></div>
+  <script src="/static/boot.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

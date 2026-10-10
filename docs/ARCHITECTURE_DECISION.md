@@ -336,5 +336,20 @@ MinGW 编译器，且单次打包约 20 分钟（增量构建快得多）。
 **产物指纹**（0.1.0，供比对）：26.4 MB，
 SHA256 见 `build/SpriteLens_0.1.0.exe` 现状（每次构建会变）。
 
+### §8.1 启动体验（2026-10-11）
+
+用户实测反馈三个问题，根因与修复：
+
+| 现象 | 根因（实测数据） | 修复 |
+|---|---|---|
+| 启动弹黑色控制台窗口 | 窗口子系统的 GUI 进程调 `subprocess` 会给子进程分配新控制台——启动路径上的 RSC 检测每次启动都跑一次 PowerShell（实测 1.8s，黑窗一闪 1.8s） | `environment.py::_no_window_kwargs`：所有子进程调用带 `STARTUPINFO(SW_HIDE)` + `CREATE_NO_WINDOW` |
+| 启动慢（双击后 ~4.4s 才见窗口） | RSC 检测同步阻塞在装配路径（占 1.8s）；onefile 每次解包 ~2.2s 是硬底 | `check_npcap(quick=True)` 毫秒级先拿 installed 结论（autostart 不等探测），RSC 结果由后台探测线程异步补齐，经 WS 推送刷新横幅 |
+| 窗口出现后先白屏再出内容 | WebView2 渲染前的空窗默认白色，与前端深青启动遮罩（`#074f5d→#053b48`）形成割裂 | `create_window(background_color=SPLASH_BG)`，空窗与遮罩同色，视觉无缝 |
+
+测试基线变化：构造 `CaptureViewModel` 不再同步跑 PowerShell——测试套件
+20s → 4.3s；`probe_environment=False` 可关闭后台探测（测试注入用），
+`environment_probe` 参数可注入假探针。
+
 **尚未做**：主程序体积/冷启动的正式实测（§5.3 判据：≤60MB / ≤1.5s）——
-22.3MB 已满足体积判据，冷启动待正式计时。
+26.4MB 已满足体积判据，冷启动待正式计时（§5.3 的 1.5s 不含 onefile 解包，
+如需达标可改 standalone 目录分发）。

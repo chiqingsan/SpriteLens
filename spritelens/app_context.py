@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from spritelens.capture.key_store import KeyStore
+from spritelens.domain.eggs import EggCatalog
 from spritelens.domain.static_data import StaticData, load_static_data
 from spritelens.logs import get_logger
 from spritelens.paths import (
@@ -53,6 +54,7 @@ class AppContext:
     pet_vm: PetViewModel
     pet_store: PetStore | None = None
     event_log: EventLogWriter | None = None
+    egg_catalog: EggCatalog | None = None  # 蛋目录（缺失时蛋相关页面降级）
 
     def close(self) -> None:
         """停监听、落盘、关日志（幂等；退出路径唯一）。"""
@@ -76,6 +78,7 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
     settings = SettingsRepository(config_path())
     load_library(schema_dir())
     static_data = load_static_data(static_dir())
+    egg_catalog = EggCatalog(static_dir())
 
     # 启动即恢复上次捕获的会话密钥：连接未重连时（AES 无跨包状态）可立即续解
     key_store = KeyStore(keys_dir())
@@ -118,6 +121,7 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
         pet_vm=pet_vm,
         pet_store=pet_store,
         event_log=event_log,
+        egg_catalog=egg_catalog,
     )
     if autostart and capture_vm.start_if_autostart():
         logger.info("已自动开始采集（可在采集页关闭「打开即采集」）")

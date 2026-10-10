@@ -260,7 +260,69 @@ def handbook_payload(
     }
 
 
+def egg_dex_payload(
+    catalog,
+    *,
+    search: str = "",
+    group: str = "",
+    egg_type: str = "",
+    hatch_min_hours: int = 0,
+) -> dict:
+    """蛋图鉴载荷：蛋目录静态数据 + 可选筛选（搜索/蛋组/蛋类型/孵化时长下限）。"""
+    entries = catalog.entries() if catalog is not None else ()
+    keyword = search.strip().lower()
+    rows: list[dict] = []
+    for info in entries:
+        if keyword and keyword not in info.name_key.lower() and keyword not in str(info.egg_conf_id):
+            continue
+        if group and group not in info.egg_group_names:
+            continue
+        if egg_type and info.egg_type_name != egg_type:
+            continue
+        if hatch_min_hours and info.hatch_seconds < hatch_min_hours * 3600:
+            continue
+        rows.append(
+            {
+                "egg_conf_id": info.egg_conf_id,
+                "egg_name": info.egg_name,
+                "name": info.name,
+                "base_id": info.base_id,
+                "icon_url": species_icon_url(info.base_id) if info.base_id else "",
+                "handbook_no": info.handbook_no,
+                "dex_no": info.dex_no,
+                "egg_type_name": info.egg_type_name,
+                "hatch_label": info.hatch_label,
+                "hatch_seconds": info.hatch_seconds,
+                "egg_group_names": list(info.egg_group_names),
+                "gender_male": info.gender_male,
+                "gender_female": info.gender_female,
+                "gender_ratio_text": (
+                    f"♂{info.gender_male}% / ♀{info.gender_female}%"
+                    if info.gender_male or info.gender_female
+                    else "暂无"
+                ),
+                "height": [info.height_low, info.height_high],
+                "weight": [info.weight_low, info.weight_high],
+                "chain": list(info.chain_members),
+            }
+        )
+    return {
+        "eggs": rows,
+        "total": len(entries),
+        "shown": len(rows),
+        "groups": list(catalog.group_names()) if catalog is not None else [],
+        "egg_types": list(catalog.type_names()) if catalog is not None else [],
+        "filters": {
+            "search": search,
+            "group": group,
+            "egg_type": egg_type,
+            "hatch_min_hours": hatch_min_hours,
+        },
+    }
+
+
 __all__ = [
+    "egg_dex_payload",
     "handbook_payload",
     "overview_payload",
     "pet_row",

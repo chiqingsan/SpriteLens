@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from spritelens.app_context import AppContext
 from spritelens.capture.key_store import KeyStore
+from spritelens.domain.eggs import EggCatalog
 from spritelens.domain.identity import PlayerIdentity
 from spritelens.domain.pets import Pet, PetAttribute, PetSkill
 from spritelens.domain.static_data import load_static_data
@@ -96,6 +97,7 @@ def build_demo_context(tmp: Path, count: int) -> AppContext:
         capture_vm=capture_vm,
         events_vm=EventsViewModel(monitor=monitor),
         pet_vm=PetViewModel(repository, static_data=static),
+        egg_catalog=EggCatalog(static_dir()),
     )
 
 

@@ -52,6 +52,26 @@ class CheckNpcapTest(unittest.TestCase):
             report = check_npcap(search_paths=(str(first), str(second)), check_rsc=lambda: (False, ""))
         self.assertEqual(report.wpcap_path, str(first))
 
+    def test_quick_check_skips_rsc_probe(self):
+        """quick 模式只查驱动文件（毫秒级），绝不触发 RSC 的 PowerShell 探活。
+
+        这是启动路径的契约：探测线程据此异步补 RSC，检查自身不能阻塞。
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = Path(tmp) / "wpcap.dll"
+            fake.write_bytes(b"MZ")
+            calls: list[int] = []
+
+            def _forbidden() -> tuple[bool, str]:
+                calls.append(1)
+                return (True, "WLAN")
+
+            report = check_npcap(search_paths=(str(fake),), check_rsc=_forbidden, quick=True)
+        self.assertTrue(report.installed)
+        self.assertFalse(report.rsc_enabled)  # 未探测，占位默认
+        self.assertIn("RSC", report.message)  # 文案告知检查进行中
+        self.assertEqual(calls, [], "quick 模式不得调用 RSC 探测")
+
 
 class ParseDistPageTest(unittest.TestCase):
     def test_latest_version_selected(self):

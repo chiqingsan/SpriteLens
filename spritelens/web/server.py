@@ -28,6 +28,7 @@ from aiohttp import WSMsgType, web
 from spritelens.app_context import AppContext
 from spritelens.logs import get_logger
 from spritelens.web.payloads import (
+    egg_dex_payload,
     handbook_payload,
     overview_payload,
     pets_payload,
@@ -187,6 +188,7 @@ class LocalServer:
         app.router.add_get("/api/pets", self._api_pets)
         app.router.add_post("/api/pets/clear", self._api_pets_clear)
         app.router.add_get("/api/handbook", self._api_handbook)
+        app.router.add_get("/api/eggs", self._api_eggs)
         app.router.add_get("/api/events", self._api_events)
         app.router.add_get("/api/events/detail", self._api_event_detail)
         app.router.add_get("/api/capture", self._api_capture)
@@ -320,6 +322,18 @@ class LocalServer:
             )
         )
 
+    async def _api_eggs(self, request: web.Request) -> web.Response:
+        query = request.query
+        return web.json_response(
+            egg_dex_payload(
+                self._context.egg_catalog,
+                search=query.get("search", ""),
+                group=query.get("group", ""),
+                egg_type=query.get("egg_type", ""),
+                hatch_min_hours=_as_int(query.get("hatch_min_hours"), 0),
+            )
+        )
+
     async def _api_events(self, request: web.Request) -> web.Response:
         vm = self._context.events_vm
         rows = [
@@ -345,6 +359,10 @@ class LocalServer:
 
     async def _api_capture_ifaces(self, request: web.Request) -> web.Response:
         ifaces = await asyncio.to_thread(self._context.capture_vm.refresh_ifaces)
+        # 活跃网卡排前面（PowerShell 查询在开销时执行；失败则保持原序）
+        from spritelens.capture.nic_rank import rank_ifaces
+
+        ifaces = await asyncio.to_thread(rank_ifaces, list(ifaces))
         return web.json_response(
             {"ifaces": [{"name": name, "description": desc} for name, desc in ifaces]}
         )
@@ -403,11 +421,20 @@ class LocalServer:
         return data if isinstance(data, dict) else {}
 
     # -- 状态与推送 ----------------------------------------------------
+    def _environment_payload(self) -> dict:
+        """环境报告 → JSON（/api/capture 与 WS state 推送共用一份契约）。"""
+        report = self._context.capture_vm.environment_report()
+        return {
+            "installed": report.installed,
+            "message": report.message,
+            "rsc_enabled": report.rsc_enabled,
+            "rsc_adapter": report.rsc_adapter,
+        }
+
     def _capture_payload(self) -> dict:
         ctx = self._context
         vm = ctx.capture_vm
         snapshot = vm.snapshot()
-        report = vm.environment_report()
         install = vm.install_state()
         return {
             "running": snapshot.running,
@@ -433,12 +460,7 @@ class LocalServer:
                 {"session_id": s.session_id, "has_key": s.has_key, "data_frames": s.data_frames}
                 for s in snapshot.sessions
             ],
-            "environment": {
-                "installed": report.installed,
-                "message": report.message,
-                "rsc_enabled": report.rsc_enabled,
-                "rsc_adapter": report.rsc_adapter,
-            },
+            "environment": self._environment_payload(),
             "install": {
                 "phase": install.phase,
                 "message": install.message,
@@ -480,6 +502,9 @@ class LocalServer:
                 "decrypt_ok": capture.totals.decrypt_ok,
                 "raw_chunks": capture.totals.raw_chunks,
             },
+            # 环境探测在启动路径上异步进行（RSC 检查约 1.8s）；
+            # 探测完成后 report 变化 → 此载荷变化 → WS 推送 → 横幅自动刷新
+            "environment": self._environment_payload(),
         }
 
     async def _push_loop(self) -> None:

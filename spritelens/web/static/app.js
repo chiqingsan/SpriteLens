@@ -30,7 +30,8 @@
     return fetch(path, {
       method: opts.method || "GET",
       headers: headers,
-      body: opts.body === undefined ? undefined : JSON.stringify(opts.body)
+      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+      signal: opts.signal
     }).then(function (response) {
       if (!response.ok) {
         return response.json().catch(function () { return {}; }).then(function (data) {
@@ -121,6 +122,7 @@
     });
     if (name === "pets") { loadPets(); }
     if (name === "handbook") { loadHandbook(); }
+    if (name === "egg-dex") { loadEggDex(); }
     if (name === "events") { loadEvents(); }
     if (name === "capture") { loadCapture(); }
     if (name === "overview") { loadOverview(); }
@@ -261,6 +263,7 @@
     }
 
     if (state.page === "capture") { renderCaptureSummary(payload.capture || {}); }
+    if (payload.environment) { renderEnvBanner(payload.environment); }
     var version = payload.pets_version;
     if (version !== undefined && version !== state._petsVersion) {
       state._petsVersion = version;
@@ -903,10 +906,10 @@
   }
 
   /* ---------- 采集与设置 ---------- */
-  function renderCapture(payload) {
-    state.capture = payload;
-    var env = payload.environment || {};
-    // 横幅语义：仅在「未装 Npcap」或「RSC 开启」时显示
+  // 横幅语义：仅在「未装 Npcap」或「RSC 开启」时显示。
+  // 环境探测异步进行，WS state 载荷里也带 environment，探测完成后横幅自动刷新。
+  function renderEnvBanner(env) {
+    env = env || {};
     var rscIssue = !!env.rsc_enabled;
     var needBanner = !env.installed || rscIssue;
     $("npcap-banner").hidden = !needBanner;
@@ -915,6 +918,11 @@
     // 按钮可见性按问题类型区分（RSC 只能装完 Npcap 后处理）
     $("btn-npcap-install").hidden = !!env.installed;
     $("btn-rsc").hidden = !(env.installed && rscIssue);
+  }
+
+  function renderCapture(payload) {
+    state.capture = payload;
+    renderEnvBanner(payload.environment);
 
     renderInstallProgress(payload.install || {});
     $("c-record").checked = !!payload.recording_requested;
@@ -1078,9 +1086,156 @@
     socket.onerror = function () { try { socket.close(); } catch (e) {} };
   }
 
-  /* ---------- 启动 ---------- */
-  function boot() {
-    api("/api/bootstrap").then(function (payload) {
+  /* ---------- 蛋图鉴 ---------- */
+  var eggDexState = { search: "", group: "", egg_type: "", hatch_min_hours: "", built: false, data: null, selected: null };
+
+  /* 蛋卡头像：立绘覆盖首字，加载失败移除 img 露出首字（与图鉴同约定） */
+  function eggAvatarHtml(egg) {
+    var img = egg.icon_url
+      ? '<img src="' + esc(egg.icon_url) + '" alt="" loading="lazy" onerror="this.remove()">'
+      : "";
+    return '<span class="hb-art">' + esc((egg.name || "?").slice(0, 1)) + img + "</span>";
+  }
+
+  function hatchSecondsLabel(seconds) {
+    if (!seconds) { return "—"; }
+    if (seconds < 3600) { return Math.round(seconds / 60) + " 分钟"; }
+    var hours = seconds / 3600;
+    return (hours % 1 === 0 ? hours : hours.toFixed(1)) + " 小时";
+  }
+
+  function loadEggDex() {
+    api("/api/eggs" + query({
+      search: eggDexState.search,
+      group: eggDexState.group,
+      egg_type: eggDexState.egg_type,
+      hatch_min_hours: eggDexState.hatch_min_hours
+    })).then(function (payload) {
+      eggDexState.data = payload;
+      renderEggDex(payload);
+    }).catch(function (err) { toast("蛋图鉴加载失败：" + err.message, true); });
+  }
+
+  function renderEggDex(payload) {
+    if (!eggDexState.built) {
+      eggDexState.built = true;
+      $("ed-group").innerHTML = '<option value="">全部蛋组</option>'
+        + (payload.groups || []).map(function (name) {
+            return '<option value="' + esc(name) + '">' + esc(name) + "</option>";
+          }).join("");
+      $("ed-type").innerHTML = '<option value="">全部类型</option>'
+        + (payload.egg_types || []).map(function (name) {
+            return '<option value="' + esc(name) + '">' + esc(name) + "</option>";
+          }).join("");
+    }
+    $("ed-count").textContent = "收录 " + (payload.shown || 0) + " / " + (payload.total || 0) + " 种蛋";
+    $("ed-grid").innerHTML = (payload.eggs || []).map(function (egg) {
+      var groups = (egg.egg_group_names || []).map(function (g) {
+        return '<span class="skill-chip">' + esc(g) + "</span>";
+      }).join(" ");
+      return '<article class="hb-card' + (eggDexState.selected === egg.egg_conf_id ? " active" : "")
+        + '" data-egg="' + egg.egg_conf_id + '">'
+        + '<div class="hb-head"><span class="hb-key">' + esc(egg.handbook_no || "—") + "</span>"
+        + eggAvatarHtml(egg)
+        + "<div><strong>" + esc(egg.egg_name) + "</strong>"
+        + "<small>" + esc(egg.name) + "</small></div></div>"
+        + '<div class="hb-meta">' + (groups || '<span class="muted">—</span>') + "</div>"
+        + '<span class="hb-badge">⏱ ' + esc(egg.hatch_label || "—") + "</span>"
+        + "</article>";
+    }).join("");
+    $("ed-empty").hidden = (payload.eggs || []).length > 0;
+    if (eggDexState.selected !== null) { renderEggDetail(eggDexState.selected); }
+  }
+
+  function renderEggDetail(eggConfId) {
+    var eggs = (eggDexState.data || {}).eggs || [];
+    var egg = null;
+    for (var i = 0; i < eggs.length; i++) {
+      if (eggs[i].egg_conf_id === eggConfId) { egg = eggs[i]; break; }
+    }
+    var panel = $("ed-detail");
+    document.querySelectorAll("#ed-grid [data-egg]").forEach(function (node) {
+      node.classList.toggle("active", Number(node.dataset.egg) === Number(eggConfId));
+    });
+    if (!egg) { panel.innerHTML = '<div class="empty-hint">蛋数据不存在</div>'; return; }
+
+    var seconds = egg.hatch_seconds || 0;
+    var speedRows = [["原始", seconds], ["5 倍速", seconds / 5], ["6 倍速", seconds / 6], ["30 倍速", seconds / 30]]
+      .map(function (row) {
+        return '<div class="speed-row"><span>' + row[0] + '</span><b>' + hatchSecondsLabel(row[1]) + "</b></div>";
+      }).join("");
+    var male = egg.gender_male || 0, female = egg.gender_female || 0;
+    var ring = (male || female)
+      ? '<div class="gender-ring" style="background:conic-gradient(var(--male-strong) 0 ' + male + "%, var(--female-strong) " + male + '% 100%)"><b>'
+        + (male ? "♂ " + male + "%" : "♀ " + female + "%") + "</b></div>"
+      : '<div class="gender-ring unknown"><b>暂无数据</b></div>';
+    var chain = (egg.chain || []).map(function (baseId) {
+      var member = null;
+      for (var j = 0; j < eggs.length; j++) {
+        if (eggs[j].base_id === baseId) { member = eggs[j]; break; }
+      }
+      return '<span class="skill-chip">' + esc(member ? member.name : "#" + baseId) + "</span>";
+    }).join('<span class="chain-arrow">→</span>');
+    var height = egg.height || [0, 0], weight = egg.weight || [0, 0];
+
+    panel.innerHTML =
+      '<div class="detail-title"><h2>' + esc(egg.egg_name) + "</h2>"
+      + '<span class="muted">#' + esc(egg.egg_conf_id) + "</span></div>"
+      + '<div class="detail-sub">' + esc(egg.name)
+      + (egg.handbook_no ? " · 图鉴号 " + esc(egg.handbook_no) : "")
+      + " · " + esc(egg.egg_type_name || "普通") + "</div>"
+      + '<div class="detail-section"><h3>孵化时长</h3>' + speedRows + "</div>"
+      + '<div class="detail-section"><h3>公母比例</h3>' + ring + "</div>"
+      + '<div class="detail-section"><h3>身高 / 体重区间</h3><div class="info-line">'
+      + "身高 " + height[0] + " – " + height[1] + " dm · 体重 " + weight[0] + " – " + weight[1] + " g</div></div>"
+      + '<div class="detail-section"><h3>进化链</h3><div class="skill-list">'
+      + (chain || '<span class="muted">—</span>') + "</div></div>";
+  }
+
+  function bindEggDexFilters() {
+    var debounced = null;
+    $("ed-search").addEventListener("input", function (event) {
+      eggDexState.search = event.target.value.trim();
+      clearTimeout(debounced);
+      debounced = setTimeout(loadEggDex, 220);
+    });
+    $("ed-group").addEventListener("change", function (event) {
+      eggDexState.group = event.target.value; loadEggDex();
+    });
+    $("ed-type").addEventListener("change", function (event) {
+      eggDexState.egg_type = event.target.value; loadEggDex();
+    });
+    $("ed-hatch").addEventListener("change", function (event) {
+      eggDexState.hatch_min_hours = event.target.value; loadEggDex();
+    });
+    $("ed-grid").addEventListener("click", function (event) {
+      var card = event.target.closest("[data-egg]");
+      if (!card) { return; }
+      eggDexState.selected = Number(card.dataset.egg);
+      renderEggDetail(eggDexState.selected);
+    });
+  }
+
+  /* ---------- 待实现页占位 ---------- */
+  function renderFeaturePlaceholders() {
+    document.querySelectorAll(".feature-page-root").forEach(function (root) {
+      var feature = root.dataset.feature || "功能";
+      var hint = root.dataset.hint || "协议数据域就绪后开放";
+      root.innerHTML = '<div class="feature-placeholder"><strong>' + esc(feature) + '</strong>'
+        + '<p>' + esc(hint) + '</p>'
+        + '<span class="muted">该页面对标蛋神助手本地功能，随协议帧解析逐批开放</span></div>';
+    });
+  }
+
+  /* ---------- 启动（15s 超时 + 自动重试 2 次，与自恢复链协同） ---------- */
+  var BOOT_RETRIES = 2;
+
+  function bootAttempt(remaining) {
+    var controller = ("AbortController" in window) ? new AbortController() : null;
+    var timer = controller ? setTimeout(function () { controller.abort(); }, 15000) : null;
+    api("/api/bootstrap", { signal: controller ? controller.signal : undefined }).then(function (payload) {
+      if (timer) { clearTimeout(timer); }
+      if (window.__spritelensBoot) { window.__spritelensBoot.ready(); }
       $("startup").hidden = true;
       $("app").hidden = false;
       renderOverview(payload.overview || {});
@@ -1091,15 +1246,29 @@
       renderPets(payload.pets || {});
       renderCapture(payload.capture || {});
       renderState(payload.state || {});
+      renderFeaturePlaceholders();
       bindPetFilters();
       bindHandbookFilters();
+      bindEggDexFilters();
       bindCaptureActions();
       loadIfaces();
       connectPush();
     }).catch(function (err) {
-      $("startup").innerHTML = "<strong>小洛探探 SpriteLens</strong><p>启动失败：" + esc(err.message)
+      if (timer) { clearTimeout(timer); }
+      if (remaining > 0) {
+        setTimeout(function () { bootAttempt(remaining - 1); }, 2000);
+        if (window.__spritelensBoot) { window.__spritelensBoot.message("连接本地服务失败，正在重试（剩余 " + remaining + " 次）…"); }
+        return;
+      }
+      var reason = err.name === "AbortError" ? "请求超时" : err.message;
+      if (window.__spritelensBoot) { window.__spritelensBoot.failed(reason); return; }
+      $("startup").innerHTML = "<strong>小洛探探 SpriteLens</strong><p>启动失败：" + esc(reason)
         + "</p><p>请重启程序；若持续失败请查看日志目录。</p>";
     });
+  }
+
+  function boot() {
+    bootAttempt(BOOT_RETRIES);
   }
 
   if (document.readyState === "loading") {

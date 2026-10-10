@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -85,6 +86,8 @@ class CaptureViewModel:
         resolver=None,
         downloader=None,
         launcher=None,
+        environment_probe: Callable[[], NpcapReport] | None = None,
+        probe_environment: bool = True,
     ) -> None:
         self._monitor = monitor
         self._settings = settings
@@ -100,8 +103,9 @@ class CaptureViewModel:
         self._ifaces: list[tuple[str, str]] = []
         self._last_error = ""
         self._preset_key: bytes | None = None
-        # Npcap 环境检测（构造时一次，安装后可 refresh_environment 重测）
-        self._npcap_report = check_npcap()
+        # 快速检查（毫秒级）：只查驱动文件存在性，installed 立即可用，
+        # autostart 不必等探测；RSC 检查（PowerShell 实测约 1.8s）随后异步补齐。
+        self._npcap_report = check_npcap(quick=True)
         self._install_phase = "idle"
         self._install_message = ""
         self._install_progress: float | None = None
@@ -120,6 +124,28 @@ class CaptureViewModel:
         self._resolver = resolver or resolve_latest_installer
         self._downloader = downloader or download_installer
         self._launcher = launcher or launch_installer
+        self._environment_probe = environment_probe or check_npcap
+        if probe_environment:
+            threading.Thread(
+                target=self._probe_environment,
+                args=(self._environment_probe,),
+                name="npcap-probe",
+                daemon=True,
+            ).start()
+
+    # -- 环境探测 --------------------------------------------------------
+    def _probe_environment(self, probe) -> None:
+        """后台执行完整环境检查（含 RSC 的 PowerShell 探测），完成后替换占位报告。
+
+        为什么不在这里触发 autostart：autostart 只依赖 installed 字段，
+        快速检查（毫秒级）已经能给出正确结论，装配路径无需等探测。
+        """
+        try:
+            report = probe()
+        except Exception:  # noqa: BLE001 - 探测失败不影响其他功能
+            logger.exception("环境探测失败")
+            return
+        self._npcap_report = report
 
     # -- 网卡 ----------------------------------------------------------
     def refresh_ifaces(self) -> list[tuple[str, str]]:

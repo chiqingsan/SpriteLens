@@ -91,7 +91,8 @@ button { border: 0; cursor: pointer; }
 .brand-copy strong { display: block; font-size: 15px; }
 .brand-copy span { display: block; font-size: 11px; color: #b8d8da; margin-top: 2px; }
 
-#main-nav { display: grid; gap: 7px; padding-top: 16px; }
+#main-nav { display: grid; gap: 4px; padding-top: 12px; overflow-y: auto; min-height: 0; }
+.nav-group { display: grid; gap: 4px; }
 .nav-item {
   height: 44px;
   border-radius: 9px;
@@ -181,6 +182,9 @@ button { border: 0; cursor: pointer; }
 /* 页面 */
 .page { display: none; overflow: auto; padding: 14px; }
 .page.active { display: block; }
+/* 防御：任何未激活的 page 一律不可见——防止后续变体规则的 display 声明把
+   隐藏页漏出来（实际发生过：feature-page 的 grid 展示规则盖过了 display:none） */
+.page:not(.active) { display: none !important; }
 .page .workspace.split { display: grid; grid-template-columns: 236px minmax(0, 1fr) 316px; gap: 10px; align-items: start; }
 /* 宠物页：详情默认收起（让宽度给卡片网格，对标蛋神点阵背包），选中宠物后展开 */
 #page-pets .workspace.split { grid-template-columns: 224px minmax(0, 1fr); }
@@ -189,6 +193,7 @@ button { border: 0; cursor: pointer; }
 #page-pets .workspace.split.has-detail .detail-panel { display: block; }
 #page-events .workspace.split { grid-template-columns: minmax(0, 1fr) 360px; }
 #page-handbook .workspace.split { grid-template-columns: minmax(0, 1fr) 340px; }
+#page-egg-dex .workspace.split { grid-template-columns: minmax(0, 1fr) 340px; }
 #page-pets { padding: 10px; }
 #page-handbook { padding: 10px; }
 
@@ -633,6 +638,63 @@ button { border: 0; cursor: pointer; }
 .toast.bad { background: #a83843; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
+/* 侧栏分组导航（对标蛋神分组结构） */
+:root { --male-strong: #5b9dd9; --female-strong: #d98ab0; }
+.nav-group-title {
+  padding: 10px 14px 4px;
+  font-size: 10px; font-weight: 700; letter-spacing: .12em;
+  color: rgba(255, 255, 255, .42); text-transform: uppercase;
+}
+.nav-subitem { padding-left: 18px; }
+.nav-icon-text { display: grid; place-items: center; font-size: 15px; width: 18px; }
+
+/* 蛋图鉴 */
+.speed-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 2px; border-bottom: 1px dashed var(--line);
+}
+.speed-row:last-child { border-bottom: 0; }
+.speed-row span { color: var(--muted); }
+.speed-row b { font-variant-numeric: tabular-nums; }
+.gender-ring {
+  width: 84px; height: 84px; border-radius: 50%;
+  display: grid; place-items: center; margin: 4px auto;
+  position: relative;
+}
+.gender-ring::after {
+  content: ""; position: absolute; inset: 12px;
+  border-radius: 50%; background: var(--panel);
+}
+.gender-ring b { position: relative; z-index: 1; font-size: 12px; }
+.gender-ring.unknown { background: #eef4f4; color: var(--muted); }
+.chain-arrow { color: var(--muted); align-self: center; }
+
+/* 待实现页占位（.page 默认 display:none，active 时才以 grid 展开） */
+.page.feature-page { display: none; }
+.page.feature-page.active { display: grid; place-items: center; padding: 40px; }
+.feature-placeholder {
+  max-width: 420px; text-align: center; display: grid; gap: 8px;
+  border: 1px dashed var(--line); border-radius: 14px;
+  background: var(--panel); padding: 32px 28px;
+}
+.feature-placeholder strong { font-size: 16px; }
+.feature-placeholder p { margin: 0; color: var(--muted); }
+
+/* 弹层（采集设置等模态框容器，供后续页面复用） */
+.modal-layer {
+  position: fixed; inset: 0; z-index: 250;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(6, 46, 56, .45);
+}
+.modal-layer.open { display: flex; }
+.modal {
+  min-width: 380px; max-width: 640px; max-height: 80vh; overflow: auto;
+  background: var(--panel); border-radius: 14px; box-shadow: var(--shadow);
+  padding: 18px 20px;
+}
+.modal h2 { margin: 0 0 12px; font-size: 15px; }
+
+
 /* 窄窗适配：收起详情栏 */
 @media (max-width: 1360px) {
   .page .workspace.split { grid-template-columns: 216px minmax(0, 1fr); }
@@ -641,6 +703,8 @@ button { border: 0; cursor: pointer; }
   #page-events .detail-panel { display: none; }
   #page-handbook .workspace.split { grid-template-columns: minmax(0, 1fr); }
   #page-handbook .detail-panel { display: none; }
+  #page-egg-dex .workspace.split { grid-template-columns: minmax(0, 1fr); }
+  #page-egg-dex .detail-panel { display: none; }
 }
 @media (max-width: 1080px) {
   :root { --sidebar: 150px; }

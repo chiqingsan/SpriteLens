@@ -18,7 +18,7 @@ from tests._synth import SYNTH_KEY, make_ack_frame, make_data_frame, make_protob
 SESSION = "10.1.1.9:60000"
 
 
-def _make_vm(tmp: Path, *, preset_key: bytes | None = None, **install_kwargs) -> tuple[CaptureViewModel, MonitorService]:
+def _make_vm(tmp: Path, *, preset_key: bytes | None = None, probe_environment: bool = False, **install_kwargs) -> tuple[CaptureViewModel, MonitorService]:
     settings = SettingsRepository(tmp / "config.json")
     monitor = MonitorService(
         catalog=OpcodeCatalog({}),
@@ -31,6 +31,8 @@ def _make_vm(tmp: Path, *, preset_key: bytes | None = None, **install_kwargs) ->
         keys_dir=tmp / "keys",
         recordings_dir=tmp / "recordings",
         port=8195,
+        # 测试默认关闭后台环境探测：不跑 PowerShell，也不与手工设置的报告竞争
+        probe_environment=probe_environment,
         **install_kwargs,
     )
     return vm, monitor
@@ -140,6 +142,45 @@ class CaptureViewModelTest(unittest.TestCase):
         self.assertEqual(snapshot.sessions, ())
         self.assertEqual(snapshot.totals.decrypt_ok, 0)
         self.assertFalse(snapshot.recording)
+
+    def test_environment_probe_updates_report_async(self):
+        """探测线程异步补全报告（含 RSC），不阻塞构造与 autostart 判定。"""
+        from spritelens.view_models import capture_vm as vm_mod
+
+        fake_report = NpcapReport(
+            installed=True,
+            wpcap_path="X:\\fake\\wpcap.dll",
+            message="(探测线程写入)",
+            rsc_enabled=True,
+            rsc_adapter="WLAN",
+        )
+        original = vm_mod.check_npcap
+        vm_mod.check_npcap = lambda **kwargs: fake_report
+        self.addCleanup(setattr, vm_mod, "check_npcap", original)
+
+        vm, _monitor = _make_vm(self.tmp_path, probe_environment=True)
+        self.assertTrue(
+            _wait_until(lambda: vm.environment_report().message == "(探测线程写入)"),
+            "探测线程应在超时前替换占位报告",
+        )
+        self.assertTrue(vm.environment_report().rsc_enabled)
+
+    def test_probe_failure_is_swallowed(self):
+        """探测线程异常不传播：后台线程死亡不影响界面与采集主流程。"""
+        import threading as _threading
+
+        ran = _threading.Event()
+
+        def _boom(**kwargs):
+            ran.set()
+            raise RuntimeError("探测炸了")
+
+        vm, _monitor = _make_vm(
+            self.tmp_path, probe_environment=True, environment_probe=_boom
+        )
+        self.assertTrue(ran.wait(timeout=2.0), "探测线程应被启动并消费注入函数")
+        # 报告保持在快速检查结果上（异常被吞，未覆盖也未崩溃）
+        self.assertIsInstance(vm.environment_report(), NpcapReport)
 
     def test_manual_key_valid_and_invalid(self):
         vm, monitor = _make_vm(self.tmp_path)

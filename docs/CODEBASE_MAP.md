@@ -20,13 +20,14 @@
 | `tools/import_schema.py` | 导入外部 schema 全集到 data/schemas（本地目录或 GitHub） |
 | `tools/import_static_data.py` | 导入基础静态表（物种/性格/系别/技能）到 data/static |
 | `tools/import_assets.py` | 导入图鉴元数据 + 精灵图 + 系别图标 + 系别克制表 |
+| `tools/import_egg_data.py` | 导入蛋目录（蛋组/孵化时长/公母比/身高体重/进化链）到 data/static/eggs.json |
 | `tools/analyze_recording.py` | 录制文件离线分析（帧分类/opcode 分布/宠物形状） |
 | `tools/run_web_demo.py` | 带合成数据的界面实例（浏览器打开，视觉验收用） |
 | `tools/make_icon.py` | 生成 `resources/app.ico` 多尺寸图标与 favicon（PIL，产物入库） |
 | `resources/app.ico` | 应用图标（窗口/任务栏用，打包时随包分发） |
 | `data/schemas/` | 外挂 schema：`opcodes.json` + `messages/*.json`（字段级合并） |
 | `data/static/` | 静态映射：`species/natures/types/skills/type_chart.json` + 各 `_meta.json` |
-| `spritelens/web/static/` | 前端资源：`index.html` / `app.css` / `app.js` / `favicon.png` / `pets/*.webp` / `type-icons/` |
+| `spritelens/web/static/` | 前端资源：`index.html`（分组导航骨架）/ `boot.js`（启动自恢复链）/ `app.css` / `app.js` / `favicon.png` / `pets/*.webp` / `type-icons/` |
 | `data/recordings/` | 运行时录制产物（gitignore；本地回放样例不在版本库） |
 
 ## spritelens/
@@ -47,13 +48,17 @@
 | `capture/base.py` | CaptureSource 协议、StreamChunk、SourceError |
 | `capture/reassembly.py` | TCP 流重组（乱序/重传/全零段回滚/空洞，纯逻辑） |
 | `capture/npcap_source.py` | scapy AsyncSniffer 接入（轻量回调 + 队列 + worker 投递） |
+| `capture/nic_rank.py` | 活跃网卡识别与排序（Get-NetAdapter Status=Up → 设备列表前置） |
 | `capture/key_store.py` | 密钥文本解析与 latest.key 持久化 |
 | `system/environment.py` | Npcap 检测、官方版本解析、下载、UAC 拉起安装向导 |
+| `system/webview_guard.py` | WebView2 运行时预检测（注册表/env）+ 缺失时原生对话框引导安装 |
+| `system/window_geometry.py` | 初始窗口尺寸：工作区 + 系统 DPI 缩放适配（fit_window 纯函数） |
 | `system/single_instance.py` | 单实例控制：命名互斥锁 + 唤醒事件 + Win32 强制置顶 |
 | `system/net_diagnose.py` | --diagnose-net：宽抓会话统计，定位多连接的数据端口 |
 | `domain/pets.py` | 宠物语义层：形状搜索提取 PacketEvent → Pet 对象（含六维/技能/外观） |
 | `domain/identity.py` | 玩家身份语义层：self_info/avatar/base → PlayerIdentity（uid 归属） |
 | `domain/static_data.py` | 静态映射：物种/性格/系别/技能（base_conf_id 关联，含图鉴元数据） |
+| `domain/eggs.py` | 蛋目录：蛋静态数据索引（egg_conf_id / base_id 联查，孵蛋工具链底座） |
 | `domain/display.py` | 展示常量：系别配色、六维标签、天赋阶配色（框架无关） |
 | `repositories/database.py` | SQLite 底座：连接、PRAGMA user_version 迁移（v2 含六维/外观列）、损坏自恢复 |
 | `repositories/pet_store.py` | 宠物持久化网关：write-behind 批量落盘 + 读取（适配器模式） |
@@ -90,6 +95,9 @@
 | `test_pets.py` | 形状提取、仓库合并、schema→管线→聚合端到端、v2 扩展字段 |
 | `test_pet_vm.py` | 宠物 VM：多维筛选、排序、聚合统计 |
 | `test_static_data.py` | 静态表加载/索引/降级；base_conf_id 与 conf_id 的区分回归 |
+| `test_eggs.py` | 蛋目录：加载/索引/降级、载荷筛选（蛋组/类型/孵化时长/搜索） |
+| `test_desktop_shell.py` | 窗口几何 fit_window（DPI/工作区 clamp）、WebView2 env 覆盖检测 |
+| `test_nic_rank.py` | 活跃网卡排序（前置/保持原序/宽松匹配） |
 | `test_single_instance.py` | 单实例互斥锁唯一性、唤醒事件投递与消费、close 幂等 |
 | `test_persistence.py` | 身份识别（NPC 不误取）、写库/重开/加载、多账号隔离、迁移与损坏恢复 |
 | `test_view_models.py` | VM 状态与命令（Capture/Events + 自动采集开关） |

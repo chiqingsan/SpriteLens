@@ -64,6 +64,7 @@ def _make_context(tmp: Path, pets: tuple[Pet, ...] = ()) -> AppContext:
         keys_dir=tmp / "keys",
         recordings_dir=tmp / "recordings",
         port=8195,
+        probe_environment=False,  # 测试不跑 PowerShell，报告按需手工注入
     )
     return AppContext(
         settings=settings,
@@ -280,6 +281,18 @@ class LocalServerTest(unittest.TestCase):
         self.assertIn("species", payload)
         self.assertIn("total", payload)
         self.assertIn("filters", payload)
+
+    def test_eggs_endpoint(self):
+        """蛋图鉴：目录缺失时返回空壳（前端可渲染空态与空筛选器）。"""
+        status, payload = _http_get(
+            f"http://127.0.0.1:{self.server.port}/api/eggs", token=self.server.token
+        )
+        self.assertEqual(status, 200)
+        self.assertIn("eggs", payload)
+        self.assertIn("groups", payload)
+        self.assertIn("egg_types", payload)
+        self.assertIn("filters", payload)
+        self.assertEqual(payload["total"], 0)
 
     def test_websocket_requires_token(self):
         """WebSocket 走查询参数鉴权（浏览器无法自定义头）；错 token 被拒、对 token 可连。"""
