@@ -51,6 +51,7 @@ class SpeciesInfo:
     dex_no: int = 0
     handbook_no: str = ""
     display_name: str = ""
+    description: str = ""
     egg_groups: tuple[str, ...] = ()
     gender_ratio: tuple[int, int] = (0, 0)  # (雄%, 雌%)
     height_range: tuple[int, int] = (0, 0)
@@ -153,6 +154,7 @@ class StaticData:
                 dex_no=int(entry.get("dex_no") or 0),
                 handbook_no=str(entry.get("handbook_no") or ""),
                 display_name=str(entry.get("display_name") or ""),
+                description=str(entry.get("description") or ""),
                 egg_groups=tuple(str(g) for g in (entry.get("egg_groups") or [])),
                 gender_ratio=(
                     int(ratio.get("male") or 0),
