@@ -44,7 +44,7 @@ def run_web(*, open_browser: bool = False) -> int:
         server.start()
     except Exception as exc:  # noqa: BLE001 - 端口/绑定失败直接给出可读提示
         logger.exception("本地服务启动失败")
-        print(f"[web] 本地服务启动失败：{exc}")
+        _fatal("本地服务启动失败", f"{exc}\n\n日志目录：{logs_dir()}")
         context.close()
         guard.close()
         return 1
@@ -64,11 +64,22 @@ def run_web(*, open_browser: bool = False) -> int:
         _run_window(server, guard)
     except Exception as exc:  # noqa: BLE001 - WebView2 缺失等环境问题
         logger.error("窗口创建失败: %s", exc)
-        print(f"[web] {WEBVIEW2_HINT}\n原始错误：{exc}")
+        _fatal("窗口创建失败", f"{WEBVIEW2_HINT}\n\n原始错误：{exc}\n日志目录：{logs_dir()}")
         _shutdown(server, context, guard)
         return 1
     _shutdown(server, context, guard)
     return 0
+
+
+def _fatal(title: str, message: str) -> None:
+    """弹出系统错误框：pythonw 启动时控制台不可见，必须让用户看到失败原因。"""
+    print(f"[web] {title}：{message}")
+    try:
+        import ctypes
+
+        ctypes.windll.user32.MessageBoxW(None, message, f"{WINDOW_TITLE} — {title}", 0x10)
+    except Exception:  # noqa: BLE001 - 对话框失败不影响退出码
+        pass
 
 
 def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> None:

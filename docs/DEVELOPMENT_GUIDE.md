@@ -100,6 +100,16 @@ web（aiohttp/pywebview）；protocol 不反向依赖 services/capture；线程�
 - 抓包线程内的异常必须消化（`_handle_packet` 全包裹），绝不让嗅探线程死亡
 - 解码异常只影响单条事件（返回空树），不影响管线
 - 服务端错误不进日志堆栈（连接重置属正常收尾）；对外只回可读消息
+- `pythonw` 启动下控制台不可见：未捕获异常由 `install_excepthook()` 落盘到
+  `logs/spritelens.crash.log`，启动致命失败弹系统对话框（`web/run.py::_fatal`）——
+  新增入口路径时不得绕过这两层
+
+## 架构边界测试
+
+`tests/test_architecture.py` 用 AST 静态解析校验分层约束（不导入模块，无副作用）：
+业务层不得 import aiohttp/pywebview、不得反向依赖上层、protocol 保持纯函数、
+业务层不得依赖装配根。违规立即红灯。已批准的例外（`protocol → logs`、
+`domain → services.PacketEvent`）在文件头部记录，**只减不增**。
 
 ## 测试
 
@@ -145,9 +155,13 @@ web（aiohttp/pywebview）；protocol 不反向依赖 services/capture；线程�
 - 删除前先做引用扫描（README / 文档 / 代码），确认无引用
 - 有价值的事故经验、阈值、回滚条件先迁入维护文档，再删旧文档
 - 生成物（日志、截图、临时诊断脚本）默认不进版本库——
-  `.guishot/`、`data/recordings/`、`data/keys/`、`logs/` 已在 .gitignore
+  `.guishot/`、`data/recordings/`、`data/keys/`、`/logs/` 已在 .gitignore
+- **忽略规则一律锚定仓库根**：写 `/logs/` 而不是 `logs/`。无前导斜杠会匹配
+  任意层级同名目录，曾把源码包 `spritelens/logs/` 一起忽略（首次提交实测漏文件）
+- 新增 Git 忽略规则后，用 `git status --ignored --porcelain` 复查一遍，
+  确认没有源码文件被误伤
 
 ## 安全边界
 
-- 日志与录制文件含会话密钥与本机地址：logs/、data/recordings/、data/keys/ 均已 gitignore
+- 日志与录制文件含会话密钥与本机地址：/logs/、data/recordings/、data/keys/ 均已 gitignore
 - 不把本机绝对路径写进代码与文档

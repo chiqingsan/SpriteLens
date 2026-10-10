@@ -14,7 +14,7 @@ import argparse
 import sys
 
 import spritelens
-from spritelens.logs import setup_logger
+from spritelens.logs import install_excepthook, setup_logger
 from spritelens.paths import logs_dir
 
 
@@ -41,6 +41,8 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     logger = setup_logger(logs_dir(), debug=args.debug)
+    crash_log = install_excepthook(logs_dir())
+    logger.debug("崩溃日志: %s", crash_log)
 
     if args.smoke_test:
         return _run_smoke_test()

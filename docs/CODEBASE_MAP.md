@@ -60,7 +60,7 @@
 | `services/event_logger.py` | PacketEvent JSONL 落盘（按天分片，复盘用） |
 | `recording/recorder.py` | StreamChunk jsonl 录制/读回 |
 | `recording/replay.py` | ReplaySource + CLI 回放摘要输出 |
-| `logs/local_logger.py` | 双文件 RotatingFileHandler |
+| `logs/local_logger.py` | 双文件 RotatingFileHandler + 崩溃兜底 `install_excepthook`（crash.log） |
 | `view_models/pet_vm.py` | 宠物页 VM（多维筛选/排序/聚合统计，纯 Python） |
 | `view_models/capture_vm.py` | 采集页 VM（source 构造、Npcap 安装状态机、自动采集开关） |
 | `view_models/events_vm.py` | 协议流页 VM（行视图/详情缓存） |
@@ -89,6 +89,8 @@
 | `test_single_instance.py` | 单实例互斥锁唯一性、唤醒事件投递与消费、close 幂等 |
 | `test_persistence.py` | 身份识别（NPC 不误取）、写库/重开/加载、多账号隔离、迁移与损坏恢复 |
 | `test_view_models.py` | VM 状态与命令（Capture/Events + 自动采集开关） |
+| `test_architecture.py` | 架构边界：业务层无 Web 依赖、无反向分层、protocol 纯函数约束 |
+| `test_crash_log.py` | 崩溃日志：主线程/后台线程异常落盘、Ctrl+C 不记录、写入失败静默 |
 | `test_web_server.py` | 本地服务：token 鉴权（REST/WS）、随机端口、宠物/图鉴/采集 API、载荷构造 |
 | `test_environment.py` | Npcap 检测与安装引导状态机 |
 | `test_event_logger.py` | 事件日志落盘与分片 |

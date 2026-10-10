@@ -5,7 +5,8 @@ __pycache__/
 .pytest_cache/
 
 # 运行时产物：日志 / 录制帧 / 密钥均含本地敏感信息
-logs/
+# 注意：/logs/ 必须锚定仓库根，否则会连源码包 spritelens/logs/ 一起忽略
+/logs/
 data/recordings/
 data/keys/
 *.local.json
