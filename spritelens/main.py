@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 import spritelens
 from spritelens.logs import install_excepthook, setup_logger
@@ -86,6 +87,40 @@ def _run_smoke_test() -> int:
         print(f"[smoke] scapy 可用，枚举到 {count} 个网卡")
     except Exception as exc:  # noqa: BLE001 - smoke 只报告环境状态
         print(f"[smoke] 抓包源不可用（不影响协议层测试）: {exc}")
+
+    # 界面资源必须齐（打包最常见的漏带项）：缺了前端目录服务起不来，
+    # 缺了静态表则宠物名/系别全退化成 ID。这里直接失败，不静默通过。
+    return _smoke_check_assets()
+
+
+def _smoke_check_assets() -> int:
+    """检查界面与静态资源是否随包分发（打包后自检的关键一步）。"""
+    from spritelens.web.server import STATIC_DIR
+
+    failures: list[str] = []
+    required_dirs = {
+        "前端静态目录": STATIC_DIR,
+        "静态映射表": spritelens.paths.static_dir(),
+        "schema 目录": spritelens.paths.schema_dir(),
+    }
+    for label, path in required_dirs.items():
+        if path.is_dir():
+            print(f"[smoke] {label}: {path} ✓")
+        else:
+            failures.append(f"{label}缺失: {path}")
+
+    for name in ("index.html", "app.js", "app.css"):
+        if not (STATIC_DIR / name).is_file():
+            failures.append(f"前端文件缺失: {STATIC_DIR / name}")
+
+    if spritelens.paths.project_root() != Path(__file__).resolve().parent.parent:
+        print(f"[smoke] 冻结态资源根: {spritelens.paths.project_root()}")
+
+    if failures:
+        print("[smoke] 资源检查失败：")
+        for item in failures:
+            print(f"  - {item}")
+        return 1
 
     print("[smoke] 通过")
     return 0

@@ -109,6 +109,12 @@ web（aiohttp/pywebview）；protocol 不反向依赖 services/capture；线程�
 - **打包**：`build.bat` / `python build.py`（配置在 `build_config.toml`）。
   **不要排除 scapy 的任何子模块**——scapy 内部动态 import 多，静态排除会
   在打包产物里才暴露为运行时失败（实测排除 `as_resolvers` 让网卡枚举直接挂）
+- **包内非 Python 资源必须显式附带**：`spritelens/web/static/`（前端 HTML/CSS/JS
+  /精灵图）要写进 `include_data_dirs`，Nuitka 只编译 `.py`。漏带的症状是
+  exe 启动即崩（服务报 `web/static does not exist`），而 `--smoke-test` 等
+  非 GUI 路径测不出来——所以 `--smoke-test` 已内含静态资源检查
+- **打包后必须实机验证三件事**：`--smoke-test`（三项资源齐全）→
+  `--list-ifaces`（scapy 链路完好）→ **实际启动 GUI 看窗口**（前两条都过不了这个坑）
 - **杀软干扰**：Nuitka 后处理调 `rc.exe` 写图标/版本资源，临时文件
   `build/RCX*.tmp` 会被部分杀软（火绒实测）误报并锁定，导致
   `Failed to add resources` 打包失败。打包前给项目目录加白名单

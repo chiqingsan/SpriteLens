@@ -324,11 +324,17 @@ MinGW 编译器，且单次打包约 20 分钟（增量构建快得多）。
 |---|---|---|
 | `Conflict between user and plugin decision for module 'webview.platforms.android'` | Nuitka 4.x 内置 `pywebview` 插件且**强制启用**，自行决定只收 Windows 平台分支；手动 `--enable-plugin=pywebview` 或 `--include-package=webview` 都会与之冲突 | 两者都不加，交给插件自动处理 |
 | exe 里网卡枚举失败：`Module 'scapy.as_resolvers' was actively excluded` | 曾把 `scapy.as_resolvers` 当无用模块排除，实际它在 `scapy.arch.windows` 的调用链上（scapy 动态 import 多，静态排除极易误伤） | **不要排除 scapy 任何子模块** |
-| 资源（`data/`、`resources/`）在 exe 内定位不到 | 冻结态 `project_root()` 需指向解包目录 | 已由 `paths.project_root()` 的 `_MEIPASS` 分支处理，`include_data_dirs` 的 dest 保持与源码态相对路径一致 |
+| **exe 能通过 smoke 却启动即崩**：`ValueError: '...\spritelens\web\static' does not exist` | 只把 `data/`、`resources/` 加进 `include_data_dirs`，漏了**包内资源** `spritelens/web/static/`（前端 HTML/CSS/JS/精灵图）。Nuitka 只编译 `.py`，非 Python 文件必须显式附带。而 `--smoke-test`/`--replay` 等非 GUI 路径不加载前端，测不出来 | 把 `spritelens/web/static` 加入 `include_data_dirs`；**并把静态资源检查并入 `--smoke-test`**（缺目录/缺文件直接返回非 0），`tests/test_smoke_assets.py` 锁死 |
 | `Failed to add resources to file ...exe`（重试 5 次后失败） | **杀毒软件实时扫描锁住 Nuitka 后处理写入的临时文件**；本机火绒会报 `build/RCX*.tmp` 为病毒。`RCX*.tmp` 是微软 `rc.exe` 资源编译器的标准临时文件，用于给 exe 写入图标与版本信息——属**误报** | 打包前给项目目录加杀软白名单；或临时关闭实时防护。成品可用 `Start-MpScan` 独立复检：本机 Defender 对产物零检出 |
 
-**产物指纹**（0.1.0，供比对）：22.3 MB，
-SHA256 `178581d050796bd7bbe90373700efa6a1276ce77d2444a474203fa2bde352576`。
+**打包后必须验的三件事**（按顺序，缺一不可）：
+
+1. `SpriteLens_x.y.z.exe --smoke-test` → 应含前端静态目录/静态表/schema 三项 ✓
+2. `--list-ifaces` → 应枚举出网卡（scapy 链路完好）
+3. **实际启动 GUI**：看窗口是否出现、五页是否渲染（前两条都过不了这个坑）
+
+**产物指纹**（0.1.0，供比对）：26.4 MB，
+SHA256 见 `build/SpriteLens_0.1.0.exe` 现状（每次构建会变）。
 
 **尚未做**：主程序体积/冷启动的正式实测（§5.3 判据：≤60MB / ≤1.5s）——
 22.3MB 已满足体积判据，冷启动待正式计时。

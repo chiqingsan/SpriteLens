@@ -96,6 +96,7 @@
 | `test_architecture.py` | 架构边界：业务层无 Web 依赖、无反向分层、protocol 纯函数约束 |
 | `test_crash_log.py` | 崩溃日志：主线程/后台线程异常落盘、Ctrl+C 不记录、写入失败静默 |
 | `test_paths.py` | 打包态资源定位：源码/frozen/_MEIPASS 三分支、数据目录不受打包影响 |
+| `test_smoke_assets.py` | 随包资源齐备（前端静态目录/静态表/schema），防打包漏带 |
 | `test_web_server.py` | 本地服务：token 鉴权（REST/WS）、随机端口、宠物/图鉴/采集 API、载荷构造 |
 | `test_environment.py` | Npcap 检测与安装引导状态机 |
 | `test_event_logger.py` | 事件日志落盘与分片 |

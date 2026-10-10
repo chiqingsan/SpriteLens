@@ -62,9 +62,15 @@ include_modules = [
 
 # 静态资源随包分发。`paths.project_root()` 在冻结态指向 exe 的解包目录，
 # 所以 dest 必须与源码态的相对路径一致（data/、resources/）。
+#
+# 注意 spritelens/web/static：它是包内资源（前端 HTML/CSS/JS/精灵图），
+# Nuitka 只编译 .py，不会自动带上非 Python 文件。少了它的症状是服务启动
+# 直接抛 `ValueError: '...\spritelens\web\static' does not exist`——
+# 而 --smoke-test / --replay 等非 GUI 路径不加载静态资源，测不出来。
 include_data_dirs = [
   "data=data",
   "resources=resources",
+  "spritelens/web/static=spritelens/web/static",
 ]
 
 # 排除确定用不到的大件，控制体积。
