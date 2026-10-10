@@ -33,7 +33,9 @@ from spritelens.paths import logs_dir, schema_dir, static_dir
 from spritelens.protocol.opcodes import OpcodeCatalog
 from spritelens.protocol.schema import load_library
 from spritelens.repositories.settings import SettingsRepository
+from spritelens.domain.home import HomeFurniture, HomeResident, HomeSnapshot
 from spritelens.services.egg_repository import EggBoxRepository
+from spritelens.services.home_repository import HomeRepository
 from spritelens.services.monitor_service import MonitorService
 from spritelens.services.pet_repository import PetRepository
 from spritelens.view_models import CaptureViewModel, EventsViewModel, PetViewModel
@@ -44,6 +46,27 @@ _SAMPLE = (
     ("燃薪虫", 3437, 42), ("小独角兽", 3062, 35), ("菊花梨", 3227, 28), ("恶魔叮", 3010, 22),
     ("皇家狮鹫", 3469, 58), ("治愈兔", 3081, 44), ("机械方方", 3200, 39), ("乖乖鹄", 3344, 31),
 )
+
+
+def _demo_home() -> HomeRepository:
+    repo = HomeRepository()
+    repo._snapshot = HomeSnapshot(
+        room_level=10,
+        residents=(
+            HomeResident(actor_id=0x84182c0b68a0000a, name="护主犬", gender=1, level=41,
+                         position=(-882, 1284, 61)),
+            HomeResident(actor_id=0x84182c0b68a0000b, name="喵喵", gender=2, level=35,
+                         position=(100, 200, 1)),
+        ),
+        furniture=(
+            HomeFurniture(config_id=710069, guid="70182c0b68100000", kind="ordinary",
+                          name="普通小窝", position=(100, 200, 1)),
+            HomeFurniture(config_id=150011, guid="65d37b61f2690", kind="furniture",
+                          name="家具 #150011", position=(300, 400, 1)),
+        ),
+    )
+    repo._version += 1
+    return repo
 
 
 def build_demo_context(tmp: Path, count: int) -> AppContext:
@@ -120,6 +143,7 @@ def build_demo_context(tmp: Path, count: int) -> AppContext:
         pet_vm=PetViewModel(repository, static_data=static),
         egg_catalog=catalog,
         egg_box=egg_box,
+        home_repo=_demo_home(),
     )
 
 

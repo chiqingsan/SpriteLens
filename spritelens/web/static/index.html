@@ -349,10 +349,55 @@
           </aside>
         </div>
       </section>
-      <section id="page-breeder-library" class="page feature-page"><div class="feature-page-root" data-feature="种公母库" data-hint="基于宠物库按配种价值分组，随孵蛋工具链一起开放"></div></section>
+      <!-- 种公母库：按性别分组的配种宠物库 -->
+      <section id="page-breeder-library" class="page">
+        <div class="stack">
+          <section class="panel">
+            <div class="panel-head"><h2>种公（♂）</h2><span id="bl-male-count" class="muted"></span></div>
+            <div id="bl-male" class="bl-groups"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><h2>种母（♀）</h2><span id="bl-female-count" class="muted"></span></div>
+            <div id="bl-female" class="bl-groups"></div>
+          </section>
+        </div>
+      </section>
       <section id="page-planner" class="page feature-page"><div class="feature-page-root" data-feature="智能配窝" data-hint="需要家园场景与繁育范围协议帧"></div></section>
       <section id="page-collection-lines" class="page feature-page"><div class="feature-page-root" data-feature="产线收集" data-hint="需要蛋仓与孵化事件的长期积累"></div></section>
-      <section id="page-home" class="page feature-page"><div class="feature-page-root" data-feature="我的家园" data-hint="需要家园场景协议帧（居民 / 家具 / 产蛋窝）"></div></section>
+      <!-- 我的家园 -->
+      <section id="page-home" class="page">
+        <div class="stack">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>家园概览</h2>
+              <span id="home-meta" class="muted">等待家园快照（进入家园后自动更新）</span>
+            </div>
+            <div id="home-deltas" class="banner warn" hidden>
+              <div class="banner-copy"><strong>家园有最新变化</strong>
+                <p>收到增量帧但尚未合并到快照；重新进入家园可刷新完整数据。</p></div>
+            </div>
+          </section>
+          <div class="overview-lower">
+            <section class="panel">
+              <div class="panel-head"><h2>居民宠物</h2><span id="home-resident-count" class="muted"></span></div>
+              <div id="home-residents" class="home-residents"></div>
+              <div id="home-residents-empty" class="empty-hint" hidden>家园中没有居民：进入家园并让宠物上架</div>
+            </section>
+            <div class="overview-side">
+              <section class="panel">
+                <div class="panel-head"><h2>产蛋窝</h2><span id="home-nest-count" class="muted"></span></div>
+                <div id="home-nests" class="home-nests"></div>
+                <div id="home-nests-empty" class="empty-hint" hidden>未发现产蛋窝：放置小窝后自动识别</div>
+              </section>
+              <section class="panel">
+                <div class="panel-head"><h2>家具</h2><span id="home-furniture-count" class="muted"></span></div>
+                <p class="info-line" id="home-furniture-line">—</p>
+                <p class="muted">产蛋配对（layEggCouples）待增量帧样本采集后开放</p>
+              </section>
+            </div>
+          </div>
+        </div>
+      </section>
       <section id="page-colors" class="page feature-page"><div class="feature-page-root" data-feature="炫彩色卡" data-hint="需要玻璃（glass）信息协议帧"></div></section>
       <section id="page-flowers" class="page feature-page"><div class="feature-page-root" data-feature="炫彩花种" data-hint="需要花种协议帧与花种等级静态表"></div></section>
 

@@ -31,6 +31,7 @@ from spritelens.repositories.egg_store import EggStore
 from spritelens.repositories.pet_store import PetStore
 from spritelens.repositories.settings import DEFAULT_CAPTURE_PORT, SettingsRepository
 from spritelens.services.egg_repository import EggBoxRepository
+from spritelens.services.home_repository import HomeRepository
 from spritelens.services.event_logger import EventLogWriter
 from spritelens.services.monitor_service import MonitorService
 from spritelens.services.pet_repository import PetRepository
@@ -59,6 +60,7 @@ class AppContext:
     egg_catalog: EggCatalog | None = None  # 蛋目录（缺失时蛋相关页面降级）
     egg_store: EggStore | None = None
     egg_box: EggBoxRepository | None = None  # 蛋仓聚合（缺失时蛋仓页面空态）
+    home_repo: HomeRepository | None = None  # 家园快照（缺失时家园页空态）
 
     def close(self) -> None:
         """停监听、落盘、关日志（幂等；退出路径唯一）。"""
@@ -105,6 +107,10 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
     event_log = EventLogWriter(data_root() / "eventlog")
     monitor.add_packet_listener(event_log.handle_packet)
 
+    # 家园快照聚合（0x014A 全量 + 增量版本提示）
+    home_repo = HomeRepository()
+    monitor.add_packet_listener(home_repo.handle_packet)
+
     # 蛋仓聚合：订阅协议事件流 + SQLite 持久化（重启不丢，离线可看）
     egg_store = EggStore(database)
     egg_box = EggBoxRepository(store=egg_store)
@@ -136,6 +142,7 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
         event_log=event_log,
         egg_catalog=egg_catalog,
         egg_store=egg_store,
+        home_repo=home_repo,
     )
     if autostart and capture_vm.start_if_autostart():
         logger.info("已自动开始采集（可在采集页关闭「打开即采集」）")

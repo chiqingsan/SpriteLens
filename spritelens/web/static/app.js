@@ -125,6 +125,8 @@
     if (name === "egg-dex") { loadEggDex(); }
     if (name === "egg-box") { loadEggBox(); }
     if (name === "male-matrix") { loadMaleMatrix(); }
+    if (name === "home") { loadHome(); }
+    if (name === "breeder-library") { loadBreederLibrary(); }
     if (name === "events") { loadEvents(); }
     if (name === "capture") { loadCapture(); }
     if (name === "overview") { loadOverview(); }
@@ -252,6 +254,10 @@
     if (payload.egg_box_version !== undefined && payload.egg_box_version !== eggBoxState.version) {
       eggBoxState.version = payload.egg_box_version;
       if (state.page === "egg-box") { loadEggBox(); }
+    }
+    if (payload.home_version !== undefined && payload.home_version !== homeState.version) {
+      homeState.version = payload.home_version;
+      if (state.page === "home") { loadHome(); }
     }
 
     renderRole(payload.identity);
@@ -1441,6 +1447,15 @@
       });
       loadMaleMatrix();
     });
+    document.getElementById("page-breeder-library").addEventListener("click", function (event) {
+      var chip = event.target.closest("[data-mm]");
+      if (!chip) { return; }
+      switchPage("pets");
+      state.filters.search = String(chip.dataset.mm);
+      var searchBox = $("f-search");
+      if (searchBox) { searchBox.value = String(chip.dataset.mm); }
+      loadPets();
+    });
     $("mm-matrix").addEventListener("click", function (event) {
       var chip = event.target.closest("[data-mm]");
       if (chip) {
@@ -1458,6 +1473,94 @@
       mmState.selected = key;
       renderMaleMatrixDetail(key);
     });
+  }
+
+  /* ---------- 我的家园 ---------- */
+  var homeState = { data: null, version: -1 };
+
+  function loadHome() {
+    api("/api/home").then(function (payload) {
+      homeState.data = payload;
+      homeState.version = payload.version || 0;
+      renderHome();
+    }).catch(function (err) { toast("家园加载失败：" + err.message, true); });
+  }
+
+  function renderHome() {
+    var payload = homeState.data;
+    if (!payload) { return; }
+    $("home-deltas").hidden = !(payload.pending_deltas > 0);
+    if (!payload.available) {
+      $("home-meta").textContent = "等待家园快照（进入家园后自动更新）";
+      $("home-residents").innerHTML = "";
+      $("home-residents-empty").hidden = false;
+      $("home-nests").innerHTML = "";
+      $("home-nests-empty").hidden = false;
+      $("home-furniture-line").textContent = "—";
+      return;
+    }
+    $("home-meta").textContent = "房间等级 " + payload.room_level + " · 快照 #" + payload.version;
+    var residents = payload.residents || [];
+    $("home-resident-count").textContent = residents.length + " 只";
+    $("home-residents").innerHTML = residents.map(function (r) {
+      var gender = r.gender === 2 ? '<span class="female-mark">♀</span>'
+        : (r.gender === 1 ? '<span class="male-mark">♂</span>' : "");
+      var img = r.icon_url
+        ? '<img src="' + esc(r.icon_url) + '" alt="" loading="lazy" onerror="this.remove()">'
+        : "";
+      return '<div class="home-resident">'
+        + '<span class="pc-avatar">' + esc((r.name || "?").slice(0, 1)) + img + "</span>"
+        + '<div><b>' + esc(r.name) + "</b>" + gender
+        + '<small>' + (r.level ? "Lv" + r.level : "") + (r.species_name ? " · " + esc(r.species_name) : "") + "</small></div>"
+        + '<span class="muted home-pos">坐标 ' + r.position.join(", ") + "</span></div>";
+    }).join("");
+    $("home-residents-empty").hidden = residents.length > 0;
+    var nests = payload.nests || [];
+    $("home-nest-count").textContent = nests.length + " 个";
+    $("home-nests").innerHTML = nests.map(function (nest) {
+      return '<div class="home-nest"><b>' + esc(nest.name) + "</b>"
+        + '<span class="muted">配置 #' + nest.config_id + "</span></div>";
+    }).join("");
+    $("home-nests-empty").hidden = nests.length > 0;
+    var furniture = payload.furniture || [];
+    $("home-furniture-line").textContent = "共 " + furniture.length + " 件（含窝 " + nests.length + "）";
+  }
+
+  /* ---------- 种公母库（性别分组的配种宠物库） ---------- */
+  function loadBreederLibrary() {
+    Promise.all([
+      api("/api/male-matrix" + query({ gender: "male" })),
+      api("/api/male-matrix" + query({ gender: "female" }))
+    ]).then(function (results) {
+      renderBreederSection("bl-male", "bl-male-count", results[0]);
+      renderBreederSection("bl-female", "bl-female-count", results[1]);
+    }).catch(function (err) { toast("种公母库加载失败：" + err.message, true); });
+  }
+
+  function renderBreederSection(listId, countId, payload) {
+    var natures = payload.natures || [];
+    var total = payload.matched || 0;
+    $(countId).textContent = total + " 只（性格组 " + natures.length + "）";
+    $(listId).innerHTML = natures.map(function (nature) {
+      var groups = (payload.groups || []).filter(function (g) {
+        return payload.cells[nature.name + "|" + g];
+      });
+      if (!groups.length) { return ""; }
+      var blocks = groups.map(function (g) {
+        var pets = payload.cells[nature.name + "|" + g] || [];
+        var chips = pets.map(function (pet) {
+          var mark = pet.gender === 2 ? "♀" : "♂";
+          return '<span class="mm-pet" data-mm="' + pet.gid + '"><img src="' + esc(pet.icon_url)
+            + '" alt="" loading="lazy" onerror="this.remove()">' + mark + esc(pet.name)
+            + '<small>Lv' + pet.level + "</small></span>";
+        }).join("");
+        return '<div class="bl-group"><b>' + esc(g) + '</b><div class="bl-chips">' + chips + "</div></div>";
+      }).join("");
+      return '<details class="bl-nature" open><summary>' + esc(nature.name)
+        + '<small>' + (nature.positive ? (STAT_CN[nature.positive] || nature.positive) + "↑ " : "")
+        + (nature.negative ? (STAT_CN[nature.negative] || nature.negative) + "↓" : "") + "</small></summary>"
+        + blocks + "</details>";
+    }).join("") || '<div class="empty-hint">没有符合条件的宠物</div>';
   }
 
   /* ---------- 启动（15s 超时 + 自动重试 2 次，与自恢复链协同） ---------- */

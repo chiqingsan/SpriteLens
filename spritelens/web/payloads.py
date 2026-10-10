@@ -316,6 +316,46 @@ def male_matrix_payload(pet_repository, static: StaticData | None, gender: str =
     }
 
 
+def home_payload(home_repo, static: StaticData | None) -> dict:
+    """我的家园载荷：居民（联查物种图标）/ 家具 / 产蛋窝 / 增量提示。"""
+    snap = home_repo.snapshot() if home_repo is not None else None
+    if snap is None:
+        return {"available": False, "residents": [], "furniture": [], "nests": [],
+                "room_level": 0, "pending_deltas": 0, "version": 0}
+    residents = []
+    for r in snap.residents:
+        species = static.species(r.actor_id & 0xFFFF) if static is not None else None
+        residents.append({
+            "actor_id": r.actor_id,
+            "name": r.name,
+            "gender": r.gender,
+            "level": r.level,
+            "position": list(r.position),
+            "icon_url": species_icon_url(species.base_conf_id if species else 0),
+            "species_name": species.name if species else "",
+        })
+    furniture = [
+        {
+            "config_id": f.config_id,
+            "guid": f.guid,
+            "kind": f.kind,
+            "name": f.name,
+            "position": list(f.position),
+        }
+        for f in snap.furniture
+    ]
+    nests = [f for f in furniture if f["kind"] != "furniture"]
+    return {
+        "available": True,
+        "room_level": snap.room_level,
+        "residents": residents,
+        "furniture": furniture,
+        "nests": nests,
+        "pending_deltas": home_repo.pending_deltas(),
+        "version": home_repo.version(),
+    }
+
+
 def egg_box_payload(egg_box, catalog) -> dict:
     """蛋蛋仓库载荷：蛋仓快照 + 蛋目录联查（名字/孵化时长/图标）+ 聚合统计。"""
     entries = egg_box.snapshot() if egg_box is not None else ()
@@ -423,6 +463,7 @@ def egg_dex_payload(
 
 __all__ = [
     "egg_box_payload",
+    "home_payload",
     "male_matrix_payload",
     "egg_dex_payload",
     "handbook_payload",

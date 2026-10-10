@@ -728,6 +728,36 @@ button { border: 0; cursor: pointer; }
 .male-mark { color: #5b9dd9; }
 .female-mark { color: #d98ab0; }
 
+/* 种公母库 */
+.bl-groups { display: grid; gap: 8px; }
+.bl-nature {
+  border: 1px solid var(--line); border-radius: 10px; background: #fff;
+  padding: 8px 12px;
+}
+.bl-nature summary {
+  cursor: pointer; font-weight: 700; font-size: 13px;
+  display: flex; align-items: baseline; gap: 8px; list-style: revert;
+}
+.bl-nature summary small { color: var(--muted); font-weight: 400; }
+.bl-group { margin-top: 8px; }
+.bl-group > b { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.bl-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.bl-chips .mm-pet small { color: var(--muted); margin-left: 2px; }
+
+/* 我的家园 */
+.home-residents, .home-nests { display: grid; gap: 7px; }
+.home-resident {
+  display: flex; align-items: center; gap: 9px;
+  border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; background: #fff;
+}
+.home-resident .pc-avatar { width: 34px; height: 34px; border-radius: 9px; }
+.home-resident small { display: block; color: var(--muted); }
+.home-pos { margin-left: auto; font-size: 11px; }
+.home-nest {
+  display: flex; align-items: center; justify-content: space-between;
+  border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: #fff;
+}
+
 /* 待实现页占位（.page 默认 display:none，active 时才以 grid 展开） */
 .page.feature-page { display: none; }
 .page.feature-page.active { display: grid; place-items: center; padding: 40px; }
