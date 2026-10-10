@@ -194,6 +194,8 @@ button { border: 0; cursor: pointer; }
 #page-events .workspace.split { grid-template-columns: minmax(0, 1fr) 360px; }
 #page-handbook .workspace.split { grid-template-columns: minmax(0, 1fr) 340px; }
 #page-egg-dex .workspace.split { grid-template-columns: minmax(0, 1fr) 340px; }
+#page-egg-box .workspace.split { grid-template-columns: minmax(0, 1fr) 340px; }
+#page-male-matrix .workspace.split { grid-template-columns: minmax(0, 1fr) 320px; }
 #page-pets { padding: 10px; }
 #page-handbook { padding: 10px; }
 
@@ -422,9 +424,12 @@ button { border: 0; cursor: pointer; }
 .detail-sub { font-size: 11px; color: var(--muted); margin-bottom: 10px; }
 .detail-section { margin-top: 12px; }
 .detail-section h3 {
-  margin: 0 0 6px; font-size: 11px; color: var(--muted);
-  text-transform: none; letter-spacing: .3px;
+  margin: 0 0 6px; font-size: 12px; color: var(--muted);
 }
+.detail-rows { margin: 0; display: grid; gap: 4px; }
+.detail-rows > div { display: flex; justify-content: space-between; gap: 12px; }
+.detail-rows dt { color: var(--muted); }
+.detail-rows dd { margin: 0; font-variant-numeric: tabular-nums; }
 .stat-table { width: 100%; border-collapse: collapse; }
 .stat-table td { padding: 3px 0; font-size: 12px; }
 .stat-table td:first-child { color: var(--muted); width: 42px; }
@@ -669,6 +674,60 @@ button { border: 0; cursor: pointer; }
 .gender-ring.unknown { background: #eef4f4; color: var(--muted); }
 .chain-arrow { color: var(--muted); align-self: center; }
 
+/* 图鉴描述文本 */
+.species-desc { margin: 0; line-height: 1.7; color: var(--ink); }
+
+/* 蛋蛋仓库 */
+.egg-qty {
+  align-self: center; margin-left: auto;
+  background: var(--teal-soft); color: var(--teal-dark);
+  border-radius: 8px; padding: 2px 8px; font-size: 11px; font-weight: 800;
+}
+.egg-progress {
+  position: relative; height: 18px; border-radius: 9px;
+  background: #e8f0f0; overflow: hidden;
+}
+.egg-progress i {
+  position: absolute; inset: 0 auto 0 0;
+  background: linear-gradient(90deg, var(--teal), #12b8a6);
+  transition: width .3s ease;
+}
+.egg-progress b {
+  position: relative; z-index: 1; display: block; text-align: center;
+  font-size: 10px; line-height: 18px; color: var(--teal-deep);
+}
+.egg-progress.large { height: 22px; }
+.egg-progress.large b { line-height: 22px; font-size: 11px; }
+
+/* 种公阵列：性格 × 蛋组覆盖矩阵 */
+.mm-matrix { overflow: auto; }
+.mm-matrix table { border-collapse: collapse; width: 100%; }
+.mm-matrix th, .mm-matrix td {
+  border: 1px solid var(--line); padding: 5px 6px; text-align: left; vertical-align: top;
+}
+.mm-matrix thead th {
+  position: sticky; top: 0; background: var(--teal-soft); color: var(--teal-deep);
+  font-size: 11px; white-space: nowrap; z-index: 1;
+}
+.mm-corner { min-width: 96px; }
+.mm-rowhead { min-width: 96px; background: #f6fafa; }
+.mm-rowhead b { display: block; font-size: 12px; }
+.mm-rowhead small { display: block; font-size: 10px; color: var(--muted); font-weight: 400; }
+.mm-cell { min-width: 120px; cursor: pointer; }
+.mm-cell.empty { color: var(--line); text-align: center; cursor: default; }
+.mm-cell.selected { outline: 2px solid var(--teal); outline-offset: -2px; }
+.mm-pet {
+  display: inline-flex; align-items: center; gap: 3px; margin: 1px 3px 1px 0;
+  border: 1px solid var(--line); border-radius: 8px; padding: 1px 5px 1px 1px;
+  font-size: 11px; background: #fff;
+}
+.mm-pet img { width: 20px; height: 20px; border-radius: 6px; }
+.mm-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; border-bottom: 1px dashed var(--line); }
+.mm-row img { width: 28px; height: 28px; border-radius: 8px; }
+.mm-row b { flex: 1; }
+.male-mark { color: #5b9dd9; }
+.female-mark { color: #d98ab0; }
+
 /* 待实现页占位（.page 默认 display:none，active 时才以 grid 展开） */
 .page.feature-page { display: none; }
 .page.feature-page.active { display: grid; place-items: center; padding: 40px; }
@@ -705,6 +764,10 @@ button { border: 0; cursor: pointer; }
   #page-handbook .detail-panel { display: none; }
   #page-egg-dex .workspace.split { grid-template-columns: minmax(0, 1fr); }
   #page-egg-dex .detail-panel { display: none; }
+  #page-egg-box .workspace.split { grid-template-columns: minmax(0, 1fr); }
+  #page-egg-box .detail-panel { display: none; }
+  #page-male-matrix .workspace.split { grid-template-columns: minmax(0, 1fr); }
+  #page-male-matrix .detail-panel { display: none; }
 }
 @media (max-width: 1080px) {
   :root { --sidebar: 150px; }

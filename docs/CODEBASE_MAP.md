@@ -21,6 +21,7 @@
 | `tools/import_static_data.py` | 导入基础静态表（物种/性格/系别/技能）到 data/static |
 | `tools/import_assets.py` | 导入图鉴元数据 + 精灵图 + 系别图标 + 系别克制表 |
 | `tools/import_egg_data.py` | 导入蛋目录（蛋组/孵化时长/公母比/身高体重/进化链）到 data/static/eggs.json |
+| `tools/import_pet_details.py` | 补全静态数据：图鉴描述并入 species.json（+sum 重算修正）、补技能名、奖牌表、蛋/奖牌图标、花种等级表 |
 | `tools/analyze_recording.py` | 录制文件离线分析（帧分类/opcode 分布/宠物形状） |
 | `tools/run_web_demo.py` | 带合成数据的界面实例（浏览器打开，视觉验收用） |
 | `tools/make_icon.py` | 生成 `resources/app.ico` 多尺寸图标与 favicon（PIL，产物入库） |
@@ -59,13 +60,16 @@
 | `domain/identity.py` | 玩家身份语义层：self_info/avatar/base → PlayerIdentity（uid 归属） |
 | `domain/static_data.py` | 静态映射：物种/性格/系别/技能（base_conf_id 关联，含图鉴元数据） |
 | `domain/eggs.py` | 蛋目录：蛋静态数据索引（egg_conf_id / base_id 联查，孵蛋工具链底座） |
+| `domain/egg_box.py` | 蛋仓语义层：形状搜索提取 PacketEvent → EggBoxEntry（bagType==8 指纹） |
 | `domain/display.py` | 展示常量：系别配色、六维标签、天赋阶配色（框架无关） |
 | `repositories/database.py` | SQLite 底座：连接、PRAGMA user_version 迁移（v2 含六维/外观列）、损坏自恢复 |
 | `repositories/pet_store.py` | 宠物持久化网关：write-behind 批量落盘 + 读取（适配器模式） |
+| `repositories/egg_store.py` | 蛋仓持久化网关：覆盖式写 + load_latest（v3 eggs 表） |
 | `repositories/settings.py` | JSON 配置仓库（原子写、脏值归一、窗口几何） |
 | `services/monitor_service.py` | 采集管线编排：字节流 → 帧 → 解密 → 解码 → PacketEvent |
 | `services/session_tracker.py` | 会话表（LRU）与全局统计 |
 | `services/pet_repository.py` | 宠物聚合（内存快照 + 身份归属 + 入库出口；不注入 store 时纯内存） |
+| `services/egg_repository.py` | 蛋仓聚合（instance_id 去重 + 版本号 + 入库出口） |
 | `services/event_logger.py` | PacketEvent JSONL 落盘（按天分片，复盘用） |
 | `recording/recorder.py` | StreamChunk jsonl 录制/读回 |
 | `recording/replay.py` | ReplaySource + CLI 回放摘要输出 |
@@ -96,6 +100,7 @@
 | `test_pet_vm.py` | 宠物 VM：多维筛选、排序、聚合统计 |
 | `test_static_data.py` | 静态表加载/索引/降级；base_conf_id 与 conf_id 的区分回归 |
 | `test_eggs.py` | 蛋目录：加载/索引/降级、载荷筛选（蛋组/类型/孵化时长/搜索） |
+| `test_egg_box.py` | 蛋仓：形状搜索提取/拒收、聚合去重、SQLite roundtrip、载荷联查、种公矩阵 |
 | `test_desktop_shell.py` | 窗口几何 fit_window（DPI/工作区 clamp）、WebView2 env 覆盖检测 |
 | `test_nic_rank.py` | 活跃网卡排序（前置/保持原序/宽松匹配） |
 | `test_single_instance.py` | 单实例互斥锁唯一性、唤醒事件投递与消费、close 幂等 |

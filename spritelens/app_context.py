@@ -27,8 +27,10 @@ from spritelens.paths import (
 from spritelens.protocol.opcodes import OpcodeCatalog
 from spritelens.protocol.schema import load_library
 from spritelens.repositories.database import Database
+from spritelens.repositories.egg_store import EggStore
 from spritelens.repositories.pet_store import PetStore
 from spritelens.repositories.settings import DEFAULT_CAPTURE_PORT, SettingsRepository
+from spritelens.services.egg_repository import EggBoxRepository
 from spritelens.services.event_logger import EventLogWriter
 from spritelens.services.monitor_service import MonitorService
 from spritelens.services.pet_repository import PetRepository
@@ -55,6 +57,8 @@ class AppContext:
     pet_store: PetStore | None = None
     event_log: EventLogWriter | None = None
     egg_catalog: EggCatalog | None = None  # 蛋目录（缺失时蛋相关页面降级）
+    egg_store: EggStore | None = None
+    egg_box: EggBoxRepository | None = None  # 蛋仓聚合（缺失时蛋仓页面空态）
 
     def close(self) -> None:
         """停监听、落盘、关日志（幂等；退出路径唯一）。"""
@@ -101,6 +105,14 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
     event_log = EventLogWriter(data_root() / "eventlog")
     monitor.add_packet_listener(event_log.handle_packet)
 
+    # 蛋仓聚合：订阅协议事件流 + SQLite 持久化（重启不丢，离线可看）
+    egg_store = EggStore(database)
+    egg_box = EggBoxRepository(store=egg_store)
+    monitor.add_packet_listener(egg_box.handle_packet)
+    restored_eggs = egg_box.load_last_account()
+    if restored_eggs:
+        logger.info("已载入历史蛋仓 %d 枚（来自本地库）", restored_eggs)
+
     capture_vm = CaptureViewModel(
         monitor=monitor,
         settings=settings,
@@ -119,9 +131,11 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
         capture_vm=capture_vm,
         events_vm=events_vm,
         pet_vm=pet_vm,
+        egg_box=egg_box,
         pet_store=pet_store,
         event_log=event_log,
         egg_catalog=egg_catalog,
+        egg_store=egg_store,
     )
     if autostart and capture_vm.start_if_autostart():
         logger.info("已自动开始采集（可在采集页关闭「打开即采集」）")

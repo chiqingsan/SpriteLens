@@ -299,9 +299,56 @@
         </div>
       </section>
 
-      <!-- 待实现页面（对标蛋神助手对应页，随协议数据域逐批开放） -->
-      <section id="page-egg-box" class="page feature-page"><div class="feature-page-root" data-feature="蛋蛋仓库" data-hint="需要采集到蛋仓快照协议帧（0x… 蛋仓域）后自动积累数据"></div></section>
-      <section id="page-male-matrix" class="page feature-page"><div class="feature-page-root" data-feature="种公阵列" data-hint="基于宠物库与性格×蛋组覆盖矩阵，静态数据就绪后开放"></div></section>
+      <!-- 蛋蛋仓库 -->
+      <section id="page-egg-box" class="page">
+        <div class="workspace split">
+          <section class="content-panel">
+            <div class="panel-toolbar">
+              <span id="eb-count" class="count-badge">0 枚</span>
+              <span id="eb-hatching" class="muted">在孵 0</span>
+              <label class="inline-field">搜索
+                <input id="eb-search" type="text" placeholder="蛋名 / 物种 / 编号">
+              </label>
+              <div class="segmented" id="eb-mode">
+                <button data-mode="all" class="active">全部</button>
+                <button data-mode="hatching">孵化中</button>
+              </div>
+              <button id="btn-eggbox-clear" class="ghost-button small danger-ghost">清空快照</button>
+            </div>
+            <div class="table-wrap">
+              <div id="eb-grid" class="hb-grid eggbox-grid"></div>
+              <div id="eb-empty" class="empty-hint" hidden>蛋仓为空：开始采集后进入游戏，打开蛋仓面板，数据会自动积累</div>
+            </div>
+          </section>
+          <aside id="eb-detail" class="detail-panel">
+            <div class="empty-hint">点击蛋卡片查看详情</div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- 种公阵列：性格 × 蛋组覆盖矩阵 -->
+      <section id="page-male-matrix" class="page">
+        <div class="workspace split">
+          <section class="content-panel">
+            <div class="panel-toolbar">
+              <span id="mm-count" class="count-badge">0 只可配种</span>
+              <div class="segmented" id="mm-gender">
+                <button data-gender="all" class="active">全部</button>
+                <button data-gender="male">♂ 公</button>
+                <button data-gender="female">♀ 母</button>
+              </div>
+              <span class="muted">性格 × 蛋组覆盖矩阵——回答"想孵某性格，该找哪个蛋组的宠"</span>
+            </div>
+            <div class="table-wrap">
+              <div id="mm-matrix" class="mm-matrix"></div>
+              <div id="mm-empty" class="empty-hint" hidden>没有带蛋组的宠物：开始采集并进入游戏后自动出现</div>
+            </div>
+          </section>
+          <aside id="mm-detail" class="detail-panel">
+            <div class="empty-hint">点击矩阵格子查看该组合的宠物</div>
+          </aside>
+        </div>
+      </section>
       <section id="page-breeder-library" class="page feature-page"><div class="feature-page-root" data-feature="种公母库" data-hint="基于宠物库按配种价值分组，随孵蛋工具链一起开放"></div></section>
       <section id="page-planner" class="page feature-page"><div class="feature-page-root" data-feature="智能配窝" data-hint="需要家园场景与繁育范围协议帧"></div></section>
       <section id="page-collection-lines" class="page feature-page"><div class="feature-page-root" data-feature="产线收集" data-hint="需要蛋仓与孵化事件的长期积累"></div></section>

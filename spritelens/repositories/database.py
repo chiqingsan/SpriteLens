@@ -82,6 +82,27 @@ _MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
             "ALTER TABLE pets ADD COLUMN base_conf_id    INTEGER NOT NULL DEFAULT 0",
         ),
     ),
+    (
+        3,
+        (
+            # 蛋仓快照（bagType==8）：一行一枚蛋实例，明细 JSON 冗余全字段
+            """
+            CREATE TABLE IF NOT EXISTS eggs (
+                uid            INTEGER NOT NULL,
+                instance_id    INTEGER NOT NULL,
+                egg_conf_id    INTEGER NOT NULL DEFAULT 0,
+                pet_conf_id    INTEGER NOT NULL DEFAULT 0,
+                quantity       INTEGER NOT NULL DEFAULT 0,
+                obtained_at    INTEGER NOT NULL DEFAULT 0,
+                hatching       INTEGER NOT NULL DEFAULT 0,
+                detail_json    TEXT    NOT NULL DEFAULT '',
+                updated_at     REAL    NOT NULL,
+                PRIMARY KEY (uid, instance_id)
+            )
+            """,
+            "CREATE INDEX IF NOT EXISTS idx_eggs_uid ON eggs (uid, updated_at)",
+        ),
+    ),
 )
 
 

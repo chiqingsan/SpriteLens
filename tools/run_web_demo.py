@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from spritelens.app_context import AppContext
 from spritelens.capture.key_store import KeyStore
+from spritelens.domain.egg_box import EggBoxEntry
 from spritelens.domain.eggs import EggCatalog
 from spritelens.domain.identity import PlayerIdentity
 from spritelens.domain.pets import Pet, PetAttribute, PetSkill
@@ -32,6 +33,7 @@ from spritelens.paths import logs_dir, schema_dir, static_dir
 from spritelens.protocol.opcodes import OpcodeCatalog
 from spritelens.protocol.schema import load_library
 from spritelens.repositories.settings import SettingsRepository
+from spritelens.services.egg_repository import EggBoxRepository
 from spritelens.services.monitor_service import MonitorService
 from spritelens.services.pet_repository import PetRepository
 from spritelens.view_models import CaptureViewModel, EventsViewModel, PetViewModel
@@ -81,6 +83,25 @@ def build_demo_context(tmp: Path, count: int) -> AppContext:
     repository._version += 1
     repository._identity = PlayerIdentity(uid=101384922, name="话绵雨", level=60)
 
+    # 合成蛋仓（联查蛋目录：confId 取 eggs.json 的真实条目）
+    egg_box = EggBoxRepository()
+    catalog = EggCatalog(static_dir())
+    conf_ids = [info.egg_conf_id for info in catalog.entries()][:8]
+    import time as _time
+    for i, conf_id in enumerate(conf_ids):
+        hatching = i % 3 == 0
+        hatch_total = 43200 if i % 2 else 28800
+        egg_box._eggs[9000 + i] = EggBoxEntry(
+            instance_id=9000 + i, egg_conf_id=conf_id, pet_conf_id=0, quantity=(i % 3) + 1,
+            obtained_at=int(_time.time()) - i * 3600, bag_type=8,
+            height_cm=25 + i, weight_g=1300 + i * 10,
+            hatch_seconds=hatch_total,
+            hatched_seconds=hatch_total // 3 * (i % 3 + 1) if hatching else 0,
+            hatch_updated_at=0, start_hatch_time=int(_time.time()) - 3600 if hatching else 0,
+            category=6, special_egg_conf_id=0, appearance_type=0, extension_type=0,
+        )
+    egg_box._version += 1
+
     settings = SettingsRepository(tmp / "config.json")
     capture_vm = CaptureViewModel(
         monitor=monitor,
@@ -97,7 +118,8 @@ def build_demo_context(tmp: Path, count: int) -> AppContext:
         capture_vm=capture_vm,
         events_vm=EventsViewModel(monitor=monitor),
         pet_vm=PetViewModel(repository, static_data=static),
-        egg_catalog=EggCatalog(static_dir()),
+        egg_catalog=catalog,
+        egg_box=egg_box,
     )
 
 

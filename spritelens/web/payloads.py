@@ -243,6 +243,7 @@ def handbook_payload(
                 "collected": own is not None,
                 "owned_count": own["count"] if own else 0,
                 "best_level": own["max_level"] if own else 0,
+                "description": info.description,
             }
         )
     return {
@@ -257,6 +258,102 @@ def handbook_payload(
             "collected_only": collected_only,
             "uncollected_only": uncollected_only,
         },
+    }
+
+
+def male_matrix_payload(pet_repository, static: StaticData | None, gender: str = "all") -> dict:
+    """种公阵列载荷：性格 × 蛋组覆盖矩阵（对标孵蛋管理器）。
+
+    行=性格（含正/负修正说明），列=蛋组，格子=该组合下的宠物摘要列表。
+    gender: all / male / female——按公母分库筛选。
+    """
+    pets = pet_repository.snapshot() if pet_repository is not None else ()
+    cells: dict[str, list[dict]] = {}
+    natures_seen: dict[str, dict] = {}
+    groups_seen: dict[str, None] = {}
+    for pet in pets:
+        species = static.species(pet.base_conf_id) if static is not None else None
+        if species is None or not species.egg_groups:
+            continue
+        if gender == "male" and pet.gender != 1:
+            continue
+        if gender == "female" and pet.gender != 2:
+            continue
+        nature_name = static.nature_name(pet.nature) if static is not None else str(pet.nature)
+        nature_info = static.nature(pet.nature) if static is not None else None
+        natures_seen.setdefault(
+            nature_name,
+            {
+                "name": nature_name,
+                "positive": nature_info.positive_stat if nature_info else None,
+                "negative": nature_info.negative_stat if nature_info else None,
+            },
+        )
+        summary = {
+            "gid": pet.gid,
+            "name": pet.name,
+            "gender": pet.gender,
+            "level": pet.level,
+            "icon_url": species_icon_url(pet.base_conf_id),
+        }
+        for group in species.egg_groups:
+            groups_seen.setdefault(group, None)
+            cells.setdefault(f"{nature_name}|{group}", []).append(summary)
+    order = {name: i for i, name in enumerate(sorted(groups_seen))}
+    cell_lists = {
+        key: sorted(items, key=lambda p: (-p["level"], p["gid"]))[:8]
+        for key, items in cells.items()
+        if items
+    }
+    return {
+        "natures": sorted(natures_seen.values(), key=lambda n: n["name"]),
+        "groups": sorted(groups_seen),
+        "cell_order": order,
+        "cells": cell_lists,
+        "total_pets": len(pets),
+        "matched": sum(len(v) for v in cells.values()),
+        "gender": gender,
+    }
+
+
+def egg_box_payload(egg_box, catalog) -> dict:
+    """蛋蛋仓库载荷：蛋仓快照 + 蛋目录联查（名字/孵化时长/图标）+ 聚合统计。"""
+    entries = egg_box.snapshot() if egg_box is not None else ()
+    rows: list[dict] = []
+    hatching_count = 0
+    total_quantity = 0
+    for egg in entries:
+        info = catalog.egg(egg.egg_conf_id) if catalog is not None else None
+        total_quantity += egg.quantity or 1
+        if egg.hatching:
+            hatching_count += 1
+        rows.append(
+            {
+                "instance_id": egg.instance_id,
+                "egg_conf_id": egg.egg_conf_id,
+                "egg_name": info.egg_name if info else f"蛋 #{egg.egg_conf_id}",
+                "species_name": info.name if info else "",
+                "icon_url": (
+                    f"/static/egg-icons/{info.egg_item_id}.png" if info.egg_item_id else ""
+                ),
+                "fallback_icon_url": species_icon_url(info.base_id) if info is not None else "",
+                "egg_type_name": info.egg_type_name if info else "",
+                "hatch_label": info.hatch_label if info else "",
+                "quantity": egg.quantity,
+                "obtained_at": egg.obtained_at,
+                "hatching": egg.hatching,
+                "hatch_progress": round(egg.hatch_progress, 4),
+                "category": egg.category,
+                "height_cm": egg.height_cm,
+                "weight_g": egg.weight_g,
+            }
+        )
+    return {
+        "eggs": rows,
+        "total": len(entries),
+        "total_quantity": total_quantity,
+        "hatching": hatching_count,
+        "version": egg_box.version() if egg_box is not None else 0,
     }
 
 
@@ -288,6 +385,9 @@ def egg_dex_payload(
                 "name": info.name,
                 "base_id": info.base_id,
                 "icon_url": species_icon_url(info.base_id) if info.base_id else "",
+                "egg_icon_url": (
+                    f"/static/egg-icons/{info.egg_item_id}.png" if info.egg_item_id else ""
+                ),
                 "handbook_no": info.handbook_no,
                 "dex_no": info.dex_no,
                 "egg_type_name": info.egg_type_name,
@@ -322,6 +422,8 @@ def egg_dex_payload(
 
 
 __all__ = [
+    "egg_box_payload",
+    "male_matrix_payload",
     "egg_dex_payload",
     "handbook_payload",
     "overview_payload",

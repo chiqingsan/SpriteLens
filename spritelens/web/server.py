@@ -28,6 +28,8 @@ from aiohttp import WSMsgType, web
 from spritelens.app_context import AppContext
 from spritelens.logs import get_logger
 from spritelens.web.payloads import (
+    egg_box_payload,
+    male_matrix_payload,
     egg_dex_payload,
     handbook_payload,
     overview_payload,
@@ -189,6 +191,9 @@ class LocalServer:
         app.router.add_post("/api/pets/clear", self._api_pets_clear)
         app.router.add_get("/api/handbook", self._api_handbook)
         app.router.add_get("/api/eggs", self._api_eggs)
+        app.router.add_get("/api/egg-box", self._api_egg_box)
+        app.router.add_get("/api/male-matrix", self._api_male_matrix)
+        app.router.add_post("/api/egg-box/clear", self._api_egg_box_clear)
         app.router.add_get("/api/events", self._api_events)
         app.router.add_get("/api/events/detail", self._api_event_detail)
         app.router.add_get("/api/capture", self._api_capture)
@@ -334,6 +339,27 @@ class LocalServer:
             )
         )
 
+    async def _api_egg_box(self, request: web.Request) -> web.Response:
+        return web.json_response(
+            egg_box_payload(self._context.egg_box, self._context.egg_catalog)
+        )
+
+    async def _api_egg_box_clear(self, request: web.Request) -> web.Response:
+        """清空会话内蛋仓快照（本地库历史不受影响）。"""
+        self._context.egg_box.clear()
+        return web.json_response(
+            egg_box_payload(self._context.egg_box, self._context.egg_catalog)
+        )
+
+    async def _api_male_matrix(self, request: web.Request) -> web.Response:
+        return web.json_response(
+            male_matrix_payload(
+                self._context.pet_repository,
+                self._context.static_data,
+                gender=request.query.get("gender", "all"),
+            )
+        )
+
     async def _api_events(self, request: web.Request) -> web.Response:
         vm = self._context.events_vm
         rows = [
@@ -474,6 +500,8 @@ class LocalServer:
         identity = ctx.pet_repository.identity
         stats = ctx.pet_vm.stats()
         return {
+            "egg_box_version": ctx.egg_box.version() if ctx.egg_box is not None else 0,
+            "egg_box_total": len(ctx.egg_box.snapshot()) if ctx.egg_box is not None else 0,
             "pets_version": ctx.pet_vm.version(),
             "pets_total": stats.total,
             "events_total": ctx.events_vm.total_events,
