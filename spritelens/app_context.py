@@ -76,6 +76,8 @@ class AppContext:
             self.event_log.close()
         if self.pet_store is not None:
             self.pet_store.close()
+        if self.egg_store is not None:
+            self.egg_store.close()
 
     _closed: bool = False
 

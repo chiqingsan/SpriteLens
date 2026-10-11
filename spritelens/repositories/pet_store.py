@@ -46,8 +46,9 @@ INSERT INTO pets (
     blood_id, talent_rank, is_first_catch, first_seen, updated_at,
     attr_hp, attr_atk, attr_spa, attr_def, attr_spd, attr_spe,
     height, weight, voice, mutation_type, classis, breakthrough_lv,
-    speciality_id, ball_id, attributes_json, skills_json, base_conf_id
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    speciality_id, ball_id, attributes_json, skills_json, base_conf_id,
+    colorful_conf_id, glass_type, glass_value
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(uid, gid) DO UPDATE SET
     conf_id        = excluded.conf_id,
     name           = excluded.name,
@@ -75,6 +76,9 @@ ON CONFLICT(uid, gid) DO UPDATE SET
     attributes_json = excluded.attributes_json,
     skills_json    = excluded.skills_json,
     base_conf_id   = excluded.base_conf_id,
+    colorful_conf_id = excluded.colorful_conf_id,
+    glass_type     = excluded.glass_type,
+    glass_value    = excluded.glass_value,
     updated_at     = excluded.updated_at
 """
 
@@ -82,7 +86,8 @@ _SELECT_PETS = """
 SELECT gid, conf_id, name, level, exp, nature, gender, blood_id, talent_rank, is_first_catch,
        attr_hp, attr_atk, attr_spa, attr_def, attr_spd, attr_spe,
        height, weight, voice, mutation_type, classis, breakthrough_lv,
-       speciality_id, ball_id, attributes_json, skills_json, base_conf_id
+       speciality_id, ball_id, attributes_json, skills_json, base_conf_id,
+       colorful_conf_id, glass_type, glass_value
 FROM pets WHERE uid = ? ORDER BY gid
 """
 
@@ -247,6 +252,7 @@ class PetStore:
                             pet.height, pet.weight, pet.voice, pet.mutation_type,
                             pet.classis, pet.breakthrough_lv, pet.speciality_id, pet.ball_id,
                             _attributes_to_json(pet), _skills_to_json(pet), pet.base_conf_id,
+                            pet.colorful_conf_id, pet.glass_type, pet.glass_value,
                         )
                         for (uid, _gid), pet in pets.items()
                     ],
@@ -291,6 +297,9 @@ class PetStore:
                 breakthrough_lv=int(row["breakthrough_lv"]),
                 speciality_id=int(row["speciality_id"]),
                 ball_id=int(row["ball_id"]),
+                colorful_conf_id=int(row["colorful_conf_id"]),
+                glass_type=int(row["glass_type"]),
+                glass_value=int(row["glass_value"]),
                 skills=_skills_from_json(str(row["skills_json"] or "")),
             )
             for row in rows

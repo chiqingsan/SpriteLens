@@ -1,8 +1,8 @@
-"""TCP 流重组测试：顺序、乱序、重复、重叠冲突、空洞补齐。"""
+"""TCP 流重组测试：顺序、乱序、重复、重叠冲突、空洞补齐、内存有界。"""
 
 import unittest
 
-from spritelens.capture.reassembly import TcpStreamReassembler
+from spritelens.capture.reassembly import MAX_HISTORY_BYTES, TcpStreamReassembler
 
 
 class ReassemblyTest(unittest.TestCase):
@@ -91,6 +91,58 @@ class ReassemblyTest(unittest.TestCase):
         r = TcpStreamReassembler()
         self.assertEqual(r.feed(1000, b""), b"")
         self.assertIsNone(r._base_seq)
+
+    def test_delivered_bytes_released(self):
+        """回归：交付的字节必须有界保留（旧实现累计流量后缓冲不释放）。
+
+        连续交付 8 MiB 后，_buffer 只应保留历史窗口，而不是全部流量。
+        """
+        r = TcpStreamReassembler(name="t")
+        chunk = b"x" * 65536
+        seq = 0
+        emitted = 0
+        total = 8 * 1024 * 1024
+        while emitted < total:
+            out = r.feed(seq, chunk)
+            emitted += len(out)
+            seq += len(chunk)
+        self.assertEqual(emitted, total)
+        self.assertLessEqual(len(r._buffer), MAX_HISTORY_BYTES + len(chunk) + 16)
+        self.assertLess(len(r._buffer), total)  # 绝不再是全量
+
+    def test_conflict_detection_within_window_after_trim(self):
+        """裁剪后窗口内的重传冲突比对仍工作（既有字节校验不被破坏）。"""
+        r = TcpStreamReassembler(name="t")
+        chunk = b"a" * 65536
+        seq = 0
+        total = 4 * 1024 * 1024
+        while seq < total:
+            r.feed(seq, chunk)
+            seq += len(chunk)
+        # 全部落在已交付区的重复段：直接忽略（不比对、不冲突）
+        self.assertEqual(r.feed(seq - len(chunk), b"b" * len(chunk)), b"")
+        self.assertEqual(r.conflicts, 0)
+        # 窗口内、越过交付前沿的重传冲突段：既有字节不同 → 计冲突并按尾部接纳
+        out = r.feed(seq - 1000, b"b" * 2000)
+        self.assertEqual(r.conflicts, 1)
+        self.assertEqual(out, b"b" * 1000)
+        # 前沿推进后衔接正常
+        self.assertEqual(r.feed(seq + 1000, b"tail"), b"tail")
+
+    def test_stale_segment_straddling_trim_boundary(self):
+        """跨越已裁剪区域与交付前沿的老段：仅接纳越过前沿的尾部。"""
+        r = TcpStreamReassembler(name="t")
+        chunk = b"a" * 65536
+        seq = 0
+        total = 2 * 1024 * 1024
+        while seq < total:
+            r.feed(seq, chunk)
+            seq += len(chunk)
+        straddle_start = seq - 1000
+        out = r.feed(straddle_start, b"z" * 2000)
+        # 前 1000 字节在已交付区（忽略），后 1000 字节为新数据
+        self.assertEqual(out, b"z" * 1000)
+        self.assertEqual(r.feed(seq + 1000, b"next"), b"next")
 
 
 if __name__ == "__main__":

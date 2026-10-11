@@ -301,13 +301,18 @@ class PetRepositoryPersistenceTest(unittest.TestCase):
         db.close()
 
     def test_without_store_behaviour_unchanged(self):
-        """未注入 store 时保持纯内存语义（回放 / 单测场景）。"""
+        """未注入 store：不落库、不补历史，但身份跟踪与切换清空照常生效。"""
         repo = PetRepository()
         repo.handle_packet(identity_event())
         repo.handle_packet(pet_event([(1, "魔力猫", 41)]))
-        self.assertIsNone(repo.identity)  # 无 store 不追踪身份
+        # 身份跟踪独立于持久化（切号清空内存快照是回放场景也需要的隔离）
+        self.assertIsNotNone(repo.identity)
+        self.assertEqual(repo.identity.uid, UID)
         self.assertEqual(repo.load_persisted(UID), 0)
         self.assertEqual(len(repo.snapshot()), 1)
+        # 切换账号 → 旧快照作废
+        repo.handle_packet(identity_event(uid=OTHER_UID, name="另一个账号"))
+        self.assertEqual(repo.snapshot(), ())
 
 
 # --- 4. 迁移与降级 ----------------------------------------------------
@@ -474,6 +479,265 @@ class DatabaseMigrationTest(unittest.TestCase):
         self.assertEqual(loaded.attributes, ())
         self.assertEqual(loaded.skills, ())
         self.assertEqual((loaded.height, loaded.weight, loaded.voice), (0, 0, 0))
+        self.assertEqual((loaded.colorful_conf_id, loaded.glass_type, loaded.glass_value), (0, 0, 0))
+        store.close()
+        db.close()
+
+    def test_colorful_glass_fields_round_trip(self):
+        """炫彩外观字段（colorful_conf_id/glass_type/glass_value）写入后完整读回。
+
+        回归：这三个字段曾未落库，重启后色卡/花种离线展示全部清零。
+        """
+        db = Database(self.db_path)
+        store = PetStore(db)
+        store.put(UID, [Pet(gid=9, conf_id=100, name="菊花梨", level=40, exp=0, nature=1,
+                            gender=1, blood_id=1, talent_rank=3, is_first_catch=False,
+                            colorful_conf_id=130001, glass_type=2, glass_value=5)])
+        store.flush()
+        loaded = store.load(UID)[0]
+        self.assertEqual(loaded.colorful_conf_id, 130001)
+        self.assertEqual(loaded.glass_type, 2)
+        self.assertEqual(loaded.glass_value, 5)
+        store.close()
+        db.close()
+
+    def test_v3_database_upgrades_to_v4(self):
+        """v3 库（无外观字段列）升级后读写正常，历史数据保留。"""
+        import sqlite3
+
+        v3 = self.tmp_path / "v3.sqlite"
+        conn = sqlite3.connect(v3)
+        conn.executescript(
+            """
+            CREATE TABLE accounts (
+                uid INTEGER PRIMARY KEY, name TEXT NOT NULL DEFAULT '',
+                level INTEGER NOT NULL DEFAULT 0, first_seen REAL NOT NULL, last_seen REAL NOT NULL);
+            CREATE TABLE pets (
+                uid INTEGER NOT NULL, gid INTEGER NOT NULL, conf_id INTEGER NOT NULL DEFAULT 0,
+                name TEXT NOT NULL DEFAULT '', level INTEGER NOT NULL DEFAULT 0,
+                exp INTEGER NOT NULL DEFAULT 0, nature INTEGER NOT NULL DEFAULT 0,
+                gender INTEGER NOT NULL DEFAULT 0, blood_id INTEGER NOT NULL DEFAULT 0,
+                talent_rank INTEGER NOT NULL DEFAULT 0, is_first_catch INTEGER NOT NULL DEFAULT 0,
+                first_seen REAL NOT NULL, updated_at REAL NOT NULL,
+                attr_hp INTEGER NOT NULL DEFAULT 0, attr_atk INTEGER NOT NULL DEFAULT 0,
+                attr_spa INTEGER NOT NULL DEFAULT 0, attr_def INTEGER NOT NULL DEFAULT 0,
+                attr_spd INTEGER NOT NULL DEFAULT 0, attr_spe INTEGER NOT NULL DEFAULT 0,
+                height INTEGER NOT NULL DEFAULT 0, weight INTEGER NOT NULL DEFAULT 0,
+                voice INTEGER NOT NULL DEFAULT 0, mutation_type INTEGER NOT NULL DEFAULT 0,
+                classis INTEGER NOT NULL DEFAULT 0, breakthrough_lv INTEGER NOT NULL DEFAULT 0,
+                speciality_id INTEGER NOT NULL DEFAULT 0, ball_id INTEGER NOT NULL DEFAULT 0,
+                attributes_json TEXT NOT NULL DEFAULT '', skills_json TEXT NOT NULL DEFAULT '',
+                base_conf_id INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (uid, gid));
+            CREATE TABLE eggs (
+                uid INTEGER NOT NULL, instance_id INTEGER NOT NULL,
+                egg_conf_id INTEGER NOT NULL DEFAULT 0, pet_conf_id INTEGER NOT NULL DEFAULT 0,
+                quantity INTEGER NOT NULL DEFAULT 0, obtained_at INTEGER NOT NULL DEFAULT 0,
+                hatching INTEGER NOT NULL DEFAULT 0, detail_json TEXT NOT NULL DEFAULT '',
+                updated_at REAL NOT NULL, PRIMARY KEY (uid, instance_id));
+            PRAGMA user_version = 3;
+            """
+        )
+        conn.execute("INSERT INTO accounts VALUES (?, ?, 60, 1.0, 2.0)", (UID, "老账号"))
+        conn.commit()
+        conn.close()
+
+        db = Database(v3)
+        try:
+            self.assertGreaterEqual(db.schema_version, 4)
+            cols = {row["name"] for row in db.query("PRAGMA table_info(pets)")}
+            self.assertIn("colorful_conf_id", cols)
+            self.assertIn("glass_type", cols)
+            self.assertIn("glass_value", cols)
+            # 旧库无 pets 行也不影响；写入新外观字段可读回
+            store = PetStore(db)
+            store.put(UID, [Pet(gid=5, conf_id=7, name="新宠", level=10, exp=0, nature=0,
+                                gender=0, blood_id=0, talent_rank=0, is_first_catch=False,
+                                colorful_conf_id=5400001, glass_type=1, glass_value=1048605)])
+            store.flush()
+            loaded = store.load(UID)[0]
+            self.assertEqual(loaded.colorful_conf_id, 5400001)
+            self.assertEqual(loaded.glass_value, 1048605)
+            store.close()
+        finally:
+            db.close()
+
+    def test_interrupted_migration_no_longer_blocks_startup(self):
+        """历史半迁移库（列已在但版本号未推进）能自动修复、不再启动崩溃。
+
+        回归：旧迁移逐句自动提交，中断后重跑报
+        `duplicate column name: attr_hp`，应用彻底无法启动。
+        """
+        import sqlite3
+
+        broken = self.tmp_path / "broken.sqlite"
+        conn = sqlite3.connect(broken)
+        conn.executescript(
+            """
+            CREATE TABLE accounts (
+                uid INTEGER PRIMARY KEY, name TEXT NOT NULL DEFAULT '',
+                level INTEGER NOT NULL DEFAULT 0, first_seen REAL NOT NULL, last_seen REAL NOT NULL);
+            CREATE TABLE pets (
+                uid INTEGER NOT NULL, gid INTEGER NOT NULL, conf_id INTEGER NOT NULL DEFAULT 0,
+                name TEXT NOT NULL DEFAULT '', level INTEGER NOT NULL DEFAULT 0,
+                exp INTEGER NOT NULL DEFAULT 0, nature INTEGER NOT NULL DEFAULT 0,
+                gender INTEGER NOT NULL DEFAULT 0, blood_id INTEGER NOT NULL DEFAULT 0,
+                talent_rank INTEGER NOT NULL DEFAULT 0, is_first_catch INTEGER NOT NULL DEFAULT 0,
+                first_seen REAL NOT NULL, updated_at REAL NOT NULL, PRIMARY KEY (uid, gid));
+            PRAGMA user_version = 1;
+            """
+        )
+        # 模拟 v2 迁移中途被打断：第一条列已加上，版本号仍停在 1
+        conn.execute("ALTER TABLE pets ADD COLUMN attr_hp INTEGER NOT NULL DEFAULT 0")
+        conn.commit()
+        conn.close()
+
+        db = Database(broken)  # 旧实现会在此抛 duplicate column name
+        try:
+            self.assertGreaterEqual(db.schema_version, 4)
+            cols = {row["name"] for row in db.query("PRAGMA table_info(pets)")}
+            for name in ("attr_hp", "attr_atk", "colorful_conf_id", "glass_value"):
+                self.assertIn(name, cols)
+        finally:
+            db.close()
+
+    def test_migration_failure_rolls_back_atomically(self):
+        """迁移中途失败整组回滚：不留下「版本未推进但半个迁移已提交」。"""
+        import sqlite3
+
+        bad = self.tmp_path / "bad_mig.sqlite"
+        conn = sqlite3.connect(bad)
+        conn.executescript(
+            """
+            CREATE TABLE accounts (
+                uid INTEGER PRIMARY KEY, name TEXT NOT NULL DEFAULT '',
+                level INTEGER NOT NULL DEFAULT 0, first_seen REAL NOT NULL, last_seen REAL NOT NULL);
+            CREATE TABLE pets (
+                uid INTEGER NOT NULL, gid INTEGER NOT NULL, conf_id INTEGER NOT NULL DEFAULT 0,
+                name TEXT NOT NULL DEFAULT '', level INTEGER NOT NULL DEFAULT 0,
+                exp INTEGER NOT NULL DEFAULT 0, nature INTEGER NOT NULL DEFAULT 0,
+                gender INTEGER NOT NULL DEFAULT 0, blood_id INTEGER NOT NULL DEFAULT 0,
+                talent_rank INTEGER NOT NULL DEFAULT 0, is_first_catch INTEGER NOT NULL DEFAULT 0,
+                first_seen REAL NOT NULL, updated_at REAL NOT NULL, PRIMARY KEY (uid, gid));
+            PRAGMA user_version = 1;
+            """
+        )
+        conn.commit()
+        conn.close()
+
+        # 注入点：先执行一条有效 DDL，再执行必然失败的语句——
+        # 验证有效 DDL 也随整组回滚（不是「跑了就算」）
+        import spritelens.repositories.database as db_mod
+
+        original = db_mod._MIGRATIONS
+        broken = (
+            original[0],
+            (2, (
+                "ALTER TABLE pets ADD COLUMN attr_test INTEGER NOT NULL DEFAULT 0",
+                "SELECT * FROM not_a_table",
+            )),
+        )
+        db_mod._MIGRATIONS = broken
+        try:
+            with self.assertRaises(sqlite3.Error):
+                Database(bad)
+        finally:
+            db_mod._MIGRATIONS = original
+
+        # 注入失败后：版本号未推进、v2 的列全部未留下（原子回滚）
+        conn = sqlite3.connect(bad)
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(pets)")}
+        version = conn.execute("PRAGMA user_version").fetchone()[0]
+        conn.close()
+        self.assertEqual(version, 1)
+        self.assertNotIn("attr_test", cols)
+        self.assertNotIn("attr_hp", cols)
+        # 恢复正常代码库：再次启动可完整升级
+        db = Database(bad)
+        self.assertGreaterEqual(db.schema_version, 4)
+        db.close()
+
+    def test_execute_many_failure_rolls_back(self):
+        """批量写入中途失败整体回滚，残缺行不会被后续操作提交带出。"""
+        import sqlite3
+
+        db = Database(self.db_path)
+        db.execute("CREATE TABLE t (a INTEGER PRIMARY KEY, b INTEGER NOT NULL CHECK (b > 0))")
+        with self.assertRaises(sqlite3.Error):
+            db.execute_many("INSERT INTO t (a, b) VALUES (?, ?)", [(1, 5), (2, -1)])
+        # 失败批次整体不可见（旧实现：第一行留在事务里被后续 commit 带出）
+        self.assertEqual(db.query("SELECT a FROM t"), [])
+        db.execute("INSERT INTO t (a, b) VALUES (?, ?)", (3, 7))
+        self.assertEqual([tuple(r) for r in db.query("SELECT a FROM t")], [(3,)])
+        db.close()
+
+    def test_account_switch_clears_snapshot(self):
+        """切号后内存快照不混合：B 登录后只应看到 B 的宠物，且入库分 uid 隔离。"""
+        db = Database(self.db_path)
+        store = PetStore(db, flush_interval=0.05)
+        repo = PetRepository(store=store)
+
+        repo.handle_packet(identity_event(uid=UID, name="账号A"))
+        repo.handle_packet(pet_event([(1, "A的宠物", 30)]))
+        store.flush()
+
+        repo.handle_packet(identity_event(uid=OTHER_UID, name="账号B"))
+        repo.handle_packet(pet_event([(2, "B的宠物", 20)]))
+        store.flush()
+
+        snap = repo.snapshot()
+        self.assertEqual([p.gid for p in snap], [2])  # A 的数据已清出内存
+        self.assertEqual(repo.identity.uid, OTHER_UID)
+        # 落库各自隔离
+        self.assertEqual([p.gid for p in store.load(UID)], [1])
+        self.assertEqual([p.gid for p in store.load(OTHER_UID)], [2])
+        store.close()
+        db.close()
+
+    def test_same_account_identity_refresh_keeps_snapshot(self):
+        """同账号重发身份帧（进出场景）不清空快照。"""
+        repo = PetRepository()
+        repo.handle_packet(identity_event(uid=UID))
+        repo.handle_packet(pet_event([(1, "魔力猫", 41)]))
+        repo.handle_packet(identity_event(uid=UID, name="话绵雨", level=56))  # 同 uid 重发
+        self.assertEqual(len(repo.snapshot()), 1)
+        self.assertEqual(repo.identity.level, 56)
+
+    def test_offline_history_same_account_not_treated_as_switch(self):
+        """启动时载入的历史数据属于同一账号：其登录到达不得清空。"""
+        db = Database(self.db_path)
+        store = PetStore(db)
+        store.put_account(UID, "账号A", 60)
+        store.put(UID, [Pet(gid=7, conf_id=1, name="历史宠物", level=20, exp=0, nature=0,
+                            gender=0, blood_id=0, talent_rank=0, is_first_catch=False)])
+        store.flush()
+
+        repo = PetRepository(store=store)
+        self.assertEqual(repo.load_last_account(), 1)
+        repo.handle_packet(identity_event(uid=UID))  # 上次账号登录
+        self.assertEqual(len(repo.snapshot()), 1)  # 历史仍可见
+        repo.handle_packet(identity_event(uid=OTHER_UID))  # 真切换
+        self.assertEqual(repo.snapshot(), ())
+        store.close()
+        db.close()
+
+    def test_load_persisted_restores_colorful_names(self):
+        """回归（P2）：载入历史宠物时重建炫彩名字学习表。
+
+        旧实现只恢复 colorful_conf_id 字段、不重建 id→名字映射，
+        重启后花田/花种载荷引用该形态时退化成「#130001」。
+        """
+        db = Database(self.db_path)
+        store = PetStore(db)
+        store.put(UID, [Pet(gid=11, conf_id=100, name="菊花梨", level=40, exp=0, nature=0,
+                            gender=0, blood_id=0, talent_rank=0, is_first_catch=False,
+                            colorful_conf_id=130001, glass_type=1, glass_value=7)])
+        store.flush()
+
+        repo = PetRepository(store=store)
+        self.assertIsNone(repo.colorful_name(130001))  # 载入前无学习结果
+        repo.load_persisted(UID)
+        self.assertEqual(repo.colorful_name(130001), "菊花梨")  # 载入即恢复映射
         store.close()
         db.close()
 

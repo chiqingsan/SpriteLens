@@ -67,6 +67,11 @@ class SessionTracker:
             session.has_key = True
             session.key_captured_at = time.time()
 
+    def drop(self, session_id: str) -> None:
+        """移除会话行（连接关闭/超时淘汰时与管线会话同步）。"""
+        with self._lock:
+            self._sessions.pop(session_id, None)
+
     def count(self, session_id: str, kind: str) -> None:
         """kind ∈ data_frame / decrypt_ok / decrypt_fail / key_miss / parse_fail。"""
         with self._lock:

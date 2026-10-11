@@ -1,7 +1,9 @@
 """监听管线编排：字节流 → GCP 帧 → 提 key → 解密 → 拆分 → schema/wire 解码 → PacketEvent。
 
-线程模型：on_chunk 由接入层后台线程（scapy 嗅探线程）调用，内部用锁保护
-会话状态；UI 线程通过 drain_events() / snapshot 拉取，不做跨线程回调。
+线程模型：on_chunk 与连接关闭（close_session）均由接入层**投递线程**
+按序调用（嗅探线程只做分类/重组/入队，见 npcap_source 模块注释——
+关闭事件排在残余数据之后，不会被抢跑）。内部用锁保护会话状态；
+UI 线程通过 drain_events() / snapshot 拉取，不做跨线程回调。
 """
 
 from __future__ import annotations
@@ -25,6 +27,12 @@ from spritelens.services.session_tracker import SessionTracker, Totals
 logger = get_logger("monitor")
 
 MAX_BUFFERED_EVENTS = 2000
+# 会话状态上限与空闲回收：抓包中途接入/异常断连会留下永不关闭的会话，
+# 帧流缓冲与密钥状态必须随连接关闭或长时间无活动释放（复现过 _sessions
+# 只增不减的长期运行泄漏）。
+MAX_SESSIONS = 256
+SESSION_IDLE_SECONDS = 30 * 60
+_SWEEP_INTERVAL = 60.0
 
 
 @dataclass(frozen=True)
@@ -43,11 +51,12 @@ class PacketEvent:
 class _SessionState:
     """单会话可变状态（由 MonitorService 锁保护）。"""
 
-    __slots__ = ("streams", "key")
+    __slots__ = ("streams", "key", "last_activity")
 
     def __init__(self) -> None:
         self.streams: dict[str, FrameStream] = {Direction.C2S: FrameStream(), Direction.S2C: FrameStream()}
         self.key: bytes | None = None
+        self.last_activity = time.monotonic()
 
 
 class MonitorService:
@@ -72,6 +81,7 @@ class MonitorService:
         self._source: CaptureSource | None = None
         self._preset_key = preset_key
         self._packet_listeners: list[Callable[[PacketEvent], None]] = []
+        self._last_sweep = 0.0
         # 实例属性绑定回调，供接入层以 SourceCallback 协议持有
         self.on_chunk: SourceCallback = self._handle_chunk
 
@@ -117,12 +127,34 @@ class MonitorService:
                     state.key = key
                     self._tracker.mark_key(session_id)
 
+    def close_session(self, session_id: str) -> None:
+        """连接关闭：释放该会话的帧流缓冲与密钥状态（由接入层事件驱动）。
+
+        返回后同一 session_id 再来数据会按新会话重建状态（需重新提 key）。
+        """
+        with self._lock:
+            removed = self._sessions.pop(session_id, None)
+        if removed is not None:
+            self._tracker.drop(session_id)
+
+    @property
+    def session_count(self) -> int:
+        with self._lock:
+            return len(self._sessions)
+
     # -- 接入层回调（运行于抓包线程）----------------------------------
 
     def _handle_chunk(self, chunk: StreamChunk) -> None:
         self._tracker.count_raw(len(chunk.data))
+        now = time.monotonic()
         with self._lock:
-            state = self._sessions.setdefault(chunk.session_id, _SessionState())
+            self._sweep_locked(now)
+            state = self._sessions.get(chunk.session_id)
+            if state is None:
+                state = _SessionState()
+                self._sessions[chunk.session_id] = state
+                self._evict_lru_locked()
+            state.last_activity = now
             if state.key is None and self._preset_key is not None:
                 state.key = self._preset_key
                 self._tracker.mark_key(chunk.session_id)
@@ -133,6 +165,29 @@ class MonitorService:
             key = state.key
             for frame in frames:
                 self._handle_frame(chunk.session_id, chunk.direction, frame, state, key)
+
+    def _sweep_locked(self, now: float) -> None:
+        """定期回收长时间无活动的会话（连接异常断开时收不到 flow_closed）。"""
+        if now - self._last_sweep < _SWEEP_INTERVAL:
+            return
+        self._last_sweep = now
+        stale = [
+            session_id
+            for session_id, state in self._sessions.items()
+            if now - state.last_activity > SESSION_IDLE_SECONDS
+        ]
+        for session_id in stale:
+            del self._sessions[session_id]
+            self._tracker.drop(session_id)
+        if stale:
+            logger.info("回收空闲会话 %d 个（超时 %ds）", len(stale), SESSION_IDLE_SECONDS)
+
+    def _evict_lru_locked(self) -> None:
+        """会话数超限时淘汰最久未活动者（硬上限兜底，防内存无界增长）。"""
+        while len(self._sessions) > MAX_SESSIONS:
+            oldest = min(self._sessions, key=lambda sid: self._sessions[sid].last_activity)
+            del self._sessions[oldest]
+            self._tracker.drop(oldest)
 
     # -- 帧处理 --------------------------------------------------------
     def _handle_frame(

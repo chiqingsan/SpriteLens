@@ -72,6 +72,29 @@ def _event(*rows: dict, opcode: int = 0x1344) -> PacketEvent:
     )
 
 
+def _identity_event(uid: int, name: str = "玩家") -> PacketEvent:
+    """self_info → avatar → base 身份帧（与持久化测试同形）。"""
+
+    def _named(field_name: str, raw) -> dict:
+        return {"no": 1, "name": field_name, "type": "", "value": "", "raw": raw}
+
+    base = {"no": 1, "name": "base", "type": "", "value": "", "children": [
+        _named("logic_id", uid), _named("name", name.encode()), _named("lv", 50)]}
+    avatar = {"no": 1, "name": "avatar", "type": "", "value": "", "children": [base]}
+    return PacketEvent(
+        ts=0.0, session_id="s1", direction="s2c", opcode=0x0152, opcode_name="ZoneEnterSceneRsp",
+        payload_len=0, decoded=[{"no": 1, "name": "self_info", "type": "", "value": "", "children": [avatar]}],
+    )
+
+
+def _hatch_event(ids: list[int]) -> PacketEvent:
+    return PacketEvent(
+        ts=0.0, session_id="s1", direction="s2c", opcode=0x0312, opcode_name="hatch", payload_len=0,
+        decoded=[{"no": 1, "name": "f1", "type": "", "value": "", "raw": None, "children": []}]
+        + [{"no": 2, "name": "f2", "type": "", "value": "", "raw": i} for i in ids],
+    )
+
+
 class ExtractEggsTests(unittest.TestCase):
     def test_extract_valid_row(self) -> None:
         eggs = extract_eggs(_event(_egg_row()))
@@ -145,6 +168,66 @@ class EggBoxRepositoryTests(unittest.TestCase):
         # instance 2 被第二帧覆盖为新 itemConfId
         self.assertEqual(snap[1].egg_conf_id, 3002001)
 
+    def test_account_switch_clears_eggs_and_slots(self) -> None:
+        """切号清空蛋仓与孵化槽，且孵化槽帧不把旧账号的蛋写进新账号记录。
+
+        回归：B 登录后仍能看到 A 的蛋，孵化槽帧触发整仓写入把 A 的蛋
+        复制进 B 的 uid 记录（审查复现的串库场景）。
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Database(Path(tmp) / "db.sqlite")
+            try:
+                store = EggStore(db, flush_interval=0.05)
+                repo = EggBoxRepository(store=store)
+
+                repo.handle_packet(_identity_event(uid=111, name="账号A"))
+                repo.handle_packet(_event(_egg_row(101)))
+                store.flush()
+
+                # 切换账号：内存蛋仓立即作废
+                repo.handle_packet(_identity_event(uid=222, name="账号B"))
+                self.assertEqual(repo.snapshot(), ())
+                self.assertEqual(repo.hatch_slots(), set())
+
+                # B 的孵化槽帧（A 的蛋 id）不得把 A 的蛋写入 B 的 uid
+                repo.handle_packet(_hatch_event([101]))
+                store.flush()
+                rows = db.query("SELECT uid, instance_id FROM eggs ORDER BY uid")
+                self.assertEqual([(r["uid"], r["instance_id"]) for r in rows], [(111, 101)])
+
+                # B 自有的蛋正常入仓入槽
+                repo.handle_packet(_event(_egg_row(202)))
+                repo.handle_packet(_hatch_event([202]))
+                snap = repo.snapshot()
+                self.assertEqual([e.instance_id for e in snap], [202])
+                self.assertEqual(repo.hatch_slots(), {202})
+                store.close()
+            finally:
+                db.close()
+
+    def test_load_last_account_not_treated_as_switch(self) -> None:
+        """离线恢复的蛋仓属于该账号：同账号登录不清空恢复的数据。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Database(Path(tmp) / "db.sqlite")
+            try:
+                store = EggStore(db)
+                store.put(101, [EggBoxEntry(
+                    instance_id=7, egg_conf_id=3001001, pet_conf_id=3001, quantity=1,
+                    obtained_at=1791661300, bag_type=8, height_cm=25, weight_g=1300,
+                    hatch_seconds=100, hatched_seconds=50, hatch_updated_at=0,
+                    start_hatch_time=0, category=6, special_egg_conf_id=0,
+                    appearance_type=0, extension_type=0,
+                )])
+                repo = EggBoxRepository(store=store)
+                self.assertEqual(repo.load_last_account(), 1)
+                repo.handle_packet(_identity_event(uid=101, name="账号A"))  # 同账号登录
+                self.assertEqual(len(repo.snapshot()), 1)
+                repo.handle_packet(_identity_event(uid=202, name="账号B"))  # 真切换
+                self.assertEqual(repo.snapshot(), ())
+                store.close()
+            finally:
+                db.close()
+
     def test_store_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             db = Database(Path(tmp) / "db.sqlite")
@@ -165,6 +248,31 @@ class EggBoxRepositoryTests(unittest.TestCase):
                 self.assertEqual(got.instance_id, 7)
                 self.assertEqual(got.hatch_seconds, 100)
                 self.assertTrue(got.hatching)
+                store.close()
+            finally:
+                db.close()
+
+    def test_store_write_behind_and_close_flush(self) -> None:
+        """写入不阻塞（待写表），close 落盘不丢（回归：同步写改异步的等价性）。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Database(Path(tmp) / "db.sqlite")
+            try:
+                store = EggStore(db, flush_interval=60.0)  # 不自动落盘，验证待写表
+                egg = EggBoxEntry(
+                    instance_id=1, egg_conf_id=3001001, pet_conf_id=3001, quantity=1,
+                    obtained_at=1, bag_type=8, height_cm=0, weight_g=0,
+                    hatch_seconds=0, hatched_seconds=0, hatch_updated_at=0,
+                    start_hatch_time=0, category=0, special_egg_conf_id=0,
+                    appearance_type=0, extension_type=0,
+                )
+                store.put(101, [egg])
+                self.assertEqual(store.pending_count, 1)
+                # 同 id 更新在待写表合并
+                store.put(101, [egg])
+                self.assertEqual(store.pending_count, 1)
+                store.close()  # close 内含最终 flush
+                self.assertEqual(store.pending_count, 0)
+                self.assertEqual(len(store.load(101)), 1)
             finally:
                 db.close()
 

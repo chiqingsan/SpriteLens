@@ -128,7 +128,7 @@ def build_demo_context(tmp: Path, count: int) -> AppContext:
             ),
         )
     repository._version += 1
-    repository._identity = PlayerIdentity(uid=101384922, name="话绵雨", level=60)
+    repository._account.observe(PlayerIdentity(uid=101384922, name="话绵雨", level=60))
 
     # 合成蛋仓（联查蛋目录：confId 取 eggs.json 的真实条目）
     egg_box = EggBoxRepository()

@@ -45,7 +45,8 @@ web (server/run/payloads/static)  →  view_models  →  services  →  domain /
 
 硬约束：`view_models` / `domain` / `services` / `repositories` 不 import
 web（aiohttp/pywebview）；protocol 不反向依赖 services/capture；线程安全边界——
-接入层回调运行于抓包线程，MonitorService 内部加锁，服务线程只做拉取
+嗅探线程只做分类/重组/入队，接入层回调（on_chunk 与流关闭事件，经同一队列
+**保序**）运行于投递线程，MonitorService 内部加锁，服务线程只做拉取
 （drain/snapshot），不做跨线程回调。
 
 ## 业务层无 UI 可测（强制约定）
@@ -90,9 +91,13 @@ web（aiohttp/pywebview）；protocol 不反向依赖 services/capture；线程�
 
 - 新增业务域数据：在 `repositories/database.py` 的 `_MIGRATIONS` **追加**
   `(版本号, SQL 语句组)`（不得修改已发布条目，历史库需能逐级升上来），
-  并新建同构 Store（参考 `pet_store.py`）。
-- 写路径必须无 IO：抓包线程内的调用只允许并入内存待写表；落盘交给
+  并新建同构 Store（参考 `pet_store.py` / `egg_store.py`）。
+- 迁移语句整组单事务执行，失败必须整体回滚（不得留下「列已存在但版本号
+  没推进」的半迁移库）；`ADD COLUMN` 类语句按「列已存在即跳过」容错。
+- 写路径必须无 IO：抓包线程内的调用只允许并入内存待写表/队列；落盘交给
   worker 线程批量执行（登录突发实测：同步 flush 会让轮询等待 57ms）。
+- 账号维度数据：uid 变化（真切换）才清该域内存快照；同 uid 重复身份帧与
+  离线加载账号登录不算切换——判定统一走 `services/account_tracker.py`。
 - 改表结构后跑 `tests.test_persistence`；损坏恢复路径已覆盖（备份重建）。
 
 ## 资源与打包兼容
@@ -172,6 +177,7 @@ web（aiohttp/pywebview）；protocol 不反向依赖 services/capture；线程�
 - 功能与用法变化 → `README.md`；架构边界与分层 → `docs/ARCHITECTURE.md`
 - 文件级新增/移动 → `docs/CODEBASE_MAP.md`（新增文件必须同步本表）
 - 协议结论与排障 → `docs/PROTOCOL_NOTES.md`
+- UI 视觉/组件规范 → `docs/UI_GUIDE.md`；蛋神对标实施状态 → `docs/DANSHEN_FEATURE_SPEC.md`
 - 竞品分析与功能规划 → `docs/COMPETITOR_ANALYSIS.md` / `docs/FEATURE_MODULES.md`
 - 开发约定（本文件）随实践更新：踩过的坑要写进来，避免重复犯
 

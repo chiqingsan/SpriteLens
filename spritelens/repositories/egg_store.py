@@ -1,12 +1,20 @@
-"""蛋仓持久化网关：写透 + 读取（与 PetStore 同型的简化版）。
+"""蛋仓持久化网关：写回缓存 + 后台批量落盘 + 读取（与 PetStore 同型）。
 
-蛋仓每次登录由服务器全量重推（先清后写即可保证一致），条目量级小
-（几百行），直接同步写，无需 PetStore 的 write-behind 批量刷盘。
+为什么异步：put() 由 EggBoxRepository 在 MonitorService 锁内的抓包回调
+里调用，同步 SQLite 提交会让磁盘变慢时拖住后续解码与 UI 事件拉取
+（PetStore 文件头记录了同类实测：每条 flush 净增约 14ms、UI 轮询最长
+57ms）。因此 put() 只并入内存待写表，落盘由独立 worker 线程批量执行。
+
+语义：同一 (uid, instance_id) 的重复更新在待写表天然合并；写库异常整批
+回滚回待写表（新值优先），下轮重试。读取前先 flush 待写表，保证
+「写出去的数据立刻读得到」。
 """
 
 from __future__ import annotations
 
 import json
+import sqlite3
+import threading
 import time
 
 from spritelens.domain.egg_box import EggBoxEntry
@@ -15,16 +23,79 @@ from spritelens.repositories.database import Database
 
 logger = get_logger("egg_store")
 
+DEFAULT_FLUSH_INTERVAL = 0.5
+
+_UPSERT_EGG = """
+INSERT INTO eggs (uid, instance_id, egg_conf_id, pet_conf_id, quantity,
+                  obtained_at, hatching, detail_json, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT (uid, instance_id) DO UPDATE SET
+    egg_conf_id = excluded.egg_conf_id,
+    pet_conf_id = excluded.pet_conf_id,
+    quantity    = excluded.quantity,
+    obtained_at = excluded.obtained_at,
+    hatching    = excluded.hatching,
+    detail_json = excluded.detail_json,
+    updated_at  = excluded.updated_at
+"""
+
+
+def _detail_json(egg: EggBoxEntry) -> str:
+    return json.dumps(
+        {
+            "height_cm": egg.height_cm,
+            "weight_g": egg.weight_g,
+            "hatch_seconds": egg.hatch_seconds,
+            "hatched_seconds": egg.hatched_seconds,
+            "hatch_updated_at": egg.hatch_updated_at,
+            "start_hatch_time": egg.start_hatch_time,
+            "category": egg.category,
+            "special_egg_conf_id": egg.special_egg_conf_id,
+            "appearance_type": egg.appearance_type,
+            "extension_type": egg.extension_type,
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+
 
 class EggStore:
-    """eggs 表的读写网关；单连接由 Database 的锁串行化。"""
+    """eggs 表的读写网关；写入方（抓包线程）永不等待磁盘。"""
 
-    def __init__(self, database: Database) -> None:
+    def __init__(self, database: Database, *, flush_interval: float = DEFAULT_FLUSH_INTERVAL) -> None:
         self._db = database
+        self._flush_interval = max(0.05, float(flush_interval))
+        self._lock = threading.Lock()
+        self._pending: dict[tuple[int, int], EggBoxEntry] = {}
+        self._stop = threading.Event()
+        self._worker: threading.Thread | None = None
+        self._closed = False
+        self._written = 0
 
+    # -- 写入（任意线程，无 IO）----------------------------------------
     def put(self, uid: int, eggs: list[EggBoxEntry]) -> int:
-        """覆盖式写入一批蛋（同 instance_id 覆盖）。"""
+        """并入待写表（同 (uid, instance_id) 以最新为准）；返回受理条数。"""
         if uid <= 0 or not eggs:
+            return 0
+        accepted = [egg for egg in eggs if egg.instance_id > 0]
+        if not accepted:
+            return 0
+        with self._lock:
+            if self._closed:
+                logger.warning("EggStore 已关闭，忽略 %d 枚蛋的写入", len(accepted))
+                return 0
+            for egg in accepted:
+                self._pending[(uid, egg.instance_id)] = egg
+            self._ensure_worker_locked()
+        return len(accepted)
+
+    # -- 落盘 ----------------------------------------------------------
+    def flush(self) -> int:
+        """把待写表批量写入 SQLite；返回本次写入的条数。"""
+        with self._lock:
+            pending = self._pending
+            self._pending = {}
+        if not pending:
             return 0
         now = time.time()
         rows = [
@@ -36,49 +107,27 @@ class EggStore:
                 egg.quantity,
                 egg.obtained_at,
                 1 if egg.hatching else 0,
-                json.dumps(
-                    {
-                        "height_cm": egg.height_cm,
-                        "weight_g": egg.weight_g,
-                        "hatch_seconds": egg.hatch_seconds,
-                        "hatched_seconds": egg.hatched_seconds,
-                        "hatch_updated_at": egg.hatch_updated_at,
-                        "start_hatch_time": egg.start_hatch_time,
-                        "category": egg.category,
-                        "special_egg_conf_id": egg.special_egg_conf_id,
-                        "appearance_type": egg.appearance_type,
-                        "extension_type": egg.extension_type,
-                    },
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                ),
+                _detail_json(egg),
                 now,
             )
-            for egg in eggs
+            for (uid, _iid), egg in pending.items()
         ]
         try:
-            self._db.execute_many(
-                """
-                INSERT INTO eggs (uid, instance_id, egg_conf_id, pet_conf_id, quantity,
-                                  obtained_at, hatching, detail_json, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT (uid, instance_id) DO UPDATE SET
-                    egg_conf_id = excluded.egg_conf_id,
-                    pet_conf_id = excluded.pet_conf_id,
-                    quantity    = excluded.quantity,
-                    obtained_at = excluded.obtained_at,
-                    hatching    = excluded.hatching,
-                    detail_json = excluded.detail_json,
-                    updated_at  = excluded.updated_at
-                """,
-                rows,
-            )
-        except Exception as exc:  # noqa: BLE001 - 持久化失败不阻断采集
-            logger.warning("蛋仓写入失败: %s", exc)
+            self._db.execute_many(_UPSERT_EGG, rows)
+        except sqlite3.Error as exc:
+            logger.warning("蛋仓写库失败，留待下轮重试: %s", exc)
+            with self._lock:
+                for key, egg in pending.items():  # 新值优先：不覆盖期间已合并的新数据
+                    self._pending.setdefault(key, egg)
             return 0
+        with self._lock:
+            self._written += len(rows)
         return len(rows)
 
+    # -- 读取 ----------------------------------------------------------
     def load(self, uid: int) -> tuple[EggBoxEntry, ...]:
+        """读取某账号全部蛋（按获取时间排序）；先落一次待写表保证一致。"""
+        self.flush()
         try:
             rows = self._db.query(
                 "SELECT instance_id, egg_conf_id, pet_conf_id, quantity, obtained_at,"
@@ -118,6 +167,7 @@ class EggStore:
 
     def load_latest(self) -> tuple[int, tuple[EggBoxEntry, ...]]:
         """最近活跃账号的蛋仓快照（离线展示用）。"""
+        self.flush()
         try:
             rows = self._db.query(
                 "SELECT uid, MAX(updated_at) AS recent FROM eggs GROUP BY uid ORDER BY recent DESC LIMIT 1"
@@ -130,5 +180,37 @@ class EggStore:
         uid = int(rows[0]["uid"])
         return uid, self.load(uid)
 
+    # -- 生命周期 ------------------------------------------------------
+    def close(self) -> None:
+        """停止 worker 并做最后一次落盘（退出不丢数据）。"""
+        with self._lock:
+            self._closed = True
+        self._stop.set()
+        worker = self._worker
+        if worker is not None:
+            worker.join(timeout=5)
+        self.flush()
 
-__all__ = ["EggStore"]
+    def _ensure_worker_locked(self) -> None:
+        if self._worker is not None and self._worker.is_alive():
+            return
+        self._worker = threading.Thread(target=self._run, name="spritelens-egg-store", daemon=True)
+        self._worker.start()
+
+    def _run(self) -> None:
+        while not self._stop.wait(self._flush_interval):
+            self.flush()
+
+    # -- 观测 ----------------------------------------------------------
+    @property
+    def pending_count(self) -> int:
+        with self._lock:
+            return len(self._pending)
+
+    @property
+    def written_count(self) -> int:
+        with self._lock:
+            return self._written
+
+
+__all__ = ["DEFAULT_FLUSH_INTERVAL", "EggStore"]

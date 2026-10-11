@@ -159,6 +159,90 @@ class MonitorServiceTest(unittest.TestCase):
         self.assertEqual(totals.key_miss, 1)
         self.assertEqual(totals.decrypt_ok, 0)
 
+    def test_close_session_releases_state(self):
+        """连接关闭事件释放管线会话状态（回归：_sessions 曾只增不减）。"""
+        self._feed_raw(make_ack_frame(SYNTH_KEY))
+        self.assertEqual(self.monitor.session_count, 1)
+        self.monitor.close_session(SESSION)
+        self.assertEqual(self.monitor.session_count, 0)
+        # 统计表同步移除该会话行
+        sessions, _totals = self.monitor.snapshot()
+        self.assertEqual([s.session_id for s in sessions], [])
+        # 同一 session_id 再次到来按新会话重建（需重新提 key）
+        self._feed_raw(make_data_frame(SYNTH_KEY, 0x0007, b"\x06" * 16, sequence=5))
+        _sessions, totals = self.monitor.snapshot()
+        self.assertEqual(totals.key_miss, 1)
+
+    def test_idle_session_swept(self):
+        """空闲超时回收：抓包异常断连（收不到 flow_closed）也能释放。"""
+        import spritelens.services.monitor_service as mod
+
+        self._feed_raw(make_ack_frame(SYNTH_KEY))
+        self.assertEqual(self.monitor.session_count, 1)
+        original = mod.SESSION_IDLE_SECONDS
+        mod.SESSION_IDLE_SECONDS = 0.0
+        try:
+            self.monitor._last_sweep = 0.0
+            self._feed_raw(make_data_frame(SYNTH_KEY, 0x0008, b"\x07" * 16, sequence=6))
+            # 上一条 chunk 里旧会话被清扫，同 id 重建
+            self.assertEqual(self.monitor.session_count, 1)
+        finally:
+            mod.SESSION_IDLE_SECONDS = original
+
+    def test_session_hard_cap(self):
+        """会话数硬上限（LRU 淘汰），防止内存无界增长。"""
+        import spritelens.services.monitor_service as mod
+
+        original = mod.MAX_SESSIONS
+        mod.MAX_SESSIONS = 3
+        try:
+            for i in range(6):
+                self.monitor.on_chunk(StreamChunk(
+                    session_id=f"10.9.9.{i}:5000",
+                    direction=Direction.S2C,
+                    data=b"\x33\x66" + b"\x00" * 30,
+                    first_seq=1,
+                ))
+            self.assertLessEqual(self.monitor.session_count, 3)
+        finally:
+            mod.MAX_SESSIONS = original
+
+    def test_source_events_preserve_data_before_close(self):
+        """回归（P1）：接入层关闭事件排在本会话数据之后，密钥不被提前清掉。
+
+        旧实现：FIN 在嗅探线程直接回调 close_session，越过仍排队的 DATA，
+        协议层先清密钥再处理残余数据 → key_miss，且会话被重新建出。
+        """
+        from spritelens.capture.npcap_source import FlowClosed, NpcapCaptureSource
+
+        source = NpcapCaptureSource(
+            port=8195,
+            on_chunk=self.monitor.on_chunk,
+            on_event=lambda kind, detail: self.monitor.close_session(detail) if kind == "flow_closed" else None,
+        )
+        # 依次投递：ACK（此时入会话）→ DATA → 关闭事件（模拟已排队的顺序）
+        self.monitor.on_chunk(StreamChunk(
+            session_id=SESSION, direction=Direction.S2C, data=make_ack_frame(SYNTH_KEY), first_seq=1))
+        self.monitor.on_chunk(StreamChunk(
+            session_id=SESSION, direction=Direction.S2C,
+            data=make_data_frame(SYNTH_KEY, 0x0009, b"\x08" * 16, sequence=2), first_seq=2))
+        source._announce_flow_closed(SESSION)  # 排队（本测试未起投递线程）
+
+        # 顺序处理队列：DATA 先解出事件、关闭事件再释放会话
+        while not source._queue.empty():
+            item = source._queue.get_nowait()
+            if isinstance(item, FlowClosed):
+                source._on_event("flow_closed", item.flow_id)
+            else:
+                source._on_chunk(item)
+
+        events = self.monitor.drain_events()
+        self.assertEqual([e.opcode for e in events], [0x0009])  # DATA 正常解出
+        _sessions, totals = self.monitor.snapshot()
+        self.assertEqual(totals.key_miss, 0)
+        # 关闭后会话已释放，且不会被残余数据重新建出
+        self.assertEqual(self.monitor.session_count, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

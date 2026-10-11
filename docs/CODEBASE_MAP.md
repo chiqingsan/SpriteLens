@@ -11,6 +11,7 @@
 | --- | --- |
 | `main.py` | 入口转发到 `spritelens.main:main` |
 | `start.bat` | 双击启动界面（pythonw，无控制台窗口） |
+| `start_silent.vbs` | 零窗口启动（wscript 直接跑 pythonw，cmd 不闪窗） |
 | `start_debug.bat` | 前台控制台启动（看错误输出用） |
 | `build.bat` + `build.py` + `build_config.toml` | Nuitka 打包（配置驱动；`--dry-run` 只打印命令） |
 | `requirements-build.txt` | 打包依赖（nuitka / ordered-set / zstandard），运行程序不需要 |
@@ -47,8 +48,8 @@
 | `protocol/schema.py` | schema 库加载、双路解码与降级 |
 | `protocol/opcodes.py` | opcode → 名称/分类/消息名目录 |
 | `capture/base.py` | CaptureSource 协议、StreamChunk、SourceError |
-| `capture/reassembly.py` | TCP 流重组（乱序/重传/全零段回滚/空洞，纯逻辑） |
-| `capture/npcap_source.py` | scapy AsyncSniffer 接入（轻量回调 + 队列 + worker 投递） |
+| `capture/reassembly.py` | TCP 流重组（乱序/重传/全零段回滚/空洞；交付历史只留最近 256KB，纯逻辑） |
+| `capture/npcap_source.py` | scapy AsyncSniffer 接入（轻量回调 + 队列 + worker 投递；FIN/RST/空闲淘汰释放流，关闭事件经队列保序） |
 | `capture/nic_rank.py` | 活跃网卡识别与排序（Get-NetAdapter Status=Up → 设备列表前置） |
 | `capture/key_store.py` | 密钥文本解析与 latest.key 持久化 |
 | `system/environment.py` | Npcap 检测、官方版本解析、下载、UAC 拉起安装向导 |
@@ -65,27 +66,28 @@
 | `domain/home.py` | 家园语义层：0x014A 快照 → 居民/家具/产蛋窝（实证字段映射 + NEST_TYPES） |
 | `domain/flowers.py` | 花种语义层：0x0375 花田帧 → 自己的花/好友花田（含宠物三维） |
 | `domain/display.py` | 展示常量：系别配色、六维标签、天赋阶配色（框架无关） |
-| `repositories/database.py` | SQLite 底座：连接、PRAGMA user_version 迁移（v2 含六维/外观列）、损坏自恢复 |
+| `repositories/database.py` | SQLite 底座：连接、PRAGMA user_version 迁移（v4 至炫彩外观列；整组事务化 + 半迁移自修复）、损坏自恢复 |
 | `repositories/pet_store.py` | 宠物持久化网关：write-behind 批量落盘 + 读取（适配器模式） |
-| `repositories/egg_store.py` | 蛋仓持久化网关：覆盖式写 + load_latest（v3 eggs 表） |
+| `repositories/egg_store.py` | 蛋仓持久化网关：write-behind 批量落盘 + load_latest（v3 eggs 表） |
 | `repositories/settings.py` | JSON 配置仓库（原子写、脏值归一、窗口几何） |
-| `services/monitor_service.py` | 采集管线编排：字节流 → 帧 → 解密 → 解码 → PacketEvent |
-| `services/session_tracker.py` | 会话表（LRU）与全局统计 |
-| `services/pet_repository.py` | 宠物聚合（内存快照 + 身份归属 + 入库出口；不注入 store 时纯内存） |
-| `services/egg_repository.py` | 蛋仓聚合（instance_id 去重 + 版本号 + 入库出口） |
-| `services/home_repository.py` | 家园聚合（快照覆盖 + 增量帧版本提示） |
-| `services/flower_repository.py` | 花田聚合（快照覆盖 + 版本号） |
-| `services/event_logger.py` | PacketEvent JSONL 落盘（按天分片，复盘用） |
+| `services/monitor_service.py` | 采集管线编排：字节流 → 帧 → 解密 → 解码 → PacketEvent；会话释放/空闲回收/硬上限 |
+| `services/session_tracker.py` | 会话表（LRU，支持 drop）与全局统计 |
+| `services/account_tracker.py` | 账号切换判定（uid 变化才清快照；同 uid 重复帧/离线加载登录不算切换） |
+| `services/pet_repository.py` | 宠物聚合（内存快照 + 身份归属/切号清空 + 彩名学习表恢复 + 入库出口） |
+| `services/egg_repository.py` | 蛋仓聚合（instance_id 去重 + 版本号 + 切号清空 + 入库出口） |
+| `services/home_repository.py` | 家园聚合（快照覆盖 + 切号清空 + 增量帧版本提示） |
+| `services/flower_repository.py` | 花田聚合（快照覆盖 + 切号清空 + 版本号） |
+| `services/event_logger.py` | PacketEvent JSONL 异步落盘（有界队列 + worker 批量写，按天分片，复盘用） |
 | `recording/recorder.py` | StreamChunk jsonl 录制/读回 |
 | `recording/replay.py` | ReplaySource + CLI 回放摘要输出 |
 | `logs/local_logger.py` | 双文件 RotatingFileHandler + 崩溃兜底 `install_excepthook`（crash.log） |
 | `view_models/pet_vm.py` | 宠物页 VM（多维筛选/排序/聚合统计，纯 Python） |
-| `view_models/capture_vm.py` | 采集页 VM（source 构造、Npcap 安装状态机、自动采集开关） |
+| `view_models/capture_vm.py` | 采集页 VM（source 构造、Npcap 安装状态机、自动采集开关、丢弃计数） |
 | `view_models/events_vm.py` | 协议流页 VM（行视图/详情缓存） |
 | `view_models/_shared.py` | 解码树文本渲染 |
 | `web/server.py` | 本地服务：aiohttp，仅回环 + 随机端口 + token 鉴权 + WS 推送 |
 | `web/run.py` | 界面入口：pywebview 窗口（系统 WebView2）+ 单实例唤醒 + 降级提示 |
-| `web/payloads.py` | 业务对象 → JSON 契约（宠物/概览/图鉴三类载荷，无 UI 依赖） |
+| `web/payloads.py` | 业务对象 → JSON 契约（宠物/概览/图鉴/蛋仓/家园/花田/色卡/种公矩阵，无 UI 依赖） |
 
 ## tests/（unittest 平铺）
 
@@ -97,20 +99,20 @@
 | `test_records.py` | trailer 剥离、s2c 锚点、c2s 偏移 |
 | `test_wire.py` | varint/嵌套/截断/二进制保留 |
 | `test_schema.py` | schema 加载、双路解码、opcode 目录 |
-| `test_reassembly.py` | 顺序/乱序/重复/全零段回滚/空洞/历史段 |
-| `test_monitor_service.py` | 管线端到端（key 捕获、续解、隔离、统计） |
-| `test_npcap_source.py` | 抓包线程逻辑（分类/入队/队列满丢弃/worker 投递） |
+| `test_reassembly.py` | 顺序/乱序/重复/全零段回滚/空洞/交付历史窗口裁剪 |
+| `test_monitor_service.py` | 管线端到端（key 捕获、续解、隔离、统计、会话释放与回收） |
+| `test_npcap_source.py` | 抓包线程逻辑（分类/入队/队列满丢弃/worker 投递/关闭事件保序/流淘汰） |
 | `test_recording.py` | 录制 roundtrip、坏行跳过、回放一致性 |
 | `test_pets.py` | 形状提取、仓库合并、schema→管线→聚合端到端、v2 扩展字段 |
 | `test_pet_vm.py` | 宠物 VM：多维筛选、排序、聚合统计 |
 | `test_static_data.py` | 静态表加载/索引/降级；base_conf_id 与 conf_id 的区分回归 |
 | `test_eggs.py` | 蛋目录：加载/索引/降级、载荷筛选（蛋组/类型/孵化时长/搜索） |
-| `test_egg_box.py` | 蛋仓：形状搜索提取/拒收、聚合去重、SQLite roundtrip、载荷联查、种公矩阵 |
+| `test_egg_box.py` | 蛋仓：形状搜索提取/拒收、聚合去重、SQLite roundtrip、写-behind 落盘、跨账号隔离、载荷联查、种公矩阵 |
 | `test_home.py` | 家园：居民/家具/窝提取、聚合与增量计数、载荷、花种提取与载荷 |
 | `test_desktop_shell.py` | 窗口几何 fit_window（DPI/工作区 clamp）、WebView2 env 覆盖检测 |
 | `test_nic_rank.py` | 活跃网卡排序（前置/保持原序/宽松匹配） |
 | `test_single_instance.py` | 单实例互斥锁唯一性、唤醒事件投递与消费、close 幂等 |
-| `test_persistence.py` | 身份识别（NPC 不误取）、写库/重开/加载、多账号隔离、迁移与损坏恢复 |
+| `test_persistence.py` | 身份识别（NPC 不误取）、写库/重开/加载、跨账号隔离、迁移事务/回滚/半迁移自修复、外观字段往返、彩名恢复、损坏恢复 |
 | `test_view_models.py` | VM 状态与命令（Capture/Events + 自动采集开关） |
 | `test_architecture.py` | 架构边界：业务层无 Web 依赖、无反向分层、protocol 纯函数约束 |
 | `test_crash_log.py` | 崩溃日志：主线程/后台线程异常落盘、Ctrl+C 不记录、写入失败静默 |
@@ -118,4 +120,4 @@
 | `test_smoke_assets.py` | 随包资源齐备（前端静态目录/静态表/schema），防打包漏带 |
 | `test_web_server.py` | 本地服务：token 鉴权（REST/WS）、随机端口、宠物/图鉴/采集 API、载荷构造 |
 | `test_environment.py` | Npcap 检测与安装引导状态机 |
-| `test_event_logger.py` | 事件日志落盘与分片 |
+| `test_event_logger.py` | 事件日志异步落盘与分片、队列满丢弃、关闭超时不跨线程关文件 |

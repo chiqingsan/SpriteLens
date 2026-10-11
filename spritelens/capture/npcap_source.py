@@ -6,6 +6,9 @@ scapy 采用延迟导入：顶层 import 会在 Windows 上触发 npcap 环境�
 抓包回调只做流分类与重组（微秒级），重组产出的 StreamChunk 进入有界
 队列由工作线程异步投递——登录/进场景时服务器会突发数百 KB 下行，若在
 嗅探线程内同步做解密解码，libpcap 内核缓冲会溢出导致整批丢包。
+
+流关闭（FIN/RST）同样经该队列保序投递（FlowClosed），嗅探线程不直接
+触碰协议层：既保证「残余数据先于关闭处理」，也让抓包线程不等待协议锁。
 """
 
 from __future__ import annotations
@@ -13,6 +16,7 @@ from __future__ import annotations
 import queue
 import threading
 import time
+from dataclasses import dataclass
 
 from spritelens.capture.base import SourceCallback, SourceError, SourceEventCallback, StreamChunk
 from spritelens.capture.reassembly import TcpStreamReassembler
@@ -25,6 +29,21 @@ logger = get_logger("npcap_source")
 PCAP_BUFFER_BYTES = 32 * 1024 * 1024
 # chunk 队列上限：超出说明下游持续过载，丢新块保嗅探（计数上报）。
 CHUNK_QUEUE_MAX = 4096
+# 流空闲淘汰：拔网线/进程被杀等异常断连收不到 FIN/RST，重组器必须按
+# 空闲时间回收（长时间挂机时流表与重组缓冲的内存边界）。
+FLOW_IDLE_SECONDS = 30 * 60
+_FLOW_SWEEP_INTERVAL = 60.0
+
+
+@dataclass(frozen=True)
+class FlowClosed:
+    """流关闭事件：经 chunk 队列保序投递（见 _announce_flow_closed）。
+
+    FIN/RST 到达时此前产生的 chunk 可能仍在队列里，直接回调会让协议层
+    先清会话密钥、再处理残余数据（复现过 DATA 解码失败 key_miss）。
+    """
+
+    flow_id: str
 
 
 class NpcapCaptureSource:
@@ -49,8 +68,12 @@ class NpcapCaptureSource:
         self._sniffer = None
         self._running = False
         self._flows: dict[str, dict[str, TcpStreamReassembler]] = {}
+        self._flow_lock = threading.Lock()  # 保护流表（嗅探线程写、UI 线程读计数）
+        self._flow_seen: dict[str, float] = {}
+        self._last_flow_sweep = 0.0
+        self._retired_dropped_segments = 0
         self._flow_count = 0
-        self._queue: queue.Queue[StreamChunk | None] = queue.Queue(maxsize=CHUNK_QUEUE_MAX)
+        self._queue: queue.Queue[StreamChunk | FlowClosed | None] = queue.Queue(maxsize=CHUNK_QUEUE_MAX)
         self._worker: threading.Thread | None = None
         self.dropped_chunks = 0
 
@@ -132,6 +155,12 @@ class NpcapCaptureSource:
             self._queue.put(None)  # 哨兵：结束工作线程
             self._worker.join(timeout=5)
             self._worker = None
+        # 停止后不再有 FIN/RST 事件，流表与重组缓冲在这里统一释放
+        with self._flow_lock:
+            self._retired_dropped_segments += self._live_dropped_segments()
+            self._flows.clear()
+            self._flow_seen.clear()
+            self._flow_count = 0
         self._on_event("stopped", "")
 
     @property
@@ -141,6 +170,68 @@ class NpcapCaptureSource:
     @property
     def flow_count(self) -> int:
         return self._flow_count
+
+    @property
+    def dropped_segments(self) -> int:
+        """重组层丢弃的乱序段总数（pending 超限 + 已关闭流的历史累计）。"""
+        with self._flow_lock:
+            return self._retired_dropped_segments + self._live_dropped_segments()
+
+    def _live_dropped_segments(self) -> int:
+        return sum(r.dropped_segments for flows in self._flows.values() for r in flows.values())
+
+    def _drop_flow(self, flow_id: str) -> int:
+        """移除流及其重组器；返回被移除的重组器个数（维护 flow_count）。"""
+        with self._flow_lock:
+            flows = self._flows.pop(flow_id, None)
+            self._flow_seen.pop(flow_id, None)
+            if not flows:
+                return 0
+            self._retired_dropped_segments += sum(r.dropped_segments for r in flows.values())
+            self._flow_count = max(0, self._flow_count - len(flows))
+            return len(flows)
+
+    def _sweep_flows(self, now: float) -> None:
+        """淘汰长时间无活动的流（异常断连时收不到 FIN/RST）。"""
+        with self._flow_lock:
+            stale = [fid for fid, seen in self._flow_seen.items() if now - seen > FLOW_IDLE_SECONDS]
+        for flow_id in stale:
+            logger.info("流空闲超时，释放重组器: %s", flow_id)
+            self._drop_flow(flow_id)
+            self._announce_flow_closed(flow_id)
+
+    def _announce_flow_closed(self, flow_id: str) -> None:
+        """把关闭事件排入 chunk 队列，由投递线程按序处理后回调。
+
+        顺序保证：关闭事件总排在「此前已入队的数据」之后，协议层因此
+        先解完残余数据、再释放会话（反之会清掉密钥导致 key_miss）。
+        满载时丢最旧一个数据块腾位——关闭事件必须按时送达，否则会话
+        状态泄漏；但绝不丢停止哨兵（None），它关系投递线程能否退出。
+        """
+        event = FlowClosed(flow_id=flow_id)
+        try:
+            self._queue.put_nowait(event)
+            return
+        except queue.Full:
+            pass
+        try:
+            victim = self._queue.get_nowait()
+        except queue.Empty:
+            victim = None  # 竞态：队列已被腾空，直接重试投递
+        else:
+            if victim is None:
+                try:
+                    self._queue.put_nowait(victim)  # 放回哨兵（刚取出必然有位）
+                except queue.Full:
+                    pass
+                logger.warning("流关闭事件未能入队（队列持续满载）: %s", flow_id)
+                return
+            if not isinstance(victim, FlowClosed):
+                self.dropped_chunks += 1  # 腾位丢弃的数据块计入过载统计
+        try:
+            self._queue.put_nowait(event)
+        except queue.Full:
+            logger.warning("流关闭事件未能入队（队列持续满载）: %s", flow_id)
 
     # -- 抓包回调（运行于 scapy 后台线程）-----------------------------
     def _handle_packet(self, packet) -> None:
@@ -166,15 +257,25 @@ class NpcapCaptureSource:
                 return
             flow_id = f"{client[0]}:{client[1]}"
             if flags & 0x01 or flags & 0x04:  # FIN / RST：会话结束
-                self._on_event("flow_closed", flow_id)
+                self._drop_flow(flow_id)
+                self._announce_flow_closed(flow_id)
                 return
             if not payload:
                 return
-            reassembler = self._flows.get(flow_id, {}).get(direction)
-            if reassembler is None:
-                reassembler = TcpStreamReassembler(name=flow_id)
-                self._flows.setdefault(flow_id, {})[direction] = reassembler
-                self._flow_count += 1
+            now = time.monotonic()
+            with self._flow_lock:
+                self._flow_seen[flow_id] = now
+                sweep_due = now - self._last_flow_sweep >= _FLOW_SWEEP_INTERVAL
+                if sweep_due:
+                    self._last_flow_sweep = now
+            if sweep_due:
+                self._sweep_flows(now)
+            with self._flow_lock:
+                reassembler = self._flows.get(flow_id, {}).get(direction)
+                if reassembler is None:
+                    reassembler = TcpStreamReassembler(name=flow_id)
+                    self._flows.setdefault(flow_id, {})[direction] = reassembler
+                    self._flow_count += 1
             seq = int(tcp.seq)
             data = reassembler.feed(seq, payload)
             if data:
@@ -193,15 +294,24 @@ class NpcapCaptureSource:
             logger.exception("处理抓包帧失败")
 
     def _drain_queue(self) -> None:
-        """工作线程：把重组后的 chunk 依次投递给监听管线（重活在下游）。"""
+        """工作线程：按入队顺序投递 chunk 与流关闭事件（保序是语义要求）。
+
+        关闭事件必须由本线程处理：若在嗅探线程直接回调，协议层会越过
+        队列里尚未处理的残余数据先释放会话（复现过 key_miss 与关闭后
+        会话被重新建出的场景）；经本线程后顺序天然正确，且嗅探线程
+        不再触碰协议层锁。
+        """
         while True:
-            chunk = self._queue.get()
-            if chunk is None:
+            item = self._queue.get()
+            if item is None:
                 return
             try:
-                self._on_chunk(chunk)
+                if isinstance(item, FlowClosed):
+                    self._on_event("flow_closed", item.flow_id)
+                else:
+                    self._on_chunk(item)
             except Exception:  # noqa: BLE001 - 下游缺陷不反噬抓包线程
-                logger.exception("投递 chunk 失败")
+                logger.exception("投递流数据失败")
 
     # -- 网卡枚举 ------------------------------------------------------
     @staticmethod

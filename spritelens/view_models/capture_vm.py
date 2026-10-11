@@ -68,6 +68,9 @@ class CaptureSnapshot:
     last_error: str
     any_key: bool
     event_log_name: str = ""
+    dropped_chunks: int = 0  # 队列过载丢弃的 chunk 数（下游处理不及时）
+    dropped_segments: int = 0  # 重组层丢弃的乱序段数（pending 超限）
+    event_log_dropped: int = 0  # 事件日志队列满丢弃的条数（磁盘跟不上）
 
 
 class CaptureViewModel:
@@ -96,6 +99,7 @@ class CaptureViewModel:
         self._recordings_dir = recordings_dir
         self._port = port
         self._event_log = event_log
+        self._source: NpcapCaptureSource | None = None  # 本次采集的接入层（读丢弃计数）
         self._iface = settings.get_str(IFACE_SETTING_KEY)
         self._recording_requested = settings.get_bool(RECORD_SETTING_KEY, False)
         # 打开即采集：默认开启（用户可关）；环境不满足时 start() 会转成可读错误
@@ -173,10 +177,11 @@ class CaptureViewModel:
         source = NpcapCaptureSource(
             self._port,
             on_chunk=self._tee_chunk,
-            on_event=lambda kind, detail: logger.info("[source] %s %s", kind, detail),
+            on_event=self._handle_source_event,
             iface=self._iface or None,
             extra_ports=self._extra_ports,
         )
+        self._source = source  # 先挂引用：启动期间的快照也能读到丢弃计数
         try:
             self._monitor.bind(source)
             self._monitor.start()
@@ -185,6 +190,17 @@ class CaptureViewModel:
             logger.warning("采集启动失败: %s", exc)
         if self._recording_requested and self._monitor.is_running:
             self._start_recording()
+
+    def _handle_source_event(self, kind: str, detail: str) -> None:
+        """接入层生命周期事件：连接关闭贯穿到协议层释放会话状态。
+
+        flow_closed 由投递线程按序回调（排在本会话残余数据之后），
+        因此 close_session 不会清掉尚未处理的 DATA 所需的密钥；
+        抓包线程与此回调解耦，不等待协议层锁。
+        """
+        logger.info("[source] %s %s", kind, detail)
+        if kind == "flow_closed" and detail:
+            self._monitor.close_session(detail)
 
     @property
     def extra_ports(self) -> tuple[int, ...]:
@@ -341,6 +357,7 @@ class CaptureViewModel:
             SessionRow(session_id=s.session_id, has_key=s.has_key, data_frames=s.data_frames)
             for s in sessions_raw
         )
+        source = self._source
         return CaptureSnapshot(
             running=self._monitor.is_running,
             iface=self._iface,
@@ -355,6 +372,15 @@ class CaptureViewModel:
                 Path(self._event_log.current_path).name
                 if self._event_log is not None and self._event_log.current_path
                 else ""
+            ),
+            # 丢弃计数：队列过载（下游处理不及时）与重组层超限，均是静默丢数据，
+            # 必须在状态接口可见（采集页据此提示"有数据未进入分析"）
+            dropped_chunks=getattr(source, "dropped_chunks", 0) if source is not None else 0,
+            dropped_segments=getattr(source, "dropped_segments", 0) if source is not None else 0,
+            event_log_dropped=(
+                self._event_log.dropped_count
+                if self._event_log is not None and hasattr(self._event_log, "dropped_count")
+                else 0
             ),
         )
 

@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -14,6 +15,14 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 def main() -> int:
+    # 子进程输出含非 GBK 字符（✓ 等），控制台默认 cp936 下子测试进程会直接
+    # UnicodeEncodeError；统一强制 UTF-8。父进程自身输出同样重配置。
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(encoding="utf-8", errors="replace")
     cmd = [
         sys.executable,
         "-B",
@@ -34,6 +43,7 @@ def main() -> int:
         text=True,
         encoding="utf-8",
         errors="replace",
+        env=env,
     )
     output = (proc.stdout or "") + (proc.stderr or "")
     print(output, end="" if output.endswith("\n") else "\n")

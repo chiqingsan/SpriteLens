@@ -119,8 +119,8 @@ start_debug.bat
 # 网络诊断：按会话统计 TCP 流量分布（排障用，游戏开着时运行）
 .venv\Scripts\python.exe main.py --diagnose-net 20
 
-# 离线回放录制文件
-.venv\Scripts\python.exe main.py --replay data\recordings\capture_xxx.jsonl
+# 离线回放录制文件（录制默认在数据目录的 recordings\ 下）
+.venv\Scripts\python.exe main.py --replay "%LOCALAPPDATA%\SpriteLens\recordings\capture_xxx.jsonl"
 
 # 组件自检（不打开窗口）
 .venv\Scripts\python.exe main.py --smoke-test
@@ -134,19 +134,19 @@ API 与 WebSocket 均校验。数据只在本机流动，不对外发送。
 
 ### 留档与复盘
 
-- 原始流录制：`data\recordings\`（勾选「自动录制原始流」，可 --replay 回放）
-- 事件日志：`data\eventlog\eventlog_YYYYMMDD.jsonl`（每条消息含完整解码字段树，
+- 原始流录制：`%LOCALAPPDATA%\SpriteLens\recordings\`（勾选「自动录制原始流」，可 --replay 回放）
+- 事件日志：`%LOCALAPPDATA%\SpriteLens\eventlog\eventlog_YYYYMMDD.jsonl`（每条消息含完整解码字段树，
   采集页状态行会显示当前文件名）
 
 界面操作顺序：选择游戏实际使用的网卡（不确定就保持「默认路由网卡」）→ 默认「打开即采集」已自动开始（也可手动点「开始采集」）
 → 再进入游戏。若在游戏已登录后才开始采集，请退出到登录界面重新进入（会话密钥只在
 连接建立时下发一次）。
 
-**状态行怎么读**：`采集中 | 原始流 N 段 / M | 密钥 ✓ | 解密成功 …`
+**状态行怎么读**：`原始流 N 段 / M 字节 · 解密成功 X · 缺密钥 Y · 会话 Z`（下游过载时追加 `· 丢弃 D 段`）
 
 - 原始流一直是 0 → 抓包层没工作（网卡选错或 Npcap 问题）
-- 原始流在涨但密钥「未获取」→ 连接建立早于采集启动，退回登录界面重新进入
-- 密钥 ✓ 且解密成功在涨 → 正常工作，事件流页实时滚动
+- 原始流在涨但解密成功不涨（缺密钥在涨）→ 连接建立早于采集启动，退回登录界面重新进入
+- 解密成功在涨 → 正常工作，事件流页实时滚动
 
 ## 数据目录
 
@@ -196,3 +196,4 @@ exe 放在哪都不影响配置与历史数据。
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 架构与协议说明
 - [docs/ARCHITECTURE_DECISION.md](docs/ARCHITECTURE_DECISION.md) 架构决策（含 Tauri 评估与 Web 化路线）
 - [docs/CODEBASE_MAP.md](docs/CODEBASE_MAP.md) 代码地图
+- [docs/UI_GUIDE.md](docs/UI_GUIDE.md) 前端视觉与组件规范

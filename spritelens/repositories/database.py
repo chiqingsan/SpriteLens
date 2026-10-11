@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import re
 import sqlite3
 import threading
 import time
@@ -19,6 +20,11 @@ from pathlib import Path
 from spritelens.logs import get_logger
 
 logger = get_logger("db")
+
+# 迁移语句里的 ALTER ADD COLUMN（用于幂等跳过历史半迁移库的已存在列）
+_ADD_COLUMN_RE = re.compile(
+    r"ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)", re.IGNORECASE
+)
 
 # 结构版本：新增表/列时追加 (版本号, SQL 语句组)，不得修改已发布的条目
 _MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
@@ -103,6 +109,15 @@ _MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
             "CREATE INDEX IF NOT EXISTS idx_eggs_uid ON eggs (uid, updated_at)",
         ),
     ),
+    (
+        4,
+        (
+            # 炫彩外观字段（色卡/花种离线展示依赖；此前未落库，重启清零）
+            "ALTER TABLE pets ADD COLUMN colorful_conf_id INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE pets ADD COLUMN glass_type       INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE pets ADD COLUMN glass_value      INTEGER NOT NULL DEFAULT 0",
+        ),
+    ),
 )
 
 
@@ -149,12 +164,37 @@ class Database:
         for version, statements in _MIGRATIONS:
             if version <= current:
                 continue
-            for statement in statements:
-                self._conn.execute(statement)
-            self._conn.execute(f"PRAGMA user_version = {version}")
-            self._conn.commit()
+            try:
+                # 整组 DDL 单事务：中途失败整体回滚，绝不留下「版本号未推进
+                # 但半个迁移已提交」的死局（旧实现逐句自动提交，重启必崩
+                # duplicate column name）
+                self._conn.execute("BEGIN")
+                for statement in statements:
+                    self._execute_migration_statement_locked(statement)
+                self._conn.execute(f"PRAGMA user_version = {version}")
+                self._conn.commit()
+            except sqlite3.Error as exc:
+                self._conn.rollback()
+                logger.error("数据库迁移 v%d 失败，已回滚: %s", version, exc)
+                raise
             logger.info("数据库迁移: v%d → v%d (%s)", current, version, self.path)
             current = version
+
+    def _execute_migration_statement_locked(self, statement: str) -> None:
+        """执行单条迁移语句；ALTER ADD COLUMN 幂等，修复历史半迁移库。
+
+        旧版逐句自动提交，中途中断会留下「列已存在但版本号没推进」的库：
+        重启重跑该句报 duplicate column name，启动被彻底卡死。这里对
+        ADD COLUMN 先查表结构，列已在则跳过——库自动修复到目标结构。
+        """
+        match = _ADD_COLUMN_RE.match(statement)
+        if match:
+            table, column = match.group(1), match.group(2)
+            existing = {row[1] for row in self._conn.execute(f"PRAGMA table_info({table})")}
+            if column in existing:
+                logger.warning("迁移跳过已存在列（历史半迁移库）: %s.%s", table, column)
+                return
+        self._conn.execute(statement)
 
     @property
     def schema_version(self) -> int:
@@ -164,17 +204,26 @@ class Database:
     # -- 执行 ----------------------------------------------------------
     def execute(self, sql: str, params: tuple = ()) -> None:
         with self._lock:
-            self._conn.execute(sql, params)
-            self._conn.commit()
+            try:
+                self._conn.execute(sql, params)
+                self._conn.commit()
+            except sqlite3.Error:
+                self._conn.rollback()
+                raise
 
     def execute_many(self, sql: str, seq_of_params: list[tuple]) -> int:
-        """批量执行（单事务、一次提交）；返回受影响行数。"""
+        """批量执行（单事务、一次提交）；失败整体回滚后抛出。"""
         if not seq_of_params:
             return 0
         with self._lock:
-            cursor = self._conn.executemany(sql, seq_of_params)
-            self._conn.commit()
-            return cursor.rowcount
+            try:
+                cursor = self._conn.executemany(sql, seq_of_params)
+                self._conn.commit()
+                return cursor.rowcount
+            except sqlite3.Error:
+                # 不回滚会留下半批残缺行，并被后续任何 commit 一起带入磁盘
+                self._conn.rollback()
+                raise
 
     def query(self, sql: str, params: tuple = ()) -> list[sqlite3.Row]:
         with self._lock:

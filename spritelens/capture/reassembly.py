@@ -6,7 +6,9 @@
 - 全零短段（突发前实测出现的 6 字节探测形态）暂缓下发：若随后同 seq 的
   真实段与之冲突，回滚重收（零丢失）；其余重叠冲突保留既有字节、接纳
   新段尾部（下游按内容自同步）；
-- pending 总量超限丢弃最远段，防止内存无限增长。
+- pending 总量超限丢弃最远段，防止内存无限增长；
+- 已交付字节保留有限历史窗口（重传比对所需），其余裁剪释放——
+  旧实现 `_buffer` 随流量无界增长（复现：交付 8 MiB 后仍全量保留）。
 
 历史教训：旧版对冲突一律丢弃新段，而服务器在大批下行突发前会插入同 seq
 的 6 字节全零段——真实首段被丢弃后空洞永久无法补齐，后续段全部卡在
@@ -20,6 +22,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 MAX_PENDING_BYTES = 8 * 1024 * 1024
+# 已交付字节的保留窗口：覆盖正常重传/冲突比对范围，超出即裁剪
+MAX_HISTORY_BYTES = 256 * 1024
 # 全零且不超过此长度的段视为可疑探测段，暂缓下发以待可能的回滚
 _TENTATIVE_MAX = 16
 
@@ -52,12 +56,19 @@ class TcpStreamReassembler:
 
     def _ingest(self, seq: int, payload: bytes, out: bytearray) -> None:
         if seq < self._base_seq:
-            # 早于基准的历史段（中段接入的残留重传）丢弃：帧不完整且多为
-            # 重复数据，保留反而引入负偏移与错乱拼接的风险
-            return
-        if seq + len(payload) <= self._next_seq:
+            if seq + len(payload) <= self._next_seq:
+                # 完全落在已交付（且可能已裁剪）区间：重复数据，丢弃
+                return
+            # 覆盖已裁剪历史 + 新尾部：历史部分无法比对（已交付），
+            # 直接接纳越过交付前沿的尾部
+            overlap = self._next_seq - seq
+            payload = payload[overlap:]
+            seq = self._next_seq
+            if not payload:
+                return
+        elif seq + len(payload) <= self._next_seq:
             return  # 完全重复的旧段（含已确认区间内的重复）
-        if seq < self._next_seq:
+        elif seq < self._next_seq:
             overlap = self._next_seq - seq
             existing = bytes(self._buffer[seq - self._base_seq : seq - self._base_seq + overlap])
             incoming = payload[:overlap]
@@ -104,11 +115,18 @@ class TcpStreamReassembler:
         self._store_pending(seq, payload)
 
     def _emit_ready(self, out: bytearray) -> None:
-        """下发 _buffer 中排除暂缓区后的全部新字节。"""
+        """下发 _buffer 中排除暂缓区后的全部新字节，并裁剪已交付历史。"""
         safe_end = len(self._buffer) - self._tentative_len
         if safe_end > self._emitted:
             out.extend(self._buffer[self._emitted:safe_end])
             self._emitted = safe_end
+        # 已交付区只保留最近 MAX_HISTORY_BYTES：重传比对窗口之外的内容
+        # 不再可能（也无必要）回滚，裁剪释放内存
+        if self._emitted > MAX_HISTORY_BYTES:
+            keep_from = self._emitted - MAX_HISTORY_BYTES
+            del self._buffer[:keep_from]
+            self._base_seq += keep_from  # 基准随裁剪前移（feed 后必非 None）
+            self._emitted -= keep_from
 
     def _store_pending(self, seq: int, payload: bytes) -> None:
         # 覆盖/去重：已有段包含新段则跳过，反之替换

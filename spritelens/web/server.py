@@ -518,6 +518,10 @@ class LocalServer:
             "any_key": snapshot.any_key,
             "last_error": snapshot.last_error,
             "event_log_name": snapshot.event_log_name,
+            # 静默丢数据信号：队列过载与重组超限（>0 时采集页提示）
+            "dropped_chunks": snapshot.dropped_chunks,
+            "dropped_segments": snapshot.dropped_segments,
+            "event_log_dropped": snapshot.event_log_dropped,
             "totals": {
                 "decrypt_ok": snapshot.totals.decrypt_ok,
                 "decrypt_fail": snapshot.totals.decrypt_fail,

@@ -17,19 +17,19 @@
 | 蛋神模块 | 规模 | 职责 | SpriteLens 状态 |
 |---|---:|---|---|
 | `roco_collector` | 7,117 行 | 协议采集器（可独立 CLI） | 已有等价且更强（schema 双路降级） |
-| `egg_types` | 小 | 蛋类型判定（普通/特殊/异色/神奇/炫彩 + 玻璃信息） | 📋 规格在 §3.1 |
-| `egg_inventory` | 757 行 | 蛋仓快照解析 + 分页 + SQLite | ⬜ 待做（需协议帧） |
+| `egg_types` | 小 | 蛋类型判定（普通/特殊/异色/神奇/炫彩 + 玻璃信息） | 🟡 协议字段已提取（special/appearance/extension）；动态判定未做（类型名暂用静态目录） |
+| `egg_inventory` | 757 行 | 蛋仓快照解析 + 分页 + SQLite | ✅ 已实装（蛋蛋仓库页：形状搜索累积 + SQLite 持久化） |
 | `egg_evidence` | 小 | 孵蛋证据链（性格预测/声音/标注来源） | ⬜ 待做 |
-| `nest_egg_inference` | 1,454 行 | **孵蛋推断引擎**（窝×父本→子代概率） | ⬜ 待做（算法在 §3.4） |
-| `home_scene` | 737 行 | 家园场景解码（居民/家具/产蛋窝/场景蛋） | ⬜ 待做（结构在 §3.5） |
-| `home_breeding_range` | 295 行 | 繁育范围（楼层×距离×蛋组兼容） | ⬜ 待做 |
-| `color_cards` | 小 | 炫彩色卡（glass→卡号/粒子映射） | ⬜ 待做 |
-| `flower_seeds` / `flower_state` | 小 | 炫彩花种（协议帧 + 按天合并） | ⬜ 待做 |
-| `pet_medals` | 4,710 行 | 体型/声音奖牌富化（种群内极值 + 内嵌种群名录） | ⬜ 待做（含 890 条宠物名数据） |
+| `nest_egg_inference` | 1,454 行 | **孵蛋推断引擎**（窝×父本→子代概率） | ⬜ 待做（算法在 §3.4；智能配窝页已占位） |
+| `home_scene` | 737 行 | 家园场景解码（居民/家具/产蛋窝/场景蛋） | ✅ 已实装（我的家园页；增量帧/配对未解析） |
+| `home_breeding_range` | 295 行 | 繁育范围（楼层×距离×蛋组兼容） | ⬜ 待做（智能配窝前置） |
+| `color_cards` | 小 | 炫彩色卡（glass→卡号/粒子映射） | ✅ 已实装（炫彩色卡页：底色×混色矩阵） |
+| `flower_seeds` / `flower_state` | 小 | 炫彩花种（协议帧 + 按天合并） | ✅ 已实装（炫彩花种页：0x0375 快照 + 宠物名学习表） |
+| `pet_medals` | 4,710 行 | 体型/声音奖牌富化（种群内极值 + 内嵌种群名录） | ⬜ 富化未做（medals.json 静态表已导入） |
 | `desktop_catalog` | 小 | 静态目录加载（技能/勋章/特长/体型声音名） | 部分已有（static_data） |
 | `desktop_preferences` | 小 | WebView2 leveldb 旧偏好迁移 | 不适用（无历史包袱） |
-| `collection_accounts` | 小 | 产线收集的账号维度（本地 gameIds ≤100 / 云端 gating） | ⬜ 本地部分待做 |
-| `webview_guard` / `window_geometry` / `window_close` | 小 | 桌面壳三件套 | ✅ 前两者已抄（见 §4） |
+| `collection_accounts` | 小 | 产线收集的账号维度（本地 gameIds ≤100 / 云端 gating） | ⬜ 本地部分待做（产线收集页已占位） |
+| `webview_guard` / `window_geometry` / `window_close` | 小 | 桌面壳三件套 | ✅ 前两者已抄（见 §3.9） |
 | `delta_update` / `remote_release` / `update_launcher` | 1,700+ 行 | 增量更新链（Ed25519+bsdiff4） | ⬜ 跳过（属分发服务） |
 | 云端（app 内 market/subscription/sync 部分） | — | 交易市场/订阅/云同步 | ⛔ 明确不做 |
 
@@ -115,7 +115,8 @@ recalculate / reconcile        快照对账（snapshot-species 规则）
 - 楼层：`_home_position` 的 signed x/y/z → 一楼/二楼/地下室（`home_floor`）
 - 请求/响应配对：`pending_home_collection`（前端主动拉家园数据，带 gameId + requestedAt，响应 ambiguous 处理）
 - 繁育范围：`in_range(a, b, home)`——两窝距离判定 + `compatible(a, b)`（性别不同 + 蛋组交集）
-- opcode 线索（待协议层确认）：0x14A/0x152 附近 + 0x7532
+- opcode（已确认）：0x014A 完整快照已实装（我的家园页）；0x0413/0x0414 增量帧仅作
+  版本提示（未解析）；`layEggCouples`（产蛋配对）与繁育范围未做
 
 ### 3.6 炫彩色卡（color_cards）与花种（flower_seeds/flower_state）
 
@@ -151,7 +152,7 @@ roco_helper 同款字段名 caught_camp）。花种帧（0x0375 field13）按这
 冲突消解：`resolve_size_medal_conflict(names, pet)`。
 desktopSkillMedalData.json 提供 skills/medals 名称映射（desktop_catalog 加载）。
 
-### 3.8 桌面壳三件套（已抄 ✅）
+### 3.9 桌面壳三件套（已抄 ✅）
 
 | 项 | 蛋神实现 | SpriteLens 实施 |
 |---|---|---|
@@ -167,7 +168,7 @@ desktopSkillMedalData.json 提供 skills/medals 名称映射（desktop_catalog �
 > DANSHEN_ASSISTANT_ANALYSIS.md §11 的方法重新生成）。
 
 蛋神路由结构 = `_process_frame` 的 if/elif 显式分支（17 个）+ 全扫描解码器（12 个，
-对每帧无条件尝试、结构校验通过即发事件）。与待实施页面直接相关的：
+对每帧无条件尝试、结构校验通过即发事件）。与页面直接相关的：
 
 | opcode | 方向 | 语义 | 喂给哪个页面 |
 |---|---|---|---|
@@ -202,21 +203,25 @@ handbook、egg.upsert、pet.snapshot、team.snapshot 等——这套"结构准�
 - 历史文档勘误：DANSHEN_ASSISTANT_ANALYSIS.md §3.2(7) 所述"活跃网卡智能排序
   （active_network_descriptions）"在 v1.1.6 中**不存在**——设备枚举仅用
   pcap_findalldevs，选择靠 config.json。SpriteLens 的 nic_rank.py 是自有增强（保留）。
-- 工程参数：pcap_setbuff 32 MiB（SpriteLens 可对照调大抓包缓冲）、BPF `tcp port 8195`、
+- 工程参数：pcap_setbuff 32 MiB（SpriteLens 已对齐：`PCAP_BUFFER_BYTES`）、BPF `tcp port 8195`、
   PcapWriter 写标准小端 pcap（0xA1B2C3D4 / snaplen 65535 / link_type 首包锁定）。
 
-## 5. 已实施清单（本轮）
+## 5. 已实施清单（累计）
 
 | 项 | 文件 | 说明 |
 |---|---|---|
-| UI 骨架 | `web/static/index.html` | 分组侧栏 + 8 个待实现页占位 + modal 层 |
-| 启动自恢复链 | `web/static/boot.js` + app.js | 资源加载错误捕获 + bootstrap 15s 超时重试 2 次 + 内联启动面板 |
-| WebView2 预检 | `system/webview_guard.py` | 开壳前检测，缺失弹窗引导（测试：test_desktop_shell） |
-| 窗口几何 + DPI | `system/window_geometry.py` + run.py | 工作区/DPI 适配初始尺寸 |
-| 活跃网卡排序 | `capture/nic_rank.py` | Get-NetAdapter Status=Up 前置（server 接线，测试：test_nic_rank） |
-| 蛋目录静态数据 | `tools/import_egg_data.py` + `data/static/eggs.json` | 224 种蛋（来源游戏客户端配置整理） |
-| 蛋目录域 | `domain/eggs.py` | EggCatalog（egg_conf_id/base_id 联查，测试：test_eggs） |
-| **蛋图鉴页** | payloads/server/app.js/index.html | `/api/eggs` + 筛选（蛋组/类型/孵化时长）+ 详情（倍速表/公母比环/身高体重/进化链） |
+| UI 骨架 | `web/static/index.html` | 分组侧栏（14 页）+ modal 层 |
+| 启动自恢复链 | `web/static/boot.js` + app.js | 资源加载错误捕获 + 15s 超时重试 + 内联启动面板 |
+| 桌面壳三件套 | `system/webview_guard.py` / `window_geometry.py` / run.py | WebView2 预检、窗口几何 + DPI（见 §3.9） |
+| 活跃网卡排序 | `capture/nic_rank.py` | Get-NetAdapter Status=Up 前置 |
+| 静态目录 | `tools/import_*.py` + `data/static/` | 蛋目录 224 / 图鉴描述 601 / 色卡 44 / 花种等级表 / 奖牌表 |
+| 蛋图鉴 / 蛋蛋仓库 | `domain/eggs.py` / `domain/egg_box.py` + `egg_store` | 蛋目录联查 + 蛋仓快照累积 → SQLite 持久化 + 孵化槽标记 |
+| 种公阵列 / 种公母库 | payloads 种公矩阵 + app.js | 性格×蛋组覆盖矩阵、公母分库（可折叠） |
+| 我的家园 | `domain/home.py` + `home_repository` | 0x014A 快照：居民/家具/产蛋窝 |
+| 炫彩色卡 / 炫彩花种 | `domain/color_cards.py` / `domain/flowers.py` | glass→卡号矩阵；0x0375 花田 + 宠物名学习表 |
+| 账号隔离 | `services/account_tracker.py` | 切号清空各域内存快照；同 uid 重复帧不误判 |
+| 持久化底座 | `repositories/*` + `services/event_logger.py` | v1→v4 追加式迁移（事务化）、宠物/蛋仓 write-behind |
+| 抓包健壮性 | `capture/npcap_source.py` + `services/monitor_service.py` | 32MiB 缓冲、流/会话回收、关闭事件保序、丢弃计数 |
 
 ## 6. 待实施清单（分批建议）
 
@@ -224,20 +229,20 @@ handbook、egg.upsert、pet.snapshot、team.snapshot 等——这套"结构准�
 > 大部分页面的前置只剩"真实帧验证 + 字段映射落码"。
 
 **第二批（有 opcode 映射，可直接开工）**：
-1. 蛋蛋仓库：0x1344 蛋背包分页解析（EggInventoryPages 等价物）→ SQLite → 页面 + "智能标注"UI
-2. 种公阵列：性格×蛋组覆盖矩阵（纯本地数据即可做；0x0312 孵化槽加"在孵"标记）
-3. 体型/声音奖牌富化：pet_medals 规则 + 种群名录静态数据
-4. 协议层增强：抓包缓冲 32MiB 对照、"3 秒停滞"断流恢复、IV exact 模式兼容
+1. 蛋蛋仓库 ✅ 已实装（0x1344 分页解析 + SQLite；"智能标注"UI 未做）
+2. 种公阵列 ✅ 已实装（性格×蛋组矩阵；0x0312 孵化槽已在蛋仓页标记）
+3. 体型/声音奖牌富化 ⬜（medals.json 静态表已导入，极值富化规则未做）
+4. 协议层增强 🟡 部分：32MiB 缓冲 ✅；"3 秒停滞"断流恢复 ⬜、IV exact 模式兼容 ⬜
 
 **第三批（需真实帧验证字段映射）**：
-5. 我的家园：0x014A/0x0413/0x0414 快照+增量 → 居民/家具/产蛋窝可视化
-6. 智能配窝：nest_egg_inference 推断引擎（§3.4 算法）+ planner UI
-7. 炫彩花种：0x039D/258/338 帧 + flowerLevels 静态表导入 + 按天合并
-8. 炫彩色卡：glass 信息帧 → card_id（底色×混色）矩阵
+5. 我的家园 ✅ 已实装（0x014A 快照；增量帧/产蛋配对未解析）
+6. 智能配窝 ⬜ 待做（nest_egg_inference 推断引擎（§3.4）+ planner UI；页占位已挂）
+7. 炫彩花种 ✅ 已实装（0x0375 快照 + 名字学习表）
+8. 炫彩色卡 ✅ 已实装（glass→卡号→底色×混色矩阵）
 
 **第四批（大工程）**：
-9. 产线收集：跨会话孵化统计（依赖蛋仓长期积累 + collection_accounts 本地部分）
-10. 证据链闭环：egg_evidence 三级标注（本地推断 > 手改 > 云标——纯本地只做前两级）
-11. 3D 宠物模型（蛋神用 Rust/WebGPU wasm 1.77MB + 云端模型 CDN——需评估本地化方案）
+9. 产线收集 ⬜ 待做（依赖蛋仓长期积累 + collection_accounts 本地部分；页占位已挂）
+10. 证据链闭环 ⬜ 待做（egg_evidence 三级标注——纯本地只做前两级）
+11. 3D 宠物模型 ⬜ 待做（蛋神用 Rust/WebGPU wasm 1.77MB + 云端模型 CDN——需评估本地化方案）
 
 **明确不做**：交易市场、换蛋广场、赞赏、云账号、订阅、增量更新服务（分发服务）。

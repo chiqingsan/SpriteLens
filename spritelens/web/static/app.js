@@ -1053,9 +1053,12 @@
   function renderCaptureSummary(payload) {
     var totals = payload.totals || {};
     var sessions = payload.sessions || [];
+    var dropped = (payload.dropped_chunks || 0) + (payload.dropped_segments || 0)
+      + (payload.event_log_dropped || 0);
     $("capture-stats").textContent = "原始流 " + (totals.raw_chunks || 0) + " 段 / "
       + (totals.raw_bytes || 0) + " 字节 · 解密成功 " + (totals.decrypt_ok || 0)
       + " · 缺密钥 " + (totals.key_miss || 0) + " · 会话 " + sessions.length
+      + (dropped > 0 ? " · 丢弃 " + dropped + " 段" : "")
       + (payload.event_log_name ? " · 事件日志 " + payload.event_log_name : "");
     $("session-rows").innerHTML = sessions.length ? sessions.map(function (item) {
       return "<tr><td>" + esc(item.session_id) + "</td>"
