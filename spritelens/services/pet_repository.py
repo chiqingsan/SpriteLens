@@ -25,12 +25,18 @@ class PetRepository:
     def __init__(self, store: PetStore | None = None) -> None:
         self._lock = threading.Lock()
         self._pets: dict[int, Pet] = {}
+        self._colorful_names: dict[int, str] = {}
         self._version = 0
         self._store = store
         self._identity: PlayerIdentity | None = None
 
     def handle_packet(self, event: PacketEvent) -> None:
         """PacketEvent 监听回调：先认身份，再提取宠物并合并（新的覆盖旧的）。"""
+        # 炫彩形态名字学习：花种帧按 colorful_conf_id（130xxx 系）引用宠物，
+        # 图鉴静态表不含该体系，只能从宠物帧的 (field58, name) 对现场学习
+        for pet in extract_pets(event):
+            if pet.colorful_conf_id > 0 and pet.name:
+                self._colorful_names.setdefault(pet.colorful_conf_id, pet.name)
         if self._store is not None:
             identity = extract_identity(event)
             if identity is not None:
@@ -50,6 +56,11 @@ class PetRepository:
             uid = self._identity.uid if self._identity is not None else 0
         if self._store is not None and uid > 0:
             self._store.put(uid, pets)
+
+    def colorful_name(self, conf_id: int) -> str | None:
+        """炫彩形态 id → 宠物名（协议学习表；未见过返回 None）。"""
+        with self._lock:
+            return self._colorful_names.get(conf_id)
 
     def snapshot(self) -> tuple[Pet, ...]:
         """当前全部宠物（按 gid 排序）；UI 按版本号判断是否需要重建表。"""

@@ -372,7 +372,10 @@ class LocalServer:
     async def _api_flowers(self, request: web.Request) -> web.Response:
         return web.json_response(
             flowers_payload(
-                self._context.flower_repo, self._context.static_data, self._context.egg_catalog
+                self._context.flower_repo,
+                self._context.static_data,
+                self._context.egg_catalog,
+                self._context.pet_repository,
             )
         )
 

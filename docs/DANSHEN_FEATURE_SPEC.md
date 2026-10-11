@@ -127,7 +127,20 @@ recalculate / reconcile        快照对账（snapshot-species 规则）
   记录 baseId/pet/endTime，登录（login 域）拉全量、增量更新
 - 花种等级静态表：assets/catalog/flowerLevels.json（source: client-config-reference）
 
-### 3.7 体型/声音奖牌（pet_medals）
+### 3.7 炫彩形态 id 体系与名字来源（重要结论）
+
+宠物帧 field58 = 炫彩形态 conf_id（130xxx/140xxx/5400xxx 系，实测 210/214 覆盖；
+roco_helper 同款字段名 caught_camp）。花种帧（0x0375 field13）按这套 id 引用宠物，
+**图鉴静态表（3001-5061 系）不含它，蛋神与 roco_helper 的发行包里也没有
+这套 id 的静态名字表**——两边都靠协议现场学习（宠物帧的 field58 + field3 名字
+成对出现）。SpriteLens 用 Pet.colorful_conf_id + PetRepository.colorful_name()
+学习表实现同款；未学到的 id 显示 "#id"（用户在游戏里获得该炫彩宠后自动补全）。
+
+宠物帧 field87 = glass 外观参数 {field1: type, field4: value}（214/214 全量携带；
+普通宠物实测 type=1/value=1，异色/炫彩时值变化）——色卡页数据随宠物帧全量
+下发，无需专门"查看色卡"操作。
+
+### 3.8 体型/声音奖牌（pet_medals）
 
 四种奖牌 = 种群内极值：大块头（体型最大）/ 小不点（最小）/ 粗嗓门（声音最低）/ 婉转声（最高）。
 `enrich_pet_medals(pet)`：内嵌种群名录（890 条宠物名 → 种群分组）+ `_load_catalog_measurements()`

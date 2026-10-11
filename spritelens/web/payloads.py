@@ -316,8 +316,12 @@ def male_matrix_payload(pet_repository, static: StaticData | None, gender: str =
     }
 
 
-def flowers_payload(flower_repo, static: StaticData | None, catalog=None) -> dict:
-    """炫彩花种载荷：我的花田 + 好友花田摘要（花联查宠物名）。"""
+def flowers_payload(flower_repo, static: StaticData | None, catalog=None, pet_repository=None) -> dict:
+    """炫彩花种载荷：我的花田 + 好友花田摘要（花联查宠物名）。
+
+    名字降级链：图鉴物种表 → 蛋目录 → 宠物帧学习表（colorful_conf_id→名字）
+    → "#id"。
+    """
     snap = flower_repo.snapshot() if flower_repo is not None else None
     if snap is None:
         return {"available": False, "own": [], "friends": [], "version": 0}
@@ -327,7 +331,10 @@ def flowers_payload(flower_repo, static: StaticData | None, catalog=None) -> dic
         if species is not None:
             return species.name
         egg = catalog.egg_by_base_id(conf_id) if catalog is not None else None
-        return egg.name if egg is not None else f"#{conf_id}"
+        if egg is not None:
+            return egg.name
+        learned = pet_repository.colorful_name(conf_id) if pet_repository is not None else None
+        return learned or f"#{conf_id}"
 
     def row(r, owner):
         return {

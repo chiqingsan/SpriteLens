@@ -32,6 +32,12 @@ _NO_BALL_ID = 11
 _NO_SKILL = 12
 _NO_ATTRIBUTE = 14
 _NO_BASE_CONF_ID = 15
+# 炫彩形态 conf_id（130xxx/5400xxx 系，花种帧引用的就是它；实测 210/214 覆盖）
+_NO_COLORFUL_CONF_ID = 58
+# glass 外观参数（异色/炫彩材质；普通宠物实测为 type=1, value=1）
+_NO_GLASS = 87
+_GLASS_TYPE = 1
+_GLASS_VALUE = 4
 _NO_HEIGHT = 26
 _NO_WEIGHT = 27
 _NO_CLASSIS = 28
@@ -110,6 +116,9 @@ class Pet:
     breakthrough_lv: int = 0
     speciality_id: int = 0
     ball_id: int = 0
+    colorful_conf_id: int = 0  # 炫彩形态 id（花种帧按它引用；0=未知）
+    glass_type: int = 0  # glass 外观参数（色卡底色维度；0=帧中无）
+    glass_value: int = 0  # glass 混色维度
     skills: tuple[PetSkill, ...] = ()
 
     def attribute(self, slot: str) -> PetAttribute:
@@ -250,8 +259,19 @@ def _extend_pet(base: Pet, node: list[dict]) -> Pet:
         breakthrough_lv=_coerce_int(_raw_by_no(node, _NO_BREAKTHROUGH)),
         speciality_id=_coerce_int(_raw_by_no(node, _NO_SPECIALITY)),
         ball_id=_coerce_int(_raw_by_no(node, _NO_BALL_ID)),
+        colorful_conf_id=_coerce_int(_raw_by_no(node, _NO_COLORFUL_CONF_ID)),
+        glass_type=_glass_dim(node, _GLASS_TYPE),
+        glass_value=_glass_dim(node, _GLASS_VALUE),
         skills=_skills_from_children(_children_by_no(node, _NO_SKILL)),
     )
+
+
+def _glass_dim(node: dict[str, object], child_no: int) -> int:
+    """glass 子消息（field87: {1: type, 4: value}）的维度值；缺失返回 0。"""
+    children = _children_by_no(node, _NO_GLASS)
+    if not children:
+        return 0
+    return _coerce_int(_raw_by_no(children, child_no))
 
 
 def _walk(fields: list[dict], out: list[Pet]) -> None:
