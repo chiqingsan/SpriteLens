@@ -999,6 +999,16 @@
     state.capture = payload;
     renderEnvBanner(payload.environment);
 
+    var toggle = $("btn-toggle");
+    if (toggle) {
+      var running = !!payload.running;
+      toggle.textContent = running ? "停止采集" : "开始采集";
+      toggle.classList.toggle("stop-button", running);
+      toggle.classList.remove("toggle-busy");
+      toggle.disabled = false;
+      toggle.onclick = running ? doStop : doStart;
+    }
+
     renderInstallProgress(payload.install || {});
     $("c-record").checked = !!payload.recording_requested;
     if ($("c-autostart")) { $("c-autostart").checked = payload.autostart !== false; }
@@ -1130,19 +1140,38 @@
     });
   }
 
+  /* 切换按钮的中间态：启动/停止都耗时（Npcap 开销），禁用+琥珀脉冲过渡 */
+  function setToggleBusy(text) {
+    var toggle = $("btn-toggle");
+    if (!toggle) { return; }
+    toggle.textContent = text;
+    toggle.classList.remove("stop-button");
+    toggle.classList.add("toggle-busy");
+    toggle.disabled = true;
+    toggle.onclick = null;
+  }
+
   function doStart() {
+    setToggleBusy("启动中…");
     api("/api/capture/start", { method: "POST" }).then(function (payload) {
       renderCapture(payload);
       if (payload.last_error) { toast("采集启动失败：" + payload.last_error, true); }
       else { toast("已开始采集"); }
-    }).catch(function (err) { toast("启动失败：" + err.message, true); });
+    }).catch(function (err) {
+      toast("启动失败：" + err.message, true);
+      if (state.capture) { renderCapture(state.capture); }  // 回落到上一状态
+    });
   }
 
   function doStop() {
+    setToggleBusy("停止中…");
     api("/api/capture/stop", { method: "POST" }).then(function (payload) {
       renderCapture(payload);
       toast("已停止采集");
-    }).catch(function (err) { toast("停止失败：" + err.message, true); });
+    }).catch(function (err) {
+      toast("停止失败：" + err.message, true);
+      if (state.capture) { renderCapture(state.capture); }
+    });
   }
 
   /* ---------- WebSocket 推送 ---------- */

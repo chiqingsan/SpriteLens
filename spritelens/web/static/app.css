@@ -128,7 +128,17 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   scrollbar-width: none;            /* Firefox：隐藏导航滚动条 */
 }
 #main-nav::-webkit-scrollbar { display: none; }  /* Chromium/WebView2 同 */
-.stop-button { background: var(--danger); box-shadow: 0 8px 20px rgba(227, 93, 106, .28); }
+/* 采集切换按钮三态：主色开始 / 危险色停止 / 琥珀处理中 */
+.top-actions .primary-button.stop-button {
+  background: var(--danger); color: #fff;
+  box-shadow: 0 8px 20px rgba(227, 93, 106, .28);
+}
+.top-actions .primary-button.toggle-busy {
+  background: linear-gradient(90deg, var(--amber), #f7bd63);
+  color: #3d2c00; cursor: progress; opacity: .9;
+  animation: busy-pulse 1.1s ease-in-out infinite;
+}
+@keyframes busy-pulse { 50% { opacity: .65; } }
 .nav-group { display: grid; gap: 4px; }
 .nav-item {
   height: 44px;
