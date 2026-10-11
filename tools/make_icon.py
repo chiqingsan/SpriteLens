@@ -10,64 +10,44 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "resources" / "app.ico"
-
-# 品牌色（与 web/static/app.css 的 teal 体系一致）
-TEAL = (7, 151, 143)
-TEAL_DEEP = (6, 70, 83)
-WHITE = (255, 255, 255)
+SOURCE = ROOT / "resources" / "icon_source.jpg"
+FAVICON = ROOT / "spritelens" / "web" / "static" / "favicon.png"
 
 SIZES = (16, 24, 32, 48, 64, 128, 256)
 
 
-def _draw(size: int) -> Image.Image:
-    """在 size×size 画布上画：深色圆角底 + 白色镜筒 + 三个像素点。"""
-    scale = 8  # 先大画布绘制再缩放，得到抗锯齿边缘
-    canvas = size * scale
-    img = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-
-    radius = int(canvas * 0.22)
-    draw.rounded_rectangle([0, 0, canvas - 1, canvas - 1], radius=radius, fill=TEAL_DEEP)
-
-    # 放大镜：圆环 + 手柄
-    ring_r = int(canvas * 0.26)
-    cx, cy = int(canvas * 0.44), int(canvas * 0.42)
-    stroke = max(scale, int(canvas * 0.085))
-    draw.ellipse(
-        [cx - ring_r, cy - ring_r, cx + ring_r, cy + ring_r],
-        outline=WHITE,
-        width=stroke,
-    )
-    handle_w = stroke
-    draw.line(
-        [cx + int(ring_r * 0.72), cy + int(ring_r * 0.72), int(canvas * 0.80), int(canvas * 0.80)],
-        fill=WHITE,
-        width=handle_w,
-    )
-
-    # 镜内三个像素点，暗示「精灵（点阵）」
-    dot = max(1, int(canvas * 0.045))
-    for dx, dy in ((-0.10, -0.10), (0.12, -0.04), (0.0, 0.14)):
-        px, py = cx + int(canvas * dx), cy + int(canvas * dy)
-        draw.rectangle([px - dot, py - dot, px + dot, py + dot], fill=TEAL)
-
-    return img.resize((size, size), Image.LANCZOS)
+def _load_canvas() -> Image.Image:
+    """加载源图：白底转透明（容差渐变保边缘平滑）、裁剪内容区、方形化居中。"""
+    src = Image.open(SOURCE).convert("RGBA")
+    px = src.load()
+    w, h = src.size
+    for y in range(h):
+        for x in range(w):
+            r, g, b, _ = px[x, y]
+            whiteness = min(r, g, b)
+            if whiteness >= 245 and max(r, g, b) - whiteness <= 12:
+                px[x, y] = (r, g, b, 0)
+    src = src.crop(src.getbbox())
+    side = max(src.size)
+    canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+    canvas.paste(src, ((side - src.width) // 2, (side - src.height) // 2), src)
+    return canvas
 
 
 def main() -> int:
-    frames = [_draw(size) for size in SIZES]
+    canvas = _load_canvas()
+    frames = [canvas.resize((size, size), Image.LANCZOS) for size in SIZES]
     OUT.parent.mkdir(parents=True, exist_ok=True)
     frames[-1].save(OUT, format="ICO", sizes=[(s, s) for s in SIZES], append_images=frames[:-1])
     print(f"已生成 {OUT}（{len(SIZES)} 个尺寸: {', '.join(map(str, SIZES))}）")
 
     # 同时导出 256px PNG 作为 favicon（浏览器标签页用）
-    png = ROOT / "spritelens" / "web" / "static" / "favicon.png"
-    frames[-1].save(png, format="PNG")
-    print(f"已生成 {png}")
+    frames[-1].save(FAVICON, format="PNG")
+    print(f"已生成 {FAVICON}")
     return 0
 
 
