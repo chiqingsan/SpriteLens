@@ -247,8 +247,14 @@
     }
     $("capture-message").textContent = message;
 
-    $("btn-start").disabled = !!capture.running;
-    $("btn-stop").disabled = !capture.running;
+    // 顶栏单按钮切换：运行中 = 危险色"停止采集"，否则主色"开始采集"
+    var toggle = $("btn-toggle");
+    if (toggle) {
+      var running = !!capture.running;
+      toggle.textContent = running ? "停止采集" : "开始采集";
+      toggle.classList.toggle("stop-button", running);
+      toggle.onclick = running ? doStop : doStart;
+    }
     $("btn-capture-start").disabled = !!capture.running;
     $("btn-capture-stop").disabled = !capture.running;
 
@@ -1716,6 +1722,10 @@
       if (window.__spritelensBoot) { window.__spritelensBoot.ready(); }
       $("startup").hidden = true;
       $("app").hidden = false;
+      if (payload.app && payload.app.version) {
+        var versionNode = $("app-version");
+        if (versionNode) { versionNode.textContent = "v" + payload.app.version + " · 纯本地运行"; }
+      }
       renderOverview(payload.overview || {});
       state.petOptions = (payload.pets || {}).options || null;
       state.pets = (payload.pets || {}).pets || [];

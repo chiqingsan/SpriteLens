@@ -18,7 +18,7 @@
     <!-- 侧栏 -->
     <aside class="sidebar">
       <div class="brand">
-        <span class="brand-mark">S</span>
+        <img class="brand-mark" src="/static/favicon.png" alt="">
         <div class="brand-copy">
           <strong>小洛探探</strong>
           <span>SpriteLens</span>
@@ -98,8 +98,8 @@
         </div>
       </nav>
       <div class="sidebar-foot">
-        <span class="privacy-dot"></span>
-        <div><strong>纯本地运行</strong><span>数据不出本机</span></div>
+        <span class="privacy-dot" title="纯本地运行：数据不出本机"></span>
+        <span id="app-version">—</span>
       </div>
     </aside>
 
@@ -119,8 +119,7 @@
           <span id="capture-message" class="status-copy">准备就绪</span>
         </div>
         <div class="top-actions">
-          <button id="btn-start" class="primary-button">开始采集</button>
-          <button id="btn-stop" class="ghost-button" disabled>停止</button>
+          <button id="btn-toggle" class="primary-button">开始采集</button>
         </div>
       </header>
 

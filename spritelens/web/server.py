@@ -42,6 +42,12 @@ from spritelens.web.payloads import (
 
 logger = get_logger("web")
 
+
+def _app_version() -> str:
+    from spritelens import __version__
+
+    return __version__
+
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 PUSH_INTERVAL = 0.5  # 状态推送节拍（秒）
 
@@ -293,7 +299,11 @@ class LocalServer:
     async def _api_bootstrap(self, request: web.Request) -> web.Response:
         ctx = self._context
         payload = {
-            "app": {"name": "SpriteLens", "display_name": "小洛探探"},
+            "app": {
+                "name": "SpriteLens",
+                "display_name": "小洛探探",
+                "version": _app_version(),
+            },
             "overview": overview_payload(ctx.pet_vm, ctx.pet_repository, ctx.static_data),
             "pets": pets_payload(ctx.pet_vm, ctx.static_data, ctx.color_catalog),
             "capture": self._capture_payload(),
