@@ -692,10 +692,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 :root { --male-strong: #5b9dd9; --female-strong: #d98ab0; }
 .nav-group-title {
   padding: 10px 14px 4px;
-  font-size: 10px; font-weight: 700; letter-spacing: .12em;
-  color: rgba(255, 255, 255, .42); text-transform: uppercase;
+  font-size: 11px; font-weight: 700;
+  color: rgba(255, 255, 255, .52);
+  user-select: none;  /* 分组标题是导航结构，不参与复制 */
 }
 .nav-subitem { padding-left: 18px; }
+/* 导航区整体不参与文本选择（按钮/标题均为结构元素） */
+#main-nav, .brand-copy, .sidebar-foot { user-select: none; }
 .nav-icon-text { display: grid; place-items: center; font-size: 15px; width: 18px; }
 
 /* 蛋图鉴 */
