@@ -1486,9 +1486,7 @@
         var attr = ' data-mmkey="' + encodeURIComponent(key) + '"';
         if (!pets) { return '<td class="mm-cell empty"' + attr + '>—</td>'; }
         var chips = pets.map(function (pet) {
-          var mark = pet.gender === 2 ? "♀" : "♂";
-          return '<span class="mm-pet" data-mm="' + pet.gid + '"><img src="' + esc(pet.icon_url)
-            + '" alt="" loading="lazy" onerror="this.remove()">' + mark + esc(pet.name) + "</span>";
+          return petChip(pet, false);
         }).join("");
         return '<td class="mm-cell"' + attr + '>' + chips + "</td>";
       }).join("");
@@ -1644,10 +1642,7 @@
       var blocks = groups.map(function (g) {
         var pets = payload.cells[nature.name + "|" + g] || [];
         var chips = pets.map(function (pet) {
-          var mark = pet.gender === 2 ? "♀" : "♂";
-          return '<span class="mm-pet" data-mm="' + pet.gid + '"><img src="' + esc(pet.icon_url)
-            + '" alt="" loading="lazy" onerror="this.remove()">' + mark + esc(pet.name)
-            + '<small>Lv' + pet.level + "</small></span>";
+          return petChip(pet);
         }).join("");
         return '<div class="bl-group"><b>' + esc(g) + '</b><div class="bl-chips">' + chips + "</div></div>";
       }).join("");
@@ -1702,11 +1697,11 @@
     });
   }
 
-  function petChip(pet) {
+  function petChip(pet, withLevel) {
     var mark = pet.gender === 2 ? "♀" : "♂";
     return '<span class="mm-pet" data-mm="' + pet.gid + '"><img src="' + esc(pet.icon_url)
       + '" alt="" loading="lazy" onerror="this.remove()">' + mark + esc(pet.name)
-      + '<small>Lv' + pet.level + "</small></span>";
+      + (withLevel === false ? "" : '<small>Lv' + pet.level + "</small>") + "</span>";
   }
 
   function renderColors(payload) {

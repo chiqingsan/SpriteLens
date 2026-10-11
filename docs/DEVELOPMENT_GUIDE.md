@@ -65,6 +65,7 @@ web（aiohttp/pywebview）；protocol 不反向依赖 services/capture；线程�
 
 ## 前端约定（web/static，零框架零构建）
 
+- **UI 视觉与组件一律遵循 `docs/UI_GUIDE.md`**（token 速查/组件清单/反面清单）
 - **颜色一律走 CSS 变量**（`app.css` 的 `:root`，teal 体系），禁止在样式里
   硬编码色值；系别色/天赋阶色属于业务常量，由 `domain/display.py` 经
   payloads 下发（前端不复制色表）
