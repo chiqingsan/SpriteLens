@@ -316,6 +316,39 @@ def male_matrix_payload(pet_repository, static: StaticData | None, gender: str =
     }
 
 
+def flowers_payload(flower_repo, static: StaticData | None, catalog=None) -> dict:
+    """炫彩花种载荷：我的花田 + 好友花田摘要（花联查宠物名）。"""
+    snap = flower_repo.snapshot() if flower_repo is not None else None
+    if snap is None:
+        return {"available": False, "own": [], "friends": [], "version": 0}
+
+    def name_of(conf_id: int) -> str:
+        species = static.species(conf_id) if static is not None else None
+        if species is not None:
+            return species.name
+        egg = catalog.egg_by_base_id(conf_id) if catalog is not None else None
+        return egg.name if egg is not None else f"#{conf_id}"
+
+    def row(r, owner):
+        return {
+            "slot_id": r.slot_id,
+            "slot_index": r.slot_index,
+            "pet_conf_id": r.pet_conf_id,
+            "pet_name": name_of(r.pet_conf_id) if r.pet_conf_id else "—",
+            "planted_at": r.planted_at,
+            "owner": owner,
+        }
+
+    own = [row(r, "self") for r in snap.own]
+    friends = [row(r, "friend") for r in snap.friends]
+    return {
+        "available": True,
+        "own": own,
+        "friends": friends,
+        "version": flower_repo.version(),
+    }
+
+
 def home_payload(home_repo, static: StaticData | None) -> dict:
     """我的家园载荷：居民（联查物种图标）/ 家具 / 产蛋窝 / 增量提示。"""
     snap = home_repo.snapshot() if home_repo is not None else None
@@ -359,13 +392,15 @@ def home_payload(home_repo, static: StaticData | None) -> dict:
 def egg_box_payload(egg_box, catalog) -> dict:
     """蛋蛋仓库载荷：蛋仓快照 + 蛋目录联查（名字/孵化时长/图标）+ 聚合统计。"""
     entries = egg_box.snapshot() if egg_box is not None else ()
+    slots = egg_box.hatch_slots() if egg_box is not None else set()
     rows: list[dict] = []
     hatching_count = 0
     total_quantity = 0
     for egg in entries:
         info = catalog.egg(egg.egg_conf_id) if catalog is not None else None
         total_quantity += egg.quantity or 1
-        if egg.hatching:
+        in_slot = egg.instance_id in slots
+        if egg.hatching or in_slot:
             hatching_count += 1
         rows.append(
             {
@@ -374,14 +409,19 @@ def egg_box_payload(egg_box, catalog) -> dict:
                 "egg_name": info.egg_name if info else f"蛋 #{egg.egg_conf_id}",
                 "species_name": info.name if info else "",
                 "icon_url": (
-                    f"/static/egg-icons/{info.egg_item_id}.png" if info.egg_item_id else ""
+                    f"/static/egg-icons/{info.egg_item_id}.png"
+                    if info is not None and info.egg_item_id
+                    else ""
                 ),
-                "fallback_icon_url": species_icon_url(info.base_id) if info is not None else "",
-                "egg_type_name": info.egg_type_name if info else "",
-                "hatch_label": info.hatch_label if info else "",
+                "fallback_icon_url": (
+                    species_icon_url(info.base_id) if info is not None else ""
+                ),
+                "egg_type_name": info.egg_type_name if info is not None else "",
+                "hatch_label": info.hatch_label if info is not None else "",
                 "quantity": egg.quantity,
                 "obtained_at": egg.obtained_at,
-                "hatching": egg.hatching,
+                "hatching": egg.hatching or in_slot,
+                "in_slot": in_slot,
                 "hatch_progress": round(egg.hatch_progress, 4),
                 "category": egg.category,
                 "height_cm": egg.height_cm,
@@ -393,6 +433,7 @@ def egg_box_payload(egg_box, catalog) -> dict:
         "total": len(entries),
         "total_quantity": total_quantity,
         "hatching": hatching_count,
+        "hatch_slots": len(slots),
         "version": egg_box.version() if egg_box is not None else 0,
     }
 
@@ -463,6 +504,7 @@ def egg_dex_payload(
 
 __all__ = [
     "egg_box_payload",
+    "flowers_payload",
     "home_payload",
     "male_matrix_payload",
     "egg_dex_payload",

@@ -117,5 +117,66 @@ class HomePayloadTests(unittest.TestCase):
         self.assertEqual(payload["residents"][0]["name"], "喵喵")
 
 
+class FlowerTests(unittest.TestCase):
+    """0x0375 花田帧提取（按真实帧结构构造）。"""
+
+    def _flower_event(self) -> PacketEvent:
+        # 实测层级：field2/field3 各一个节点，children 为重复 field1 子消息
+        own = {"no": 2, "name": "f2", "type": "", "value": "", "raw": None, "children": [
+            {"no": 1, "name": "f1", "type": "", "value": "", "raw": None, "children": [
+                {"no": 1, "name": "f1", "type": "", "value": "20131", "raw": 20131},
+                {"no": 3, "name": "f3", "type": "", "value": "4", "raw": 4},
+                {"no": 10, "name": "f10", "type": "", "value": "1791748800", "raw": 1791748800},
+                {"no": 13, "name": "f13", "type": "", "value": "130308", "raw": 130308},
+                {"no": 19, "name": "f19", "type": "", "value": "1", "raw": 1},
+            ]},
+        ]}
+        friend = {"no": 3, "name": "f3", "type": "", "value": "", "raw": None, "children": [
+            {"no": 1, "name": "f1", "type": "", "value": "", "raw": None, "children": [
+                {"no": 1, "name": "f1", "type": "", "value": "65516", "raw": 65516},
+                {"no": 13, "name": "f13", "type": "", "value": "130310", "raw": 130310},
+                {"no": 14, "name": "f14", "type": "", "value": "", "raw": None, "children": [
+                    {"no": 1, "name": "h", "type": "", "value": "403695", "raw": 403695},
+                    {"no": 2, "name": "w", "type": "", "value": "675368", "raw": 675368},
+                    {"no": 3, "name": "v", "type": "", "value": "64", "raw": 64},
+                ]},
+            ]},
+        ]}
+        return PacketEvent(
+            ts=0.0, session_id="s", direction="s2c", opcode=0x0375, opcode_name="x", payload_len=0,
+            decoded=[
+                {"no": 1, "name": "ok", "type": "", "value": "", "raw": None, "children": [
+                    {"no": 1, "name": "code", "type": "", "value": "0", "raw": 0}]},
+                own, friend,
+            ],
+        )
+
+    def test_extract(self) -> None:
+        from spritelens.domain.flowers import extract_flowers
+        snap = extract_flowers(self._flower_event())
+        self.assertIsNotNone(snap)
+        self.assertEqual(len(snap.own), 1)
+        self.assertEqual(snap.own[0].slot_id, 20131)
+        self.assertEqual(snap.own[0].pet_conf_id, 130308)
+        self.assertEqual(len(snap.friends), 1)
+        self.assertEqual(snap.friends[0].height, 403695)
+        self.assertEqual(snap.friends[0].owner, "friend")
+
+    def test_repo_and_payload(self) -> None:
+        from spritelens.services.flower_repository import FlowerRepository
+        from spritelens.web.payloads import flowers_payload
+        repo = FlowerRepository()
+        repo.handle_packet(self._flower_event())
+        payload = flowers_payload(repo, None, None)
+        self.assertTrue(payload["available"])
+        self.assertEqual(payload["own"][0]["pet_name"], "#130308")
+        self.assertEqual(payload["friends"][0]["owner"], "friend")
+
+    def test_non_flower_ignored(self) -> None:
+        from spritelens.domain.flowers import extract_flowers
+        self.assertIsNone(extract_flowers(
+            PacketEvent(0.0, "s", "s2c", 0x0376, "x", 0, [])))
+
+
 if __name__ == "__main__":
     unittest.main()

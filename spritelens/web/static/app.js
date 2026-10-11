@@ -127,6 +127,7 @@
     if (name === "male-matrix") { loadMaleMatrix(); }
     if (name === "home") { loadHome(); }
     if (name === "breeder-library") { loadBreederLibrary(); }
+    if (name === "flowers") { loadFlowers(); }
     if (name === "events") { loadEvents(); }
     if (name === "capture") { loadCapture(); }
     if (name === "overview") { loadOverview(); }
@@ -258,6 +259,10 @@
     if (payload.home_version !== undefined && payload.home_version !== homeState.version) {
       homeState.version = payload.home_version;
       if (state.page === "home") { loadHome(); }
+    }
+    if (payload.flower_version !== undefined && payload.flower_version !== flowerState.version) {
+      flowerState.version = payload.flower_version;
+      if (state.page === "flowers") { loadFlowers(); }
     }
 
     renderRole(payload.identity);
@@ -1561,6 +1566,43 @@
         + (nature.negative ? (STAT_CN[nature.negative] || nature.negative) + "↓" : "") + "</small></summary>"
         + blocks + "</details>";
     }).join("") || '<div class="empty-hint">没有符合条件的宠物</div>';
+  }
+
+  /* ---------- 炫彩花种 ---------- */
+  var flowerState = { data: null, version: -1 };
+
+  function loadFlowers() {
+    api("/api/flowers").then(function (payload) {
+      flowerState.data = payload;
+      flowerState.version = payload.version || 0;
+      renderFlowers();
+    }).catch(function (err) { toast("花田加载失败：" + err.message, true); });
+  }
+
+  function flowerCard(r) {
+    var planted = r.planted_at ? new Date(r.planted_at * 1000).toLocaleDateString() : "—";
+    return '<div class="fl-card"><b>' + esc(r.pet_name) + "</b>"
+      + '<small>槽位 #' + esc(r.slot_id) + "</small>"
+      + '<span class="muted">' + planted + "</span></div>";
+  }
+
+  function renderFlowers() {
+    var payload = flowerState.data;
+    if (!payload) { return; }
+    if (!payload.available) {
+      $("fl-meta").textContent = "等待花田快照（登录或打开花田界面后更新）";
+      $("fl-own").innerHTML = "";
+      $("fl-friends").innerHTML = "";
+      $("fl-own-empty").hidden = false;
+      $("fl-friends-empty").hidden = false;
+      return;
+    }
+    $("fl-meta").textContent = "快照 #" + payload.version + " · 我的花 " + (payload.own || []).length + " 朵";
+    $("fl-own").innerHTML = (payload.own || []).map(flowerCard).join("");
+    $("fl-own-empty").hidden = (payload.own || []).length > 0;
+    $("fl-friends").innerHTML = (payload.friends || []).map(flowerCard).join("");
+    $("fl-friend-count").textContent = (payload.friends || []).length + " 条";
+    $("fl-friends-empty").hidden = (payload.friends || []).length > 0;
   }
 
   /* ---------- 启动（15s 超时 + 自动重试 2 次，与自恢复链协同） ---------- */

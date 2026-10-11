@@ -40,6 +40,7 @@ _D_APPEARANCE_TYPE = 18
 _D_EXTENSION_TYPE = 21
 
 BAG_TYPE_EGG = 8
+OP_HATCH_SLOTS = 0x0312
 
 _EGG_TRAIT_NOS = (_D_HATCH_SECONDS, _D_HEIGHT_CM, _D_WEIGHT_G, _D_CATEGORY)
 
@@ -155,4 +156,23 @@ def extract_eggs(event: PacketEvent) -> list[EggBoxEntry]:
     return out
 
 
-__all__ = ["BAG_TYPE_EGG", "EggBoxEntry", "extract_eggs"]
+def extract_hatch_slots(event: PacketEvent) -> tuple[int, ...] | None:
+    """0x0312 孵化槽帧 → 正在孵化的蛋 instanceId 列表（实测结构）。
+
+    root.field1(成功).field4 = 版本对；顶层 field2 = 重复 varint（槽中蛋 id），
+    field3 = 重复 varint（已完成/关联队列，非槽位）——与蛋神规格
+    decode_egg_hatch_slots 的"root.field2 = 重复值"一致。
+    """
+    if event.direction != "s2c" or event.opcode != OP_HATCH_SLOTS or not event.decoded:
+        return None
+    ids: list[int] = []
+    for item in event.decoded:
+        if item.get("no") != 2:
+            continue
+        value = item.get("raw")
+        if isinstance(value, int) and 0 < value <= 0xFFFFFFFF:
+            ids.append(value)
+    return tuple(ids)
+
+
+__all__ = ["BAG_TYPE_EGG", "EggBoxEntry", "extract_eggs", "extract_hatch_slots", "OP_HATCH_SLOTS"]

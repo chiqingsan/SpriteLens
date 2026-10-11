@@ -399,7 +399,24 @@
         </div>
       </section>
       <section id="page-colors" class="page feature-page"><div class="feature-page-root" data-feature="炫彩色卡" data-hint="需要玻璃（glass）信息协议帧"></div></section>
-      <section id="page-flowers" class="page feature-page"><div class="feature-page-root" data-feature="炫彩花种" data-hint="需要花种协议帧与花种等级静态表"></div></section>
+      <!-- 炫彩花种 -->
+      <section id="page-flowers" class="page">
+        <div class="stack">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>我的花田</h2>
+              <span id="fl-meta" class="muted">等待花田快照（登录或打开花田界面后更新）</span>
+            </div>
+            <div id="fl-own" class="fl-grid"></div>
+            <div id="fl-own-empty" class="empty-hint" hidden>花田没有种植记录</div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><h2>好友花田</h2><span id="fl-friend-count" class="muted"></span></div>
+            <div id="fl-friends" class="fl-grid"></div>
+            <div id="fl-friends-empty" class="empty-hint" hidden>暂无好友花田数据</div>
+          </section>
+        </div>
+      </section>
 
       <!-- 协议流 -->
       <section id="page-events" class="page">

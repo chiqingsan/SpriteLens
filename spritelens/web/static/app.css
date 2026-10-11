@@ -728,6 +728,15 @@ button { border: 0; cursor: pointer; }
 .male-mark { color: #5b9dd9; }
 .female-mark { color: #d98ab0; }
 
+/* 炫彩花种 */
+.fl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.fl-card {
+  border: 1px solid var(--line); border-radius: 10px; background: #fff;
+  padding: 9px 11px; display: grid; gap: 3px;
+}
+.fl-card b { font-size: 13px; }
+.fl-card small { color: var(--muted); }
+
 /* 种公母库 */
 .bl-groups { display: grid; gap: 8px; }
 .bl-nature {

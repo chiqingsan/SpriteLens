@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from spritelens.domain.egg_box import EggBoxEntry, extract_eggs
+from spritelens.domain.egg_box import EggBoxEntry, extract_eggs, extract_hatch_slots
 from spritelens.domain.eggs import EggCatalog
 from spritelens.repositories.database import Database
 from spritelens.repositories.egg_store import EggStore
@@ -99,6 +99,39 @@ class ExtractEggsTests(unittest.TestCase):
     def test_no_events_without_tree(self) -> None:
         event = PacketEvent(0.0, "s", "c2s", 0x1344, "x", 0, [])
         self.assertEqual(extract_eggs(event), [])
+
+
+class HatchSlotTests(unittest.TestCase):
+    def test_extract_slot_ids(self) -> None:
+        event = PacketEvent(
+            ts=0.0, session_id="s", direction="s2c", opcode=0x0312, opcode_name="x", payload_len=0,
+            decoded=[
+                {"no": 1, "name": "f1", "type": "", "value": "", "raw": None, "children": [
+                    {"no": 1, "name": "ok", "type": "", "value": "0", "raw": 0},
+                    {"no": 4, "name": "f4", "type": "", "value": "", "raw": None, "children": []},
+                ]},
+                {"no": 2, "name": "f2", "type": "", "value": "888", "raw": 888},
+                {"no": 2, "name": "f2", "type": "", "value": "886", "raw": 886},
+                {"no": 3, "name": "f3", "type": "", "value": "263403", "raw": 263403},
+            ],
+        )
+        self.assertEqual(extract_hatch_slots(event), (888, 886))
+
+    def test_non_slot_frame(self) -> None:
+        event = PacketEvent(0.0, "s", "s2c", 0x0164, "x", 0, [])
+        self.assertIsNone(extract_hatch_slots(event))
+
+    def test_repo_marks_in_slot(self) -> None:
+        repo = EggBoxRepository()
+        repo.handle_packet(_event(_egg_row(888)))
+        repo.handle_packet(PacketEvent(
+            ts=0.0, session_id="s", direction="s2c", opcode=0x0312, opcode_name="x", payload_len=0,
+            decoded=[{"no": 2, "name": "f2", "type": "", "value": "888", "raw": 888}],
+        ))
+        payload = egg_box_payload(repo, None)
+        self.assertTrue(payload["eggs"][0]["hatching"])
+        self.assertTrue(payload["eggs"][0]["in_slot"])
+        self.assertEqual(payload["hatch_slots"], 1)
 
 
 class EggBoxRepositoryTests(unittest.TestCase):

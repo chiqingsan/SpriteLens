@@ -62,6 +62,7 @@
 | `domain/eggs.py` | 蛋目录：蛋静态数据索引（egg_conf_id / base_id 联查，孵蛋工具链底座） |
 | `domain/egg_box.py` | 蛋仓语义层：形状搜索提取 PacketEvent → EggBoxEntry（bagType==8 指纹） |
 | `domain/home.py` | 家园语义层：0x014A 快照 → 居民/家具/产蛋窝（实证字段映射 + NEST_TYPES） |
+| `domain/flowers.py` | 花种语义层：0x0375 花田帧 → 自己的花/好友花田（含宠物三维） |
 | `domain/display.py` | 展示常量：系别配色、六维标签、天赋阶配色（框架无关） |
 | `repositories/database.py` | SQLite 底座：连接、PRAGMA user_version 迁移（v2 含六维/外观列）、损坏自恢复 |
 | `repositories/pet_store.py` | 宠物持久化网关：write-behind 批量落盘 + 读取（适配器模式） |
@@ -72,6 +73,7 @@
 | `services/pet_repository.py` | 宠物聚合（内存快照 + 身份归属 + 入库出口；不注入 store 时纯内存） |
 | `services/egg_repository.py` | 蛋仓聚合（instance_id 去重 + 版本号 + 入库出口） |
 | `services/home_repository.py` | 家园聚合（快照覆盖 + 增量帧版本提示） |
+| `services/flower_repository.py` | 花田聚合（快照覆盖 + 版本号） |
 | `services/event_logger.py` | PacketEvent JSONL 落盘（按天分片，复盘用） |
 | `recording/recorder.py` | StreamChunk jsonl 录制/读回 |
 | `recording/replay.py` | ReplaySource + CLI 回放摘要输出 |
@@ -103,7 +105,7 @@
 | `test_static_data.py` | 静态表加载/索引/降级；base_conf_id 与 conf_id 的区分回归 |
 | `test_eggs.py` | 蛋目录：加载/索引/降级、载荷筛选（蛋组/类型/孵化时长/搜索） |
 | `test_egg_box.py` | 蛋仓：形状搜索提取/拒收、聚合去重、SQLite roundtrip、载荷联查、种公矩阵 |
-| `test_home.py` | 家园：居民/家具/窝提取、聚合与增量计数、载荷 |
+| `test_home.py` | 家园：居民/家具/窝提取、聚合与增量计数、载荷、花种提取与载荷 |
 | `test_desktop_shell.py` | 窗口几何 fit_window（DPI/工作区 clamp）、WebView2 env 覆盖检测 |
 | `test_nic_rank.py` | 活跃网卡排序（前置/保持原序/宽松匹配） |
 | `test_single_instance.py` | 单实例互斥锁唯一性、唤醒事件投递与消费、close 幂等 |

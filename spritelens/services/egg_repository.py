@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import threading
 
-from spritelens.domain.egg_box import EggBoxEntry, extract_eggs
+from spritelens.domain.egg_box import EggBoxEntry, extract_eggs, extract_hatch_slots
 from spritelens.domain.identity import extract_identity
 from spritelens.logs import get_logger
 from spritelens.services.monitor_service import PacketEvent
@@ -26,10 +26,22 @@ class EggBoxRepository:
         self._store = store
         self._lock = threading.Lock()
         self._eggs: dict[int, EggBoxEntry] = {}
+        self._hatch_slots: set[int] = set()  # 0x0312 槽中蛋 id
         self._identity = None
         self._version = 0
 
     def handle_packet(self, event: PacketEvent) -> None:
+        slots = extract_hatch_slots(event)
+        if slots is not None:
+            with self._lock:
+                self._hatch_slots = set(slots)
+                self._version += 1
+            # 落库标记在孵状态（快照里已有这些蛋时）
+            if self._store is not None:
+                uid = self._identity.uid if self._identity is not None else 0
+                if uid > 0 and self._eggs:
+                    self._store.put(uid, [e for e in self._eggs.values()])
+            return
         if self._store is not None:
             identity = extract_identity(event)
             if identity is not None:
@@ -68,9 +80,14 @@ class EggBoxRepository:
         with self._lock:
             return self._version
 
+    def hatch_slots(self) -> set[int]:
+        with self._lock:
+            return set(self._hatch_slots)
+
     def clear(self) -> None:
         with self._lock:
             self._eggs.clear()
+            self._hatch_slots.clear()
             self._version += 1
 
 
