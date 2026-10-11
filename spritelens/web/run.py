@@ -164,7 +164,7 @@ def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> None:
         server.url,
         width=width,
         height=height,
-        min_size=(1024, 640),
+        min_size=(640, 360),
         text_select=True,
         # WebView2 渲染前的空窗默认白色；用启动页同款深青色，消除白屏观感
         background_color=SPLASH_BG,

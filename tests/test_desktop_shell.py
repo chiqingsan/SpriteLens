@@ -12,24 +12,24 @@ from spritelens.system import webview_guard, window_geometry
 
 class WindowGeometryTests(unittest.TestCase):
     def test_default_on_1080p(self) -> None:
-        # 1920x1040 工作区 + 100% 缩放 → 默认 1120x700
-        self.assertEqual(window_geometry.fit_window(1920, 1040, 96), (1120, 700))
+        # 100% 缩放：工作区减 32 边距，上限 1440x810
+        self.assertEqual(window_geometry.fit_window(1920, 1040, 96), (1440, 810))
 
-    def test_small_screen_clamps_to_workarea(self) -> None:
-        # 1366x728 工作区 → 90% 上限
+    def test_small_screen_keeps_workarea(self) -> None:
+        # 小屏：工作区减边距后不足上限，取实际值
         width, height = window_geometry.fit_window(1366, 728, 96)
-        self.assertLessEqual(width, int(1366 * 0.9))
-        self.assertLessEqual(height, int(728 * 0.9))
+        self.assertEqual((width, height), (1334, 696))
 
-    def test_dpi_scales_up(self) -> None:
-        # 150% 缩放：1120*1.5=1680、700*1.5=1050 → 未触及工作区 90% 上限
-        width, height = window_geometry.fit_window(2560, 1400, 144)
-        self.assertEqual((width, height), (1680, 1050))
+    def test_dpi_converts_to_logical(self) -> None:
+        # 150% 缩放：物理工作区转逻辑后仍受 1440x810 上限约束
+        # （用户实测蛋神：逻辑 1440x810 = 物理 2160x1215，截图量到 2142x1206 含边框差）
+        width, height = window_geometry.fit_window(2560, 1396, 144)
+        self.assertEqual((width, height), (1440, 810))
 
-    def test_never_below_minimum(self) -> None:
+    def test_tiny_screen_floors(self) -> None:
+        # 极小工作区不低于下限语义（返回值供 min_size 使用）
         width, height = window_geometry.fit_window(700, 400, 96)
-        self.assertGreaterEqual(width, 630)  # min(640, 700)
-        self.assertGreaterEqual(height, 360)
+        self.assertEqual((width, height), (668, 368))
 
 
 class WindowGeometryStoreTests(unittest.TestCase):

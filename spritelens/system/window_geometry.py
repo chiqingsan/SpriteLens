@@ -13,9 +13,10 @@ from spritelens.logs import get_logger
 
 logger = get_logger("window_geometry")
 
-DEFAULT_W, DEFAULT_H = 1120, 700
-MIN_W, MIN_H = 640, 360
-_WORKAREA_RATIO = 0.9
+# 上限写死 1440x810（蛋神同款：高分屏窗口物理尺寸随 DPI 自然放大，逻辑不超）
+MAX_W, MAX_H = 1440, 810
+_MIN_W, _MIN_H = 640, 360
+_EDGE = 32  # 工作区边距
 _SPI_GETWORKAREA = 0x0030
 _FALLBACK_WORK = (1920, 1040)  # 取不到工作区时的合理兜底（1080p 常见值）
 _FALLBACK_DPI = 96
@@ -43,19 +44,26 @@ def system_dpi() -> int:
 
 
 def fit_window(work_width: int, work_height: int, dpi: int) -> tuple[int, int]:
-    """按 DPI 与工作区计算初始窗口尺寸（纯函数，便于测试）。"""
-    scale = dpi / 96.0
-    width = min(DEFAULT_W * scale, work_width * _WORKAREA_RATIO)
-    height = min(DEFAULT_H * scale, work_height * _WORKAREA_RATIO)
-    width = max(width, min(MIN_W * scale, work_width))
-    height = max(height, min(MIN_H * scale, work_height))
-    return int(width), int(height)
+    """按 DPI 与工作区计算初始窗口尺寸（蛋神同款公式，纯函数便于测试）。
+
+    work_* 为物理像素：先除以 DPI 缩放转逻辑像素（pywebview 的 width 参数
+    即逻辑像素），再减去屏幕边距，上限 1440x810。此前把 DPI 当乘数放大
+    尺寸是错误实现（150% 屏上窗口物理尺寸超屏，用户实测"过大"的根因）。
+    """
+    scale = max(1.0, dpi / 96.0)
+    logical_w = work_width / scale
+    logical_h = work_height / scale
+    width = max(1, min(MAX_W, int(logical_w) - _EDGE))
+    height = max(1, min(MAX_H, int(logical_h) - _EDGE))
+    return width, height
 
 
 def initial_window_size() -> tuple[int, int]:
     """开壳用的初始尺寸。"""
-    width, height = fit_window(*work_area(), system_dpi())
-    logger.info("初始窗口尺寸: %dx%d（工作区 %s，DPI %d）", width, height, work_area(), system_dpi())
+    work = work_area()
+    dpi = system_dpi()
+    width, height = fit_window(*work, dpi)
+    logger.info("初始窗口尺寸: %dx%d（工作区 %s，DPI %d）", width, height, work, dpi)
     return width, height
 
 
