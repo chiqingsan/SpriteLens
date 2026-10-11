@@ -34,6 +34,7 @@ def run_web(*, open_browser: bool = False) -> int:
     """启动 Web 界面；返回进程退出码。"""
     setup_logger(logs_dir())
     _enable_dpi_awareness()
+    _set_app_user_model_id()
 
     guard = SingleInstanceGuard()
     if not guard.acquire():
@@ -84,7 +85,10 @@ def run_web(*, open_browser: bool = False) -> int:
 
 def _fatal(title: str, message: str) -> None:
     """弹出系统错误框：pythonw 启动时控制台不可见，必须让用户看到失败原因。"""
-    print(f"[web] {title}：{message}")
+    try:
+        print(f"[web] {title}：{message}")  # pythonw 下 stdout 为 None，静默跳过
+    except Exception:  # noqa: BLE001
+        pass
     try:
         import ctypes
 
@@ -114,13 +118,41 @@ def _enable_dpi_awareness() -> None:
         logger.debug("DPI 感知声明失败: %s", exc)
 
 
+def _set_app_user_model_id() -> None:
+    """声明独立 AppUserModelID：源码运行时任务栏不归到 pythonw.exe 默认图标。"""
+    try:
+        import ctypes
+
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("SpriteLens.App")
+    except Exception as exc:  # noqa: BLE001 - 失败只影响任务栏图标归属
+        logger.debug("AppUserModelID 设置失败: %s", exc)
+
+
+def _apply_window_icons(hwnd: int, icon_path: str) -> None:
+    """给窗口发大小两档图标：标题栏 + 任务栏 + Alt-Tab（源码运行场景）。"""
+    import ctypes
+    from ctypes import wintypes
+
+    if not icon_path or not hwnd:
+        return
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    IMAGE_ICON, LR_LOADFROMFILE = 1, 0x10
+    for flag, size in ((0x80, 32), (0x81, 16)):  # WM_SETICON: ICON_BIG / ICON_SMALL
+        handle = user32.LoadImageW(None, icon_path, IMAGE_ICON, size, size, LR_LOADFROMFILE)
+        if handle:
+            user32.SendMessageW(wintypes.HWND(hwnd), wintypes.UINT(flag), wintypes.WPARAM(0), wintypes.LPARAM(handle))
+
+
 def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> None:
     """开 pywebview 窗口并阻塞到用户关闭它。"""
     import webview
 
     from spritelens.system.window_geometry import initial_window_size
 
-    width, height = initial_window_size()
+    settings = server._context.settings
+    saved = settings.window_geometry()
+    if saved:
+        width, height = saved["width"], saved["height"]
 
     # 唤醒句柄交给 WebView2 的窗口做前台置顶（重复启动时）
     activation_handle = guard.create_activation_event()
@@ -155,10 +187,43 @@ def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> None:
         stop_flag = None
 
     try:
-        webview.start(debug=False, icon=str(_icon_path()))  # 阻塞至窗口关闭
+        webview.start(
+            _late_init,
+            args=(window, _icon_path(), settings),  # GUI 就绪后在后台线程执行
+            debug=False,
+            icon=str(_icon_path()),
+        )  # 阻塞至窗口关闭
     finally:
         if stop_flag is not None:
             stop_flag.set()
+
+
+def _late_init(window, icon_path: str, settings) -> None:
+    """GUI 就绪后的收尾：窗口图标 + 关闭时保存窗口几何。"""
+    import time
+
+    time.sleep(0.8)  # 等 WebView2 窗口真实创建（EnumWindows 找句柄）
+    try:
+        _apply_window_icons(_window_handle(), icon_path)
+    except Exception as exc:  # noqa: BLE001 - 图标失败不影响功能
+        logger.debug("窗口图标设置失败: %s", exc)
+
+    def _save_geometry() -> None:
+        try:
+            if window.is_maximized:
+                return  # 最大化尺寸不是用户期望的还原尺寸，保留上次窗口化几何
+            settings.set_window_geometry(
+                width=int(window.width),
+                height=int(window.height),
+                maximized=False,
+            )
+        except Exception as exc:  # noqa: BLE001 - 几何保存失败不阻断退出
+            logger.debug("窗口几何保存失败: %s", exc)
+
+    try:
+        window.events.closed += _save_geometry
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("closed 事件注册失败: %s", exc)
 
 
 def _icon_path() -> str:

@@ -12,8 +12,8 @@ from spritelens.system import webview_guard, window_geometry
 
 class WindowGeometryTests(unittest.TestCase):
     def test_default_on_1080p(self) -> None:
-        # 1920x1040 工作区 + 100% 缩放 → 默认 1280x720
-        self.assertEqual(window_geometry.fit_window(1920, 1040, 96), (1280, 720))
+        # 1920x1040 工作区 + 100% 缩放 → 默认 1120x700
+        self.assertEqual(window_geometry.fit_window(1920, 1040, 96), (1120, 700))
 
     def test_small_screen_clamps_to_workarea(self) -> None:
         # 1366x728 工作区 → 90% 上限
@@ -22,14 +22,27 @@ class WindowGeometryTests(unittest.TestCase):
         self.assertLessEqual(height, int(728 * 0.9))
 
     def test_dpi_scales_up(self) -> None:
-        # 150% 缩放：1280*1.5=1920 超出上限 → 受工作区 90% 约束
+        # 150% 缩放：1120*1.5=1680、700*1.5=1050 → 未触及工作区 90% 上限
         width, height = window_geometry.fit_window(2560, 1400, 144)
-        self.assertEqual((width, height), (1920, 1080))
+        self.assertEqual((width, height), (1680, 1050))
 
     def test_never_below_minimum(self) -> None:
         width, height = window_geometry.fit_window(700, 400, 96)
         self.assertGreaterEqual(width, 630)  # min(640, 700)
         self.assertGreaterEqual(height, 360)
+
+
+class WindowGeometryStoreTests(unittest.TestCase):
+    def test_roundtrip_and_default(self) -> None:
+        import tempfile
+        from spritelens.repositories.settings import SettingsRepository
+        with tempfile.TemporaryDirectory() as tmp:
+            settings = SettingsRepository(Path(tmp) / "config.json")
+            self.assertIsNone(settings.window_geometry())  # 未记录过
+            settings.set_window_geometry(width=1180, height=730, maximized=False)
+            geometry = settings.window_geometry()
+            self.assertEqual((geometry["width"], geometry["height"]), (1180, 730))
+            self.assertFalse(geometry["maximized"])
 
 
 class WebviewGuardTests(unittest.TestCase):

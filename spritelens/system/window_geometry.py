@@ -13,7 +13,7 @@ from spritelens.logs import get_logger
 
 logger = get_logger("window_geometry")
 
-DEFAULT_W, DEFAULT_H = 1280, 720
+DEFAULT_W, DEFAULT_H = 1120, 700
 MIN_W, MIN_H = 640, 360
 _WORKAREA_RATIO = 0.9
 _SPI_GETWORKAREA = 0x0030

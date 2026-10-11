@@ -16,6 +16,6 @@ $shortcut.TargetPath = $pythonw
 $shortcut.Arguments = 'main.py'
 $shortcut.WorkingDirectory = $Root
 $shortcut.Description = '小洛探探 SpriteLens - 洛克王国数据观测'
-$shortcut.IconLocation = "$pythonw,0"
+$shortcut.IconLocation = Join-Path $Root 'resourcespp.ico'  # 应用图标而非 pythonw 默认图标
 $shortcut.Save()
 Write-Host "已创建桌面快捷方式: $lnkPath" -ForegroundColor Green
