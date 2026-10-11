@@ -295,7 +295,7 @@ class LocalServer:
         payload = {
             "app": {"name": "SpriteLens", "display_name": "小洛探探"},
             "overview": overview_payload(ctx.pet_vm, ctx.pet_repository, ctx.static_data),
-            "pets": pets_payload(ctx.pet_vm, ctx.static_data),
+            "pets": pets_payload(ctx.pet_vm, ctx.static_data, ctx.color_catalog),
             "capture": self._capture_payload(),
             "state": self._state_payload(),
         }
@@ -303,7 +303,9 @@ class LocalServer:
 
     async def _api_pets(self, request: web.Request) -> web.Response:
         self._apply_pet_query(request.query)
-        return web.json_response(pets_payload(self._context.pet_vm, self._context.static_data))
+        return web.json_response(
+            pets_payload(self._context.pet_vm, self._context.static_data, self._context.color_catalog)
+        )
 
     def _apply_pet_query(self, query) -> None:
         vm = self._context.pet_vm
@@ -318,7 +320,9 @@ class LocalServer:
     async def _api_pets_clear(self, request: web.Request) -> web.Response:
         """清空会话内宠物快照（本地库历史不受影响）。"""
         await asyncio.to_thread(self._context.pet_vm.clear)
-        return web.json_response(pets_payload(self._context.pet_vm, self._context.static_data))
+        return web.json_response(
+            pets_payload(self._context.pet_vm, self._context.static_data, self._context.color_catalog)
+        )
 
     async def _api_handbook(self, request: web.Request) -> web.Response:
         query = request.query

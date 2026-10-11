@@ -39,7 +39,13 @@ def species_icon_url(base_conf_id: int) -> str:
     return f"/static/pets/{base_conf_id}.webp"
 
 
-def pet_row(pet: Pet, static: StaticData | None, height_max: int, weight_max: int) -> dict:
+def pet_row(
+    pet: Pet,
+    static: StaticData | None,
+    height_max: int,
+    weight_max: int,
+    color_catalog=None,
+) -> dict:
     """一行宠物的完整展示数据（表格与详情共用，避免两处各算一遍）。"""
     species = static.species(pet.base_conf_id) if static is not None else None
     type_names = list(species.type_names) if species is not None else []
@@ -78,6 +84,7 @@ def pet_row(pet: Pet, static: StaticData | None, height_max: int, weight_max: in
         "stat_sum": sum(stat_values),
         "height": pet.height,
         "weight": pet.weight,
+        "glass_colors": _glass_colors(pet, color_catalog),
         "voice": pet.voice,
         "height_text": f"{pet.height / 100:.2f}m" if pet.height else "—",
         "weight_text": f"{pet.weight / 1000:.1f}kg" if pet.weight else "—",
@@ -100,7 +107,21 @@ def pet_row(pet: Pet, static: StaticData | None, height_max: int, weight_max: in
     }
 
 
-def pets_payload(vm: PetViewModel, static: StaticData | None) -> dict:
+def _glass_colors(pet: Pet, catalog) -> list[str] | None:
+    """glass 参数 → 色卡 [底色 hex, 混色 hex]；无卡/未携带返回 None。"""
+    if catalog is None or (not pet.glass_type and not pet.glass_value):
+        return None
+    card = catalog.card(catalog.card_id_for(pet.glass_type, pet.glass_value))
+    if card is None:
+        return None
+    return [card.base_color, card.mix_color]
+
+
+def pets_payload(
+    vm: PetViewModel,
+    static: StaticData | None,
+    color_catalog=None,
+) -> dict:
     """宠物列表页载荷：行数据 + 可选值与当前筛选状态（一次给全）。"""
     pets = vm.filtered_pets()
     height_max = max((p.height for p in pets), default=0)
@@ -108,7 +129,7 @@ def pets_payload(vm: PetViewModel, static: StaticData | None) -> dict:
     filters = vm.filters
     sort_key, sort_desc = vm.sort_state
     return {
-        "pets": [pet_row(p, static, height_max, weight_max) for p in pets],
+        "pets": [pet_row(p, static, height_max, weight_max, color_catalog) for p in pets],
         "total": vm.total_count(),
         "shown": len(pets),
         "version": vm.version(),

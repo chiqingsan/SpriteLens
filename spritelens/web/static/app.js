@@ -98,7 +98,7 @@
     events: [],
     selectedEventIndex: null,
     filters: { search: "", level_min: 1, level_max: 100, natures: [], types: [], talent_min: 0, first_catch: false, sort: "gid", desc: false },
-    petView: "card",
+    petView: "point",
     petPage: 1,
     lastPayload: null,
     hb: { search: "", type: "", mode: "all" },
@@ -379,7 +379,12 @@
       + (payload.shown !== payload.total ? "（显示 " + payload.shown + " 只）" : "");
     $("pet-empty").hidden = pets.length > 0;
 
-    if (state.petView === "card") {
+    if (state.petView === "point") {
+      $("pet-grid").hidden = false;
+      $("pet-table").hidden = true;
+      renderPetPoints(shown);
+      renderPetPager(pets.length);
+    } else if (state.petView === "card") {
       $("pet-grid").hidden = false;
       $("pet-table").hidden = true;
       renderPetCards(shown);
@@ -393,17 +398,57 @@
   }
 
   /* 精灵图：有图显示立绘（覆盖在首字之上）；加载失败自动移除，露出首字头像 */
+  /* 点阵视图（对标蛋神默认背包）：密集小格，hover 放大预览 */
+  function bindPointGrid() {
+    $("pet-grid").addEventListener("click", function (event) {
+      var cell = event.target.closest("[data-gid]");
+      if (!cell || state.petView !== "point") { return; }
+      state.selectedPetGid = Number(cell.dataset.gid);
+      setPetDetailOpen(true);
+      renderPetDetail(state.selectedPetGid);
+    });
+  }
+  function renderPetPoints(pets) {
+    $("pet-grid").className = "pet-grid point-grid";
+    $("pet-grid").hidden = false;
+    $("pet-table").hidden = true;
+    $("pet-grid").innerHTML = pets.map(function (pet) {
+      var mark = pet.gender === 2 ? "♀" : "♂";
+      var img = pet.icon_url
+        ? '<img src="' + esc(pet.icon_url) + '" alt="" loading="lazy" onerror="this.remove()">'
+        : "";
+      return '<button type="button" class="point-pet' + (state.selectedPetGid === pet.gid ? " selected" : "")
+        + '" data-gid="' + pet.gid + '">'
+        + '<span class="point-avatar"' + glassStyle(pet).replace('style="', 'style="') + ">" + esc((pet.name || "?").slice(0, 1)) + img + "</span>"
+        + '<span class="point-level">Lv' + pet.level + mark + "</span>"
+        + "</button>";
+    }).join("");
+  }
+
+  /* 玻璃材质底色：有色卡数据的宠物头像用底色×混色渐变（对标同类玻璃材质渲染） */
+  function glassStyle(pet) {
+    var c = pet.glass_colors;
+    return c && c.length === 2
+      ? ' style="background:linear-gradient(135deg,' + esc(c[0]) + ',' + esc(c[1]) + ')"'
+      : "";
+  }
+
   function petAvatarHtml(pet) {
     var letter = esc((pet.name || "?").slice(0, 1));
     var bg = levelColor(pet.level);
+    if (pet.glass_colors) { bg = ""; }
     var img = pet.icon_url
       ? '<img src="' + esc(pet.icon_url) + '" alt="" loading="lazy" onerror="this.remove()">'
       : "";
-    return '<span class="pc-avatar" style="background:' + bg + '">' + letter + img + "</span>";
+    var style = pet.glass_colors
+      ? ' style="background:linear-gradient(135deg,' + esc(pet.glass_colors[0]) + "," + esc(pet.glass_colors[1]) + ')"'
+      : ' style="background:' + bg + '"';
+    return '<span class="pc-avatar"' + style + ">" + letter + img + "</span>";
   }
 
   /* 卡片视图（对标蛋神「点阵背包」）：紧凑卡片承载可比较的关键信息 */
   function renderPetCards(pets) {
+    $("pet-grid").className = "pet-grid";
     $("pet-grid").innerHTML = pets.map(function (pet) {
       var genderClass = pet.gender === 2 ? "female" : "male";
       var genderMark = pet.gender === 2 ? "♀" : "♂";
@@ -1681,6 +1726,7 @@
       renderState(payload.state || {});
       renderFeaturePlaceholders();
       bindPetFilters();
+      bindPointGrid();
       bindHandbookFilters();
       bindEggDexFilters();
       bindEggBoxActions();
