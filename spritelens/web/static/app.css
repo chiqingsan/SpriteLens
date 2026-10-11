@@ -128,11 +128,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   scrollbar-width: none;            /* Firefox：隐藏导航滚动条 */
 }
 #main-nav::-webkit-scrollbar { display: none; }  /* Chromium/WebView2 同 */
-/* 采集切换按钮三态：主色开始 / 危险色停止 / 琥珀处理中 */
-.top-actions .primary-button.stop-button {
-  background: var(--danger); color: #fff;
-  box-shadow: 0 8px 20px rgba(227, 93, 106, .28);
-}
+/* 采集切换按钮：开始/停止都用主色（红色带警告意味，用户反馈不协调），
+   仅以文字区分；处理中为琥珀脉冲 */
 .top-actions .primary-button.toggle-busy {
   background: linear-gradient(90deg, var(--amber), #f7bd63);
   color: #3d2c00; cursor: progress; opacity: .9;
