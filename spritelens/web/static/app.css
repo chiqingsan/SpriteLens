@@ -869,15 +869,27 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .mm-row b { flex: 1; }
 .male-mark { color: var(--male-strong); }
 .female-mark { color: var(--female-strong); }
-
-/* 炫彩花种 */
-.fl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-3); }
-.fl-card {
-  border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--panel);
-  padding: var(--space-4); display: grid; gap: var(--space-1);
+/* 色卡轴上的目录色点（hex 由 payload 下发） */
+.swatch {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+  margin-right: var(--space-1); vertical-align: 1px;
+  box-shadow: inset 0 0 0 1px var(--line);
 }
-.fl-card b { font-size: var(--fs-md); }
-.fl-card small { color: var(--muted); }
+
+/* 炫彩花种：槽位横卡（头像 + 信息），对齐背包卡片的头像语言 */
+.fl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-3); }
+.fl-card {
+  border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--panel);
+  padding: var(--space-3) var(--space-4); display: flex; align-items: center; gap: var(--space-3);
+}
+.fl-card .pc-avatar {
+  width: 40px; height: 40px; border-radius: var(--radius-md); font-size: var(--fs-lg);
+  /* 花种无 glass 数据，底色不像背包卡由 glassStyle 注入——回退与图鉴占位一致 */
+  background: var(--surface-3); color: var(--muted-2);
+}
+.fl-info { display: grid; gap: var(--space-0); min-width: 0; }
+.fl-info b { font-size: var(--fs-md); }
+.fl-info small { color: var(--muted); }
 
 /* 点阵背包（对标蛋神默认视图）：密集小格 + hover 放大预览 */
 .pet-grid.point-grid {
@@ -915,9 +927,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   cursor: pointer; font-weight: 700; font-size: var(--fs-md);
   display: flex; align-items: baseline; gap: var(--space-3); list-style: revert;
 }
+.bl-nature summary .count-badge { margin-left: auto; }
 .bl-nature summary small { color: var(--muted); font-weight: 400; }
 .bl-group { margin-top: var(--space-3); }
-.bl-group > b { display: block; font-size: var(--fs-xs); color: var(--muted); margin-bottom: var(--space-1); }
+.bl-group > b {
+  display: flex; align-items: baseline; gap: var(--space-2);
+  font-size: var(--fs-xs); color: var(--ink-soft); margin-bottom: var(--space-1);
+}
+.bl-group > b .muted { font-weight: 400; }
 .bl-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .bl-chips .mm-pet small { color: var(--muted); margin-left: 2px; }
 
@@ -927,13 +944,18 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   display: flex; align-items: center; gap: var(--space-3);
   border: 1px solid var(--line); border-radius: var(--radius-lg); padding: var(--space-2) var(--space-4); background: var(--panel);
 }
-.home-resident .pc-avatar { width: 34px; height: 34px; border-radius: var(--radius-md); }
+/* 家园居民头像无 glass 注入，回退底色与图鉴占位一致 */
+.home-resident .pc-avatar {
+  width: 34px; height: 34px; border-radius: var(--radius-md);
+  background: var(--surface-3); color: var(--muted-2);
+}
 .home-resident small { display: block; color: var(--muted); }
 .home-pos { margin-left: auto; font-size: var(--fs-xs); }
 .home-nest {
   display: flex; align-items: center; justify-content: space-between;
   border: 1px solid var(--line); border-radius: var(--radius-lg); padding: var(--space-3) var(--space-5); background: var(--panel);
 }
+.home-nest small { display: block; color: var(--muted); margin-top: var(--space-0); }
 
 /* 待实现页占位（.page 默认 display:none，active 时才以 grid 展开） */
 .page.feature-page { display: none; }

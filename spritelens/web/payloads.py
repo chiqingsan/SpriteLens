@@ -363,6 +363,7 @@ def flowers_payload(flower_repo, static: StaticData | None, catalog=None, pet_re
             "slot_index": r.slot_index,
             "pet_conf_id": r.pet_conf_id,
             "pet_name": name_of(r.pet_conf_id) if r.pet_conf_id else "—",
+            "icon_url": species_icon_url(r.pet_conf_id) if r.pet_conf_id else "",
             "planted_at": r.planted_at,
             "owner": owner,
         }
@@ -384,13 +385,12 @@ def colors_payload(pet_repository, catalog, static: StaticData | None) -> dict:
     与赛季卡单独分组。
     """
     cards = catalog.cards() if catalog is not None else ()
-    base_names: list[str] = []
-    mix_names: list[str] = []
+    # 轴带目录色（mock/降级路径可能没有 color 字段，getattr 防御）
+    base_map: dict[str, str | None] = {}
+    mix_map: dict[str, str | None] = {}
     for card in cards:
-        if card.base_name not in base_names:
-            base_names.append(card.base_name)
-        if card.mix_name not in mix_names:
-            mix_names.append(card.mix_name)
+        base_map.setdefault(card.base_name, getattr(card, "base_color", None))
+        mix_map.setdefault(card.mix_name, getattr(card, "mix_color", None))
     matrix: dict[str, list[dict]] = {}
     seasonal: list[dict] = []
     unknown: list[dict] = []
@@ -419,8 +419,8 @@ def colors_payload(pet_repository, catalog, static: StaticData | None) -> dict:
             continue
         matrix.setdefault(f"{card.base_name}|{card.mix_name}", []).append(summary)
     return {
-        "base_axis": base_names,
-        "mix_axis": mix_names,
+        "base_axis": [{"name": n, "hex": h} for n, h in base_map.items()],
+        "mix_axis": [{"name": n, "hex": h} for n, h in mix_map.items()],
         "matrix": matrix,
         "seasonal": seasonal,
         "unknown": unknown,

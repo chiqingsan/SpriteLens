@@ -1611,8 +1611,9 @@
     var nests = payload.nests || [];
     $("home-nest-count").textContent = nests.length + " 个";
     $("home-nests").innerHTML = nests.map(function (nest) {
-      return '<div class="home-nest"><b>' + esc(nest.name) + "</b>"
-        + '<span class="muted">配置 #' + nest.config_id + "</span></div>";
+      return '<div class="home-nest"><div><b>' + esc(nest.name) + "</b>"
+        + '<small>配置 #' + nest.config_id + " · 坐标 " + nest.position.join(", ") + "</small></div>"
+        + '<span class="status-pill">产蛋窝</span></div>';
     }).join("");
     $("home-nests-empty").hidden = nests.length > 0;
     var furniture = payload.furniture || [];
@@ -1639,14 +1640,19 @@
         return payload.cells[nature.name + "|" + g];
       });
       if (!groups.length) { return ""; }
+      var natureCount = 0;
       var blocks = groups.map(function (g) {
         var pets = payload.cells[nature.name + "|" + g] || [];
+        natureCount += pets.length;
         var chips = pets.map(function (pet) {
           return petChip(pet);
         }).join("");
-        return '<div class="bl-group"><b>' + esc(g) + '</b><div class="bl-chips">' + chips + "</div></div>";
+        return '<div class="bl-group"><b>' + esc(g)
+          + '<span class="muted">' + pets.length + " 只</span></b>"
+          + '<div class="bl-chips">' + chips + "</div></div>";
       }).join("");
       return '<details class="bl-nature" open><summary>' + esc(nature.name)
+        + '<span class="count-badge">' + natureCount + "</span>"
         + '<small>' + (nature.positive ? (STAT_CN[nature.positive] || nature.positive) + "↑ " : "")
         + (nature.negative ? (STAT_CN[nature.negative] || nature.negative) + "↓" : "") + "</small></summary>"
         + blocks + "</details>";
@@ -1666,9 +1672,14 @@
 
   function flowerCard(r) {
     var planted = r.planted_at ? new Date(r.planted_at * 1000).toLocaleDateString() : "—";
-    return '<div class="fl-card"><b>' + esc(r.pet_name) + "</b>"
+    var img = r.icon_url
+      ? '<img src="' + esc(r.icon_url) + '" alt="" loading="lazy" onerror="this.remove()">'
+      : "";
+    return '<div class="fl-card">'
+      + '<span class="pc-avatar">' + esc((r.pet_name || "—").slice(0, 1)) + img + "</span>"
+      + '<div class="fl-info"><b>' + esc(r.pet_name) + "</b>"
       + '<small>槽位 #' + esc(r.slot_id) + "</small>"
-      + '<span class="muted">' + planted + "</span></div>";
+      + '<span class="muted">' + planted + "</span></div></div>";
   }
 
   function renderFlowers() {
@@ -1704,26 +1715,39 @@
       + (withLevel === false ? "" : '<small>Lv' + pet.level + "</small>") + "</span>";
   }
 
+  function axisSwatch(axis) {
+    return axis && axis.hex
+      ? '<i class="swatch" style="background:' + esc(axis.hex) + '"></i>' : "";
+  }
+
   function renderColors(payload) {
     var baseAxis = payload.base_axis || [];
     var mixAxis = payload.mix_axis || [];
     var matrix = payload.matrix || {};
     var head = '<tr><th class="mm-corner">混色 \ 底色</th>' + baseAxis.map(function (b) {
-      return "<th>" + esc(b) + "</th>";
+      return "<th>" + axisSwatch(b) + esc(b.name) + "</th>";
     }).join("") + "</tr>";
     var body = mixAxis.map(function (mix) {
       var cells = baseAxis.map(function (base) {
-        var pets = matrix[base + "|" + mix];
+        var pets = matrix[base.name + "|" + mix.name];
         if (!pets) { return "<td class='mm-cell empty'>—</td>"; }
         var chips = pets.map(petChip).join("");
         return '<td class="mm-cell">' + chips + "</td>";
       }).join("");
-      return '<tr><th class="mm-rowhead"><b>' + esc(mix) + "</b></th>" + cells + "</tr>";
+      return '<tr><th class="mm-rowhead">' + axisSwatch(mix) + "<b>" + esc(mix.name) + "</b></th>" + cells + "</tr>";
     }).join("");
     $("cl-matrix").innerHTML = "<table><thead>" + head + "</thead><tbody>" + body + "</tbody></table>";
     $("cl-empty").hidden = (payload.pet_total || 0) > 0;
-    $("cl-meta").textContent = "色卡目录 " + payload.card_total + " 张 · 持有者 " + payload.pet_total + " 只";
+    /* 收录卡数：矩阵内 + 赛季卡涉及的卡号去重 */
+    var seen = {};
+    Object.keys(matrix).forEach(function (key) {
+      (matrix[key] || []).forEach(function (pet) { seen[pet.card_id] = true; });
+    });
     var seasonal = payload.seasonal || [];
+    seasonal.forEach(function (pet) { seen[pet.card_id] = true; });
+    var collected = Object.keys(seen).length;
+    $("cl-meta").textContent = "收录 " + collected + " / " + payload.card_total + " 张 · 持有者 "
+      + payload.pet_total + " 只 · 赛季卡 " + seasonal.length + " 只";
     $("cl-seasonal").innerHTML = seasonal.map(petChip).join("");
     $("cl-seasonal-count").textContent = seasonal.length + " 只";
     $("cl-seasonal-empty").hidden = seasonal.length > 0;
