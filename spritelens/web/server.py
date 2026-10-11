@@ -31,6 +31,7 @@ from spritelens.web.payloads import (
     egg_box_payload,
     home_payload,
     flowers_payload,
+    colors_payload,
     male_matrix_payload,
     egg_dex_payload,
     handbook_payload,
@@ -197,6 +198,7 @@ class LocalServer:
         app.router.add_get("/api/male-matrix", self._api_male_matrix)
         app.router.add_get("/api/home", self._api_home)
         app.router.add_get("/api/flowers", self._api_flowers)
+        app.router.add_get("/api/colors", self._api_colors)
         app.router.add_post("/api/egg-box/clear", self._api_egg_box_clear)
         app.router.add_get("/api/events", self._api_events)
         app.router.add_get("/api/events/detail", self._api_event_detail)
@@ -376,6 +378,15 @@ class LocalServer:
                 self._context.static_data,
                 self._context.egg_catalog,
                 self._context.pet_repository,
+            )
+        )
+
+    async def _api_colors(self, request: web.Request) -> web.Response:
+        return web.json_response(
+            colors_payload(
+                self._context.pet_repository,
+                self._context.color_catalog,
+                self._context.static_data,
             )
         )
 

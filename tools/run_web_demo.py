@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from spritelens.app_context import AppContext
 from spritelens.capture.key_store import KeyStore
+from spritelens.domain.color_cards import ColorCatalog
 from spritelens.domain.egg_box import EggBoxEntry
 from spritelens.domain.flowers import FlowerRecord, FlowerSnapshot
 from spritelens.domain.eggs import EggCatalog
@@ -117,6 +118,8 @@ def build_demo_context(tmp: Path, count: int) -> AppContext:
             ),
             height=rng.randint(70, 200), weight=rng.randint(20000, 100000),
             voice=rng.randint(-100, 100), mutation_type=1 if i % 4 == 0 else 0,
+            glass_type=2 if i % 7 == 0 else 1,
+            glass_value=(1 if i % 7 == 0 else rng.choice((7, 29, 1048605, 1048597, 2097156))),
             classis=i % 18, breakthrough_lv=level // 10, speciality_id=100 + i,
             ball_id=(i % 5) + 1,
             skills=tuple(
@@ -163,6 +166,7 @@ def build_demo_context(tmp: Path, count: int) -> AppContext:
         events_vm=EventsViewModel(monitor=monitor),
         pet_vm=PetViewModel(repository, static_data=static),
         egg_catalog=catalog,
+        color_catalog=ColorCatalog(static_dir()),
         egg_box=egg_box,
         home_repo=_demo_home(),
         flower_repo=_demo_flowers(),

@@ -356,6 +356,58 @@ def flowers_payload(flower_repo, static: StaticData | None, catalog=None, pet_re
     }
 
 
+def colors_payload(pet_repository, catalog, static: StaticData | None) -> dict:
+    """炫彩色卡载荷：宠物库按 glass → 卡号聚合，输出底色×混色矩阵。
+
+    蛋神同款交互：底色在横轴、混色在纵轴；未收录的卡号（glass 在但目录无）
+    与赛季卡单独分组。
+    """
+    cards = catalog.cards() if catalog is not None else ()
+    base_names: list[str] = []
+    mix_names: list[str] = []
+    for card in cards:
+        if card.base_name not in base_names:
+            base_names.append(card.base_name)
+        if card.mix_name not in mix_names:
+            mix_names.append(card.mix_name)
+    matrix: dict[str, list[dict]] = {}
+    seasonal: list[dict] = []
+    unknown: list[dict] = []
+    total = 0
+    for pet in (pet_repository.snapshot() if pet_repository is not None else ()):
+        if not pet.glass_type and not pet.glass_value:
+            continue
+        if catalog is None:
+            continue
+        card_id = catalog.card_id_for(pet.glass_type, pet.glass_value)
+        summary = {
+            "gid": pet.gid,
+            "name": pet.name,
+            "level": pet.level,
+            "gender": pet.gender,
+            "icon_url": species_icon_url(pet.base_conf_id),
+            "card_id": card_id,
+        }
+        total += 1
+        if card_id.startswith("s"):
+            seasonal.append(summary)
+            continue
+        card = catalog.card(card_id)
+        if card is None:
+            unknown.append(summary)
+            continue
+        matrix.setdefault(f"{card.base_name}|{card.mix_name}", []).append(summary)
+    return {
+        "base_axis": base_names,
+        "mix_axis": mix_names,
+        "matrix": matrix,
+        "seasonal": seasonal,
+        "unknown": unknown,
+        "card_total": len(cards),
+        "pet_total": total,
+    }
+
+
 def home_payload(home_repo, static: StaticData | None) -> dict:
     """我的家园载荷：居民（联查物种图标）/ 家具 / 产蛋窝 / 增量提示。"""
     snap = home_repo.snapshot() if home_repo is not None else None
@@ -513,6 +565,7 @@ __all__ = [
     "egg_box_payload",
     "flowers_payload",
     "home_payload",
+    "colors_payload",
     "male_matrix_payload",
     "egg_dex_payload",
     "handbook_payload",

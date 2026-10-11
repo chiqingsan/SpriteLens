@@ -27,7 +27,7 @@
 | `tools/make_icon.py` | 生成 `resources/app.ico` 多尺寸图标与 favicon（PIL，产物入库） |
 | `resources/app.ico` | 应用图标（窗口/任务栏用，打包时随包分发） |
 | `data/schemas/` | 外挂 schema：`opcodes.json` + `messages/*.json`（字段级合并） |
-| `data/static/` | 静态映射：`species/natures/types/skills/type_chart.json` + 各 `_meta.json` |
+| `data/static/` | 静态映射：`species/natures/types/skills/type_chart/eggs/medals/flower_levels/color_cards.json` + 各 `_meta.json` |
 | `spritelens/web/static/` | 前端资源：`index.html`（分组导航骨架）/ `boot.js`（启动自恢复链）/ `app.css` / `app.js` / `favicon.png` / `pets/*.webp` / `type-icons/` |
 | `data/recordings/` | 运行时录制产物（gitignore；本地回放样例不在版本库） |
 
@@ -60,6 +60,7 @@
 | `domain/identity.py` | 玩家身份语义层：self_info/avatar/base → PlayerIdentity（uid 归属） |
 | `domain/static_data.py` | 静态映射：物种/性格/系别/技能（base_conf_id 关联，含图鉴元数据） |
 | `domain/eggs.py` | 蛋目录：蛋静态数据索引（egg_conf_id / base_id 联查，孵蛋工具链底座） |
+| `domain/color_cards.py` | 色卡目录：44 张卡（底色×混色）+ glass→卡号判定（赛季 s1-s4） |
 | `domain/egg_box.py` | 蛋仓语义层：形状搜索提取 PacketEvent → EggBoxEntry（bagType==8 指纹） |
 | `domain/home.py` | 家园语义层：0x014A 快照 → 居民/家具/产蛋窝（实证字段映射 + NEST_TYPES） |
 | `domain/flowers.py` | 花种语义层：0x0375 花田帧 → 自己的花/好友花田（含宠物三维） |

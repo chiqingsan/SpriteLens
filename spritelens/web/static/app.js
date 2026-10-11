@@ -128,6 +128,7 @@
     if (name === "home") { loadHome(); }
     if (name === "breeder-library") { loadBreederLibrary(); }
     if (name === "flowers") { loadFlowers(); }
+    if (name === "colors") { loadColors(); }
     if (name === "events") { loadEvents(); }
     if (name === "capture") { loadCapture(); }
     if (name === "overview") { loadOverview(); }
@@ -1452,6 +1453,15 @@
       });
       loadMaleMatrix();
     });
+    document.getElementById("page-colors").addEventListener("click", function (event) {
+      var chip = event.target.closest("[data-mm]");
+      if (!chip) { return; }
+      switchPage("pets");
+      state.filters.search = String(chip.dataset.mm);
+      var searchBox = $("f-search");
+      if (searchBox) { searchBox.value = String(chip.dataset.mm); }
+      loadPets();
+    });
     document.getElementById("page-breeder-library").addEventListener("click", function (event) {
       var chip = event.target.closest("[data-mm]");
       if (!chip) { return; }
@@ -1603,6 +1613,51 @@
     $("fl-friends").innerHTML = (payload.friends || []).map(flowerCard).join("");
     $("fl-friend-count").textContent = (payload.friends || []).length + " 条";
     $("fl-friends-empty").hidden = (payload.friends || []).length > 0;
+  }
+
+  /* ---------- 炫彩色卡 ---------- */
+  function loadColors() {
+    api("/api/colors").then(renderColors).catch(function (err) {
+      toast("色卡加载失败：" + err.message, true);
+    });
+  }
+
+  function petChip(pet) {
+    var mark = pet.gender === 2 ? "♀" : "♂";
+    return '<span class="mm-pet" data-mm="' + pet.gid + '"><img src="' + esc(pet.icon_url)
+      + '" alt="" loading="lazy" onerror="this.remove()">' + mark + esc(pet.name)
+      + '<small>Lv' + pet.level + "</small></span>";
+  }
+
+  function renderColors(payload) {
+    var baseAxis = payload.base_axis || [];
+    var mixAxis = payload.mix_axis || [];
+    var matrix = payload.matrix || {};
+    var head = '<tr><th class="mm-corner">混色 \ 底色</th>' + baseAxis.map(function (b) {
+      return "<th>" + esc(b) + "</th>";
+    }).join("") + "</tr>";
+    var body = mixAxis.map(function (mix) {
+      var cells = baseAxis.map(function (base) {
+        var pets = matrix[base + "|" + mix];
+        if (!pets) { return "<td class='mm-cell empty'>—</td>"; }
+        var chips = pets.map(petChip).join("");
+        return '<td class="mm-cell">' + chips + "</td>";
+      }).join("");
+      return '<tr><th class="mm-rowhead"><b>' + esc(mix) + "</b></th>" + cells + "</tr>";
+    }).join("");
+    $("cl-matrix").innerHTML = "<table><thead>" + head + "</thead><tbody>" + body + "</tbody></table>";
+    $("cl-empty").hidden = (payload.pet_total || 0) > 0;
+    $("cl-meta").textContent = "色卡目录 " + payload.card_total + " 张 · 持有者 " + payload.pet_total + " 只";
+    var seasonal = payload.seasonal || [];
+    $("cl-seasonal").innerHTML = seasonal.map(petChip).join("");
+    $("cl-seasonal-count").textContent = seasonal.length + " 只";
+    $("cl-seasonal-empty").hidden = seasonal.length > 0;
+    var unknown = payload.unknown || [];
+    $("cl-unknown").innerHTML = unknown.map(function (pet) {
+      return petChip(pet) + '<span class="muted">#' + esc(pet.card_id) + "</span>";
+    }).join("");
+    $("cl-unknown-count").textContent = unknown.length + " 只";
+    $("cl-unknown-empty").hidden = unknown.length > 0;
   }
 
   /* ---------- 启动（15s 超时 + 自动重试 2 次，与自恢复链协同） ---------- */

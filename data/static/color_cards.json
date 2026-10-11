@@ -1,0 +1,318 @@
+{
+ "cards": [
+  {
+   "card_id": "1",
+   "base_name": "绿色",
+   "mix_name": "蓝色",
+   "base_color": "#83d256",
+   "mix_color": "#3c32cf"
+  },
+  {
+   "card_id": "2",
+   "base_name": "青色",
+   "mix_name": "蓝色",
+   "base_color": "#3ed7d7",
+   "mix_color": "#3c32cf"
+  },
+  {
+   "card_id": "3",
+   "base_name": "紫色",
+   "mix_name": "蓝色",
+   "base_color": "#b869ed",
+   "mix_color": "#3c32cf"
+  },
+  {
+   "card_id": "4",
+   "base_name": "粉色",
+   "mix_name": "蓝色",
+   "base_color": "#e5576f",
+   "mix_color": "#3c32cf"
+  },
+  {
+   "card_id": "5",
+   "base_name": "黄色",
+   "mix_name": "蓝色",
+   "base_color": "#f9c924",
+   "mix_color": "#3c32cf"
+  },
+  {
+   "card_id": "6",
+   "base_name": "青色",
+   "mix_name": "绿色",
+   "base_color": "#3ed7d7",
+   "mix_color": "#83d256"
+  },
+  {
+   "card_id": "7",
+   "base_name": "紫色",
+   "mix_name": "绿色",
+   "base_color": "#b869ed",
+   "mix_color": "#83d256"
+  },
+  {
+   "card_id": "8",
+   "base_name": "粉色",
+   "mix_name": "绿色",
+   "base_color": "#e5576f",
+   "mix_color": "#83d256"
+  },
+  {
+   "card_id": "9",
+   "base_name": "黄色",
+   "mix_name": "绿色",
+   "base_color": "#f9c924",
+   "mix_color": "#83d256"
+  },
+  {
+   "card_id": "10",
+   "base_name": "紫色",
+   "mix_name": "青色",
+   "base_color": "#b869ed",
+   "mix_color": "#3ed7d7"
+  },
+  {
+   "card_id": "11",
+   "base_name": "粉色",
+   "mix_name": "青色",
+   "base_color": "#e5576f",
+   "mix_color": "#3ed7d7"
+  },
+  {
+   "card_id": "12",
+   "base_name": "黄色",
+   "mix_name": "青色",
+   "base_color": "#f9c924",
+   "mix_color": "#3ed7d7"
+  },
+  {
+   "card_id": "13",
+   "base_name": "粉色",
+   "mix_name": "紫色",
+   "base_color": "#e5576f",
+   "mix_color": "#b869ed"
+  },
+  {
+   "card_id": "14",
+   "base_name": "黄色",
+   "mix_name": "紫色",
+   "base_color": "#f9c924",
+   "mix_color": "#b869ed"
+  },
+  {
+   "card_id": "15",
+   "base_name": "黄色",
+   "mix_name": "粉色",
+   "base_color": "#f9c924",
+   "mix_color": "#e5576f"
+  },
+  {
+   "card_id": "16",
+   "base_name": "蓝色",
+   "mix_name": "浅蓝紫",
+   "base_color": "#3c32cf",
+   "mix_color": "#bac8fb"
+  },
+  {
+   "card_id": "17",
+   "base_name": "绿色",
+   "mix_name": "浅蓝紫",
+   "base_color": "#83d256",
+   "mix_color": "#bac8fb"
+  },
+  {
+   "card_id": "18",
+   "base_name": "青色",
+   "mix_name": "浅蓝紫",
+   "base_color": "#3ed7d7",
+   "mix_color": "#bac8fb"
+  },
+  {
+   "card_id": "19",
+   "base_name": "紫色",
+   "mix_name": "浅蓝紫",
+   "base_color": "#b869ed",
+   "mix_color": "#bac8fb"
+  },
+  {
+   "card_id": "20",
+   "base_name": "粉色",
+   "mix_name": "浅蓝紫",
+   "base_color": "#e5576f",
+   "mix_color": "#bac8fb"
+  },
+  {
+   "card_id": "21",
+   "base_name": "黄色",
+   "mix_name": "浅蓝紫",
+   "base_color": "#f9c924",
+   "mix_color": "#bac8fb"
+  },
+  {
+   "card_id": "22",
+   "base_name": "蓝色",
+   "mix_name": "浅绿",
+   "base_color": "#3c32cf",
+   "mix_color": "#aedfae"
+  },
+  {
+   "card_id": "23",
+   "base_name": "青色",
+   "mix_name": "浅绿",
+   "base_color": "#3ed7d7",
+   "mix_color": "#aedfae"
+  },
+  {
+   "card_id": "24",
+   "base_name": "紫色",
+   "mix_name": "浅绿",
+   "base_color": "#b869ed",
+   "mix_color": "#aedfae"
+  },
+  {
+   "card_id": "25",
+   "base_name": "粉色",
+   "mix_name": "浅绿",
+   "base_color": "#e5576f",
+   "mix_color": "#aedfae"
+  },
+  {
+   "card_id": "26",
+   "base_name": "绿色",
+   "mix_name": "浅蓝",
+   "base_color": "#83d256",
+   "mix_color": "#a8e5e5"
+  },
+  {
+   "card_id": "27",
+   "base_name": "紫色",
+   "mix_name": "浅蓝",
+   "base_color": "#b869ed",
+   "mix_color": "#a8e5e5"
+  },
+  {
+   "card_id": "28",
+   "base_name": "粉色",
+   "mix_name": "浅蓝",
+   "base_color": "#e5576f",
+   "mix_color": "#a8e5e5"
+  },
+  {
+   "card_id": "29",
+   "base_name": "黄色",
+   "mix_name": "浅蓝",
+   "base_color": "#f9c924",
+   "mix_color": "#a8e5e5"
+  },
+  {
+   "card_id": "30",
+   "base_name": "青色",
+   "mix_name": "浅紫",
+   "base_color": "#3ed7d7",
+   "mix_color": "#dbbceb"
+  },
+  {
+   "card_id": "31",
+   "base_name": "紫色",
+   "mix_name": "浅紫",
+   "base_color": "#b869ed",
+   "mix_color": "#dbbceb"
+  },
+  {
+   "card_id": "32",
+   "base_name": "粉色",
+   "mix_name": "浅紫",
+   "base_color": "#e5576f",
+   "mix_color": "#dbbceb"
+  },
+  {
+   "card_id": "33",
+   "base_name": "黄色",
+   "mix_name": "浅紫",
+   "base_color": "#f9c924",
+   "mix_color": "#dbbceb"
+  },
+  {
+   "card_id": "34",
+   "base_name": "蓝色",
+   "mix_name": "浅粉",
+   "base_color": "#3c32cf",
+   "mix_color": "#fdcdd3"
+  },
+  {
+   "card_id": "35",
+   "base_name": "紫色",
+   "mix_name": "浅粉",
+   "base_color": "#b869ed",
+   "mix_color": "#fdcdd3"
+  },
+  {
+   "card_id": "36",
+   "base_name": "黄色",
+   "mix_name": "浅粉",
+   "base_color": "#f9c924",
+   "mix_color": "#fdcdd3"
+  },
+  {
+   "card_id": "37",
+   "base_name": "蓝色",
+   "mix_name": "浅黄",
+   "base_color": "#3c32cf",
+   "mix_color": "#f1d397"
+  },
+  {
+   "card_id": "38",
+   "base_name": "绿色",
+   "mix_name": "浅黄",
+   "base_color": "#83d256",
+   "mix_color": "#f1d397"
+  },
+  {
+   "card_id": "39",
+   "base_name": "青色",
+   "mix_name": "浅黄",
+   "base_color": "#3ed7d7",
+   "mix_color": "#f1d397"
+  },
+  {
+   "card_id": "1000",
+   "base_name": "黑白",
+   "mix_name": "浅灰",
+   "base_color": "#040404",
+   "mix_color": "#999999"
+  },
+  {
+   "card_id": "s1",
+   "base_name": "赛季",
+   "mix_name": "S1",
+   "base_color": "#120826",
+   "mix_color": "#e6d14c"
+  },
+  {
+   "card_id": "s2",
+   "base_name": "赛季",
+   "mix_name": "S2",
+   "base_color": "#660a0a",
+   "mix_color": "#080303"
+  },
+  {
+   "card_id": "s3",
+   "base_name": "赛季",
+   "mix_name": "S3",
+   "base_color": "#ff2973",
+   "mix_color": "#ffff1a"
+  },
+  {
+   "card_id": "s4",
+   "base_name": "赛季",
+   "mix_name": "S4",
+   "base_color": "#2e3842",
+   "mix_color": "#808080"
+  }
+ ],
+ "particles": {
+  "1": "四角星",
+  "2": "爱心",
+  "3": "方块",
+  "4": "镂空五角星"
+ }
+}

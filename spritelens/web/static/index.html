@@ -398,7 +398,33 @@
           </div>
         </div>
       </section>
-      <section id="page-colors" class="page feature-page"><div class="feature-page-root" data-feature="炫彩色卡" data-hint="需要玻璃（glass）信息协议帧"></div></section>
+      <!-- 炫彩色卡：底色 × 混色矩阵 -->
+      <section id="page-colors" class="page">
+        <div class="stack">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>色卡矩阵</h2>
+              <span id="cl-meta" class="muted">底色在横轴、混色在纵轴；数据来自宠物帧的 glass 参数</span>
+            </div>
+            <div class="table-wrap">
+              <div id="cl-matrix" class="mm-matrix"></div>
+              <div id="cl-empty" class="empty-hint" hidden>宠物库中没有带色卡的宠物</div>
+            </div>
+          </section>
+          <div class="overview-lower">
+            <section class="panel">
+              <div class="panel-head"><h2>赛季卡</h2><span id="cl-seasonal-count" class="muted"></span></div>
+              <div id="cl-seasonal" class="bl-chips"></div>
+              <div id="cl-seasonal-empty" class="empty-hint" hidden>暂无赛季卡</div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h2>未收录编号</h2><span id="cl-unknown-count" class="muted"></span></div>
+              <div id="cl-unknown" class="bl-chips"></div>
+              <div id="cl-unknown-empty" class="empty-hint" hidden>全部色卡都已收录</div>
+            </section>
+          </div>
+        </div>
+      </section>
       <!-- 炫彩花种 -->
       <section id="page-flowers" class="page">
         <div class="stack">

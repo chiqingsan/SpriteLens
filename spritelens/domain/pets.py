@@ -34,10 +34,11 @@ _NO_ATTRIBUTE = 14
 _NO_BASE_CONF_ID = 15
 # 炫彩形态 conf_id（130xxx/5400xxx 系，花种帧引用的就是它；实测 210/214 覆盖）
 _NO_COLORFUL_CONF_ID = 58
-# glass 外观参数（异色/炫彩材质；普通宠物实测为 type=1, value=1）
-_NO_GLASS = 87
+# glass 外观参数（色卡来源，decode_handbook_glass：field86 子消息 {1:type, 2:value}；
+# 实测 162/266 只携带，普通宠物 type=1/value=1，赛季卡 type=2 值含赛季位）
+_NO_GLASS = 86
 _GLASS_TYPE = 1
-_GLASS_VALUE = 4
+_GLASS_VALUE = 2
 _NO_HEIGHT = 26
 _NO_WEIGHT = 27
 _NO_CLASSIS = 28
@@ -267,7 +268,7 @@ def _extend_pet(base: Pet, node: list[dict]) -> Pet:
 
 
 def _glass_dim(node: dict[str, object], child_no: int) -> int:
-    """glass 子消息（field87: {1: type, 4: value}）的维度值；缺失返回 0。"""
+    """glass 子消息（field86: {1: type, 2: value}）的维度值；缺失返回 0。"""
     children = _children_by_no(node, _NO_GLASS)
     if not children:
         return 0

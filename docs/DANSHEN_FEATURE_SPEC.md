@@ -136,9 +136,12 @@ roco_helper 同款字段名 caught_camp）。花种帧（0x0375 field13）按这
 成对出现）。SpriteLens 用 Pet.colorful_conf_id + PetRepository.colorful_name()
 学习表实现同款；未学到的 id 显示 "#id"（用户在游戏里获得该炫彩宠后自动补全）。
 
-宠物帧 field87 = glass 外观参数 {field1: type, field4: value}（214/214 全量携带；
-普通宠物实测 type=1/value=1，异色/炫彩时值变化）——色卡页数据随宠物帧全量
-下发，无需专门"查看色卡"操作。
+宠物帧 glass 的正确位置是 **field86 子消息 {field1: type, field2: value}**
+（decode_handbook_glass；162/266 只携带；field87 是 cheer_point 加油点，先前
+误认已纠正）。卡号判定（color_cards.card_id_from_glass）：type=2 且 value 低
+20 位 ∈{1..4} → 赛季卡 "s1".."s4"；否则 str(value & 0xFFFFF) 查 CARDS_BY_ID
+（44 张色卡目录：id/底色名/混色名/颜色 hex，已导出 data/static/color_cards.json）。
+真实帧验证：42 只宠物入矩阵、零未收录。
 
 ### 3.8 体型/声音奖牌（pet_medals）
 

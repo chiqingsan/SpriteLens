@@ -261,5 +261,76 @@ class MaleMatrixPayloadTests(unittest.TestCase):
         self.assertEqual(females["matched"], 1)
 
 
+class ColorCardTests(unittest.TestCase):
+    """色卡目录与 glass → 卡号判定。"""
+
+    def _catalog(self):
+        import json
+        from pathlib import Path
+        from spritelens.domain.color_cards import ColorCatalog
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        d = Path(tmp.name)
+        (d / "color_cards.json").write_text(json.dumps({
+            "cards": [
+                {"card_id": "7", "base_name": "紫色", "mix_name": "绿色",
+                 "base_color": "#b869ed", "mix_color": "#83d256"},
+                {"card_id": "29", "base_name": "绿色", "mix_name": "粉色",
+                 "base_color": "#83d256", "mix_color": "#e5576f"},
+            ],
+            "particles": {"1": "四角星"},
+        }, ensure_ascii=False), encoding="utf-8")
+        return ColorCatalog(d)
+
+    def test_card_lookup(self) -> None:
+        catalog = self._catalog()
+        self.assertEqual(catalog.card("7").base_name, "紫色")
+        self.assertIsNone(catalog.card("999"))
+
+    def test_card_id_for(self) -> None:
+        catalog = self._catalog()
+        # 普通卡：value 低 20 位（高位为标志位）
+        self.assertEqual(catalog.card_id_for(1, 1048605), "29")   # 1048605 & 0xFFFFF = 29
+        self.assertEqual(catalog.card_id_for(1, 7), "7")
+        # 赛季卡：type=2 且 value 低 20 位 ∈ 1..4
+        self.assertEqual(catalog.card_id_for(2, 1), "s1")
+        self.assertEqual(catalog.card_id_for(2, 4), "s4")
+        # 未收录
+        self.assertEqual(catalog.card_id_for(1, 999999), "")
+
+    def test_payload_matrix(self) -> None:
+        from spritelens.web.payloads import colors_payload
+
+        class Repo:
+            def snapshot(self):
+                return [self._p]
+        repo = Repo()
+        repo._p = self._pet(1, "菊花梨", 1, 1)  # glass 1×1048605 → 卡 29
+
+        class Catalog:
+            def cards(self):
+                from types import SimpleNamespace
+                return [SimpleNamespace(base_name="绿色", mix_name="粉色")]
+            def card(self, cid):
+                from types import SimpleNamespace
+                return SimpleNamespace(base_name="绿色", mix_name="粉色") if cid == "29" else None
+            def card_id_for(self, t, v):
+                return "29"
+
+        payload = colors_payload(repo, Catalog(), None)
+        self.assertEqual(payload["pet_total"], 1)
+        self.assertIn("绿色|粉色", payload["matrix"])
+
+    def _pet(self, gid, name, gender, base_conf_id):
+        from spritelens.domain.pets import Pet, PetAttribute
+        return Pet(
+            gid=gid, conf_id=2000000 + gid, name=name, level=40, exp=0,
+            nature=1, gender=gender, blood_id=1, talent_rank=3,
+            is_first_catch=False, base_conf_id=base_conf_id,
+            attributes=(PetAttribute(),) * 6, height=0, weight=0, voice=0,
+            glass_type=1, glass_value=1048605, skills=(),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

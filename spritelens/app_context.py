@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from spritelens.capture.key_store import KeyStore
+from spritelens.domain.color_cards import ColorCatalog
 from spritelens.domain.eggs import EggCatalog
 from spritelens.domain.static_data import StaticData, load_static_data
 from spritelens.logs import get_logger
@@ -59,6 +60,7 @@ class AppContext:
     pet_store: PetStore | None = None
     event_log: EventLogWriter | None = None
     egg_catalog: EggCatalog | None = None  # 蛋目录（缺失时蛋相关页面降级）
+    color_catalog: ColorCatalog | None = None  # 色卡目录（缺失时色卡页降级）
     egg_store: EggStore | None = None
     egg_box: EggBoxRepository | None = None  # 蛋仓聚合（缺失时蛋仓页面空态）
     home_repo: HomeRepository | None = None  # 家园快照（缺失时家园页空态）
@@ -87,6 +89,7 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
     load_library(schema_dir())
     static_data = load_static_data(static_dir())
     egg_catalog = EggCatalog(static_dir())
+    color_catalog = ColorCatalog(static_dir())
 
     # 启动即恢复上次捕获的会话密钥：连接未重连时（AES 无跨包状态）可立即续解
     key_store = KeyStore(keys_dir())
@@ -147,6 +150,7 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
         pet_store=pet_store,
         event_log=event_log,
         egg_catalog=egg_catalog,
+        color_catalog=color_catalog,
         egg_store=egg_store,
         home_repo=home_repo,
         flower_repo=flower_repo,
