@@ -153,6 +153,8 @@ def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> None:
     saved = settings.window_geometry()
     if saved:
         width, height = saved["width"], saved["height"]
+    else:
+        width, height = initial_window_size()
 
     # 唤醒句柄交给 WebView2 的窗口做前台置顶（重复启动时）
     activation_handle = guard.create_activation_event()
