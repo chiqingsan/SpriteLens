@@ -36,6 +36,7 @@ class PetFilters:
     type_names: frozenset[str] = frozenset()
     talent_min: int = 0
     first_catch_only: bool = False
+    gender: int = 0
 
     @property
     def active(self) -> bool:
@@ -45,6 +46,7 @@ class PetFilters:
             or self.type_names
             or self.talent_min > 0
             or self.first_catch_only
+            or self.gender
             or self.level_min > 1
             or self.level_max < 100
         )
@@ -95,6 +97,9 @@ class PetViewModel:
 
     def set_first_catch_only(self, enabled: bool) -> None:
         self._filters = replace(self._filters, first_catch_only=bool(enabled))
+
+    def set_gender(self, gender: int) -> None:
+        self._filters = replace(self._filters, gender=gender if gender in (1, 2) else 0)
 
     def set_sort(self, key: str, *, descending: bool = False) -> None:
         if key not in {k for k, _ in SORT_KEYS}:
@@ -230,6 +235,8 @@ class PetViewModel:
             if filters.talent_min and pet.talent_rank < filters.talent_min:
                 return False
             if filters.first_catch_only and not pet.is_first_catch:
+                return False
+            if filters.gender and pet.gender != filters.gender:
                 return False
             if filters.type_names:
                 if static is None:

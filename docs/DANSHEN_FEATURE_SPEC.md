@@ -51,14 +51,14 @@ app-shell
 │     系统：协议流 / 采集与设置        ← SpriteLens 自有页归入系统组
 └── main-shell
       ├── topbar：角色块 | 状态 pill（握手/采集/密钥/录制）| 主按钮（开始采集）
-      └── pages：每页 section#page-*，workspace.split 三栏（筛选/内容/详情）
+      └── pages：每页 section#page-*；背包为中间网格 + 右侧筛选/详情共用栏（加全局导航构成三栏）
 modal-layer + toast-layer
 ```
 
 SpriteLens 已按此骨架重构（保留自有"概览/协议流/采集与设置"页）。
 蛋神特有的交互资产，后续页面直接复用：
 
-- **点阵背包 / 卡片背包双模式**（segmented 切换 + 悬浮预览开关）
+- **点阵背包 / 属性卡片 / 对比表格**（segmented 切换；点击或 Enter 打开详情，悬停不放大）
 - **矩阵视图**（种公阵列：性格×蛋组覆盖矩阵；色卡：底色×混色矩阵）
 - **分页器 + 右侧详情面板**（Master-Detail 范式，SpriteLens 已有）
 - **孵化时间倍率表**（原始/5 倍/6 倍/30 倍）——蛋图鉴已实现

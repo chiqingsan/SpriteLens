@@ -109,7 +109,7 @@ def _smoke_check_assets() -> int:
         else:
             failures.append(f"{label}缺失: {path}")
 
-    for name in ("index.html", "app.js", "app.css"):
+    for name in ("index.html", "boot.js", "ui.js", "app.js", "app.css", "ui.css"):
         if not (STATIC_DIR / name).is_file():
             failures.append(f"前端文件缺失: {STATIC_DIR / name}")
 

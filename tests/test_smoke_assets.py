@@ -23,7 +23,7 @@ class PackagedAssetsTest(unittest.TestCase):
         self.assertTrue(STATIC_DIR.is_dir(), f"前端静态目录缺失: {STATIC_DIR}")
 
     def test_frontend_entry_files_exist(self):
-        for name in ("index.html", "app.js", "app.css"):
+        for name in ("index.html", "boot.js", "ui.js", "app.js", "app.css", "ui.css"):
             with self.subTest(file=name):
                 self.assertTrue((STATIC_DIR / name).is_file(), f"前端文件缺失: {name}")
 

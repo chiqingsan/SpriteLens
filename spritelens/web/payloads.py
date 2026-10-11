@@ -141,6 +141,7 @@ def pets_payload(
             "types": sorted(filters.type_names),
             "talent_min": filters.talent_min,
             "first_catch_only": filters.first_catch_only,
+            "gender": filters.gender,
         },
         "sort": {"key": sort_key, "desc": sort_desc},
         "options": {

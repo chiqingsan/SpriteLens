@@ -6,6 +6,7 @@
   <title>小洛探探 SpriteLens</title>
   <link rel="icon" type="image/png" href="/favicon.ico">
   <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/ui.css">
 </head>
 <body>
   <div id="startup" class="startup" role="status" aria-live="polite">
@@ -60,11 +61,11 @@
           </button>
           <button class="nav-item nav-subitem" data-page="planner">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v5M5 21v-5h14v5M12 12v9M7 8h10v4H7Z"/></svg>
-            智能配窝
+            智能配窝 <span class="nav-pending">待开放</span>
           </button>
           <button class="nav-item nav-subitem" data-page="collection-lines">
             <span class="nav-icon nav-icon-text" aria-hidden="true">▦</span>
-            产线收集
+            产线收集 <span class="nav-pending">待开放</span>
           </button>
         </div>
         <div class="nav-group" data-nav-group="home">
@@ -116,9 +117,10 @@
           <span id="pill-key" class="status-pill idle">密钥：未获取</span>
           <span id="pill-record" class="status-pill idle">录制：关</span>
           <span id="pill-pets" class="status-pill idle">宠物：0 只</span>
-          <span id="capture-message" class="status-copy">准备就绪</span>
+          <span id="capture-message" class="status-copy" role="status">开始采集后登录游戏，自动同步数据</span>
         </div>
         <div class="top-actions">
+          <button id="btn-top-settings" class="ghost-button">采集设置</button>
           <button id="btn-toggle" class="primary-button">开始采集</button>
         </div>
       </header>
@@ -159,44 +161,21 @@
       <!-- 精灵背包（宠物仓库） -->
       <section id="page-pets" class="page">
         <div class="workspace split">
-          <aside class="filter-rail" id="pet-filters">
-            <div class="filter-head"><h2>筛选</h2><button id="btn-reset-filters" class="ghost-button small">重置</button></div>
-            <label class="field">
-              <span>搜索（名字 / gid / 图鉴 ID）</span>
-              <input id="f-search" type="text" placeholder="输入关键字">
-            </label>
-            <label class="field">
-              <span>等级范围 <b id="f-level-label">1 – 100</b></span>
-              <div class="range-row">
-                <input id="f-level-min" type="range" min="1" max="100" value="1">
-                <input id="f-level-max" type="range" min="1" max="100" value="100">
-              </div>
-            </label>
-            <div class="field">
-              <span>性格</span>
-              <div id="f-natures" class="chip-group"></div>
-            </div>
-            <div class="field">
-              <span>系别</span>
-              <div id="f-types" class="chip-group"></div>
-            </div>
-            <label class="field">
-              <span>天赋阶下限</span>
-              <select id="f-talent"></select>
-            </label>
-            <label class="check-row">
-              <input id="f-first" type="checkbox"><span>只看首捕</span>
-            </label>
-          </aside>
 
           <section class="content-panel">
-            <div class="panel-toolbar">
-              <span id="pet-count" class="count-badge">共 0 只</span>
-              <div class="segmented" id="pet-view">
-                <button data-view="point">点阵</button>
-                <button data-view="card">卡片</button>
-                <button data-view="table">表格</button>
+            <div class="panel-toolbar pet-toolbar">
+              <div class="segmented" id="pet-view" aria-label="背包视图">
+                <button data-view="point" class="active" aria-pressed="true">点阵背包</button>
+                <button data-view="card" aria-pressed="false">属性卡片</button>
+                <button data-view="table" aria-pressed="false">对比表格</button>
               </div>
+              <button id="btn-pet-filters" class="ghost-button small" aria-expanded="false" aria-controls="pet-filters">筛选条件</button>
+              <span id="pet-count" class="count-badge" role="status">显示 0 / 0 只</span>
+            </div>
+            <div class="panel-toolbar pet-tools">
+              <label class="pet-search"><span class="sr-only">搜索名字、编号或图鉴 ID</span>
+                <input id="f-search" type="text" placeholder="搜索名字 / 编号 / 图鉴 ID" autocomplete="off">
+              </label>
               <label class="inline-field">排序
                 <select id="f-sort"></select>
               </label>
@@ -205,6 +184,7 @@
               </label>
               <button id="btn-clear-snapshot" class="ghost-button small danger-ghost">清空快照</button>
             </div>
+            <div id="pet-active-filters" class="active-filters" aria-label="已选筛选条件" hidden></div>
             <div class="table-wrap">
               <div id="pet-grid" class="pet-grid" hidden></div>
               <table class="pet-table" id="pet-table">
@@ -223,10 +203,48 @@
                 </thead>
                 <tbody id="pet-rows"></tbody>
               </table>
-              <div id="pet-empty" class="empty-hint">暂无宠物数据：开始采集后进入游戏，或等待登录推送</div>
+              <div id="pet-empty" class="empty-hint" role="status">
+                <p id="pet-empty-copy">暂无精灵数据：开始采集后登录游戏，等待数据同步</p>
+                <div class="button-row"><button id="btn-empty-reset" class="ghost-button small" hidden>清除筛选</button></div>
+              </div>
             </div>
             <div id="pet-pager" class="pager" hidden></div>
           </section>
+
+          <aside class="filter-rail" id="pet-filters" aria-label="精灵筛选">
+            <div class="filter-head"><h2>筛选精灵</h2><div class="button-row"><button id="btn-close-pet-filters" class="ghost-button small">收起筛选</button><button id="btn-reset-filters" class="ghost-button small">重置</button></div></div>
+            <p class="filter-note">条件即时生效，只改变当前显示结果。</p>
+            <div class="field">
+              <span>快捷筛选</span>
+              <div class="quick-filters">
+                <button type="button" class="chip" id="quick-first" aria-pressed="false">只看首捕</button>
+                <button type="button" class="chip" id="quick-maxed" aria-pressed="false">满级 60+</button>
+              </div>
+            </div>
+            <label class="field"><span>性别</span>
+              <select id="f-gender"><option value="0">不限性别</option><option value="1">雄性</option><option value="2">雌性</option></select>
+            </label>
+            <label class="field">
+              <span>等级范围 <b id="f-level-label">1 – 100</b></span>
+              <div class="range-row">
+                <input id="f-level-min" type="range" min="1" max="100" value="1" aria-label="最低等级">
+                <input id="f-level-max" type="range" min="1" max="100" value="100" aria-label="最高等级">
+              </div>
+            </label>
+            <details class="filter-section" open>
+              <summary>性格 <small>可多选</small></summary>
+              <div id="f-natures" class="chip-group"></div>
+            </details>
+            <details class="filter-section" open>
+              <summary>系别 <small>可多选</small></summary>
+              <div id="f-types" class="chip-group"></div>
+            </details>
+            <label class="field">
+              <span>天赋阶下限</span>
+              <select id="f-talent"></select>
+            </label>
+            <input id="f-first" type="checkbox" hidden>
+          </aside>
 
           <aside id="pet-detail" class="detail-panel">
             <div class="empty-hint">点击宠物卡片查看详情</div>
@@ -471,6 +489,11 @@
       <!-- 采集与设置 -->
       <section id="page-capture" class="page">
         <div class="stack">
+          <section class="panel">
+            <div class="panel-head"><h2>连接游戏</h2><span class="muted">首次使用按以下顺序操作</span></div>
+            <ol class="capture-steps"><li>检查采集环境</li><li>开始采集</li><li>登录游戏进入世界</li><li>自动同步精灵数据</li></ol>
+            <p class="muted">如果开始采集前游戏已登录，请退回登录界面再进入。网卡不确定时保持默认。</p>
+          </section>
           <section id="npcap-banner" class="banner warn" hidden>
             <div class="banner-copy">
               <strong id="npcap-title">抓包环境未就绪</strong>
@@ -506,6 +529,8 @@
             <p id="capture-hint" class="muted"></p>
           </section>
 
+          <details class="panel advanced-settings">
+            <summary>高级设置与采集诊断</summary>
           <section class="panel">
             <div class="panel-head"><h2>手动密钥</h2><span class="muted">连接早于采集时用来续解；支持 16 字节 ASCII（32 hex 字符）</span></div>
             <div class="button-row">
@@ -524,7 +549,7 @@
               </table>
             </div>
           </section>
-
+          </details>
           <section class="panel">
             <div class="panel-head"><h2>关于</h2></div>
             <p class="muted" id="about-line">SpriteLens 小洛探探 · 纯本地数据观测 · 不做云同步/账号/交易市场</p>
@@ -535,8 +560,10 @@
   </div>
 
   <div id="modal-layer" class="modal-layer" aria-hidden="true"></div>
-  <div id="toast-layer" class="toast-layer"></div>
+  <div id="detail-backdrop" class="detail-backdrop" hidden></div>
+  <div id="toast-layer" class="toast-layer" role="status" aria-live="polite"></div>
   <script src="/static/boot.js"></script>
+  <script src="/static/ui.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 from spritelens.domain.pets import Pet, PetAttribute
@@ -116,6 +117,21 @@ class PetViewModelTest(unittest.TestCase):
     def test_first_catch_filter(self):
         self.vm.set_first_catch_only(True)
         self.assertEqual(sorted(p.gid for p in self.vm.filtered_pets()), [1, 4])
+
+    def test_gender_composes_and_resets(self):
+        self.repo._pets[2] = replace(self.repo._pets[2], gender=2)
+        self.repo._pets[3] = replace(self.repo._pets[3], gender=0)
+        self.vm.set_gender(2)
+        self.assertTrue(self.vm.filters.active)
+        self.assertEqual([p.gid for p in self.vm.filtered_pets()], [2])
+        self.vm.set_level_range(40, 100)
+        self.assertEqual(self.vm.filtered_pets(), ())
+        self.vm.reset_filters()
+        self.assertEqual(len(self.vm.filtered_pets()), 4)
+        self.vm.set_gender(1)
+        self.assertEqual([p.gid for p in self.vm.filtered_pets()], [1, 4])
+        self.vm.set_gender(99)
+        self.assertFalse(self.vm.filters.active)
 
     def test_type_filter_uses_static_species(self):
         self.vm.set_types(frozenset({"水"}))

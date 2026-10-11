@@ -187,6 +187,24 @@ class LocalServerTest(unittest.TestCase):
         _, payload = _http_get(f"{base}/api/pets?sort=level&desc=1", token=self.server.token)
         self.assertEqual([p["gid"] for p in payload["pets"]], [1, 2])
 
+    def test_pets_gender_filter_roundtrip(self):
+        base = f"http://127.0.0.1:{self.server.port}/api/pets"
+        try:
+            status, payload = _http_get(f"{base}?gender=2", token=self.server.token)
+            self.assertEqual(status, 200)
+            self.assertEqual(payload["pets"], [])
+            self.assertEqual(payload["filters"]["gender"], 2)
+
+            _, payload = _http_get(f"{base}?gender=1&first_catch=1", token=self.server.token)
+            self.assertEqual([pet["gid"] for pet in payload["pets"]], [1])
+            self.assertEqual(payload["filters"]["gender"], 1)
+
+            _, payload = _http_get(f"{base}?gender=99", token=self.server.token)
+            self.assertEqual(len(payload["pets"]), 2)
+            self.assertEqual(payload["filters"]["gender"], 0)
+        finally:
+            _http_get(base, token=self.server.token)
+
     def test_pet_row_has_display_fields(self):
         _, payload = _http_get(
             f"http://127.0.0.1:{self.server.port}/api/pets", token=self.server.token

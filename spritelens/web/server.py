@@ -325,6 +325,7 @@ class LocalServer:
         vm.set_types(frozenset(_name_set(query.get("types"))))
         vm.set_talent_min(_as_int(query.get("talent_min"), 0))
         vm.set_first_catch_only(_as_bool(query.get("first_catch")))
+        vm.set_gender(_as_int(query.get("gender"), 0))
         vm.set_sort(query.get("sort") or "gid", descending=_as_bool(query.get("desc")))
 
     async def _api_pets_clear(self, request: web.Request) -> web.Response:

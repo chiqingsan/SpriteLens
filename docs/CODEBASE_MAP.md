@@ -29,7 +29,7 @@
 | `resources/app.ico` | 应用图标（窗口/任务栏用，打包时随包分发） |
 | `data/schemas/` | 外挂 schema：`opcodes.json` + `messages/*.json`（字段级合并） |
 | `data/static/` | 静态映射：`species/natures/types/skills/type_chart/eggs/medals/flower_levels/color_cards.json` + 各 `_meta.json` |
-| `spritelens/web/static/` | 前端资源：`index.html`（分组导航骨架）/ `boot.js`（启动自恢复链）/ `app.css` / `app.js` / `favicon.png` / `pets/*.webp` / `type-icons/` |
+| `spritelens/web/static/` | 前端资源：`index.html`（分组导航骨架）/ `boot.js`（启动自恢复链）/ `app.css`（自然绿主题与组件）/ `app.js`（数据渲染）/ `ui.css`（响应式布局）/ `ui.js`（详情抽屉、键盘与焦点）/ `favicon.png` / `pets/*.webp` / `type-icons/` |
 | `data/recordings/` | 运行时录制产物（gitignore；本地回放样例不在版本库） |
 
 ## spritelens/

@@ -1,6 +1,6 @@
 /* 小洛探探 SpriteLens — Web UI 样式
    布局对标蛋神助手（侧栏 + 顶栏状态条 + 分栏工作区）；
-   配色沿用其品牌 teal 体系，深色侧栏 + 浅色工作面。 */
+   自然绿主题：暖白工作面、鼠尾草绿交互与浅绿侧栏。 */
 
 :root {
   color-scheme: light;
@@ -24,12 +24,12 @@
   --space-6: 16px;
   --space-7: 20px;
 
-  /* ── 字号阶梯：--fs-md 为全局基准，密度对标蛋神数据面板（9~15px 为主） ── */
-  --fs-3xs: 9px;   /* 密集卡片角标 */
-  --fs-2xs: 10px;  /* 辅助标签 */
-  --fs-xs: 11px;   /* 次要信息 */
-  --fs-sm: 12px;   /* 正文默认 */
-  --fs-md: 13px;   /* 强调正文（全局基准） */
+  /* 密集信息最低 11px；正文保持 13~14px，便于桌面阅读。 */
+  --fs-3xs: 11px;  /* 密集卡片角标 */
+  --fs-2xs: 12px;  /* 辅助标签 */
+  --fs-xs: 12px;   /* 次要信息 */
+  --fs-sm: 13px;   /* 正文默认 */
+  --fs-md: 14px;   /* 强调正文（全局基准） */
   --fs-lg: 15px;   /* 区块/面板标题 */
   --fs-xl: 20px;   /* 页面级标题 */
   --fs-2xl: 26px;  /* 概览大数字 */
@@ -41,35 +41,43 @@
 
   /* ── 阴影三层级：面板静置 / 卡片悬停 / 浮层。
      学蛋神克制用阴影，质感主要靠 1px 描边 + surface 分层底色 ── */
-  --shadow: 0 12px 36px rgba(21, 64, 73, .12);
-  --shadow-hover: 0 8px 22px rgba(0, 88, 91, .13);
-  --shadow-pop: 0 10px 24px rgba(6, 70, 83, .28);
+  --shadow: 0 2px 8px rgba(52, 64, 51, .04);
+  --shadow-hover: 0 4px 12px rgba(52, 64, 51, .08);
+  --shadow-pop: 0 10px 24px rgba(35, 48, 33, .20);
   --shadow-inset: inset 0 -6px 12px rgba(0, 0, 0, .12); /* 头像底部内阴影 */
 
   /* ── 品牌与基底 ── */
-  --bg: #f2f6f6;
+  --bg: #f6f6ed;
   --panel: #ffffff;          /* 白面板/白输入底（历史散布的 #fff 底色统一走它） */
-  --line: #d8e3e3;
-  --line-soft: #eef3f3;      /* 表格内弱分隔，比 --line 浅一档 */
-  --ink: #073745;
-  --ink-soft: #33555e;       /* 深青正文，比 --ink 浅一档 */
-  --muted: #6b8188;
-  --muted-2: #8a9aa0;        /* 弱灰青：占位字/进度标记/徽章淡字 */
+  --line: #dce1d1;
+  --line-soft: #edf0e7;      /* 表格内弱分隔，比 --line 浅一档 */
+  --ink: #344033;
+  --ink-soft: #455543;
+  --muted: #64705f;
+  --muted-2: #64705f;        /* 次要文字仍保持可读对比度 */
   --white: #ffffff;          /* 彩色底上的白字（底色请用 --panel） */
 
   /* ── 表面分层：由浅到深（收敛历史六种近似浅灰散值） ── */
-  --surface-1: #fbfdfd;      /* 工具条/分页条底 */
-  --surface-2: #f7fafa;      /* 常用次级底：行悬停、账号行、chip */
-  --surface-3: #eef4f4;      /* 更深一档：轨道、占位头像、按钮静置底 */
-  --surface-4: #e2eeee;      /* 按压/悬停最深档 */
+  --surface-1: #fafbf6;      /* 工具条/分页条底 */
+  --surface-2: #f4f6ee;      /* 常用次级底：行悬停、账号行、chip */
+  --surface-3: #edf0e5;      /* 更深一档：轨道、占位头像、按钮静置底 */
+  --surface-4: #e3e9d8;      /* 按压/悬停最深档 */
+  --sidebar-bg: #eef2e7;
+  --sidebar-text: #455543;
+  --sidebar-muted: #68755f;
+  --sidebar-line: #d8e0ce;
+  --sidebar-hover: #e2e9d8;
+  --selection-mark: #455f35;
 
-  /* teal 家族 */
-  --teal: #07978f;
-  --teal-dark: #075b68;
-  --teal-deep: #064653;
-  --teal-soft: #e8f5f3;
-  --teal-bright: #12b8a6;    /* 渐变亮端 / 悬停描边 */
-  --focus-ring: #26aaa2;
+  /* 沿用变量名以兼容现有组件；主色采用可承载白字的深绿。 */
+  --teal: #5f7d48;
+  --teal-dark: #455f35;
+  --teal-deep: #34482c;
+  --teal-soft: #edf2df;
+  --teal-bright: #73905a;
+  --focus-ring: #5f7d48;
+  --accent: #e1ec8f;
+  --on-accent: #455543;
 
   /* 琥珀家族：处理中状态 / 提示条 */
   --amber: #f5a623;
@@ -85,26 +93,26 @@
   --danger-soft: #fdeaec;
   --danger-hover: #fbdfe2;
   --danger-ink: #a83843;
-  --positive: #1d9a6c;
+  --positive: #4b7139;
   --negative: #d0576a;
-  --ok: #34d399;
+  --ok: #8cbd6b;
 
   /* 性别：浅底（卡片底色）+ 强色（环形标记）+ ink（小字需对比度） */
   --male: #eaf6ff;
   --male-strong: #5b9dd9;
-  --male-ink: #2f7fd0;
+  --male-ink: #326aa0;
   --female: #fff0f4;
   --female-strong: #d98ab0;
-  --female-ink: #d0568a;
+  --female-ink: #a13d6b;
 
   /* 侧栏深底：渐变端与其上的文字/分隔/悬停 */
-  --deep-1: #074f5d;
-  --deep-2: #053b48;
-  --deep-text: #d4e7e8;
-  --deep-text-dim: #b8d8da;
-  --deep-line: var(--deep-line);
-  --deep-hover: var(--deep-hover);
-  --deep-text-faint: var(--deep-text-faint);
+  --deep-1: #2d3c2b;
+  --deep-2: #202b21;
+  --deep-text: #e5ecdc;
+  --deep-text-dim: #c3ceb8;
+  --deep-line: rgba(229, 236, 220, .16);
+  --deep-hover: rgba(229, 236, 220, .10);
+  --deep-text-faint: #aebb9f;
 
   /* 解码树语法高亮（colorizeDecoded 白名单着色，与 JS 侧类名一一对应） */
   --code-name: #05555f;
@@ -113,14 +121,14 @@
   --code-leaf: #9aa9ae;
   --code-text: #7a4fb5;
 
-  --overlay: rgba(6, 46, 56, .45);
+  --overlay: rgba(32, 43, 33, .45);
 
   /* 图表三色：体型条（身高/体重/声音），与 .body-bar i 的类名对应 */
   --chart-h: #4f9df7;
   --chart-w: #f0a63c;
   --chart-v: #9a7ef0;
 
-  --sidebar: 176px;
+  --sidebar: 208px;
   --topbar: 74px;
 }
 
@@ -194,8 +202,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 
 /* 侧栏 */
 .sidebar {
-  background: linear-gradient(180deg, var(--deep-1), var(--deep-2));
-  color: var(--white);
+  background: var(--sidebar-bg);
+  color: var(--sidebar-text);
   display: flex;
   flex-direction: column;
   padding: var(--space-6) var(--space-5) var(--space-5);
@@ -206,7 +214,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   align-items: center;
   gap: var(--space-4);
   padding: 0 var(--space-2) var(--space-6);
-  border-bottom: 1px solid var(--deep-line);
+  border-bottom: 1px solid var(--sidebar-line);
 }
 .brand-mark {
   width: 40px; height: 40px;
@@ -215,14 +223,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   flex: none;
 }
 .brand-copy strong { display: block; font-size: var(--fs-lg); }
-.brand-copy span { display: block; font-size: var(--fs-xs); color: var(--deep-text-dim); margin-top: var(--space-0); }
+.brand-copy span { display: block; font-size: var(--fs-xs); color: var(--sidebar-muted); margin-top: var(--space-0); }
 
 #main-nav {
   display: grid; gap: var(--space-1); padding-top: 12px;
   overflow-y: auto; min-height: 0;
-  scrollbar-width: none;            /* Firefox：隐藏导航滚动条 */
+  scrollbar-width: thin;
 }
-#main-nav::-webkit-scrollbar { display: none; }  /* Chromium/WebView2 同 */
+#main-nav::-webkit-scrollbar { width: 4px; }
+#main-nav::-webkit-scrollbar-thumb { background: var(--sidebar-line); border-radius: 999px; }
 /* 采集切换按钮：开始/停止都用主色（红色带警告意味，用户反馈不协调），
    仅以文字区分；处理中为琥珀脉冲 */
 .top-actions .primary-button.toggle-busy {
@@ -237,15 +246,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   border-radius: var(--radius-md);
   text-align: left;
   padding: 0 var(--space-5);
-  color: var(--deep-text);
+  color: var(--sidebar-text);
   background: transparent;
   font-weight: 700;
   display: flex;
   align-items: center;
   gap: var(--space-4);
 }
-.nav-item:hover { background: var(--deep-hover); }
-.nav-item.active { background: var(--teal); color: var(--white); box-shadow: var(--shadow-hover); }
+.nav-item:hover { background: var(--sidebar-hover); }
+.nav-item.active { background: var(--accent); color: var(--on-accent); }
 .nav-icon { width: 17px; height: 17px; flex: none; }
 
 .sidebar-foot {
@@ -255,8 +264,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   gap: var(--space-3);
   align-items: flex-start;
   padding: var(--space-5) var(--space-3) 0;
-  border-top: 1px solid var(--deep-line);
-  color: var(--deep-text-dim);
+  border-top: 1px solid var(--sidebar-line);
+  color: var(--sidebar-muted);
 }
 .sidebar-foot strong { display: block; font-size: var(--fs-xs); color: var(--white); }
 .sidebar-foot span { font-size: var(--fs-2xs); }
@@ -326,9 +335,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
    隐藏页漏出来（实际发生过：feature-page 的 grid 展示规则盖过了 display:none） */
 .page:not(.active) { display: none !important; }
 .page .workspace.split { display: grid; grid-template-columns: 236px minmax(0, 1fr) 316px; gap: var(--space-4); align-items: start; }
-/* 宠物页：详情默认收起（让宽度给卡片网格，对标蛋神点阵背包），选中宠物后展开 */
-#page-pets .workspace.split { grid-template-columns: 224px minmax(0, 1fr); }
-#page-pets .workspace.split.has-detail { grid-template-columns: 224px minmax(0, 1fr) 316px; }
+/* 背包右侧筛选与详情共用一列，查看详情不改变网格宽度。 */
+#page-pets .workspace.split { grid-template-columns: minmax(0, 1fr) 300px; }
+#page-pets .content-panel { grid-column: 1; grid-row: 1; }
+#page-pets .filter-rail, #page-pets .detail-panel { grid-column: 2; grid-row: 1; }
+#page-pets .workspace.split.has-detail .filter-rail { display: none; }
 #page-pets .detail-panel { display: none; }
 #page-pets .workspace.split.has-detail .detail-panel { display: block; }
 #page-events .workspace.split { grid-template-columns: minmax(0, 1fr) 360px; }
@@ -576,7 +587,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .stat-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .stat-table td.race { text-align: right; color: var(--muted); font-size: var(--fs-xs); }
 .stat-table td.bar { width: 84px; padding-left: 8px; }
-.detail-bar { position: relative; height: 6px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+.detail-bar { display: block; position: relative; height: 6px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
 .detail-bar i { position: absolute; inset: 0 auto 0 0; background: var(--teal); border-radius: 999px; }
 .detail-bar u { position: absolute; top: -1px; bottom: -1px; width: 2px; background: var(--muted-2); }
 
@@ -603,7 +614,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 }
 .hb-card:hover { border-color: var(--teal); box-shadow: var(--shadow-hover); }
 .hb-card.active { border-color: var(--teal); background: var(--teal-soft); }
-.hb-card.uncollected { opacity: .62; }
+.hb-card.uncollected .hb-art { opacity: .72; }
 .hb-head { display: flex; align-items: center; gap: var(--space-3); }
 .hb-key {
   width: 30px; height: 30px; border-radius: var(--radius-md); flex: none;
@@ -645,7 +656,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 /* 宠物卡片网格（对标蛋神「点阵背包」：紧凑卡片 + 性别底色 + 悬停预览） */
 .pet-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(204px, 1fr));
   gap: var(--space-3);
   padding: var(--space-4);
 }
@@ -661,8 +672,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   min-width: 0;
   transition: box-shadow .18s ease, border-color .18s ease;
 }
-.pet-card.male { background: var(--male); }
-.pet-card.female { background: var(--female); }
+.pet-card.male, .pet-card.female { background: var(--panel); }
 .pet-card:hover { border-color: var(--teal-bright); box-shadow: var(--shadow-hover); z-index: 3; }
 .pet-card.selected { outline: 2px solid var(--teal); outline-offset: -2px; }
 
@@ -787,7 +797,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .nav-group-title {
   padding: var(--space-4) var(--space-5) var(--space-1);
   font-size: var(--fs-xs); font-weight: 700;
-  color: var(--deep-text-faint);
+  color: var(--sidebar-muted);
   user-select: none;  /* 分组标题是导航结构，不参与复制 */
 }
 .nav-subitem { padding-left: 18px; }
@@ -909,12 +919,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 }
 .point-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .point-level { font-size: var(--fs-2xs); color: var(--muted); font-variant-numeric: tabular-nums; }
+.point-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-xs); }
 .point-grid .point-pet:hover {
-  transform: scale(1.72); z-index: 10;
+  transform: translateY(-2px); z-index: 10;
   box-shadow: var(--shadow); border-color: var(--teal);
   background: var(--panel);
 }
-.point-grid .point-pet:hover .point-avatar { width: 64px; height: 64px; }
 .point-grid .point-pet { transition: transform var(--motion-base) var(--motion-spring), box-shadow var(--motion-base) var(--motion-ease); }
 
 /* 种公母库 */
@@ -981,26 +991,3 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   padding: var(--space-6) var(--space-7);
 }
 .modal h2 { margin: 0 0 var(--space-5); font-size: var(--fs-lg); }
-
-
-/* 窄窗适配：收起详情栏 */
-@media (max-width: 1360px) {
-  .page .workspace.split { grid-template-columns: 216px minmax(0, 1fr); }
-  #page-pets .detail-panel { display: none; }
-  #page-events .workspace.split { grid-template-columns: minmax(0, 1fr); }
-  #page-events .detail-panel { display: none; }
-  #page-handbook .workspace.split { grid-template-columns: minmax(0, 1fr); }
-  #page-handbook .detail-panel { display: none; }
-  #page-egg-dex .workspace.split { grid-template-columns: minmax(0, 1fr); }
-  #page-egg-dex .detail-panel { display: none; }
-  #page-egg-box .workspace.split { grid-template-columns: minmax(0, 1fr); }
-  #page-egg-box .detail-panel { display: none; }
-  #page-male-matrix .workspace.split { grid-template-columns: minmax(0, 1fr); }
-  #page-male-matrix .detail-panel { display: none; }
-}
-@media (max-width: 1080px) {
-  :root { --sidebar: 150px; }
-  .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .page .workspace.split { grid-template-columns: minmax(0, 1fr); }
-  .filter-rail { position: static; max-height: none; }
-}
