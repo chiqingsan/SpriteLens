@@ -328,6 +328,63 @@ class NpcapSourceLogicTest(unittest.TestCase):
         self.assertFalse(self.src.is_running)
         self.assertIsNone(self.src._worker)
 
+    def test_stop_with_stuck_worker_keeps_handle_for_diagnostics(self):
+        """超时未退的 worker：句柄保留在 stale_workers，不与新投递并存（S03a）。
+
+        旧实现 join 前就把 _worker 置 None——超时后线程仍在跑，旧回调
+        无人可查，restart 时新旧投递并存。新实现句柄转存 _stale_workers
+        留诊断；is_stale_worker_active() 供停止语义判断。
+        """
+        self.src._running = True
+        gate = threading.Event()
+        worker_started = threading.Event()
+
+        def stuck_worker():
+            while True:
+                item = self.src._queue.get()
+                if item is None:
+                    return
+                worker_started.set()
+                gate.wait(timeout=30)  # 模拟下游长时间卡死（已取出一个数据块）
+
+        self.src._worker = threading.Thread(target=stuck_worker, daemon=True)
+        self.src._worker.start()
+        self.src._queue.put(b"stub")  # worker 消费后卡在下游；哨兵将排在队尾等不到消费
+        self.assertTrue(worker_started.wait(timeout=5), "worker 未消费首个数据块")
+        started = time.monotonic()
+        self.src.stop()
+        elapsed = time.monotonic() - started
+        self.assertLess(elapsed, 8, "stop 应在 join 预算内返回")
+        self.assertTrue(self.src._stale_workers, "超时 worker 句柄应保留")
+        self.assertTrue(self.src.is_stale_worker_active(), "应能诊断到未退 worker")
+        self.assertIsNone(self.src._worker)
+        gate.set()  # 释放卡死线程，让它退出（daemon 兜底，不阻塞测试）
+
+    def test_stale_worker_cleared_after_exit(self):
+        """迟退 worker 最终退出后：stale 列表可清理，不影响 restart。"""
+        self.src._running = True
+        gate = threading.Event()
+
+        def slow_worker():
+            while True:
+                item = self.src._queue.get()
+                if item is None:
+                    return
+                gate.wait(timeout=3)
+
+        self.src._worker = threading.Thread(target=slow_worker, daemon=True)
+        self.src._worker.start()
+        self.src._queue.put(b"stub")  # 有数据在队：worker 先处理再吃哨兵，可能超时
+        self.src.stop()
+        if self.src._stale_workers:
+            gate.set()
+            for worker in self.src._stale_workers:
+                worker.join(timeout=5)
+            self.src.reap_stale_workers()
+        self.assertFalse(self.src.is_stale_worker_active())
+        # restart 语义：无活跃 stale worker，可安全重新 start
+        self.assertFalse(self.src.is_stale_worker_active())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -33,6 +33,8 @@ CHUNK_QUEUE_MAX = 4096
 # 空闲时间回收（长时间挂机时流表与重组缓冲的内存边界）。
 FLOW_IDLE_SECONDS = 30 * 60
 _FLOW_SWEEP_INTERVAL = 60.0
+# 停止时等待投递线程退出的预算（S03a）：超时转存 stale 句柄而非无限等。
+_WORKER_JOIN_TIMEOUT = 5.0
 
 
 @dataclass(frozen=True)
@@ -75,6 +77,11 @@ class NpcapCaptureSource:
         self._flow_count = 0
         self._queue: queue.Queue[StreamChunk | FlowClosed | None] = queue.Queue(maxsize=CHUNK_QUEUE_MAX)
         self._worker: threading.Thread | None = None
+        # 超时未退的投递线程句柄（S03a）：句柄即所有权证据，不能在 join
+        # 超时后丢弃——restart 前可诊断 is_stale_worker_active()，避免
+        # 新旧投递线程并存互踩。
+        self._stale_workers: list[threading.Thread] = []
+        self._worker_join_timeout = _WORKER_JOIN_TIMEOUT
         self.dropped_chunks = 0
 
     def _build_bpf(self) -> str:
@@ -158,14 +165,21 @@ class NpcapCaptureSource:
             self._flow_count = 0
 
     def stop(self) -> None:
+        """停止采集：sniffer 与 worker 各自有界，单项失败不跳过其余（S03a）。
+
+        sniffer.stop 有预算（join 嗅探线程限时）；录制器/投递线程清理
+        失败不阻断流表释放与 stopped 事件。返回即代表停止流程完成，
+        是否有迟退线程由 is_stale_worker_active() 诊断。
+        """
         # 不以 _running 为前置：失败启动留下的 worker/流表也要能被清掉（R03）
         self._running = False
-        if self._sniffer is not None:
+        sniffer = self._sniffer
+        self._sniffer = None
+        if sniffer is not None:
             try:
-                self._sniffer.stop()
+                sniffer.stop()
             except Exception:  # noqa: BLE001 - 停止失败不影响退出
-                logger.debug("sniffer 停止异常", exc_info=True)
-            self._sniffer = None
+                logger.warning("sniffer 停止异常", exc_info=True)
         self._signal_worker_stop()
         # 停止后不再有 FIN/RST 事件，流表与重组缓冲在这里统一释放
         with self._flow_lock:
@@ -199,7 +213,22 @@ class NpcapCaptureSource:
             except queue.Full:  # pragma: no cover - 刚取出必然有位
                 pass
         self._worker = None
-        worker.join(timeout=5)
+        worker.join(timeout=self._worker_join_timeout)
+        if worker.is_alive():
+            # 句柄即所有权证据（S03a）：超时未退不等于不存在，转存诊断
+            self._stale_workers.append(worker)
+            logger.warning(
+                "投递线程 join 超时未退（已转存 stale 列表，restart 前应确认）: %s", worker.name
+            )
+
+    def is_stale_worker_active(self) -> bool:
+        """是否有超时未退的旧投递线程仍活着（restart 前的安全诊断）。"""
+        return any(worker.is_alive() for worker in self._stale_workers)
+
+    def reap_stale_workers(self) -> int:
+        """清理已退出的 stale 句柄；返回剩余仍活着的个数。"""
+        self._stale_workers = [worker for worker in self._stale_workers if worker.is_alive()]
+        return len(self._stale_workers)
 
     @property
     def is_running(self) -> bool:

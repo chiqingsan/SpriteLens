@@ -94,8 +94,16 @@ class CaptureService:
             self._maybe_start_recording_locked()
 
     def stop(self) -> None:
+        """停止采集（S03a）：录制器失败仍尝试停 source/协议层。
+
+        旧实现 recorder.stop 抛异常会跳过 monitor.stop，留下运行中的
+        接入层。录制是旁路功能，停源才是停止命令的主目标。
+        """
         with self._command_lock:
-            self._recorder.stop()
+            try:
+                self._recorder.stop()
+            except Exception as exc:  # noqa: BLE001 - 录制失败不阻断停源
+                logger.warning("录制器停止失败（继续停采集）: %s", exc)
             self._monitor.stop()
 
     def set_iface(self, name: str | None) -> None:
