@@ -6,7 +6,8 @@
 
 状态：当前架构说明。新的稳定性与模块化演进以 [ROADMAP](ROADMAP.md) 为准；
 历史技术选型记录仍见 `ARCHITECTURE_DECISION.md`。当前已知缺陷及证据见
-[初审](reviews/PROJECT_REVIEW_2026-10-12.md) 与 [改动复核](reviews/ARCHITECTURE_FOLLOWUP_2026-10-13.md)，
+[初审](reviews/PROJECT_REVIEW_2026-10-12.md)、[改动复核](reviews/ARCHITECTURE_FOLLOWUP_2026-10-13.md)
+与 [GLM 交付复核](reviews/GLM_DELIVERY_REVIEW_2026-10-13.md)，
 不要把设计约束解释为所有异常路径已验证。
 
 2026-10-13 已确认前端采用 Vue 3 + TypeScript + Vite，当前生产仍为原生 JS，尚未实施迁移。

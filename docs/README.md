@@ -19,6 +19,7 @@
 
 - [reviews/PROJECT_REVIEW_2026-10-12.md](reviews/PROJECT_REVIEW_2026-10-12.md) — `114be08` 全项目初审快照；当前修复状态见路线图
 - [reviews/ARCHITECTURE_FOLLOWUP_2026-10-13.md](reviews/ARCHITECTURE_FOLLOWUP_2026-10-13.md) — `240b94c` 改动复核：录制回归、生命周期/HTTP 缺口与完成范围校正
+- [reviews/GLM_DELIVERY_REVIEW_2026-10-13.md](reviews/GLM_DELIVERY_REVIEW_2026-10-13.md) — `a106044` 交付复核：启动阻断、并发/停止/HTTP 返修证据与门禁边界
 
 - `ARCHITECTURE_DECISION.md` — 架构决策：目标形态（pywebview + 本地服务 + Web UI）、
   Tauri 评估、阶段划分与量化判据

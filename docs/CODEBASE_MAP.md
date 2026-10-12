@@ -19,7 +19,7 @@ Vue 3 + TypeScript + Vite 已确认采用，工程尚未创建；下表描述当
 | `requirements-build.txt` | 打包依赖（nuitka / ordered-set / zstandard），运行程序不需要 |
 | `tools/create_shortcut.bat` + `ps1` | 创建桌面快捷方式（幂等，ps1 用 $PSScriptRoot 自定位） |
 | `requirements.txt` | scapy / pycryptodome / aiohttp / pywebview（无 UI 框架之外的额外依赖） |
-| `tools/run_build_tests.py` | 全量测试（unittest discover） |
+| `tools/run_build_tests.py` | 统一门禁：unittest、递归 JS、HTML 引用、静态清单与依赖 |
 | `tools/import_schema.py` | 导入外部 schema 全集到 data/schemas（本地目录或 GitHub） |
 | `tools/import_static_data.py` | 导入基础静态表（物种/性格/系别/技能）到 data/static |
 | `tools/import_assets.py` | 导入图鉴元数据 + 精灵图 + 系别图标 + 系别克制表 |
@@ -46,6 +46,7 @@ Vue 3 + TypeScript + Vite 已确认采用，工程尚未创建；下表描述当
 | `docs/VUE3_MIGRATION.md` | 已确认的 Vue 前端工程/接口/状态与渐进迁移决策；不代表已实现 |
 | `docs/reviews/PROJECT_REVIEW_2026-10-12.md` | 基于114be08的审查快照、复现证据与资源/文档风险；不代表已修复 |
 | `docs/reviews/ARCHITECTURE_FOLLOWUP_2026-10-13.md` | 基于240b94c的改动复核、确定性复现与完成范围校正 |
+| `docs/reviews/GLM_DELIVERY_REVIEW_2026-10-13.md` | 基于a106044的交付复核、启动/并发/生命周期/HTTP 返修证据与门禁边界 |
 
 路线图中的新模块路径是规划，尚未加入下面的当前源码地图。
 

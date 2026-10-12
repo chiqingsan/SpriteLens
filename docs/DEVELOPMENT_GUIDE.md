@@ -178,9 +178,9 @@ Store 并发批次顺序、坏库备份失败保护与坏行隔离已有修复�
 记录，**只减不增**（原 `domain → services.PacketEvent` 例外已随事件类型移入
 `spritelens/events.py` 而移除）。
 
-domain→services 豁免已移除；当前测试仍未真正检查相对导入与根级 events 的源依赖，
-禁止特定 import 也不能证明零文件 IO。它不能证明所有上述约束已执行。
-收紧任务见路线图 G01；例外按模块/符号及删除条件登记，不增加包级白名单让测试变绿。
+domain→services 豁免已移除；当前测试已检查根级 events 的源层级并拒绝包内相对导入。
+禁止特定 import 仍不能证明零文件 IO，也不能证明装配、状态和清理行为正确。
+验收证据及剩余范围见路线图 G01；例外按模块/符号及删除条件登记，不增加包级白名单让测试变绿。
 
 ## 测试
 
@@ -205,7 +205,9 @@ domain→services 豁免已移除；当前测试仍未真正检查相对导入�
 | 持久化 schema / 打包入口 / 发布前 | 上面全部 |
 | 资源导入 / 映射 | 对应工具与资源测试、JSON/图片/引用校验、覆盖/冲突差异；涉发布再做exe验收 |
 
-发布前统一用 `python tools/run_build_tests.py`（内部跑完整 unittest discover）。
+发布前统一用 `python tools/run_build_tests.py`（完整 unittest、递归 JS、HTML 引用、静态清单与依赖检查）。
+现有 JS 检查依赖 PATH 中可执行的 Node；安装 requirements-dev.txt 不会安装 Node。
+生命周期测试必须覆盖真实成功装配与受控失败/超时/重启，不能只断言异常类型或诊断句柄。
 
 环境缺测试工具或依赖时，要在最终说明里明确写清楚"跳过什么、为什么"。
 
