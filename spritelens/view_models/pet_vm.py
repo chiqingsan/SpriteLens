@@ -375,11 +375,12 @@ class PetViewModel:
 
 
 class PetView:
-    """请求级一次性视图（R08）：筛选/排序条件显式传入，不写共享 VM。
+    """请求级一次性视图（R08 + 阶段1.5）：筛选条件显式传入 + 一致性快照。
 
-    与 PetViewModel 的读取接口同形（filtered_pets/all_pets/version/…），
-    pets_payload 等载荷函数无差别消费；backpack/location/选项类读取
-    委托 VM（与筛选无关的共享数据）。
+    构造时经 repository.consistent_snapshot() 单次锁内取齐
+    pets/backpack/locations/version/uid，筛选排序在锁外对该快照执行——
+    整个响应对应仓库的同一版本，不出现「旧条目 + 新位置」的组合。
+    与 PetViewModel 的读取接口同形，pets_payload 等载荷函数无差别消费。
     """
 
     def __init__(self, vm: PetViewModel, filters: PetFilters, sort_key: str, descending: bool) -> None:
@@ -387,6 +388,7 @@ class PetView:
         self._filters = filters
         self._sort_key = sort_key
         self._sort_desc = descending
+        self._snapshot = vm._repository.consistent_snapshot()
 
     @property
     def filters(self) -> PetFilters:
@@ -397,26 +399,32 @@ class PetView:
         return self._sort_key, self._sort_desc
 
     def filtered_pets(self) -> tuple[Pet, ...]:
-        pets = self._vm._apply_filters_with(self._vm.all_pets(), self._filters)
+        pets = self._vm._apply_filters_with(self._snapshot.pets, self._filters)
         return self._vm._apply_sort_with(pets, self._sort_key, self._sort_desc)
 
     def all_pets(self) -> tuple[Pet, ...]:
-        return self._vm.all_pets()
+        return self._snapshot.pets
 
     def filtered_count(self) -> int:
         return len(self.filtered_pets())
 
     def total_count(self) -> int:
-        return self._vm.total_count()
+        return len(self._snapshot.pets)
 
     def version(self) -> int:
-        return self._vm.version()
+        return self._snapshot.version
 
     def location_of(self, pet: Pet):
-        return self._vm.location_of(pet)
+        location = self._snapshot.locations.get(pet.gid)
+        if location:
+            return location.payload()
+        for team in self._snapshot.backpack.teams:
+            if pet.gid in team.slots:
+                return {"team_id": team.box_id, "slot": team.slots.index(pet.gid) + 1, "historical": team.historical}
+        return None
 
     def backpack(self):
-        return self._vm.backpack()
+        return self._snapshot.backpack
 
     def nature_options(self):
         return self._vm.nature_options()

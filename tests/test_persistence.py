@@ -14,6 +14,7 @@ from pathlib import Path
 
 from spritelens.domain.identity import extract_identity
 from spritelens.domain.pets import Pet
+from spritelens.domain.pet_locations import Backpack
 from spritelens.capture.key_store import KeyStore
 from spritelens.protocol.opcodes import OpcodeCatalog
 from spritelens.repositories.database import Database
@@ -886,6 +887,30 @@ class DatabaseMigrationTest(unittest.TestCase):
         store.load(UID)  # 触发隔离读取
         rows = db.query("SELECT attributes_json FROM pets WHERE gid = 1")
         self.assertEqual(rows[0]["attributes_json"], '[{"talent":"bad"}]')
+        store.close()
+        db.close()
+
+    def test_consistent_snapshot_same_version_across_reads(self):
+        """consistent_snapshot 单次锁取齐：pets/backpack/version/uid 同版本（阶段1.5）。"""
+        db = Database(self.db_path)
+        store = PetStore(db, flush_interval=60.0)
+        repo = PetRepository(store=store)
+
+        repo.handle_packet(identity_event(uid=UID, name="账号A"))
+        repo.handle_packet(pet_event([(1, "魔力猫", 41)]))
+        first = repo.consistent_snapshot()
+        self.assertEqual([p.gid for p in first.pets], [1])
+        self.assertEqual(first.version, repo.version)
+        self.assertEqual(first.uid, UID)
+        self.assertIsNotNone(first.identity)
+
+        # 新数据到达后新快照版本递增，且 pets 与 version 一起变化
+        repo.handle_packet(pet_event([(1, "魔力猫", 42), (2, "岚鸟", 39)]))
+        second = repo.consistent_snapshot()
+        self.assertGreater(second.version, first.version)
+        self.assertEqual([p.gid for p in second.pets], [1, 2])
+        self.assertEqual(second.pets[0].level, 42)
+        self.assertIsInstance(second.backpack, Backpack)
         store.close()
         db.close()
 

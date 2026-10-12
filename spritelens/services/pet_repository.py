@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import threading
+from dataclasses import dataclass
 
 from spritelens.domain.identity import PlayerIdentity, extract_identity
 from spritelens.domain.pets import Pet, extract_pets
@@ -21,6 +22,19 @@ from spritelens.services.account_tracker import AccountTracker
 from spritelens.events import PacketEvent
 
 MAX_PETS = 2000
+
+
+@dataclass(frozen=True)
+class PetRepoSnapshot:
+    """一次锁内取齐的仓库只读快照（阶段1.5）：同一版本、可锁外序列化。"""
+
+    pets: tuple[Pet, ...]
+    backpack: Backpack
+    locations: dict[int, PetLocation]
+    version: int
+    uid: int
+    identity: PlayerIdentity | None
+    cached_identity: PlayerIdentity | None
 
 
 class PetRepository:
@@ -91,6 +105,30 @@ class PetRepository:
         """当前全部宠物（按 gid 排序）；UI 按版本号判断是否需要重建表。"""
         with self._lock:
             return tuple(sorted((pet for pet in self._pets.values() if not pet.is_trial_pet and not pet.is_mirror_pet), key=lambda p: p.gid))
+
+    def consistent_snapshot(self) -> "PetRepoSnapshot":
+        """单次锁内取齐 pets/backpack/version/identity（阶段1.5，R11）。
+
+        旧的多次独立读取（filtered_pets/all_pets/backpack/location/version
+        各自拿锁）可能组合出「旧条目 + 新位置」的跨版本响应；本方法保证
+        载荷来自同一版本，序列化在锁外进行。复用现有 frozen dataclass，
+        不建立第二套业务模型。
+        """
+        with self._lock:
+            pets = tuple(sorted(
+                (pet for pet in self._pets.values() if not pet.is_trial_pet and not pet.is_mirror_pet),
+                key=lambda p: p.gid,
+            ))
+            locations = dict(self._locations)
+            return PetRepoSnapshot(
+                pets=pets,
+                backpack=Backpack(dict(self._backpack.boxes), self._backpack.teams, self._backpack.active_team),
+                locations=locations,
+                version=self._version,
+                uid=self._account.uid,
+                identity=self._account.identity,
+                cached_identity=self._cached_identity,
+            )
 
     @property
     def version(self) -> int:
@@ -182,4 +220,4 @@ class PetRepository:
             self._version += 1
 
 
-__all__ = ["MAX_PETS", "PetRepository"]
+__all__ = ["MAX_PETS", "PetRepoSnapshot", "PetRepository"]
