@@ -37,6 +37,46 @@ class MonitorServiceTest(unittest.TestCase):
     def _feed_raw(self, raw: bytes, direction: Direction = Direction.S2C, seq: int = 1):
         self.monitor.on_chunk(StreamChunk(session_id=SESSION, direction=direction, data=raw, first_seq=seq))
 
+    def test_injected_schema_library_takes_priority_over_global(self):
+        """注入的 SchemaLibrary 完全生效，不回读全局库（阶段1边界锁定）。
+
+        MonitorService 未显式加载全局库时（独立测试/回放），注入实例
+        决定解码命名；即使全局库为空也不退化为 field_N。
+        """
+        from spritelens.protocol import schema as schema_mod
+        from spritelens.protocol.opcodes import OpcodeInfo
+        from spritelens.protocol.schema import SchemaLibrary
+
+        library = SchemaLibrary(
+            messages={"SynthMsg": {1: {"name": "injected_name", "type": ""}}},
+            source_dir=None,
+        )
+        monitor = MonitorService(
+            catalog=OpcodeCatalog({0x1234: OpcodeInfo("SynthTest", "test", "SynthMsg")}),
+            key_store=KeyStore(self.tmp_path / "keys"),
+            tracker=self.tracker,
+            schema_library=library,
+        )
+        saved = schema_mod._library
+        schema_mod._library = None  # 全局库为空：解码若回读全局将退化为 field_1
+        try:
+            # DATA 前需要 ACK 提供会话密钥（无密钥帧被 key_miss 计数丢弃）
+            monitor.on_chunk(StreamChunk(
+                session_id=SESSION, direction=Direction.S2C,
+                data=make_ack_frame(SYNTH_KEY), first_seq=1,
+            ))
+            monitor.on_chunk(StreamChunk(
+                session_id=SESSION, direction=Direction.S2C,
+                data=make_data_frame(SYNTH_KEY, 0x1234, make_protobuf_payload(), sequence=2),
+                first_seq=2,
+            ))
+        finally:
+            schema_mod._library = saved
+        events = monitor.drain_events()
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].opcode_name, "SynthTest")
+        self.assertEqual(events[0].decoded[0]["name"], "injected_name")
+
     def test_ack_then_data_yields_event(self):
         self._feed_raw(make_ack_frame(SYNTH_KEY))
         self._feed_raw(make_data_frame(SYNTH_KEY, 0x1888, make_protobuf_payload(), sequence=2))
