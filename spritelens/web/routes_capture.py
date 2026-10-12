@@ -32,11 +32,23 @@ class CaptureRoutesMixin:
         )
 
     async def _api_capture_iface(self, request: web.Request) -> web.Response:
-        body = await self._json_body(request)
+        try:
+            body = await self._json_body(request)
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
         name = body.get("name")
-        if name is not None and not isinstance(name, str):
-            return web.json_response({"error": "字段 name 必须是字符串"}, status=400)
-        await asyncio.to_thread(self._context.capture_vm.select_iface, name or "")
+        # 显式字符串契约（D08）：缺字段/null 不再默认成空串清空网卡；
+        # 清空选择仍被支持，但必须提交明确的空字符串
+        if not isinstance(name, str):
+            return web.json_response(
+                {"error": "字段 name 必须是字符串（清空选择用空字符串）"}, status=400
+            )
+        try:
+            await asyncio.to_thread(self._context.capture_vm.select_iface, name)
+        except OSError as exc:
+            return web.json_response(
+                {"error": f"网卡已切换，但设置保存失败（重启后可能恢复原值）：{exc}"}, status=500
+            )
         return web.json_response(self._capture_payload())
 
     async def _api_capture_start(self, request: web.Request) -> web.Response:
@@ -53,7 +65,13 @@ class CaptureRoutesMixin:
             enabled = self._require_bool(body, "enabled")
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=400)
-        await asyncio.to_thread(self._context.capture_vm.set_recording_requested, enabled)
+        try:
+            await asyncio.to_thread(self._context.capture_vm.set_recording_requested, enabled)
+        except OSError as exc:
+            # D03：运行状态已生效但保存失败——返回可读错误，页面据提示重试
+            return web.json_response(
+                {"error": f"录制设置已生效，但保存失败（重启后可能恢复原值）：{exc}"}, status=500
+            )
         return web.json_response(self._capture_payload())
 
     async def _api_capture_autostart(self, request: web.Request) -> web.Response:
@@ -62,7 +80,12 @@ class CaptureRoutesMixin:
             enabled = self._require_bool(body, "enabled")
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=400)
-        await asyncio.to_thread(self._context.capture_vm.set_autostart, enabled)
+        try:
+            await asyncio.to_thread(self._context.capture_vm.set_autostart, enabled)
+        except OSError as exc:
+            return web.json_response(
+                {"error": f"自动采集设置已生效，但保存失败（重启后可能恢复原值）：{exc}"}, status=500
+            )
         return web.json_response(self._capture_payload())
 
     async def _api_capture_key(self, request: web.Request) -> web.Response:

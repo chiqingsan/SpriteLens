@@ -368,6 +368,72 @@ class LocalServerTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertFalse(payload["recording_requested"])
 
+    def test_capture_iface_command_json_contract(self):
+        """D08 回归：iface 命令的 JSON 异常全部 400，缺 name/null 不再清空。
+
+        旧实现数组/坏 JSON 走 500（ValueError 未捕获）；`{}`/null 默认成
+        空串把原网卡清掉并 200。新契约：非法体/缺字段/错类型 400 零副作用；
+        清空选择必须提交明确空字符串。
+        """
+        base = f"http://127.0.0.1:{self.server.port}"
+        iface_url = f"{base}/api/capture/iface"
+
+        # 先设置一个网卡值作为「原值」（用合法命令）
+        status, _ = _http_post(iface_url, self.server.token, {"name": "以太网 1"})
+        self.assertEqual(status, 200)
+
+        bad_bodies = [b"[]", b"{not json", b"{}", b'{"name":null}', b'{"name":123}']
+        for raw in bad_bodies:
+            status, payload = _http_post_raw(iface_url, self.server.token, raw)
+            self.assertEqual(status, 400, f"{raw!r} 应 400，实际 {status}: {payload}")
+            self.assertIn("error", payload)
+
+        # 零副作用：原网卡值保持不变（旧实现会被清空）
+        _, payload = _http_get(f"{base}/api/capture", token=self.server.token)
+        self.assertEqual(payload["iface"], "以太网 1")
+
+        # 明确空字符串仍可清空（被支持的语义）
+        status, payload = _http_post(iface_url, self.server.token, {"name": ""})
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["iface"], "")
+
+    def test_capture_commands_io_failure_returns_readable_error(self):
+        """D03/D08 回归：配置保存失败返回可读 500，不报告成功。
+
+        旧实现 set() 吞 OSError：命令 200 成功、重启后恢复旧配置。
+        """
+        from unittest import mock
+
+        from spritelens.repositories.settings import SettingsRepository
+
+        base = f"http://127.0.0.1:{self.server.port}"
+        with mock.patch.object(
+            SettingsRepository, "set_checked", side_effect=OSError("注入：磁盘不可写")
+        ):
+            status, payload = _http_post(
+                f"{base}/api/capture/recording", self.server.token, {"enabled": True}
+            )
+            self.assertEqual(status, 500)
+            self.assertIn("保存失败", payload["error"])
+
+            status, payload = _http_post(
+                f"{base}/api/capture/autostart", self.server.token, {"enabled": False}
+            )
+            self.assertEqual(status, 500)
+            self.assertIn("保存失败", payload["error"])
+
+            status, payload = _http_post(
+                f"{base}/api/capture/iface", self.server.token, {"name": "以太网 2"}
+            )
+            self.assertEqual(status, 500)
+            self.assertIn("保存失败", payload["error"])
+
+        # 恢复真实存储后合法命令仍 200（服务未被失败请求破坏）
+        status, payload = _http_post(
+            f"{base}/api/capture/recording", self.server.token, {"enabled": False}
+        )
+        self.assertEqual(status, 200)
+
     def test_manual_key_validation(self):
         base = f"http://127.0.0.1:{self.server.port}"
         status, payload = _http_post(
