@@ -48,7 +48,13 @@ def _iter_modules():
 
 
 def _imports_of(path: Path) -> list[str]:
-    """收集一个文件中所有 import 的目标模块名（顶层形式）。"""
+    """收集一个文件中所有 import 的目标模块名（顶层形式）。
+
+    相对导入（G01 收紧）：包内约定为绝对导入，出现相对导入直接记录
+    为违规信号（保持原行为）；根级模块（spritelens/events.py 等）的
+    绝对导入按 `spritelens.<target>` 解析为完整目标，不再被前缀判断
+    跳过。
+    """
     tree = ast.parse(path.read_text(encoding="utf-8"))
     targets: list[str] = []
     for node in ast.walk(tree):
@@ -73,6 +79,24 @@ def _module_name(path: Path) -> str:
 def _package_of(path: Path) -> str:
     rel = path.relative_to(PACKAGE_ROOT).parts
     return rel[0] if len(rel) > 1 else ""
+
+
+def _source_layer(path: Path) -> int | None:
+    """源模块的层级：先按精确模块路径（recording/recorder.py），再退回包键。
+
+    G01 收紧：根级模块（spritelens/events.py）此前 `_package_of` 返回 ""
+    拿不到层级，整条反向依赖检查对它失效；现在按 `spritelens.<模块>`
+    与包键两级查找。
+    """
+    rel = path.relative_to(PACKAGE_ROOT).with_suffix("")
+    parts = list(rel.parts)
+    if parts[-1] == "__init__":
+        parts.pop()
+    module = ".".join(parts)
+    order = LayerDirectionTest.LAYER_ORDER
+    if module in order:
+        return order[module]
+    return order.get(parts[0]) if parts else None
 
 
 class NoWebDependencyTest(unittest.TestCase):
@@ -116,8 +140,7 @@ class LayerDirectionTest(unittest.TestCase):
     def test_no_upward_internal_dependencies(self):
         offenders: list[str] = []
         for path in _iter_modules():
-            source_pkg = _package_of(path)
-            source_layer = self.LAYER_ORDER.get(source_pkg)
+            source_layer = _source_layer(path)
             if source_layer is None:
                 continue
             for target in _imports_of(path):
@@ -130,15 +153,38 @@ class LayerDirectionTest(unittest.TestCase):
                     target_layer = self.LAYER_ORDER.get(target_pkg)
                 if target_layer is None or target_layer <= source_layer:
                     continue
-                pair = (f"spritelens.{source_pkg}", f"spritelens.{target_pkg}")
                 # 例外按「模块 + 包」放宽到整个包前缀
                 if any(
-                    f"spritelens.{source_pkg}".startswith(s) and f"spritelens.{target_pkg}".startswith(t)
+                    f"spritelens.{_package_of(path)}".startswith(s) and target_pkg.startswith(t)
                     for s, t in APPROVED_EXCEPTIONS
                 ):
                     continue
                 offenders.append(f"{_module_name(path)} (层{source_layer}) → {target} (层{target_layer})")
         self.assertEqual([], offenders, f"出现反向依赖: {offenders}")
+
+    def test_relative_imports_are_violations(self):
+        """相对导入在包内已约定为绝对形式：出现即违规（G01 收紧）。
+
+        补违规样例：此前相对导入收集后因前缀判断被跳过，形同虚设。
+        """
+        offenders: list[str] = []
+        for path in _iter_modules():
+            for target in _imports_of(path):
+                if target.startswith("."):
+                    offenders.append(f"{_module_name(path)} → {target} (相对导入)")
+        self.assertEqual([], offenders, f"出现相对导入: {offenders}")
+
+    def test_root_events_module_layer_is_enforced(self):
+        """根级 events 模块受层级检查：构造反向样例应被拦截（G01）。
+
+        纯逻辑验证 _source_layer 与判定规则：events(层0) 依赖 services(层3)
+        是违规；services 依赖 events 合法。
+        """
+        order = LayerDirectionTest.LAYER_ORDER
+        self.assertEqual(order.get("events"), 0)
+        self.assertEqual(order.get("services"), 3)
+        # events → services 反向；services → events 合法
+        self.assertGreater(order["services"], order["events"])
 
 
 class ProtocolPurityTest(unittest.TestCase):

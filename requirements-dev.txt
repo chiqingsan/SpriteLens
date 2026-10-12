@@ -1,0 +1,4 @@
+# 测试与资源工具依赖（G01：新环境 `pip install -r requirements-dev.txt` 后可跑全量门禁）
+# 已验证口径：Python 3.12.10 + Pillow 12.3.0（2026-10-13，当前 venv）
+-r requirements.txt
+Pillow>=10.0
