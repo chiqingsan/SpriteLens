@@ -27,60 +27,20 @@ R01–R09 已全部修复并提交（0.1→0851c98、0.2→b929dce、0.3→90636
 
 ## 阶段 1：依赖边界与前端模块（待实施）
 
-## 阶段 1：依赖边界与前端模块
+## 阶段 1：依赖边界与前端模块（后端完成，前端第一刀完成，2026-10-12）
 
-### 后端
+后端五项已落地（1.1→09d187e、1.2→44b7141、1.3→38c3b73、1.4→714ef96、1.5→66bfd85），前端蛋图鉴页已抽出（1.6→e078ef1，demo 交互验收通过）：
 
-- 将 `PacketEvent` 移到小型、无 IO 的中立叶子模块（建议 `spritelens/events.py`）。过渡期可从旧入口重导出，注明调用方与删除条件；同步迁移 domain 的导入，移除整个包的反向依赖豁免。
-- 将 schema/opcode 的文件加载与纯解码职责明确区分。静态目录先保留现有 API，通过注入目录/目录对象降低全局缓存依赖；只有在代码修改确实涉及 loader 时再迁出 IO，不一次搬完整 domain。
-- 从 CaptureViewModel 抽取采集运行服务：source 创建与生命周期、录制 tee、手动密钥和串行命令。VM 保留页面校验与展示；安装用例在实际扩展时单独抽取，采用可注入假下载/启动器。
-- `LocalServer` 保留鉴权、循环与生命周期；按已有功能将路由分为 capture/pets/catalog 等模块；payloads 先按 pets 与 catalogs 拆分，并保留兼容导出。新文件必须能独立测试，避免只是转发调用。
-- 聚合器一次返回包含 uid/version/数据质量的不可变快照，序列化在锁外完成。现有 `Pet` 等 frozen dataclass 可以复用，避免建立第二套同义业务模型。
+- **事件中立化**：`PacketEvent` 移入 `spritelens/events.py`（无 IO 叶子模块，层级 0）；domain 5 个提取模块改从该处导入，`domain→services` 反向依赖与包级豁免移除（`test_architecture` 收紧锁定）。monitor_service 过渡期重导出，调用方已全部迁移。
+- **schema 注入边界**：注入 SchemaLibrary 完全优先于全局库（回归锁定）；loader 未搬移——按「代码修改确实涉及 loader 时再迁出 IO」保留现状。
+- **采集运行服务**：`services/capture_service.py` 收口接入层生命周期、录制 tee、手动密钥与命令串行化；CaptureViewModel 保留页面校验、偏好与安装状态机，对外接口不变。`recording.recorder` 层级修正为 1（tee 旁路适配器与 capture 同层）。
+- **路由与载荷拆分**：`web/payloads_catalog.py`（目录域 7 个载荷函数机械搬移）、`web/routes_capture.py`（采集域路由/载荷 mixin）、`web/server_helpers.py`（query 解析）；server.py 654→510 行、payloads.py 661→240 行，前端契约不变。
+- **一致性快照**：`PetRepository.consistent_snapshot()` 单次锁取齐 pets/backpack/locations/version/uid 成 `PetRepoSnapshot`（frozen dataclass）；`PetView` 持快照筛选排序在锁外执行，消除「旧条目+新位置」跨版本响应。
+- **前端第一刀（蛋图鉴）**：`pages/egg-dex.js` 自持 state/load/render/bind，协作函数显式注入；bind 幂等 + 请求序号防旧覆新；app.js 2035→1903 行。demo 验收：224 卡渲染、详情抽屉、蛋组/搜索筛选、切页返回通过。
 
-目标依赖方向（待实现）：
+### 剩余待办（前端继续迁移）
 
-```mermaid
-flowchart TD
-    UI[页面模块] --> API[HTTP 路由与载荷]
-    API --> VM[页面 ViewModel / 请求查询]
-    VM --> SVC[应用服务与聚合]
-    SVC --> RULE[域纯规则]
-    SVC --> STORE[持久化与资源加载]
-    SVC --> CAP[接入与录制适配器]
-    CAP --> PROTO[协议纯算法]
-    RULE --> EVT[中立事件与值对象]
-    SVC --> EVT
-    ROOT[app_context 组合根] -.装配与释放.-> SVC
-    ROOT -.装配与释放.-> STORE
-    ROOT -.装配与释放.-> API
-```
-
-这是依赖关系图，运行时数据可以从 capture 向上流动。组合根可以访问各层，业务模块不得反向依赖组合根。
-
-### 前端
-
-第一刀选独立度较高的蛋图鉴或家园页，证明抽取方式后再迁宠物页。维持原生 JS、同源静态文件和当前桌面入口。
-
-建议目标结构：
-
-```text
-web/static/
-  app.js                 启动、导航和页面协调
-  api.js                 token、请求、错误与请求时序
-  pages/
-    egg-dex.js           该页 state/load/render/bind
-    home.js
-    pets.js
-  pet-presentation.js    已有跨视图展示能力
-  appearance.js          已有偏好状态
-  ui.js                  抽屉、焦点与键盘交互
-```
-
-路径是规划，当前没有创建这些模块。抽取时用显式传入的 api、toast、导航和展示函数协作，优先沿用现有 IIFE 风格；不要依赖读取另一个页面的私有状态，也不要为几页代码先造通用 PageManager。
-
-每页需要明确 init 一次、enter 刷新、离开后旧请求是否丢弃。订阅推送只更新当前需要的页面；所有可筛选加载都处理请求乱序，失败后保持可恢复状态。共享 escape、图片回退和展示常量，不重复复制。
-
-验收：抽出的页有纯规则/假请求测试和 demo 交互记录；返回页面、快速筛选、请求失败、键盘关闭详情和窄窗口可用；原 API、主题和资源 URL 兼容。`app.js` 每次迁移应净减少对应页面职责，不能仅把初始化转发到新文件。
+宠物页是下一个迁移目标（最大职责集中点）；迁移时沿用蛋图鉴刀法：显式注入协作函数、init 一次/enter 刷新、请求乱序防护。`api.js`（token/请求/错误）暂不单独建模块——当前 api/query 仅 ~40 行，等第二个页面迁移时再评估共享形态。
 
 ## 阶段 2：资源与发布可复现
 

@@ -112,6 +112,7 @@
 | `web/payloads.py` | 宠物域载荷（宠物行/列表页/概览/箱位）+ 目录域兼容重导出（无 UI 依赖） |
 | `web/payloads_catalog.py` | 目录域载荷：图鉴/种公矩阵/花田/色卡/家园/蛋仓/蛋图鉴（阶段1.4 自 payloads.py 拆出） |
 | `web/pet_media.py` | 物种 ID → 官方头像/立绘 URL 映射（pet_media.json，缺图回退 pets/ 兜底） |
+| `web/static/pages/egg-dex.js` | 蛋图鉴页模块：该页 state/load/render/bind（阶段1.6 自 app.js 抽出；协作函数显式注入，bind 幂等 + 请求序号防旧覆新） |
 
 ## tests/（unittest 平铺）
 
