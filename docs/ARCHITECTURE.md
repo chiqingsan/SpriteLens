@@ -23,6 +23,8 @@
 │ pets/eggs/egg_box    │ frames → crypto → records        │
 │ identity/home/flowers│ wire → schema → opcodes          │
 │ color_cards/display  │                                  │
+│ pet_locations(箱位)  │                                  │
+│ measurements/pet_marks                                  │
 │ PacketEvent→业务对象 │                                  │
 ├──────────────────────┴──────────────────────────────────┤
 │ repositories/  持久化边界（SQLite 底座 + 各域网关）     │
@@ -59,7 +61,7 @@ PacketEvent → MonitorService.add_packet_listener
 命中后关键字段按**字段号**读取（六维=14、技能=12、身高=26、体重=27、
 声音=93、物种键=15），schema 命名漂移不影响提取。
 
-## 持久化（v4：宠物 / 蛋仓 / 账号）
+## 持久化（v7：宠物 / 蛋仓 / 账号 / 箱位）
 
 **分层**：`repositories/database.py` 管连接与迁移（`PRAGMA user_version`，
 追加式迁移可安全升级历史库；每个版本的多条 DDL 在单事务内执行、失败整体
@@ -94,12 +96,22 @@ UI 的 `drain_events` 与后续帧处理——实测事件日志每条 `flush()`
 突破/专精/球种 8 列、物种键 `base_conf_id`，明细存 `attributes_json` /
 `skills_json` 两列——避免登录突发时写入放大：百只级 × 数十字段若全部建列
 会让一次 upsert 膨胀到几十个绑定参数）；v3 `eggs` 表（蛋仓快照）；
-v4 炫彩外观列（`colorful_conf_id` / `glass_type` / `glass_value`）。
-追加式迁移，v1 老库自动逐级升级、历史数据保留
+v4 炫彩外观列（`colorful_conf_id` / `glass_type` / `glass_value`）；
+v5 佩戴奖牌列 + `pet_locations` 表（箱位快照）；v6 试用个体标记
+（`is_trial_pet`）；v7 好友镜像标记（`is_mirror_pet`，与 v6 一起用于
+修正历史误收的非自有精灵）。追加式迁移，v1 老库自动逐级升级、历史数据保留
 （`test_persistence.py::test_v1_database_upgrades_to_v2`）。
 
-**已知边界**：背包（盒子快照 0x1883 系列）尚未接入；扩展方式是在
-`_MIGRATIONS` 追加表 + 新增同构 Store。
+**箱位快照（v2 JSON）**：`domain/pet_locations.py` 的 `Backpack.record()`
+落 `pet_locations.snapshot_json`：完整 30 格箱表（`gid=0` 空格 / `None`
+未采集，语义必须区分）+ 3 队 × 6 格出战队伍 + 当前队伍。`restore()` 兼容
+上一版「已知 gid 位置列表」并标记 `historical=True`（界面提示「登录后更新」）。
+箱位更新是增量语义：`PetBoxPetChange` 按槽位覆盖，跨箱/跨队移动先移除旧槽。
+
+**会话接续**：`capture/key_store.py` 的 `session.json`（v1）保存
+`flow_id + key + identity + server_sequence`，由 `MonitorService` 在 SYN/ACK
+时失效旧关联；仅当同一 flow、密钥一致且服务端序号连续时才以服务端帧确认
+接续（防伪造）；详见 `docs/SESSION_RESUME_VERIFICATION.md`。
 
 ## 接入层可插拔（应用层/协议层解绑点）
 
@@ -174,7 +186,7 @@ schema 为外挂数据文件，游戏版本更新只换文件不改代码。
 `_meta.json`）。
 
 **关键关联键（实测确立，勿用错）**：
-- `pet.base_conf_id`（协议字段 15） → `species.json`，实测 105/107 命中，
+- `pet.base_conf_id`（协议字段 15） → `species.json`（1060 物种），
   且名字与协议直带一致；
 - 反例：`pet.conf_id`（字段 2）是实例级 ID，用它查物种表会得到错误物种
   （conf_id=2000671 实为「波波拉」，旧索引却指向「水蓝蓝」）——有回归测试
@@ -196,6 +208,7 @@ schema 为外挂数据文件，游戏版本更新只换文件不改代码。
        ├─ 静态资源 /static/*（HTML/CSS/原生 JS/精灵图，无框架无构建）
        ├─ REST：/api/bootstrap（一次聚合）/api/pets /api/handbook /api/eggs
        │        /api/egg-box /api/home /api/flowers /api/colors /api/male-matrix
+       │        /api/ui/preferences（主题/显示偏好，与其余接口同为 token 鉴权）
        │        /api/capture/*（启停/录制/密钥/网卡/安装）
        │        /api/events /api/state
        └─ WebSocket /ws：状态增量推送（每 0.5s，内容不变则不推）
@@ -208,10 +221,22 @@ schema 为外挂数据文件，游戏版本更新只换文件不改代码。
 ```
 index.html   侧栏（14 页，分组导航）+ 顶栏（角色/状态胶囊/启停）+ 各页面骨架
 app.css      design token 体系（间距/字号/圆角/阴影/表面分层）+ 布局 + 组件样式
+themes.css   三套浅色主题（喵喵/火花/水蓝蓝）的色值覆盖，data-theme 切换
 app.js       导航、REST 调用、WebSocket 消费、各页渲染
-pets/<id>.webp        精灵图（128×128，788/1015 有图，缺图回退首字头像）
+appearance.js      主题/显示字段/图片模式偏好（GET/POST /api/ui/preferences）
+pet-presentation.js 头像/色卡/稀有标记/奖牌渲染帮手（三视图共用）
+pet-filters.js     蛋组 any/all、m/kg/dB 绝对范围与范围位置筛选
+backpack-controls.js 命名快捷条件（≤6 组）、性格展开与折叠摘要
+icons.js     本地 SVG sprite 图标装饰（Tabler MIT，零运行时网络）
+pet-media/<id>-<variant>.webp  官方头像/立绘（原图 + 透明边界归一派生图）
+pets/<id>.webp        精灵图（128×128 兜底，缺图回退首字头像）
 type-icons/  系别图标雪碧图（来自 roco-helper 素材）
 ```
+
+**三主题**：颜色变量在 `themes.css` 按 `:root[data-theme]` 覆盖，布局变量仍在
+`app.css`；`appearance.js` 只切根属性与显示类，不重建数据。偏好经
+`ui_preferences.py` 白名单校验后原子写 config.json，非法提交 400、非法本地
+配置降级为默认（`docs/UI_GUIDE.md` §主题）。
 
 **页面**（侧栏分组：仓库与图鉴 / 孵蛋工具 / 家园信息 / 炫彩 / 系统）：
 概览（统计卡 + 系别分布条形图 + 账号/采集状态）、精灵背包（点阵/卡片/表格

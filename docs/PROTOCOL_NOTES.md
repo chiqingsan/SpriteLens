@@ -9,14 +9,29 @@
   实测单会话 s2c 280 帧解码、160 只宠物提取成功。0x1345 分页请求已废弃。
 - 宠物响应固定 3 帧（约 46KB / 43KB / 6KB），对应 `ZoneGetPetInfoByPageRsp` 多页连续推送；
   帧结构与页面数在相邻版本间稳定（10-07 与 10-09 两次实测 payload 尺寸一致）。
-- **玩家身份（账号 uid）**：`ZoneEnterSceneRsp`(0x0152) 的
-  `self_info.avatar.base.logic_id`（实测 101384922，与外部工具记录的账号一致），
-  同节点含 `name`（角色名）与 `lv`（等级）。
-  - **必须走 self_info 路径**：`ZoneSceneClientEnterSceneFinishNtyAck` 的
+- **玩家身份（账号 uid）**：两条已核验路径，登录响应 `ZoneLoginRsp`(0x0102) 的
+  `player_info.brief_info`（`uin` / `name` / `role_level`，早于进场景），以及
+  `ZoneEnterSceneRsp`(0x0152) 的 `self_info.avatar.base.logic_id`
+  （实测 101384922，与外部工具记录的账号一致），同节点含 `name`（角色名）与
+  `lv`（等级）。
+  - **必须走已核验路径**：`ZoneSceneClientEnterSceneFinishNtyAck` 的
     `other_actors[*].npc.base.logic_id` 是 NPC 编号（实测「护主犬」
-    435444924297510922），误取会串数据。
+    435444924297510922），误取会串数据；不能递归搜索所有玩家结构。
   - 时序：身份包先于宠物推送到达（同一会话行号 853 vs 933），
     因此「先认身份、后归属宠物」是安全的（见 `domain/identity.py`）。
+- **箱位协议**：登录响应/进场景的 `player_info.pet_info`（或增量
+  `ret_info.goods_change_info.changes`）内含 `PetBox`（字段 1=箱号、
+  字段 3=30 槽位 gid 列表、字段 5=箱名，0 为空格、gid 唯一）与
+  `PetTeamInfo`（字段 4==1 为普通队伍列表、字段 1=当前队下标、每队 6 格；
+  字段 6==1 或成员超 6 的非普通队伍跳过）。`PetBoxPetChange`（字段 1=gid、
+  2=去向、3=箱号、4=槽位）是移动增量；实测「1 队 1 格 / 2 队 4 格 /
+  3 队 2 格」的行序证伪了列表顺序假设。
+
+- **会话接续的序号语义**：重启接续时旧的 `server_sequence` 只是「上次见到的
+  位置」，不能当作接头依据——新连接的 s2c 序号会重置，用旧值比较会误判。
+  实现取「首次 s2c 帧序号必须严格大于旧检查点」判定接续；SYN/ACK 到达即
+  失效旧身份。这是本机行为约定，不是协议字段语义（详见
+  `docs/SESSION_RESUME_VERIFICATION.md`）。
 
 ## 未解事项（已知存在、暂不影响主功能）
 

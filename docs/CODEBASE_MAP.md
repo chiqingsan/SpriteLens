@@ -23,13 +23,16 @@
 | `tools/import_assets.py` | 导入图鉴元数据 + 精灵图 + 系别图标 + 系别克制表 |
 | `tools/import_egg_data.py` | 导入蛋目录（蛋组/孵化时长/公母比/身高体重/进化链）到 data/static/eggs.json |
 | `tools/import_pet_details.py` | 补全静态数据：图鉴描述并入 species.json（+sum 重算修正）、补技能名、奖牌表、蛋/奖牌图标、花种等级表 |
+| `tools/sync_catalog_resources.py` | 官方目录/镜像同步：保留有效值的 ID 合并、镜像校验、可重复导入并出报告（resource_sync_report.json） |
+| `tools/sync_pet_media.py` | 按官方 manifest 导入头像/立绘，并派生透明边界归一的 `-fit`/`-rarity` 变体（幂等，报告 pet_media_report.json） |
+| `tools/sync_ui_icons.py` | 按固定官方 Git 版本导入少量 Tabler SVG 图标并合成 sprite（开发期联网，运行期零网络） |
 | `tools/analyze_recording.py` | 录制文件离线分析（帧分类/opcode 分布/宠物形状） |
 | `tools/run_web_demo.py` | 带合成数据的界面实例（浏览器打开，视觉验收用） |
 | `tools/make_icon.py` | 生成 `resources/app.ico` 多尺寸图标与 favicon（PIL，产物入库） |
 | `resources/app.ico` | 应用图标（窗口/任务栏用，打包时随包分发） |
 | `data/schemas/` | 外挂 schema：`opcodes.json` + `messages/*.json`（字段级合并） |
 | `data/static/` | 静态映射：`species/natures/types/skills/type_chart/eggs/medals/flower_levels/color_cards.json` + 各 `_meta.json` |
-| `spritelens/web/static/` | 前端资源：`index.html`（分组导航骨架）/ `boot.js`（启动自恢复链）/ `app.css`（自然绿主题与组件）/ `app.js`（数据渲染）/ `ui.css`（响应式布局）/ `ui.js`（详情抽屉、键盘与焦点）/ `favicon.png` / `pets/*.webp` / `type-icons/` |
+| `spritelens/web/static/` | 前端资源：`index.html`（分组导航骨架）/ `boot.js`（启动自恢复链）/ `app.css`（布局与组件 token）/ `themes.css`（三套主题色值）/ `app.js`（数据渲染）/ `ui.css` / `ui.js`（详情抽屉、键盘与焦点）/ `appearance.js`（主题与显示偏好）/ `pet-presentation.js`（头像/色卡/标记渲染）/ `pet-filters.js`（蛋组与范围筛选）/ `backpack-controls.js`（快捷条件）/ `icons.js` + `icons/`（本地 SVG sprite）/ `favicon.png` / `pet-media/`（官方头像立绘，含 `-fit` 派生）/ `pets/`（兜底立绘）/ `type-icons/` `egg-icons/` `medal-icons/` `medals/` `rarity/` `color-cards/` |
 | `data/recordings/` | 运行时录制产物（gitignore；本地回放样例不在版本库） |
 
 ## spritelens/
@@ -51,15 +54,18 @@
 | `capture/reassembly.py` | TCP 流重组（乱序/重传/全零段回滚/空洞；交付历史只留最近 256KB，纯逻辑） |
 | `capture/npcap_source.py` | scapy AsyncSniffer 接入（轻量回调 + 队列 + worker 投递；FIN/RST/空闲淘汰释放流，关闭事件经队列保序） |
 | `capture/nic_rank.py` | 活跃网卡识别与排序（Get-NetAdapter Status=Up → 设备列表前置） |
-| `capture/key_store.py` | 密钥文本解析与 latest.key 持久化 |
+| `capture/key_store.py` | 密钥解析与持久化：latest.key + session.json v1（flow/密钥/身份/服务端序号，原子写，损坏即弃） |
 | `system/environment.py` | Npcap 检测、官方版本解析、下载、UAC 拉起安装向导 |
 | `system/webview_guard.py` | WebView2 运行时预检测（注册表/env）+ 缺失时原生对话框引导安装 |
 | `system/window_geometry.py` | 初始窗口尺寸：工作区 + 系统 DPI 缩放适配（fit_window 纯函数） |
 | `system/single_instance.py` | 单实例控制：命名互斥锁 + 唤醒事件 + Win32 强制置顶 |
 | `system/net_diagnose.py` | --diagnose-net：宽抓会话统计，定位多连接的数据端口 |
-| `domain/pets.py` | 宠物语义层：形状搜索提取 PacketEvent → Pet 对象（含六维/技能/外观） |
+| `domain/pets.py` | 宠物语义层：形状搜索提取 PacketEvent → Pet 对象（含六维/技能/外观/佩戴奖牌；默认排除试用与好友镜像个体） |
 | `domain/identity.py` | 玩家身份语义层：登录 player_info/brief_info 与场景 self_info/avatar/base → PlayerIdentity（uid 归属） |
-| `domain/static_data.py` | 静态映射：物种/性格/系别/技能（base_conf_id 关联，含图鉴元数据） |
+| `domain/static_data.py` | 静态映射：物种/性格/系别/技能/奖牌（base_conf_id 关联，含图鉴元数据与进化链成员） |
+| `domain/measurements.py` | 参考范围工具：cm/g → m/kg 文案、范围位置比例与越界状态（纯函数） |
+| `domain/pet_marks.py` | 紧凑标记：体型大/小、声音粗/婉（含佩戴奖牌来源），组内互斥最多两项 |
+| `domain/pet_locations.py` | 真实箱位：Backpack/PetBox（30 格箱表 + 3×6 队伍 + 移动增量 + v2 快照恢复） |
 | `domain/eggs.py` | 蛋目录：蛋静态数据索引（egg_conf_id / base_id 联查，孵蛋工具链底座） |
 | `domain/color_cards.py` | 色卡目录：44 张卡（底色×混色）+ glass→卡号判定（赛季 s1-s4） |
 | `domain/egg_box.py` | 蛋仓语义层：形状搜索提取 PacketEvent → EggBoxEntry（bagType==8 指纹） |
@@ -81,13 +87,15 @@
 | `recording/recorder.py` | StreamChunk jsonl 录制/读回 |
 | `recording/replay.py` | ReplaySource + CLI 回放摘要输出 |
 | `logs/local_logger.py` | 双文件 RotatingFileHandler + 崩溃兜底 `install_excepthook`（crash.log） |
-| `view_models/pet_vm.py` | 宠物页 VM（多维筛选/排序/聚合统计，纯 Python） |
+| `view_models/pet_vm.py` | 宠物页 VM（多维筛选/排序/聚合统计/箱位查询，纯 Python） |
+| `view_models/ui_preferences.py` | UI 偏好 VM：主题/视图/显示字段/快捷条件白名单校验与快照 |
 | `view_models/capture_vm.py` | 采集页 VM（source 构造、Npcap 安装状态机、自动采集开关、丢弃计数） |
 | `view_models/events_vm.py` | 协议流页 VM（行视图/详情缓存） |
 | `view_models/_shared.py` | 解码树文本渲染 |
 | `web/server.py` | 本地服务：aiohttp，仅回环 + 随机端口 + token 鉴权 + WS 推送 |
 | `web/run.py` | 界面入口：pywebview 窗口（系统 WebView2）+ 单实例唤醒 + 降级提示 |
-| `web/payloads.py` | 业务对象 → JSON 契约（宠物/概览/图鉴/蛋仓/家园/花田/色卡/种公矩阵，无 UI 依赖） |
+| `web/payloads.py` | 业务对象 → JSON 契约（宠物/概览/图鉴/蛋仓/家园/花田/色卡/种公矩阵/箱位，无 UI 依赖） |
+| `web/pet_media.py` | 物种 ID → 官方头像/立绘 URL 映射（pet_media.json，缺图回退 pets/ 兜底） |
 
 ## tests/（unittest 平铺）
 
@@ -114,6 +122,10 @@
 | `test_single_instance.py` | 单实例互斥锁唯一性、唤醒事件投递与消费、close 幂等 |
 | `test_persistence.py` | 身份识别（NPC 不误取）、写库/重开/加载、跨账号隔离、迁移事务/回滚/半迁移自修复、外观字段往返、彩名恢复、损坏恢复 |
 | `test_view_models.py` | VM 状态与命令（Capture/Events + 自动采集开关） |
+| `test_pet_locations.py` | 箱位：登录映射、空箱/部分箱、槽位匹配状态、队伍归属与槽序、切号/重启、历史与实时去重 |
+| `test_pet_presentation.py` | 头像 `-fit` 派生、尺寸/声音标记边界、旧偏好迁移、类型色卡解码 |
+| `test_session_resume.py` | 会话接续：服务端帧确认、流/密钥/序号不匹配、新握手与关闭失效、损坏缓存 |
+| `test_ui_upgrade.py` | UI 升级：偏好鉴权/重启/并发/失败、范围与组合筛选、别名合并、sprite 完整性 |
 | `test_architecture.py` | 架构边界：业务层无 Web 依赖、无反向分层、protocol 纯函数约束 |
 | `test_crash_log.py` | 崩溃日志：主线程/后台线程异常落盘、Ctrl+C 不记录、写入失败静默 |
 | `test_paths.py` | 打包态资源定位：源码/frozen/_MEIPASS 三分支、数据目录不受打包影响 |
