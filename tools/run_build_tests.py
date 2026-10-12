@@ -39,14 +39,24 @@ REQUIRED_STATIC_FILES = (
 
 
 def check_js_syntax() -> list[str]:
-    """node --check 递归检查全部静态 JS；node 不可用时报告跳过原因。"""
+    """node --check 递归检查全部静态 JS。
+
+    缺 Node 时报告明确跳过原因（新环境前置条件），不抛 FileNotFoundError；
+    检查本身仍需在声明 Node 前置的环境中执行。
+    """
     failures: list[str] = []
     js_files = sorted(STATIC_DIR.rglob("*.js"))
     if not js_files:
         return ["未找到任何 JS 文件（静态目录异常）"]
+    import shutil
+
+    node = shutil.which("node")
+    if node is None:
+        print("  [跳过] 未找到 node 可执行文件（JS 语法检查需要 Node.js 前置）")
+        return failures
     for path in js_files:
         proc = subprocess.run(
-            ["node", "--check", str(path)],
+            [node, "--check", str(path)],
             capture_output=True,
             text=True,
             encoding="utf-8",
