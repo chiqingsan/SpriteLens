@@ -119,6 +119,10 @@ class CaptureViewModel:
             iface=self._iface or None,
             recording_wanted=self._recording_requested,
         )
+        # 录制偏好持久化经服务回调（S01）：与意愿/启停同一命令区间
+        self._service.set_recording_persist(
+            lambda enabled: settings.set(RECORD_SETTING_KEY, bool(enabled))
+        )
         # 快速检查（毫秒级）：只查驱动文件存在性，installed 立即可用，
         # autostart 不必等探测；RSC 检查（PowerShell 实测约 1.8s）随后异步补齐。
         self._npcap_report = check_npcap(quick=True)
@@ -180,13 +184,8 @@ class CaptureViewModel:
         self._service.start()
 
     def _set_error(self, message: str) -> None:
-        """页面侧错误（网卡枚举等）；运行期错误由服务记录。"""
-        self._service_note_error(message)
-
-    def _service_note_error(self, message: str) -> None:
-        # CaptureService.status().last_error 只覆盖运行期；网卡枚举错误
-        # 属页面动作，临时记到服务里保持快照单一出口
-        self._service._last_error = message
+        """页面动作错误（网卡枚举等）：经服务唯一入口登记，不跨层写字段。"""
+        self._service.set_error(message)
 
     @property
     def extra_ports(self) -> tuple[int, ...]:
@@ -229,11 +228,13 @@ class CaptureViewModel:
         return self._recording_requested
 
     def set_recording_requested(self, enabled: bool) -> None:
-        self._recording_requested = enabled
-        self._service.set_recording_wanted(enabled)
-        self._settings.set(RECORD_SETTING_KEY, enabled)
-        # 勾选立即生效：采集进行中时同步开/停录制，而不是等下次启动
-        self._service.set_recording(enabled, running=self._monitor.is_running)
+        """录制开关：整条命令（意愿+启停+持久化）由服务在命令锁内完成（S01）。
+
+        VM 只转发并同步缓存字段；running 由服务在锁内判定，不存在
+        「锁外读旧 running」窗口；设置写入经服务回调也在同一区间。
+        """
+        self._service.set_recording(bool(enabled))
+        self._recording_requested = bool(enabled)
 
     # -- 手动密钥 ------------------------------------------------------
     def apply_manual_key(self, text: str) -> tuple[bool, str]:

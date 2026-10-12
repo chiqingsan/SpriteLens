@@ -215,6 +215,89 @@ class CaptureViewModelTest(unittest.TestCase):
         self.assertTrue(SettingsRepository(self.tmp_path / "config.json").get_bool("capture.record_on_start"))
         self.assertTrue(vm.recording_requested)
 
+    def test_recording_command_is_atomic_under_interleaving(self):
+        """S01/C01 回归：录制命令四步（意愿/启停/持久化/VM缓存）原子生效。
+
+        旧实现交错复现：T1 请求 true 在「写设置前」由 Event 暂停，
+        T2 完成完整请求 false，恢复 T1——最终页面声明不录制、配置却为
+        true、录制器仍在录。新实现整条命令在服务命令锁内执行，T2 排在
+        T1 之后完整覆盖，最终四个状态一致为 false。
+        """
+        vm, monitor = _make_vm(self.tmp_path)
+        # 打桩 is_running：用假 source 走真实 property 判定（模拟采集中）
+        class _RunningSource:
+            is_running = True
+
+        monitor._source = _RunningSource()
+
+        persist_gate = threading.Event()
+        t1_started = threading.Event()
+        settings_path = self.tmp_path / "config.json"
+        original_set = SettingsRepository(settings_path).set
+
+        def blocking_persist(enabled: bool) -> None:
+            if enabled and not persist_gate.is_set():
+                t1_started.set()
+                persist_gate.wait(timeout=5)  # T1 在写设置前暂停
+            original_set("capture.record_on_start", enabled)
+
+        vm._service.set_recording_persist(blocking_persist)
+
+        t1 = threading.Thread(target=vm.set_recording_requested, args=(True,))
+        t1.start()
+        self.assertTrue(t1_started.wait(timeout=5), "T1 未进入持久化暂停点")
+
+        # T2 在 T1 暂停期间发出相反请求；新实现整条命令在命令锁内串行，
+        # T2 排队等 T1 完整结束（含持久化）后执行，最终状态以 T2 为准。
+        # 旧实现的缺陷在于四个步骤可交错出「意愿 false / 配置 true / 仍在录」。
+        t2 = threading.Thread(target=vm.set_recording_requested, args=(False,))
+        t2.start()
+        persist_gate.set()
+        t1.join(timeout=5)
+        t2.join(timeout=5)
+        self.assertFalse(t1.is_alive(), "T1 未完成")
+        self.assertFalse(t2.is_alive(), "T2 未完成")
+
+        # 四个状态最终一致（T2 后到覆盖 T1，符合「最后命令胜」语义）
+        self.assertFalse(vm.recording_requested, "页面意愿应为 false")
+        self.assertFalse(vm._service._recording_wanted, "下次启动意愿应为 false")
+        self.assertFalse(
+            SettingsRepository(settings_path).get_bool("capture.record_on_start", True),
+            "持久化配置应为 false",
+        )
+        self.assertFalse(vm._service.status().recording, "录制器不应在录")
+
+    def test_stop_then_stale_running_does_not_start_recording(self):
+        """S01 回归：锁内判定 running——stop 后带旧 running 的请求不会开录制。
+
+        旧实现 set_recording(enabled, running=锁外旧值) 可在停止后开录。
+        新实现 running 由服务在命令锁内判定，running=False 时不开。
+        """
+        vm, monitor = _make_vm(self.tmp_path)
+
+        class _RunningSource:
+            is_running = True
+
+        class _StoppedSource:
+            is_running = False
+
+            def stop(self) -> None:
+                pass
+
+        monitor._source = _RunningSource()
+        vm.set_recording_requested(True)
+        self.assertTrue(vm._service.status().recording)
+
+        # 停止采集后，录制应随 stop 关闭
+        monitor._source = _StoppedSource()
+        vm.stop()
+        self.assertFalse(vm._service.status().recording)
+        self.assertFalse(monitor.is_running)
+
+        # 若仍有旧请求到达（running 已为 False）：不开录制
+        vm._service.set_recording(True)
+        self.assertFalse(vm._service.status().recording, "停止后不得开录制")
+
     def test_stop_without_start_is_safe(self):
         vm, _monitor = _make_vm(self.tmp_path)
         vm.stop()  # 未启动时停止不应抛错

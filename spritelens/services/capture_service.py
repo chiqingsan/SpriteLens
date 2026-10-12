@@ -62,6 +62,9 @@ class CaptureService:
         self._source: NpcapCaptureSource | None = None
         self._last_error = ""
         self._recording_wanted = recording_wanted
+        # 录制偏好持久化回调（S01）：由组合根注入，命令锁内调用；
+        # 服务本身不依赖 SettingsRepository（保持可独立测试）。
+        self._persist_recording = None
         # 副作用命令串行化（R09 同源）：start/stop/录制切换/手动密钥
         # 经 HTTP 的 to_thread 并发进入时互斥执行；快照不取该锁。
         self._command_lock = threading.Lock()
@@ -99,13 +102,25 @@ class CaptureService:
         with self._command_lock:
             self._iface = name or None
 
-    def set_recording(self, enabled: bool, *, running: bool) -> None:
-        """录制开关（勾选立即生效）；running 由调用方传入当前采集状态。"""
+    def set_recording(self, enabled: bool) -> None:
+        """录制开关命令（S01）：意愿、立即启停与持久化在同一串行区间完成。
+
+        running 由本方法在命令锁内判定，不接收调用方传入的旧值——
+        旧实现 VM 锁外读 running 再传进来，「调用方读到运行中 → stop
+        完成 → 提交旧值」可让 stop 后误开录制。persist 回调（写配置）
+        也在锁内执行：命令锁可包含必要 IO，保证四个动作的顺序对并发
+        观察者原子；IO 失败不改变已生效的运行状态，异常原样抛出让
+        HTTP 层返回错误（页面意愿与实际状态仍一致）。
+        """
         with self._command_lock:
+            self._recording_wanted = enabled
+            running = self._monitor.is_running
             if enabled and running and not self._recorder.is_recording:
                 self._start_recording_locked()
             elif not enabled and self._recorder.is_recording:
                 self._recorder.stop()
+            if self._persist_recording is not None:
+                self._persist_recording(enabled)
 
     def apply_manual_key(self, text: str) -> tuple[bool, str]:
         try:
@@ -130,6 +145,14 @@ class CaptureService:
         )
 
     # -- 内部 ------------------------------------------------------------
+    def set_recording_persist(self, persist) -> None:
+        """注入录制偏好持久化回调（组合根装配时调用一次）。"""
+        self._persist_recording = persist
+
+    def set_error(self, message: str) -> None:
+        """页面动作错误登记（网卡枚举等）：唯一合法入口，替代直接写字段。"""
+        self._last_error = message
+
     def _maybe_start_recording_locked(self) -> None:
         """start 成功后按需开录制（调用方已持命令锁）。"""
         if self._recording_wanted and not self._recorder.is_recording:
