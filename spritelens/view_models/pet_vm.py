@@ -119,9 +119,15 @@ class PetViewModel:
         self._filters = replace(self._filters, egg_groups=groups, egg_mode="all" if mode == "all" else "any")
 
     def set_measurement_ranges(self, **values: object) -> None:
+        normalized = self.measurement_query(**values)
+        self._filters = replace(self._filters, **normalized)
+
+    @staticmethod
+    def measurement_query(**values: object) -> dict[str, float | None]:
+        """测量值筛选参数归一化（纯函数，不写状态）：无效值降级 None。"""
         import math
 
-        normalized = {}
+        normalized: dict[str, float | None] = {}
         for field in ("height", "weight", "voice", "height_position", "weight_position"):
             pair = []
             for bound in ("min", "max"):
@@ -135,7 +141,7 @@ class PetViewModel:
             if all(v is not None for v in pair) and pair[0] > pair[1]:
                 pair.reverse()
             normalized.update({f"{field}_min": pair[0], f"{field}_max": pair[1]})
-        self._filters = replace(self._filters, **normalized)
+        return normalized
 
     def set_sort(self, key: str, *, descending: bool = False) -> None:
         if key not in {k for k, _ in SORT_KEYS}:
@@ -158,6 +164,23 @@ class PetViewModel:
     @property
     def sort_state(self) -> tuple[str, bool]:
         return self._sort_key, self._sort_desc
+
+    def view_with(
+        self,
+        filters: PetFilters,
+        sort_key: str = "gid",
+        *,
+        descending: bool = False,
+    ) -> "PetView":
+        """按给定筛选与排序生成一次性视图（R08：GET 不写共享状态）。
+
+        请求级查询用它构造不可变条件；共享 VM 的 _filters/_sort_key 只由
+        页面命令（set_search 等）修改，HTTP 请求与 bootstrap、多客户端
+        互不污染。
+        """
+        if sort_key not in {k for k, _ in SORT_KEYS}:
+            sort_key = "gid"
+        return PetView(self, filters, sort_key, descending)
 
     def filtered_pets(self) -> tuple[Pet, ...]:
         """按当前筛选与排序返回宠物（UI 表格数据源）。"""
@@ -261,8 +284,7 @@ class PetViewModel:
         return self._repository.load_last_account()
 
     # -- 内部 ----------------------------------------------------------
-    def _apply_filters(self, pets: tuple[Pet, ...]) -> tuple[Pet, ...]:
-        filters = self._filters
+    def _apply_filters_with(self, pets: tuple[Pet, ...], filters: PetFilters) -> tuple[Pet, ...]:
         if not filters.active:
             return pets
         static = self._static
@@ -319,6 +341,9 @@ class PetViewModel:
 
         return tuple(p for p in pets if matches(p))
 
+    def _apply_filters(self, pets: tuple[Pet, ...]) -> tuple[Pet, ...]:
+        return self._apply_filters_with(pets, self._filters)
+
     def egg_group_options(self) -> tuple[str, ...]:
         groups = set()
         for pet in self._repository.snapshot():
@@ -328,8 +353,9 @@ class PetViewModel:
         return tuple(sorted(groups))
 
     def _apply_sort(self, pets: tuple[Pet, ...]) -> tuple[Pet, ...]:
-        key = self._sort_key
+        return self._apply_sort_with(pets, self._sort_key, self._sort_desc)
 
+    def _apply_sort_with(self, pets: tuple[Pet, ...], key: str, reverse: bool) -> tuple[Pet, ...]:
         def sort_value(pet: Pet):
             if key == "name":
                 return pet.name
@@ -337,10 +363,6 @@ class PetViewModel:
                 return sum(a.final_value for a in pet.attributes)
             return getattr(pet, key, 0)
 
-        reverse = self._sort_desc
-        if key == "name":
-            # 名字排序默认升序更直观；descending 时反向
-            return tuple(sorted(pets, key=sort_value, reverse=reverse))
         return tuple(sorted(pets, key=sort_value, reverse=reverse))
 
     def _primary_type(self, pet: Pet) -> str:
@@ -352,4 +374,61 @@ class PetViewModel:
         return species.type_names[0]
 
 
-__all__ = ["PetFilters", "PetStats", "PetViewModel", "SORT_KEYS"]
+class PetView:
+    """请求级一次性视图（R08）：筛选/排序条件显式传入，不写共享 VM。
+
+    与 PetViewModel 的读取接口同形（filtered_pets/all_pets/version/…），
+    pets_payload 等载荷函数无差别消费；backpack/location/选项类读取
+    委托 VM（与筛选无关的共享数据）。
+    """
+
+    def __init__(self, vm: PetViewModel, filters: PetFilters, sort_key: str, descending: bool) -> None:
+        self._vm = vm
+        self._filters = filters
+        self._sort_key = sort_key
+        self._sort_desc = descending
+
+    @property
+    def filters(self) -> PetFilters:
+        return self._filters
+
+    @property
+    def sort_state(self) -> tuple[str, bool]:
+        return self._sort_key, self._sort_desc
+
+    def filtered_pets(self) -> tuple[Pet, ...]:
+        pets = self._vm._apply_filters_with(self._vm.all_pets(), self._filters)
+        return self._vm._apply_sort_with(pets, self._sort_key, self._sort_desc)
+
+    def all_pets(self) -> tuple[Pet, ...]:
+        return self._vm.all_pets()
+
+    def filtered_count(self) -> int:
+        return len(self.filtered_pets())
+
+    def total_count(self) -> int:
+        return self._vm.total_count()
+
+    def version(self) -> int:
+        return self._vm.version()
+
+    def location_of(self, pet: Pet):
+        return self._vm.location_of(pet)
+
+    def backpack(self):
+        return self._vm.backpack()
+
+    def nature_options(self):
+        return self._vm.nature_options()
+
+    def type_options(self):
+        return self._vm.type_options()
+
+    def egg_group_options(self):
+        return self._vm.egg_group_options()
+
+    def talent_rank_max(self) -> int:
+        return self._vm.talent_rank_max()
+
+
+__all__ = ["PetFilters", "PetStats", "PetViewModel", "PetView", "SORT_KEYS"]

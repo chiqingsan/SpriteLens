@@ -21,6 +21,7 @@ import asyncio
 import json
 import secrets
 import threading
+from dataclasses import replace
 from pathlib import Path
 
 from aiohttp import WSMsgType, web
@@ -327,24 +328,36 @@ class LocalServer:
             return web.json_response({"error": "偏好保存失败，请检查配置目录是否可写"}, status=500)
 
     async def _api_pets(self, request: web.Request) -> web.Response:
-        self._apply_pet_query(request.query)
+        # 请求级查询（R08）：条件构造为不可变 PetFilters，经一次性视图
+        # 出载荷，不写共享 VM——无参请求、bootstrap 与多客户端互不污染；
+        # 保留 app.js 的请求序号机制防止旧响应覆盖新结果
+        view = self._pet_view_from_query(request.query)
         return web.json_response(
-            pets_payload(self._context.pet_vm, self._context.static_data, self._context.color_catalog, self._context.egg_catalog)
+            pets_payload(view, self._context.static_data, self._context.color_catalog, self._context.egg_catalog)
         )
 
-    def _apply_pet_query(self, query) -> None:
+    def _pet_view_from_query(self, query):
+        """HTTP query → 不可变筛选 + 一次性视图（无共享状态写入）。"""
+        from spritelens.view_models.pet_vm import PetFilters
+
+        filters = PetFilters(
+            search=(query.get("search") or "").strip().lower(),
+            level_min=max(1, min(_as_int(query.get("level_min"), 1), _as_int(query.get("level_max"), 100))),
+            level_max=max(_as_int(query.get("level_min"), 1), _as_int(query.get("level_max"), 100)),
+            natures=frozenset(_id_set(query.get("natures"))),
+            type_names=frozenset(_name_set(query.get("types"))),
+            talent_min=max(0, _as_int(query.get("talent_min"), 0)),
+            gender=(lambda g: g if g in (1, 2) else 0)(_as_int(query.get("gender"), 0)),
+            egg_groups=frozenset(_name_set(query.get("egg_groups"))),
+            egg_mode="all" if query.get("egg_mode") == "all" else "any",
+        )
         vm = self._context.pet_vm
-        vm.set_search(query.get("search", ""))
-        vm.set_level_range(_as_int(query.get("level_min"), 1), _as_int(query.get("level_max"), 100))
-        vm.set_natures(frozenset(_id_set(query.get("natures"))))
-        vm.set_types(frozenset(_name_set(query.get("types"))))
-        vm.set_talent_min(_as_int(query.get("talent_min"), 0))
-        vm.set_gender(_as_int(query.get("gender"), 0))
-        vm.set_egg_groups(frozenset(_name_set(query.get("egg_groups"))), query.get("egg_mode", "any"))
-        vm.set_measurement_ranges(**{key: query.get(key) for key in (
+        measurement = vm.measurement_query(**{key: query.get(key) for key in (
             "height_min", "height_max", "weight_min", "weight_max", "voice_min", "voice_max",
             "height_position_min", "height_position_max", "weight_position_min", "weight_position_max")})
-        vm.set_sort(query.get("sort") or "gid", descending=_as_bool(query.get("desc")))
+        filters = replace(filters, **measurement)
+        sort_key = query.get("sort") or "gid"
+        return vm.view_with(filters, sort_key, descending=_as_bool(query.get("desc")))
 
     async def _api_handbook(self, request: web.Request) -> web.Response:
         query = request.query

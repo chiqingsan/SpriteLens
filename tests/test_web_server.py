@@ -156,6 +156,61 @@ class LocalServerTest(unittest.TestCase):
             self.assertEqual(response.status, 200)
             self.assertIn("小洛探探", response.read().decode("utf-8"))
 
+    def test_pets_query_does_not_pollute_shared_vm(self):
+        """GET /api/pets 不写共享 VM：请求后 bootstrap/其他客户端不受影响（R08）。
+
+        旧实现 _apply_pet_query 修改 ctx.pet_vm 的筛选状态，bootstrap 直接
+        消费该 VM——请求 search=火 后 bootstrap 只给出筛选结果，浏览器
+        刷新（无参请求）也继承上一个请求的筛选。
+        """
+        base = f"http://127.0.0.1:{self.server.port}"
+        try:
+            # 带筛选请求：只看到火神
+            _, filtered = _http_get(
+                f"{base}/api/pets?search={urllib.parse.quote('火')}", token=self.server.token
+            )
+            self.assertEqual([p["gid"] for p in filtered["pets"]], [2])
+
+            # 无参请求（浏览器刷新场景）：应回到全量，而不是继承「火」筛选
+            _, refreshed = _http_get(f"{base}/api/pets", token=self.server.token)
+            self.assertEqual([p["gid"] for p in refreshed["pets"]], [1, 2])
+            self.assertEqual(refreshed["filters"]["search"], "")
+
+            # bootstrap 也不被污染
+            _, boot = _http_get(f"{base}/api/bootstrap", token=self.server.token)
+            self.assertEqual(boot["pets"]["total"], 2)
+            self.assertEqual(len(boot["pets"]["pets"]), 2)
+        finally:
+            _http_get(f"{base}/api/pets", token=self.server.token)
+
+    def test_concurrent_query_and_bootstrap_no_crosstalk(self):
+        """并发 search 请求与 bootstrap 互不污染（R08 审查复现）。
+
+        旧实现复现：search=火 与 bootstrap 同时发出，bootstrap 的
+        pets.total=2 但 pets 列表只剩 1 只（VM 被写入了筛选）。
+        """
+        base = f"http://127.0.0.1:{self.server.port}"
+        results: dict = {}
+
+        def do_search():
+            results["search"] = _http_get(
+                f"{base}/api/pets?search={urllib.parse.quote('火')}", token=self.server.token
+            )
+
+        def do_bootstrap():
+            results["boot"] = _http_get(f"{base}/api/bootstrap", token=self.server.token)
+
+        t1 = threading.Thread(target=do_search)
+        t2 = threading.Thread(target=do_bootstrap)
+        t1.start()
+        t2.start()
+        t1.join(timeout=5)
+        t2.join(timeout=5)
+        self.assertEqual(results["search"][1]["shown"], 1)
+        # bootstrap 属于无参请求：total 与列表条数必须一致（不继承筛选）
+        self.assertEqual(results["boot"][1]["pets"]["total"], 2)
+        self.assertEqual(len(results["boot"][1]["pets"]["pets"]), 2)
+
     def test_bootstrap_payload_shape(self):
         status, payload = _http_get(
             f"http://127.0.0.1:{self.server.port}/api/bootstrap", token=self.server.token
