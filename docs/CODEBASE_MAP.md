@@ -58,7 +58,7 @@
 | `system/single_instance.py` | 单实例控制：命名互斥锁 + 唤醒事件 + Win32 强制置顶 |
 | `system/net_diagnose.py` | --diagnose-net：宽抓会话统计，定位多连接的数据端口 |
 | `domain/pets.py` | 宠物语义层：形状搜索提取 PacketEvent → Pet 对象（含六维/技能/外观） |
-| `domain/identity.py` | 玩家身份语义层：self_info/avatar/base → PlayerIdentity（uid 归属） |
+| `domain/identity.py` | 玩家身份语义层：登录 player_info/brief_info 与场景 self_info/avatar/base → PlayerIdentity（uid 归属） |
 | `domain/static_data.py` | 静态映射：物种/性格/系别/技能（base_conf_id 关联，含图鉴元数据） |
 | `domain/eggs.py` | 蛋目录：蛋静态数据索引（egg_conf_id / base_id 联查，孵蛋工具链底座） |
 | `domain/color_cards.py` | 色卡目录：44 张卡（底色×混色）+ glass→卡号判定（赛季 s1-s4） |
@@ -66,7 +66,7 @@
 | `domain/home.py` | 家园语义层：0x014A 快照 → 居民/家具/产蛋窝（实证字段映射 + NEST_TYPES） |
 | `domain/flowers.py` | 花种语义层：0x0375 花田帧 → 自己的花/好友花田（含宠物三维） |
 | `domain/display.py` | 展示常量：系别配色、六维标签、天赋阶配色（框架无关） |
-| `repositories/database.py` | SQLite 底座：连接、PRAGMA user_version 迁移（v4 至炫彩外观列；整组事务化 + 半迁移自修复）、损坏自恢复 |
+| `repositories/database.py` | SQLite 底座：连接、PRAGMA user_version迁移（v5佩戴奖牌及箱位快照，v6试用个体、v7好友镜像标记；整组事务化 + 半迁移自修复）、损坏自恢复 |
 | `repositories/pet_store.py` | 宠物持久化网关：write-behind 批量落盘 + 读取（适配器模式） |
 | `repositories/egg_store.py` | 蛋仓持久化网关：write-behind 批量落盘 + load_latest（v3 eggs 表） |
 | `repositories/settings.py` | JSON 配置仓库（原子写、脏值归一、窗口几何） |
@@ -121,3 +121,37 @@
 | `test_web_server.py` | 本地服务：token 鉴权（REST/WS）、随机端口、宠物/图鉴/采集 API、载荷构造 |
 | `test_environment.py` | Npcap 检测与安装引导状态机 |
 | `test_event_logger.py` | 事件日志异步落盘与分片、队列满丢弃、关闭超时不跨线程关文件 |
+
+## 三主题与资源补齐（2026-10-12）
+
+| 文件 | 责任 |
+|---|---|
+| `domain/measurements.py` | cm/g参考范围转m/kg、范围位置与越界状态 |
+| `view_models/ui_preferences.py` | 主题/视图/显示字段白名单、非法配置降级与严格保存 |
+| `web/static/themes.css` / `appearance.js` | 三套浅色主题、即时切换、显示选项与保存反馈 |
+| `web/static/pet-filters.js` | 蛋组any/all和m/kg/dB绝对范围，接原有筛选与重置 |
+| `web/static/icons.js` / `icons/` | 本地Tabler SVG与sprite，29枚图标和MIT来源清单 |
+| `tools/sync_catalog_resources.py` | 保留有效值的ID合并、官方镜像校验、可重复资源导入与报告 |
+| `tools/sync_ui_icons.py` | 固定官方Git版本的少量SVG导入，无运行时网络依赖 |
+| `tests/test_ui_upgrade.py` | 偏好鉴权/重启/并发/失败、范围/组合筛选、别名、合并和sprite完整性 |
+| `docs/RESOURCE_COVERAGE_REPORT.md` | 1060物种、646组范围、224蛋、477别名；缺图/缺字段/冲突 |
+| `docs/BREEDING_PLANNER_SPEC.md` / `COLLECTION_LINES_SPEC.md` | 下一轮配窝与产线开发规格，明确已验证规则与未知假设 |
+
+新增API：鉴权GET/POST `/api/ui/preferences`，bootstrap新增`ui_preferences`。
+`/api/pets`新增egg_groups、egg_mode和height/weight/voice_min/max；原有字段兼容。
+
+## 背包操作与真实登录数据（2026-10-12）
+
+| 文件 | 责任 |
+|---|---|
+| `domain/pet_locations.py` | Backpack/PetBox：完整30格箱表、普通3×6队伍、移动增量；区分零空格与未采集，排除客户端请求和特殊队伍，兼容旧位置快照 |
+| `web/static/backpack-controls.js` | 命名快捷条件、性格更多和折叠摘要，共用原有查询 |
+| `repositories/pet_store.py` | 当前佩戴奖牌与按账号Backpack v2快照异步落盘/恢复，沿用pet_locations表 |
+| `tests/test_pet_locations.py` | 登录协议映射、真实空箱/部分箱、固定槽匹配状态、普通队伍归属/槽序、切号/重启及历史与实时位置去重、登录后WebSocket推送回归 |
+| `tests/test_session_resume.py` | 原会话重启接续、服务端帧确认、流/密钥/序号不匹配、新握手/关闭失效及损坏缓存回归 |
+| `docs/SESSION_RESUME_VERIFICATION.md` | 会话关联保存、原始录制接续与界面状态验证；空箱隐藏/未知入口删除的后续验收 |
+| `docs/BACKPACK_UPGRADE_VERIFICATION.md` | 真实样本、角色更新修复、测试结果及未完成的视觉验收 |
+
+偏好增加 `fields.positions` 与最多六组 `shortcuts` 定义；查询增加
+`height_position_min/max`、`weight_position_min/max`，排序增加身高/体重/声音。
+宠物载荷兼容增加 `location`、`worn_medal_id/name` 与 `is_colorful`。
