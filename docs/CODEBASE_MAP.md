@@ -105,9 +105,12 @@
 | `view_models/capture_vm.py` | 采集页 VM（Npcap 安装状态机、自动采集开关、偏好持久化、快照组装；运行命令委托 capture_service） |
 | `view_models/events_vm.py` | 协议流页 VM（行视图/详情缓存） |
 | `view_models/_shared.py` | 解码树文本渲染 |
-| `web/server.py` | 本地服务：aiohttp，仅回环 + 随机端口 + token 鉴权 + WS 推送 |
+| `web/server.py` | 本地服务：aiohttp，仅回环 + 随机端口 + token 鉴权 + WS 推送；数据/偏好路由与 bootstrap，采集域路由由 routes_capture mixin 提供 |
+| `web/routes_capture.py` | 采集域路由与载荷（/api/capture*、/api/state、capture/state 载荷；阶段1.4 自 server.py 拆出） |
+| `web/server_helpers.py` | HTTP query 解析助手（路由模块共用） |
 | `web/run.py` | 界面入口：pywebview 窗口（系统 WebView2）+ 单实例唤醒 + 降级提示 |
-| `web/payloads.py` | 业务对象 → JSON 契约（宠物/概览/图鉴/蛋仓/家园/花田/色卡/种公矩阵/箱位，无 UI 依赖） |
+| `web/payloads.py` | 宠物域载荷（宠物行/列表页/概览/箱位）+ 目录域兼容重导出（无 UI 依赖） |
+| `web/payloads_catalog.py` | 目录域载荷：图鉴/种公矩阵/花田/色卡/家园/蛋仓/蛋图鉴（阶段1.4 自 payloads.py 拆出） |
 | `web/pet_media.py` | 物种 ID → 官方头像/立绘 URL 映射（pet_media.json，缺图回退 pets/ 兜底） |
 
 ## tests/（unittest 平铺）
