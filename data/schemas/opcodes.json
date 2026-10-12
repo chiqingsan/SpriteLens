@@ -8,7 +8,7 @@
   "0x0102": {
    "name": "ZoneLoginRsp",
    "category": "login",
-   "message": null
+   "message": "ZoneLoginRsp"
   },
   "0x1316": {
    "name": "BattleEnterNotify",

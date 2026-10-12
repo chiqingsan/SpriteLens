@@ -52,10 +52,13 @@ def convert(source: Path) -> dict:
     eggs: list[dict] = []
     seen: set[str] = set()
     conf_index: dict[str, str] = {}
+    base_index: dict[str, str] = {}
     for entry in raw.get("eggs", []):
         if not isinstance(entry, dict) or not entry.get("eggKey"):
             continue
         egg_key = str(entry["eggKey"])
+        if entry.get("baseId"):
+            base_index[str(entry["baseId"])] = egg_key
         if egg_key in seen:
             # 形态变体只保留首条主记录；confId 索引仍全部保留
             conf_index[str(entry.get("eggConfId"))] = egg_key
@@ -78,6 +81,7 @@ def convert(source: Path) -> dict:
         "groups": {str(k): v for k, v in (raw.get("groupMap") or {}).items()},
         "eggs": eggs,
         "egg_conf_index": conf_index,
+        "egg_base_index": base_index,
     }
 
 

@@ -1,7 +1,7 @@
 """导入游戏静态资源：精灵图 / 系别图标 / 图鉴元数据 / 系别克制表。
 
 数据来源（本机解包与公开静态资源，均非云服务依赖）：
-- 精灵图：wegame.shallow.ink 的公开 wiki 静态资源（社区镜像，按 base_conf_id 取 icon）
+- 精灵图：wegame.shallow.ink 的公开 wiki 静态资源（社区镜像，按 base_conf_id 取 small.png；头像另见 sync_pet_media.py）
 - 系别图标：蛋神助手包内 assets/reference/roco-helper-v3.8.1/TypeIcon（雪碧图 + CSS）
 - 图鉴元数据：蛋神助手包内 assets/catalog/petBaseData.json（图鉴号/蛋组/性别比/体型区间/进化链）
 - 系别克制表：rocom-helper 数据包 data/game/type_chart.json
@@ -38,7 +38,7 @@ PETS_DIR = WEB_STATIC / "pets"
 TYPE_ICON_DIR = WEB_STATIC / "type-icons"
 
 PET_ICON_URL = "https://wegame.shallow.ink/api/v1/resources/wiki/assets/pets/{pid}/small.png"
-PET_ICON_SIZE = 128  # 卡片头像约 40px，128 兼顾清晰与体积
+PET_ICON_SIZE = 128  # 卡片全身小图约 40px，128 兼顾清晰与体积
 PET_ICON_QUALITY = 88
 DOWNLOAD_WORKERS = 12
 

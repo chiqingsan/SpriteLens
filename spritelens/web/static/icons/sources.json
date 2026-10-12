@@ -1,0 +1,353 @@
+{
+  "commit": "a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d",
+  "icons": [
+    {
+      "name": "layout-dashboard",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/layout-dashboard",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/layout-dashboard.svg",
+      "license": "MIT",
+      "search_tags": [
+        "overview",
+        "dashboard"
+      ],
+      "sha256": "8210661405d0e6b7b5ea671a136c59e3e8fcc5e708a9fa332601bbf4a3d2b91a"
+    },
+    {
+      "name": "backpack",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/backpack",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/backpack.svg",
+      "license": "MIT",
+      "search_tags": [
+        "pet",
+        "bag"
+      ],
+      "sha256": "b5e8fc7d4c2a97a7809379d4225d4467250cf8c54a6f650bd20972f1d291cccf"
+    },
+    {
+      "name": "book-2",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/book-2",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/book-2.svg",
+      "license": "MIT",
+      "search_tags": [
+        "handbook",
+        "catalog"
+      ],
+      "sha256": "b033f93e20d3c27a5123a603de584cdc54b50d32f53a16172726efcf05624505"
+    },
+    {
+      "name": "egg",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/egg",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/egg.svg",
+      "license": "MIT",
+      "search_tags": [
+        "egg",
+        "hatch"
+      ],
+      "sha256": "5702f7eabaaf6ec4afc3dd6bcf3b7f48ce44cd7415b60e4bf6538c04d7dbd011"
+    },
+    {
+      "name": "box",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/box",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/box.svg",
+      "license": "MIT",
+      "search_tags": [
+        "warehouse",
+        "storage"
+      ],
+      "sha256": "9c41c0236687a8ffa1c00e7de7c6a1c55bef1073c8adaf2c277f6f36f4552a8f"
+    },
+    {
+      "name": "table",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/table",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/table.svg",
+      "license": "MIT",
+      "search_tags": [
+        "matrix",
+        "coverage"
+      ],
+      "sha256": "4e5361445165142336fe34566d43906a323765906bfc3bb26571121807ace3f7"
+    },
+    {
+      "name": "users",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/users",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/users.svg",
+      "license": "MIT",
+      "search_tags": [
+        "breeder",
+        "parents"
+      ],
+      "sha256": "a9892bcba1adad20184c0b50641b1a96a56fb9ef5135ff60462c664874021cc3"
+    },
+    {
+      "name": "sitemap",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/sitemap",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/sitemap.svg",
+      "license": "MIT",
+      "search_tags": [
+        "planner",
+        "nest"
+      ],
+      "sha256": "42405d5439295b654dcc699790f74968c579d4b1982664e2c556ad1bc743251c"
+    },
+    {
+      "name": "checklist",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/checklist",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/checklist.svg",
+      "license": "MIT",
+      "search_tags": [
+        "collection",
+        "progress"
+      ],
+      "sha256": "7e6753a32e2207411201877467fb7b3c52645338a09c6612478e300d99ada973"
+    },
+    {
+      "name": "home",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/home",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/home.svg",
+      "license": "MIT",
+      "search_tags": [
+        "home",
+        "house"
+      ],
+      "sha256": "069600f461f3e967685765723a851af7b35f24b715e03d41a2928152cf75644c"
+    },
+    {
+      "name": "palette",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/palette",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/palette.svg",
+      "license": "MIT",
+      "search_tags": [
+        "color",
+        "palette"
+      ],
+      "sha256": "d9c39bf1ce00d10694015d9d736ae6006a7e7b2f0df776dd206e1058a9a700a7"
+    },
+    {
+      "name": "flower",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/flower",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/flower.svg",
+      "license": "MIT",
+      "search_tags": [
+        "flower",
+        "seed"
+      ],
+      "sha256": "fc0e05fd927e64dd04b35fdb0332ad9e09771d3a9add0a38bb9d9eb67efa3536"
+    },
+    {
+      "name": "activity",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/activity",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/activity.svg",
+      "license": "MIT",
+      "search_tags": [
+        "protocol",
+        "stream"
+      ],
+      "sha256": "2279e7a64688d1e730e42a7b277792350fbfade1fd3b992ad3971737e88ccde8"
+    },
+    {
+      "name": "settings",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/settings",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/settings.svg",
+      "license": "MIT",
+      "search_tags": [
+        "settings",
+        "capture"
+      ],
+      "sha256": "ef9cf42d822c00b4fad5bc5eeceddd4e1ec3774bb7ddd09891d0fba274bc3e95"
+    },
+    {
+      "name": "filter",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/filter",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/filter.svg",
+      "license": "MIT",
+      "search_tags": [
+        "filter",
+        "condition"
+      ],
+      "sha256": "69bbcca665588bd0b64c44c42ced4538b3e3c75a59e3fc46e58b1f10d99d15ec"
+    },
+    {
+      "name": "filter-off",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/filter-off",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/filter-off.svg",
+      "license": "MIT",
+      "search_tags": [
+        "reset",
+        "clear"
+      ],
+      "sha256": "be012040cf35ef5fc4fb3017b498b7e8706505e80650c0763cd76e01bf5a325d"
+    },
+    {
+      "name": "refresh",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/refresh",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/refresh.svg",
+      "license": "MIT",
+      "search_tags": [
+        "reload",
+        "refresh"
+      ],
+      "sha256": "9dd8ab8cac268489501cbb0a106d93cc3f367add493d20c47ec1e1d9804c760a"
+    },
+    {
+      "name": "search",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/search",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/search.svg",
+      "license": "MIT",
+      "search_tags": [
+        "search",
+        "empty"
+      ],
+      "sha256": "3dd53b9606283dfa0adcb0b10a7d9a4432369d4bebcfacf67f80fbe358381c34"
+    },
+    {
+      "name": "chevron-left",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/chevron-left",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/chevron-left.svg",
+      "license": "MIT",
+      "search_tags": [
+        "previous",
+        "back"
+      ],
+      "sha256": "889174801ca4213379fe4e6a574546793a72ab22be35bc2f177e3d8d24576dbd"
+    },
+    {
+      "name": "chevron-right",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/chevron-right",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/chevron-right.svg",
+      "license": "MIT",
+      "search_tags": [
+        "next",
+        "forward"
+      ],
+      "sha256": "83733bb6e03e1d20fd2674d06a493642c8ea6eef76c44ebb2239b9ef17dedff7"
+    },
+    {
+      "name": "x",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/x",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/x.svg",
+      "license": "MIT",
+      "search_tags": [
+        "close",
+        "remove"
+      ],
+      "sha256": "9350785360414c39450c3505f17d1745e55a7534edace8548e30cf49e3727d43"
+    },
+    {
+      "name": "download",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/download",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/download.svg",
+      "license": "MIT",
+      "search_tags": [
+        "download",
+        "install"
+      ],
+      "sha256": "c13f6f9cf87deee99e331622169efd59cd764b376994540347e50d6bb5e2e0ef"
+    },
+    {
+      "name": "player-play",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/player-play",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/player-play.svg",
+      "license": "MIT",
+      "search_tags": [
+        "start",
+        "capture"
+      ],
+      "sha256": "e2bff69284f1dc77224c47c03798017206a29d4ef665549db724b0a4534d8e5c"
+    },
+    {
+      "name": "player-stop",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/player-stop",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/player-stop.svg",
+      "license": "MIT",
+      "search_tags": [
+        "stop",
+        "capture"
+      ],
+      "sha256": "9ed8cfd7b7cffbc925dae2c28ad5fb5115f3db451511acc47348e01cb862e291"
+    },
+    {
+      "name": "trash",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/trash",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/trash.svg",
+      "license": "MIT",
+      "search_tags": [
+        "clear",
+        "delete"
+      ],
+      "sha256": "4b90fa07a6d980736951d9e83b91432972b2bcecf81be4578608a0983f2ebc9d"
+    },
+    {
+      "name": "circle-check",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/circle-check",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/circle-check.svg",
+      "license": "MIT",
+      "search_tags": [
+        "selected",
+        "success"
+      ],
+      "sha256": "c4cb2e026be5f4c217c3ff9b0ccefb9a26b7a135bc82eef28a8bead0cc02a958"
+    },
+    {
+      "name": "layout-grid",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/layout-grid",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/layout-grid.svg",
+      "license": "MIT",
+      "search_tags": [
+        "grid",
+        "card"
+      ],
+      "sha256": "91f923bcca6e9201ccedd2a10bb5d5a7eb3dbb5fa5a26af394d362f35c935237"
+    },
+    {
+      "name": "adjustments",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/adjustments",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/adjustments.svg",
+      "license": "MIT",
+      "search_tags": [
+        "appearance",
+        "display"
+      ],
+      "sha256": "46ee742d7cdec46bacd05374a8322f6dae1ccca41b4e09e3c52456ef70af014d"
+    },
+    {
+      "name": "clock",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/clock",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/clock.svg",
+      "license": "MIT",
+      "search_tags": [
+        "hatch",
+        "time"
+      ],
+      "sha256": "971b0b2d3b5b17ae240cd3aac1a09710ab680d8c41900f1a37a0e430994d7fda"
+    }
+  ]
+}
