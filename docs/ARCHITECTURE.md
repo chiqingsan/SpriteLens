@@ -69,7 +69,7 @@ PacketEvent → MonitorService.add_packet_listener
 命中后关键字段按**字段号**读取（六维=14、技能=12、身高=26、体重=27、
 声音=93、物种键=15），schema 命名漂移不影响提取。
 
-## 持久化（v7：宠物 / 蛋仓 / 账号 / 箱位）
+## 持久化（v8：宠物 / 蛋仓 / 账号 / 箱位 / 孵化槽）
 
 **分层**：`repositories/database.py` 管连接与迁移（`PRAGMA user_version`，
 追加式迁移可安全升级历史库；每个版本的多条 DDL 在单事务内执行、失败整体
@@ -107,7 +107,9 @@ UI 的 `drain_events` 与后续帧处理——实测事件日志每条 `flush()`
 v4 炫彩外观列（`colorful_conf_id` / `glass_type` / `glass_value`）；
 v5 佩戴奖牌列 + `pet_locations` 表（箱位快照）；v6 试用个体标记
 （`is_trial_pet`）；v7 好友镜像标记（`is_mirror_pet`，与 v6 一起用于
-修正历史误收的非自有精灵）。追加式迁移，v1 老库自动逐级升级、历史数据保留
+修正历史误收的非自有精灵）；v8 `egg_hatch_slots` 表（孵化槽快照，
+slots 帧按 uid 落「槽中蛋 id」集合，恢复标记历史状态）。追加式迁移，
+v1 老库自动逐级升级、历史数据保留
 （`test_persistence.py::test_v1_database_upgrades_to_v2`）。
 
 **箱位快照（v2 JSON）**：`domain/pet_locations.py` 的 `Backpack.record()`
@@ -300,9 +302,11 @@ type-icons/  系别图标雪碧图（来自 roco-helper 素材）
 
 ## 当前健壮性债务与演进入口
 
-审查确认坏库备份失败可能删除原文件、Store并发flush可能旧值覆盖新值、抓包失败启动遗留worker、
-坏行阻断恢复、离线各域选错账号、孵化槽未落盘、schema实例依赖全局库以及HTTP查询污染共享VM。
-这些均尚未修复，修复顺序与验收见 [ROADMAP](ROADMAP.md) 阶段0。
+审查确认的 R01–R09 缺陷已于 2026-10-12 全部修复（顺序与验收见 [ROADMAP](ROADMAP.md) 阶段0）：
+坏库恢复只针对真损坏且备份失败保留原文件；Store 批次串行化；抓包启动失败回滚、停止有界；
+组合根持有 Database 并逆序清理、采集命令串行化；坏行逐行隔离；离线恢复统一展示 uid（蛋仓
+载荷带 uid 归属）；孵化槽快照按 uid 持久化（v8 迁移 `egg_hatch_slots`）；schema 递归只用传入
+实例；/api/pets 请求级筛选不写共享 VM。
 
 下一阶段保护三项边界：资源由组合根明确持有并按逆序释放；业务返回单一uid/version快照；页面和请求状态按功能隔离。
 `app.js`、`server.py`、`payloads.py` 是优先控制职责增长的位置；原始流录制与checkpoint的同步IO需要实际慢盘验证。
