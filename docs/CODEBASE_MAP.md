@@ -89,6 +89,7 @@
 | `repositories/egg_store.py` | 蛋仓持久化网关：write-behind 批量落盘 + load_latest（v3 eggs 表） |
 | `repositories/settings.py` | JSON 配置仓库（原子写、脏值归一、窗口几何） |
 | `services/monitor_service.py` | 采集管线编排：字节流 → 帧 → 解密 → 解码 → PacketEvent；会话释放/空闲回收/硬上限 |
+| `services/capture_service.py` | 采集运行服务：接入层创建与生命周期、录制 tee、手动密钥、副作用命令串行化（阶段1.3 自 capture_vm 抽出） |
 | `services/session_tracker.py` | 会话表（LRU，支持 drop）与全局统计 |
 | `services/account_tracker.py` | 账号切换判定（uid 变化才清快照；同 uid 重复帧/离线加载登录不算切换） |
 | `services/pet_repository.py` | 宠物聚合（内存快照 + 身份归属/切号清空 + 彩名学习表恢复 + 入库出口） |
@@ -101,7 +102,7 @@
 | `logs/local_logger.py` | 双文件 RotatingFileHandler + 崩溃兜底 `install_excepthook`（crash.log） |
 | `view_models/pet_vm.py` | 宠物页 VM（多维筛选/排序/聚合统计/箱位查询，纯 Python） |
 | `view_models/ui_preferences.py` | UI 偏好 VM：主题/视图/显示字段/快捷条件白名单校验与快照 |
-| `view_models/capture_vm.py` | 采集页 VM（source 构造、Npcap 安装状态机、自动采集开关、丢弃计数） |
+| `view_models/capture_vm.py` | 采集页 VM（Npcap 安装状态机、自动采集开关、偏好持久化、快照组装；运行命令委托 capture_service） |
 | `view_models/events_vm.py` | 协议流页 VM（行视图/详情缓存） |
 | `view_models/_shared.py` | 解码树文本渲染 |
 | `web/server.py` | 本地服务：aiohttp，仅回环 + 随机端口 + token 鉴权 + WS 推送 |

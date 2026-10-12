@@ -2,22 +2,23 @@
 
 纯 Python 类（不依赖任何 UI 框架/异步运行时），本地服务经
 `asyncio.to_thread` 调其命令，前端按 WebSocket 推送拉取状态快照。
+
+阶段1.3 起，运行时职责（接入层创建/录制/手动密钥/命令串行化）在
+`services.capture_service.CaptureService`；本类保留页面校验、偏好
+持久化与安装引导，命令经组合的服务执行——对外接口不变。
 """
 
 from __future__ import annotations
 
 import threading
-import time
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from spritelens.capture.base import SourceError, StreamChunk
-from spritelens.capture.key_store import KeyStore, parse_key_text
+from spritelens.capture.base import SourceError
 from spritelens.capture.npcap_source import NpcapCaptureSource
 from spritelens.logs import get_logger
-from spritelens.recording.recorder import StreamRecorder
 from spritelens.repositories.settings import SettingsRepository
+from spritelens.services.capture_service import CaptureService
 from spritelens.services.monitor_service import MonitorService
 from spritelens.services.session_tracker import SessionStats, Totals
 from spritelens.system.environment import (
@@ -74,7 +75,7 @@ class CaptureSnapshot:
 
 
 class CaptureViewModel:
-    """采集页状态与命令；接入层构造在此完成（可插拔点）。"""
+    """采集页状态与命令；接入层构造在 CaptureService（可插拔点）。"""
 
     def __init__(
         self,
@@ -89,38 +90,18 @@ class CaptureViewModel:
         resolver=None,
         downloader=None,
         launcher=None,
-        environment_probe: Callable[[], NpcapReport] | None = None,
+        environment_probe: callable | None = None,
         probe_environment: bool = True,
     ) -> None:
         self._monitor = monitor
         self._settings = settings
-        self._key_store = KeyStore(keys_dir)
-        self._recorder = StreamRecorder()
         self._recordings_dir = recordings_dir
-        self._port = port
         self._event_log = event_log
-        self._source: NpcapCaptureSource | None = None  # 本次采集的接入层（读丢弃计数）
         self._iface = settings.get_str(IFACE_SETTING_KEY)
         self._recording_requested = settings.get_bool(RECORD_SETTING_KEY, False)
         # 打开即采集：默认开启（用户可关）；环境不满足时 start() 会转成可读错误
         self._autostart = settings.get_bool(AUTOSTART_SETTING_KEY, True)
         self._ifaces: list[tuple[str, str]] = []
-        self._last_error = ""
-        self._preset_key: bytes | None = None
-        # 快速检查（毫秒级）：只查驱动文件存在性，installed 立即可用，
-        # autostart 不必等探测；RSC 检查（PowerShell 实测约 1.8s）随后异步补齐。
-        self._npcap_report = check_npcap(quick=True)
-        self._install_phase = "idle"
-        self._install_message = ""
-        self._install_progress: float | None = None
-        self._installing = False
-        # 副作用命令串行化（R09）：start/stop/录制切换/手动密钥经 HTTP 的
-        # to_thread 并发进入时互斥执行，避免并发创建来源或操作录制；
-        # 快照走 monitor 自身锁，不取该锁、不做等待与磁盘 IO。
-        self._command_lock = threading.Lock()
-        from spritelens.paths import data_root
-
-        self._installer_dir = installer_dir or (data_root() / "downloads")
         # 附加采集端口（排障用，多端口游戏/新连接），逗号分隔配置 capture.ports
         ports: list[int] = []
         for part in settings.get_str("capture.ports", "").split(","):
@@ -128,6 +109,26 @@ class CaptureViewModel:
             if part.isdigit() and int(part) != port and int(part) not in ports:
                 ports.append(int(part))
         self._extra_ports = tuple(ports)
+        # 运行时职责收口到服务（命令锁/接入层/录制/密钥）
+        self._service = CaptureService(
+            monitor=monitor,
+            keys_dir=keys_dir,
+            recordings_dir=recordings_dir,
+            port=port,
+            extra_ports=self._extra_ports,
+            iface=self._iface or None,
+            recording_wanted=self._recording_requested,
+        )
+        # 快速检查（毫秒级）：只查驱动文件存在性，installed 立即可用，
+        # autostart 不必等探测；RSC 检查（PowerShell 实测约 1.8s）随后异步补齐。
+        self._npcap_report = check_npcap(quick=True)
+        self._install_phase = "idle"
+        self._install_message = ""
+        self._install_progress: float | None = None
+        self._installing = False
+        from spritelens.paths import data_root
+
+        self._installer_dir = installer_dir or (data_root() / "downloads")
         # 安装依赖可注入（测试用 fake），默认官方源真实实现
         self._resolver = resolver or resolve_latest_installer
         self._downloader = downloader or download_installer
@@ -160,7 +161,7 @@ class CaptureViewModel:
         try:
             self._ifaces = NpcapCaptureSource.list_ifaces()
         except SourceError as exc:
-            self._last_error = str(exc)
+            self._set_error(str(exc))
             self._ifaces = []
         return list(self._ifaces)
 
@@ -170,46 +171,22 @@ class CaptureViewModel:
 
     def select_iface(self, name: str) -> None:
         self._iface = name
+        self._service.set_iface(name or None)
         self._settings.set(IFACE_SETTING_KEY, name)
 
-    # -- 启停 ----------------------------------------------------------
+    # -- 启停（委托运行服务；页面只做校验与状态同步）----------------------
     def start(self) -> None:
-        """构造接入层并启动；失败转 last_error 供页面提示。
+        """构造接入层并启动；失败转 last_error 供页面提示。"""
+        self._service.start()
 
-        命令锁内执行：并发调用（同源重复点击）排队串行，靠 monitor 的
-        is_running 判定去重，不会重复创建来源。
-        """
-        with self._command_lock:
-            if self._monitor.is_running:
-                return
-            self._last_error = ""
-            source = NpcapCaptureSource(
-                self._port,
-                on_chunk=self._tee_chunk,
-                on_event=self._handle_source_event,
-                iface=self._iface or None,
-                extra_ports=self._extra_ports,
-            )
-            self._source = source  # 先挂引用：启动期间的快照也能读到丢弃计数
-            try:
-                self._monitor.bind(source)
-                self._monitor.start()
-            except SourceError as exc:
-                self._last_error = str(exc)
-                logger.warning("采集启动失败: %s", exc)
-            if self._recording_requested and self._monitor.is_running:
-                self._start_recording()
+    def _set_error(self, message: str) -> None:
+        """页面侧错误（网卡枚举等）；运行期错误由服务记录。"""
+        self._service_note_error(message)
 
-    def _handle_source_event(self, kind: str, detail: str) -> None:
-        """接入层生命周期事件：连接关闭贯穿到协议层释放会话状态。
-
-        flow_closed 由投递线程按序回调（排在本会话残余数据之后），
-        因此 close_session 不会清掉尚未处理的 DATA 所需的密钥；
-        抓包线程与此回调解耦，不等待协议层锁。
-        """
-        logger.info("[source] %s %s", kind, detail)
-        if kind == "flow_closed" and detail:
-            self._monitor.close_session(detail)
+    def _service_note_error(self, message: str) -> None:
+        # CaptureService.status().last_error 只覆盖运行期；网卡枚举错误
+        # 属页面动作，临时记到服务里保持快照单一出口
+        self._service._last_error = message
 
     @property
     def extra_ports(self) -> tuple[int, ...]:
@@ -240,9 +217,7 @@ class CaptureViewModel:
         return self._monitor.is_running
 
     def stop(self) -> None:
-        with self._command_lock:
-            self._recorder.stop()
-            self._monitor.stop()
+        self._service.stop()
 
     @property
     def is_running(self) -> bool:
@@ -254,30 +229,15 @@ class CaptureViewModel:
         return self._recording_requested
 
     def set_recording_requested(self, enabled: bool) -> None:
-        with self._command_lock:
-            self._recording_requested = enabled
-            self._settings.set(RECORD_SETTING_KEY, enabled)
-            # 勾选立即生效：采集进行中时同步开/停录制，而不是等下次启动
-            if enabled and self._monitor.is_running and not self._recorder.is_recording:
-                self._start_recording()
-            elif not enabled and self._recorder.is_recording:
-                self._recorder.stop()
-
-    def _start_recording(self) -> None:
-        name = f"capture_{time.strftime('%Y%m%d_%H%M%S')}.jsonl"
-        self._recorder.start(self._recordings_dir / name)
+        self._recording_requested = enabled
+        self._service.set_recording_wanted(enabled)
+        self._settings.set(RECORD_SETTING_KEY, enabled)
+        # 勾选立即生效：采集进行中时同步开/停录制，而不是等下次启动
+        self._service.set_recording(enabled, running=self._monitor.is_running)
 
     # -- 手动密钥 ------------------------------------------------------
     def apply_manual_key(self, text: str) -> tuple[bool, str]:
-        try:
-            key = parse_key_text(text)
-        except ValueError as exc:
-            return False, str(exc)
-        with self._command_lock:
-            self._preset_key = key
-            self._key_store.save_latest(key, "(manual)")
-            self._monitor.set_preset_key(key)
-        return True, "密钥已应用（对新旧会话生效）"
+        return self._service.apply_manual_key(text)
 
     # -- Npcap 环境 ----------------------------------------------------
     def environment_report(self) -> NpcapReport:
@@ -369,16 +329,16 @@ class CaptureViewModel:
             SessionRow(session_id=s.session_id, has_key=s.has_key, data_frames=s.data_frames)
             for s in sessions_raw
         )
-        source = self._source
+        status = self._service.status()
         return CaptureSnapshot(
-            running=self._monitor.is_running,
+            running=status.running,
             iface=self._iface,
             flow_count=len(sessions),
             sessions=sessions,
             totals=totals,
-            recording=self._recorder.is_recording,
-            recorded_chunks=self._recorder.chunk_count,
-            last_error=self._last_error,
+            recording=status.recording,
+            recorded_chunks=status.recorded_chunks,
+            last_error=status.last_error,
             any_key=any(s.has_key for s in sessions),
             event_log_name=(
                 Path(self._event_log.current_path).name
@@ -387,20 +347,14 @@ class CaptureViewModel:
             ),
             # 丢弃计数：队列过载（下游处理不及时）与重组层超限，均是静默丢数据，
             # 必须在状态接口可见（采集页据此提示"有数据未进入分析"）
-            dropped_chunks=getattr(source, "dropped_chunks", 0) if source is not None else 0,
-            dropped_segments=getattr(source, "dropped_segments", 0) if source is not None else 0,
+            dropped_chunks=status.source_dropped_chunks,
+            dropped_segments=status.source_dropped_segments,
             event_log_dropped=(
                 self._event_log.dropped_count
                 if self._event_log is not None and hasattr(self._event_log, "dropped_count")
                 else 0
             ),
         )
-
-    # -- 内部 ----------------------------------------------------------
-    def _tee_chunk(self, chunk: StreamChunk) -> None:
-        """录制与解析共用一个流入口（组合根不感知该分流）。"""
-        self._recorder.append(chunk)
-        self._monitor.on_chunk(chunk)
 
 
 __all__ = [

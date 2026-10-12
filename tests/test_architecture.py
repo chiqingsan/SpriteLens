@@ -96,11 +96,14 @@ class LayerDirectionTest(unittest.TestCase):
     # 层级序号越小越底层；允许依赖序号更小的层。
     # spritelens.events 是中立叶子模块（无 IO 无依赖），层级 0——任何层
     # 都可以依赖它而不视为反向。
+    # recording.recorder 是 tee 旁路适配器（只依赖 capture/protocol/logs），
+    # 与 capture 同层；recording.replay 复用整条管线，保持在 services 之上。
     LAYER_ORDER = {
         "protocol": 0,
         "logs": 0,
         "events": 0,
         "capture": 1,
+        "recording.recorder": 1,
         "domain": 2,
         "repositories": 2,
         "services": 3,
@@ -120,8 +123,11 @@ class LayerDirectionTest(unittest.TestCase):
             for target in _imports_of(path):
                 if not target.startswith("spritelens."):
                     continue
+                # 先试精确子模块键（recording.recorder），再退回包键
                 target_pkg = target.split(".")[1]
-                target_layer = self.LAYER_ORDER.get(target_pkg)
+                target_layer = self.LAYER_ORDER.get(target.removeprefix("spritelens."))
+                if target_layer is None:
+                    target_layer = self.LAYER_ORDER.get(target_pkg)
                 if target_layer is None or target_layer <= source_layer:
                     continue
                 pair = (f"spritelens.{source_pkg}", f"spritelens.{target_pkg}")

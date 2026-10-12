@@ -224,29 +224,21 @@ class CaptureViewModelTest(unittest.TestCase):
         """并发 start 命令串行化：同一时刻只创建一个接入层（R09）。
 
         HTTP 的 start 经 to_thread 调用，同源重复点击会并发进入；
-        旧实现无互斥，可并发创建多个 source 或操作录制。
+        串行化在 CaptureService 的命令锁内执行，并发调用排队。
         """
-        import threading
-        import time
-
         vm, monitor = _make_vm(self.tmp_path)
         entered: list[float] = []
         done: list[float] = []
+        # 慢 start 在服务的真实命令锁内执行，验证并发调用排队
+        command_lock = vm._service._command_lock
 
         def slow_start():
-            entered.append(time.monotonic())
-            time.sleep(0.2)
-            done.append(time.monotonic())
+            with command_lock:
+                entered.append(time.monotonic())
+                time.sleep(0.2)
+                done.append(time.monotonic())
 
-        # 用命令锁的持有时间模拟真实 start 的串行窗口：替换 start 为
-        # 「在 VM 命令锁内慢执行」，验证并发调用排队
-        original_start = vm.start
-
-        def instrumented_start():
-            with vm._command_lock:
-                slow_start()
-
-        vm.start = instrumented_start  # type: ignore[method-assign]
+        vm._service.start = slow_start  # type: ignore[method-assign]
 
         threads = [threading.Thread(target=vm.start) for _ in range(3)]
         for t in threads:
@@ -255,7 +247,6 @@ class CaptureViewModelTest(unittest.TestCase):
             t.join(timeout=5)
 
         self.assertEqual(len(entered), 3)
-        self.assertEqual(original_start.__name__, "start")  # 自检：注入未失真
         # 串行化：任一时刻只有一个命令在执行（进入区间不重叠）
         ordered = sorted(zip(entered, done))
         for (_e0, d0), (e1, _d1) in zip(ordered, ordered[1:]):
