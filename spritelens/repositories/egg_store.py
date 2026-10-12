@@ -138,7 +138,11 @@ class EggStore:
 
     # -- 读取 ----------------------------------------------------------
     def load(self, uid: int) -> tuple[EggBoxEntry, ...]:
-        """读取某账号全部蛋（按获取时间排序）；先落一次待写表保证一致。"""
+        """读取某账号全部蛋（按获取时间排序）；先落一次待写表保证一致。
+
+        逐行隔离（R04）：单条坏行（数值列被改坏、detail 结构异常）只丢
+        该行并留定位日志，不阻断其余合法数据。
+        """
         self.flush()
         try:
             rows = self._db.query(
@@ -152,30 +156,40 @@ class EggStore:
         out: list[EggBoxEntry] = []
         for row in rows:
             try:
-                detail = json.loads(row["detail_json"] or "{}")
-            except json.JSONDecodeError:
-                detail = {}
-            out.append(
-                EggBoxEntry(
-                    instance_id=int(row["instance_id"]),
-                    egg_conf_id=int(row["egg_conf_id"]),
-                    pet_conf_id=int(row["pet_conf_id"]),
-                    quantity=int(row["quantity"]),
-                    obtained_at=int(row["obtained_at"]),
-                    bag_type=8,
-                    height_cm=int(detail.get("height_cm") or 0),
-                    weight_g=int(detail.get("weight_g") or 0),
-                    hatch_seconds=int(detail.get("hatch_seconds") or 0),
-                    hatched_seconds=int(detail.get("hatched_seconds") or 0),
-                    hatch_updated_at=int(detail.get("hatch_updated_at") or 0),
-                    start_hatch_time=int(detail.get("start_hatch_time") or 0),
-                    category=int(detail.get("category") or 0),
-                    special_egg_conf_id=int(detail.get("special_egg_conf_id") or 0),
-                    appearance_type=int(detail.get("appearance_type") or 0),
-                    extension_type=int(detail.get("extension_type") or 0),
+                out.append(self._egg_from_row(row))
+            except (ValueError, TypeError, KeyError) as exc:
+                logger.error(
+                    "蛋行损坏已隔离：uid=%s instance_id=%s (%s)",
+                    uid, row["instance_id"], exc,
                 )
-            )
         return tuple(out)
+
+    @staticmethod
+    def _egg_from_row(row) -> EggBoxEntry:
+        try:
+            detail = json.loads(row["detail_json"] or "{}")
+        except json.JSONDecodeError:
+            detail = {}
+        if not isinstance(detail, dict):
+            detail = {}
+        return EggBoxEntry(
+            instance_id=int(row["instance_id"]),
+            egg_conf_id=int(row["egg_conf_id"]),
+            pet_conf_id=int(row["pet_conf_id"]),
+            quantity=int(row["quantity"]),
+            obtained_at=int(row["obtained_at"]),
+            bag_type=8,
+            height_cm=int(detail.get("height_cm") or 0),
+            weight_g=int(detail.get("weight_g") or 0),
+            hatch_seconds=int(detail.get("hatch_seconds") or 0),
+            hatched_seconds=int(detail.get("hatched_seconds") or 0),
+            hatch_updated_at=int(detail.get("hatch_updated_at") or 0),
+            start_hatch_time=int(detail.get("start_hatch_time") or 0),
+            category=int(detail.get("category") or 0),
+            special_egg_conf_id=int(detail.get("special_egg_conf_id") or 0),
+            appearance_type=int(detail.get("appearance_type") or 0),
+            extension_type=int(detail.get("extension_type") or 0),
+        )
 
     def load_latest(self) -> tuple[int, tuple[EggBoxEntry, ...]]:
         """最近活跃账号的蛋仓快照（离线展示用）。"""

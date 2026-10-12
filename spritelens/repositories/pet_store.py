@@ -323,41 +323,55 @@ class PetStore:
 
     # -- 读取 ----------------------------------------------------------
     def load(self, uid: int) -> tuple[Pet, ...]:
-        """读取某账号全部宠物（按 gid 排序）；无记录返回空元组。"""
+        """读取某账号全部宠物（按 gid 排序）；无记录返回空元组。
+
+        逐行隔离（R04）：单条坏数据（如被外部改坏的 JSON/数值列）只丢
+        该行并留下定位日志，不阻断其余合法数据恢复，也不伪装成空账号。
+        """
         if uid <= 0:
             return ()
         rows = self._db.query(_SELECT_PETS, (uid,))
-        return tuple(
-            Pet(
-                gid=int(row["gid"]),
-                conf_id=int(row["conf_id"]),
-                name=str(row["name"]),
-                level=int(row["level"]),
-                exp=int(row["exp"]),
-                nature=int(row["nature"]),
-                gender=int(row["gender"]),
-                blood_id=int(row["blood_id"]),
-                talent_rank=int(row["talent_rank"]),
-                is_first_catch=bool(row["is_first_catch"]),
-                base_conf_id=int(row["base_conf_id"]),
-                attributes=_attributes_from_json(str(row["attributes_json"] or "")),
-                height=int(row["height"]),
-                weight=int(row["weight"]),
-                voice=int(row["voice"]),
-                mutation_type=int(row["mutation_type"]),
-                classis=int(row["classis"]),
-                breakthrough_lv=int(row["breakthrough_lv"]),
-                speciality_id=int(row["speciality_id"]),
-                ball_id=int(row["ball_id"]),
-                colorful_conf_id=int(row["colorful_conf_id"]),
-                glass_type=int(row["glass_type"]),
-                glass_value=int(row["glass_value"]),
-                worn_medal_id=int(row["worn_medal_id"]),
-                is_trial_pet=bool(row["is_trial_pet"]),
-                is_mirror_pet=bool(row["is_mirror_pet"]),
-                skills=_skills_from_json(str(row["skills_json"] or "")),
-            )
-            for row in rows
+        pets: list[Pet] = []
+        for row in rows:
+            try:
+                pets.append(self._pet_from_row(row))
+            except (ValueError, TypeError, KeyError) as exc:
+                logger.error(
+                    "宠物行损坏已隔离：uid=%s gid=%s name=%r (%s)",
+                    uid, row["gid"], row["name"], exc,
+                )
+        return tuple(pets)
+
+    @staticmethod
+    def _pet_from_row(row) -> Pet:
+        return Pet(
+            gid=int(row["gid"]),
+            conf_id=int(row["conf_id"]),
+            name=str(row["name"]),
+            level=int(row["level"]),
+            exp=int(row["exp"]),
+            nature=int(row["nature"]),
+            gender=int(row["gender"]),
+            blood_id=int(row["blood_id"]),
+            talent_rank=int(row["talent_rank"]),
+            is_first_catch=bool(row["is_first_catch"]),
+            base_conf_id=int(row["base_conf_id"]),
+            attributes=_attributes_from_json(str(row["attributes_json"] or "")),
+            height=int(row["height"]),
+            weight=int(row["weight"]),
+            voice=int(row["voice"]),
+            mutation_type=int(row["mutation_type"]),
+            classis=int(row["classis"]),
+            breakthrough_lv=int(row["breakthrough_lv"]),
+            speciality_id=int(row["speciality_id"]),
+            ball_id=int(row["ball_id"]),
+            colorful_conf_id=int(row["colorful_conf_id"]),
+            glass_type=int(row["glass_type"]),
+            glass_value=int(row["glass_value"]),
+            worn_medal_id=int(row["worn_medal_id"]),
+            is_trial_pet=bool(row["is_trial_pet"]),
+            is_mirror_pet=bool(row["is_mirror_pet"]),
+            skills=_skills_from_json(str(row["skills_json"] or "")),
         )
 
     def list_accounts(self) -> tuple[tuple[int, str], ...]:

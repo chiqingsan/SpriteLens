@@ -849,6 +849,45 @@ class DatabaseMigrationTest(unittest.TestCase):
         store.close()
         db.close()
 
+    def test_corrupt_row_isolated_not_fatal(self):
+        """单条坏行不阻断整个账号恢复：合法行照常读出，坏行留日志（R04）。
+
+        旧实现整表对象构造无隔离，一只宠物的 attributes_json 被改坏，
+        load_last_account 抛 ValueError，应用恢复路径整体失败。
+        """
+        db = Database(self.db_path)
+        store = PetStore(db)
+        store.put(UID, [
+            Pet(gid=1, conf_id=1, name="好猫", level=1, exp=0, nature=0,
+                gender=0, blood_id=0, talent_rank=0, is_first_catch=False),
+            Pet(gid=2, conf_id=2, name="好鸟", level=2, exp=0, nature=0,
+                gender=0, blood_id=0, talent_rank=0, is_first_catch=False),
+        ])
+        store.flush()
+        # 模拟外部改坏：合法 JSON 但字段类型错（int 列转换失败）
+        db.execute(
+            "UPDATE pets SET attributes_json = ? WHERE gid = 1",
+            ('[{"talent":"bad"}]',),
+        )
+        loaded = store.load(UID)
+        self.assertEqual([p.name for p in loaded], ["好鸟"], "坏行应被隔离，合法行照常恢复")
+        store.close()
+        db.close()
+
+    def test_corrupt_row_not_silently_overwritten(self):
+        """坏行保留在库中等待处置，不被静默删除或伪造数据覆盖。"""
+        db = Database(self.db_path)
+        store = PetStore(db)
+        store.put(UID, [Pet(gid=1, conf_id=1, name="好猫", level=1, exp=0, nature=0,
+                            gender=0, blood_id=0, talent_rank=0, is_first_catch=False)])
+        store.flush()
+        db.execute("UPDATE pets SET attributes_json = ? WHERE gid = 1", ('[{"talent":"bad"}]',))
+        store.load(UID)  # 触发隔离读取
+        rows = db.query("SELECT attributes_json FROM pets WHERE gid = 1")
+        self.assertEqual(rows[0]["attributes_json"], '[{"talent":"bad"}]')
+        store.close()
+        db.close()
+
     def test_account_switch_clears_snapshot(self):
         """切号后内存快照不混合：B 登录后只应看到 B 的宠物，且入库分 uid 隔离。"""
         db = Database(self.db_path)

@@ -276,6 +276,57 @@ class EggBoxRepositoryTests(unittest.TestCase):
             finally:
                 db.close()
 
+    def test_store_corrupt_row_isolated_not_fatal(self) -> None:
+        """单条坏行不阻断蛋仓恢复：合法蛋照常读出（R04）。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Database(Path(tmp) / "db.sqlite")
+            try:
+                store = EggStore(db, flush_interval=60.0)
+                eggs = [
+                    EggBoxEntry(
+                        instance_id=i, egg_conf_id=3001000 + i, pet_conf_id=3000 + i,
+                        quantity=1, obtained_at=i, bag_type=8, height_cm=0, weight_g=0,
+                        hatch_seconds=0, hatched_seconds=0, hatch_updated_at=0,
+                        start_hatch_time=0, category=0, special_egg_conf_id=0,
+                        appearance_type=0, extension_type=0,
+                    )
+                    for i in (1, 2)
+                ]
+                store.put(101, eggs)
+                store.flush()
+                db.execute("UPDATE eggs SET obtained_at = 'not-a-number' WHERE instance_id = 1")
+                loaded = store.load(101)
+                self.assertEqual([e.instance_id for e in loaded], [2], "坏行应被隔离")
+                # load_latest 同样不因坏行失败
+                uid, latest = store.load_latest()
+                self.assertEqual(uid, 101)
+                self.assertEqual([e.instance_id for e in latest], [2])
+                store.close()
+            finally:
+                db.close()
+
+    def test_store_detail_json_non_dict_tolerated(self) -> None:
+        """detail_json 为列表/null 时按空明细降级，不抛错。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Database(Path(tmp) / "db.sqlite")
+            try:
+                store = EggStore(db, flush_interval=60.0)
+                store.put(101, [EggBoxEntry(
+                    instance_id=5, egg_conf_id=3001001, pet_conf_id=3001, quantity=1,
+                    obtained_at=1, bag_type=8, height_cm=0, weight_g=0,
+                    hatch_seconds=0, hatched_seconds=0, hatch_updated_at=0,
+                    start_hatch_time=0, category=0, special_egg_conf_id=0,
+                    appearance_type=0, extension_type=0,
+                )])
+                store.flush()
+                db.execute("UPDATE eggs SET detail_json = '[1,2]' WHERE instance_id = 5")
+                loaded = store.load(101)
+                self.assertEqual(len(loaded), 1)
+                self.assertEqual(loaded[0].hatch_seconds, 0)
+                store.close()
+            finally:
+                db.close()
+
 
 class EggBoxPayloadTests(unittest.TestCase):
     def test_payload_joins_catalog(self) -> None:
