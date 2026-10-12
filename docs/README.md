@@ -1,15 +1,22 @@
 # 文档索引
 
+状态：当前文档总入口。读者：用户、维护者、开发者与 AI 协作者。
+当前事实以代码与维护文档为准；路线图中的方案是待实施任务，带日期的核验/审查只代表当时证据。
+
 阅读顺序：
 
 1. `../README.md` — 安装与使用
-2. `DEVELOPMENT_GUIDE.md` — 开发规范（改码前必读）
-3. `ARCHITECTURE.md` — 分层约束、接入层可插拔设计、协议栈
-4. `CODEBASE_MAP.md` — 文件级代码地图
-5. `PROTOCOL_NOTES.md` — 排障自查清单、未解事项、版本适配指引
-6. `UI_GUIDE.md` — 前端视觉与组件规范（改 UI 前必读：token 速查/组件清单/反面清单）
+2. [AI_CONTEXT.md](AI_CONTEXT.md) — 项目定位、重点风险与协作入口
+3. `DEVELOPMENT_GUIDE.md` — 开发规范（改码前必读）
+4. `ARCHITECTURE.md` — 当前分层、已知边界、接入设计与协议栈
+5. [ROADMAP.md](ROADMAP.md) — 健壮性与可维护性演进顺序、验收条件
+6. `CODEBASE_MAP.md` — 文件级代码地图
+7. `PROTOCOL_NOTES.md` — 排障自查清单、未解事项、版本适配指引
+8. `UI_GUIDE.md` — 前端视觉与组件规范（改 UI 前必读：token 速查/组件清单/反面清单）
 
 方向与决策（按需查阅）：
+
+- [reviews/PROJECT_REVIEW_2026-10-12.md](reviews/PROJECT_REVIEW_2026-10-12.md) — 全项目审查快照：基线、可复现缺陷、代码/资源/文档风险；缺陷尚未修复
 
 - `ARCHITECTURE_DECISION.md` — 架构决策：目标形态（pywebview + 本地服务 + Web UI）、
   Tauri 评估、阶段划分与量化判据
@@ -33,4 +40,6 @@
 新增文件 → CODEBASE_MAP；协议观察与排障经验 → PROTOCOL_NOTES；
 UI 视觉/组件规范 → UI_GUIDE；蛋神对标实施进度 → DANSHEN_FEATURE_SPEC；
 每轮迭代验收记录与下轮规格 → 本轮组（验收命名 `*_VERIFICATION.md`）。
+当前路线与验收顺序只维护在 `ROADMAP.md`，协作规则维护在 `DEVELOPMENT_GUIDE.md`；
+历史评估中的架构、体积、测试数量与阶段状态须结合记录日期阅读。
 文档用 LF、不写本机绝对路径。

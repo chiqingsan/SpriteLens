@@ -9,6 +9,7 @@
 
 | 文件 | 职责 |
 | --- | --- |
+| `AGENTS.md` | 仓库协作规则与必读入口 |
 | `main.py` | 入口转发到 `spritelens.main:main` |
 | `start.bat` | 双击启动界面（pythonw，无控制台窗口） |
 | `start_silent.vbs` | 零窗口启动（wscript 直接跑 pythonw，cmd 不闪窗） |
@@ -34,6 +35,16 @@
 | `data/static/` | 静态映射：`species/natures/types/skills/type_chart/eggs/medals/flower_levels/color_cards.json` + 各 `_meta.json` |
 | `spritelens/web/static/` | 前端资源：`index.html`（分组导航骨架）/ `boot.js`（启动自恢复链）/ `app.css`（布局与组件 token）/ `themes.css`（三套主题色值）/ `app.js`（数据渲染）/ `ui.css` / `ui.js`（详情抽屉、键盘与焦点）/ `appearance.js`（主题与显示偏好）/ `pet-presentation.js`（头像/色卡/标记渲染）/ `pet-filters.js`（蛋组与范围筛选）/ `backpack-controls.js`（快捷条件）/ `icons.js` + `icons/`（本地 SVG sprite）/ `favicon.png` / `pet-media/`（官方头像立绘，含 `-fit` 派生）/ `pets/`（兜底立绘）/ `type-icons/` `egg-icons/` `medal-icons/` `medals/` `rarity/` `color-cards/` |
 | `data/recordings/` | 运行时录制产物（gitignore；本地回放样例不在版本库） |
+
+## 维护与审查文档
+
+| 文件 | 职责 |
+|---|---|
+| `docs/AI_CONTEXT.md` | 新开发者/AI快速上下文与当前风险导航 |
+| `docs/ROADMAP.md` | 待实施稳定性修复、模块演进和各阶段验收；唯一任务顺序入口 |
+| `docs/reviews/PROJECT_REVIEW_2026-10-12.md` | 基于114be08的审查快照、复现证据与资源/文档风险；不代表已修复 |
+
+路线图中的新模块路径是规划，尚未加入下面的当前源码地图。
 
 ## spritelens/
 

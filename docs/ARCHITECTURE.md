@@ -4,6 +4,10 @@
 > 承载本地服务提供的页面；历史 PyQt6 原生界面已退役。
 > 目标形态演进与阶段划分见 `ARCHITECTURE_DECISION.md` §0。
 
+状态：当前架构说明。新的稳定性与模块化演进以 [ROADMAP](ROADMAP.md) 为准；
+历史技术选型记录仍见 `ARCHITECTURE_DECISION.md`。当前已知缺陷及证据见
+[2026-10-12 项目审查](reviews/PROJECT_REVIEW_2026-10-12.md)，不要把设计约束解释为所有异常路径已验证。
+
 ## 分层与依赖方向
 
 ```
@@ -38,9 +42,13 @@
 └─────────────────────────────────────────────────────────┘
 ```
 
-依赖单向：`ui → services → domain/repositories/protocol/capture`。`protocol` 与
-`domain` 不依赖任何上层、零 IO 零线程，可被合成数据驱动（测试、回放均如此）。
-`repositories` 只被 `services` 与组合根使用，不反向依赖 UI。
+目标依赖方向：`web → view_models → services → domain/repositories/protocol/capture`。
+协议算法与域提取规则可以被合成数据驱动（测试、回放均如此）；当前目录中的schema/opcode与静态目录加载含文件IO。
+`repositories` 由 `services`、设置类ViewModel与组合根使用，不反向依赖 UI。
+
+当前过渡边界：domain的5个事件提取模块运行时依赖services中的PacketEvent，Monitor延迟导入identity；
+CaptureViewModel构造抓包源并控制录制/安装线程。后续将事件类型移到中立叶子模块，运行副作用移入应用服务，
+具体拆分与兼容方式见路线图。新功能不得继续扩大这些例外。
 
 ### 应用层管线（宠物仓库为例）
 
@@ -257,8 +265,9 @@ type-icons/  系别图标雪碧图（来自 roco-helper 素材）
 改前端后刷新不生效（实测 WebView2/浏览器缓存会命中旧 CSS）。
 
 **服务运行方式**：aiohttp 跑在专属线程的独立事件循环（桌面壳占主线程），
-业务层均为线程安全的同步代码，经 `asyncio.to_thread` 调用；停止时
+阻塞命令经 `asyncio.to_thread` 调用，部分同步快照/载荷仍在事件循环中构造；停止时
 `run_coroutine_threadsafe` 优雅收尾。
+目前副作用命令尚未统一串行化，Store提交顺序和跨读取快照一致性仍待修复，不能把线程池调用本身作为线程安全保证。
 
 ## 单实例控制
 
@@ -288,3 +297,13 @@ type-icons/  系别图标雪碧图（来自 roco-helper 素材）
 - 本地服务线程：aiohttp 事件循环，0.5s 推送状态；业务调用经 `asyncio.to_thread`
   回到同步世界，绝不跨线程回调
 - 录制器与解析器共享一个 tee 入口（`CaptureViewModel._tee_chunk`），各自线程安全
+
+## 当前健壮性债务与演进入口
+
+审查确认坏库备份失败可能删除原文件、Store并发flush可能旧值覆盖新值、抓包失败启动遗留worker、
+坏行阻断恢复、离线各域选错账号、孵化槽未落盘、schema实例依赖全局库以及HTTP查询污染共享VM。
+这些均尚未修复，修复顺序与验收见 [ROADMAP](ROADMAP.md) 阶段0。
+
+下一阶段保护三项边界：资源由组合根明确持有并按逆序释放；业务返回单一uid/version快照；页面和请求状态按功能隔离。
+`app.js`、`server.py`、`payloads.py` 是优先控制职责增长的位置；原始流录制与checkpoint的同步IO需要实际慢盘验证。
+资源流水线先明确来源、版本、临时输出验证和发布清单，再处理体积，保留当前兜底资源与可追溯原图。
