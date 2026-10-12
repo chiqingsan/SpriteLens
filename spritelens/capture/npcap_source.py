@@ -95,11 +95,20 @@ class NpcapCaptureSource:
             target=self._drain_queue, name="spritelens-chunk-dispatch", daemon=True
         )
         self._worker.start()
-        # 新版 scapy 支持调大 libpcap 内核缓冲；旧实现不认识该参数——
-        # 但 TypeError 发生在嗅探线程内（存入 .exception），无法同步捕获，
-        # 只能在探活时识别并降级重建
+        # 启动中途失败统一回滚：worker 必须回收，否则反复点开始会累积
+        # 等待 queue.get 的守护线程（R03）
         try:
-            self._sniffer = AsyncSniffer(
+            self._start_sniffer(AsyncSniffer)
+        except BaseException:
+            self._rollback_started_worker()
+            raise
+        self._running = True
+        self._on_event("started", self._iface or "(默认路由网卡)")
+
+    def _start_sniffer(self, async_sniffer) -> None:
+        """创建并探活嗅探器；失败抛 SourceError（降级重建 buffer_size 兼容路径）。"""
+        try:
+            self._sniffer = async_sniffer(
                 filter=self._build_bpf(),
                 prn=self._handle_packet,
                 store=False,
@@ -108,6 +117,7 @@ class NpcapCaptureSource:
             )
             self._sniffer.start()
         except Exception as exc:  # noqa: BLE001
+            self._sniffer = None
             raise SourceError(f"抓包启动失败（缺 Npcap 或权限不足）: {exc}") from exc
         deadline = time.monotonic() + 0.6
         while time.monotonic() < deadline:
@@ -119,7 +129,7 @@ class NpcapCaptureSource:
                     self._sniffer.stop()
                 except Exception:  # noqa: BLE001
                     pass
-                self._sniffer = AsyncSniffer(
+                self._sniffer = async_sniffer(
                     filter=self._build_bpf(),
                     prn=self._handle_packet,
                     store=False,
@@ -128,22 +138,27 @@ class NpcapCaptureSource:
                 self._sniffer.start()
                 break
             if exc is not None:
-                self._running = False
                 self._sniffer = None
                 raise SourceError(f"抓包启动失败（Npcap 未安装或权限不足）: {exc}")
             time.sleep(0.05)
         else:
             exc = getattr(self._sniffer, "exception", None)
             if exc is not None:
-                self._running = False
                 self._sniffer = None
                 raise SourceError(f"抓包启动失败（Npcap 未安装或权限不足）: {exc}")
-        self._running = True
-        self._on_event("started", self._iface or "(默认路由网卡)")
+
+    def _rollback_started_worker(self) -> None:
+        """启动失败时回收投递线程与队列：与 stop 的有界清理共用路径。"""
+        self._sniffer = None
+        self._running = False
+        self._signal_worker_stop()
+        with self._flow_lock:
+            self._flows.clear()
+            self._flow_seen.clear()
+            self._flow_count = 0
 
     def stop(self) -> None:
-        if not self._running:
-            return
+        # 不以 _running 为前置：失败启动留下的 worker/流表也要能被清掉（R03）
         self._running = False
         if self._sniffer is not None:
             try:
@@ -151,10 +166,7 @@ class NpcapCaptureSource:
             except Exception:  # noqa: BLE001 - 停止失败不影响退出
                 logger.debug("sniffer 停止异常", exc_info=True)
             self._sniffer = None
-        if self._worker is not None:
-            self._queue.put(None)  # 哨兵：结束工作线程
-            self._worker.join(timeout=5)
-            self._worker = None
+        self._signal_worker_stop()
         # 停止后不再有 FIN/RST 事件，流表与重组缓冲在这里统一释放
         with self._flow_lock:
             self._retired_dropped_segments += self._live_dropped_segments()
@@ -162,6 +174,32 @@ class NpcapCaptureSource:
             self._flow_seen.clear()
             self._flow_count = 0
         self._on_event("stopped", "")
+
+    def _signal_worker_stop(self) -> None:
+        """有界地通知投递线程退出并限时等待；超时不再阻塞调用方。
+
+        哨兵入队必须非阻塞：满队列时丢最旧一个数据块腾位（等价过载丢弃，
+        与嗅探线程的丢新块语义一致），绝不无限等待下游消费（R03 实测
+        满队列 stop 挂死）。join 限时后线程交由 daemon 兜底。
+        """
+        worker = self._worker
+        if worker is None:
+            return
+        try:
+            self._queue.put_nowait(None)
+        except queue.Full:
+            try:
+                victim = self._queue.get_nowait()  # 丢最旧腾位（不可能是哨兵：队列满时无人消费它）
+            except queue.Empty:
+                victim = None
+            if victim is not None:
+                self.dropped_chunks += 1
+            try:
+                self._queue.put_nowait(None)
+            except queue.Full:  # pragma: no cover - 刚取出必然有位
+                pass
+        self._worker = None
+        worker.join(timeout=5)
 
     @property
     def is_running(self) -> bool:

@@ -216,6 +216,118 @@ class NpcapSourceLogicTest(unittest.TestCase):
         while not self.src._queue.empty():
             self.src._queue.get()
 
+    def _patch_scapy_sniffer(self, sniffer_cls) -> None:
+        """用假 scapy.all 替换 sys.modules 里的条目（AsyncSniffer 在 start() 内延迟导入）。"""
+        import sys
+        import types
+
+        fake = types.ModuleType("scapy.all")
+        fake.AsyncSniffer = sniffer_cls
+        self._original_scapy_all = sys.modules.get("scapy.all")
+        sys.modules["scapy.all"] = fake
+        self.addCleanup(self._restore_scapy_sniffer)
+
+    def _restore_scapy_sniffer(self) -> None:
+        import sys
+
+        if getattr(self, "_original_scapy_all", None) is not None:
+            sys.modules["scapy.all"] = self._original_scapy_all
+        else:
+            sys.modules.pop("scapy.all", None)
+
+    def test_start_failure_rolls_back_worker(self):
+        """启动失败（sniffer 抛错）必须回收已创建的 worker 线程（R03）。
+
+        旧实现 worker 在嗅探器启动前创建，AsyncSniffer.start 抛 SourceError
+        后无回滚；stop 因 _running == False 直接返回，反复点开始会累积
+        等待 queue.get 的守护线程。
+        """
+        from spritelens.capture.base import SourceError
+
+        class _Boom:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def start(self):
+                raise RuntimeError("缺 Npcap")
+
+            def stop(self):  # pragma: no cover - 失败路径不会走到
+                pass
+
+        self._patch_scapy_sniffer(_Boom)
+        with self.assertRaises(SourceError):
+            self.src.start()
+
+        # worker 已被回滚：无遗留投递线程
+        self.assertIsNone(self.src._worker)
+        self.assertFalse(self.src.is_running)
+        # 失败后 stop 仍可安全调用且能清理资源（重复启停不积累状态）
+        self.src.stop()
+        self.assertEqual(self.src._flows, {})
+        self.assertIsNone(self.src._sniffer)
+
+    def test_repeated_start_stop_no_worker_leak(self):
+        """失败启动后再次成功启停：无线程与流表累积。"""
+
+        class _FakeOk:
+            exception = None
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def start(self):
+                pass
+
+            def stop(self):
+                pass
+
+        class _Boom(_FakeOk):
+            def start(self):
+                raise RuntimeError("缺 Npcap")
+
+        from spritelens.capture.base import SourceError
+
+        self._patch_scapy_sniffer(_Boom)
+        with self.assertRaises(SourceError):
+            self.src.start()
+
+        self._restore_scapy_sniffer()
+        self._patch_scapy_sniffer(_FakeOk)
+        self.src.start()
+        self.assertTrue(self.src.is_running)
+        self.src.stop()
+        self.assertFalse(self.src.is_running)
+        self.assertIsNone(self.src._worker)
+        self.assertEqual(self.src._flows, {})
+
+    def test_stop_bounded_when_queue_full_and_worker_busy(self):
+        """满队列+投递线程忙碌时 stop 仍有界返回（R03 回归）。
+
+        旧实现 stop 的 `queue.put(None)` 在满队列时无限阻塞（已实测挂死）；
+        新实现哨兵有界入队（满时丢最旧腾位），join 限时。
+        """
+        for _ in range(CHUNK_QUEUE_MAX):
+            self.src._queue.put(b"stub")
+        self.src._running = True
+        gate = threading.Event()
+
+        def busy_worker():
+            while True:
+                item = self.src._queue.get()
+                if item is None:
+                    return
+                gate.wait(timeout=3)  # 模拟下游处理阻塞
+
+        self.src._worker = threading.Thread(target=busy_worker, daemon=True)
+        self.src._worker.start()
+        # 稍后恢复下游，避免测试吃满 join 上限
+        threading.Timer(0.3, gate.set).start()
+        started = time.monotonic()
+        self.src.stop()
+        self.assertLess(time.monotonic() - started, 5, "stop 超出 join 上限")
+        self.assertFalse(self.src.is_running)
+        self.assertIsNone(self.src._worker)
+
 
 if __name__ == "__main__":
     unittest.main()
