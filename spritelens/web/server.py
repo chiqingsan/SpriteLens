@@ -56,30 +56,8 @@ def _app_version() -> str:
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 PUSH_INTERVAL = 0.5  # 状态推送节拍（秒）
 
-# query 解析助手统一在 server_helpers（路由 mixin 共用）；server 本地保留
-# 原实现等价的历史入口（_id_set 的 isdigit 语义比 helpers 宽容版更严格，
-# 沿用既有行为避免契约漂移）
-from spritelens.web.server_helpers import _as_bool, _as_int, _name_set  # noqa: E402,F401
-
-
-def _as_int(value: str | None, default: int) -> int:
-    try:
-        return int(value) if value is not None else default
-    except (TypeError, ValueError):
-        return default
-
-
-def _as_bool(value: str | None) -> bool:
-    return str(value).lower() in {"1", "true", "yes", "on"}
-
-
-def _id_set(value: str | None) -> set[int]:
-    out: set[int] = set()
-    for part in (value or "").split(","):
-        part = part.strip()
-        if part.isdigit():
-            out.add(int(part))
-    return out
+# query 解析助手统一在 server_helpers（S04：消除重复定义，锁定原语义）
+from spritelens.web.server_helpers import _as_bool, _as_int, _id_set, _name_set  # noqa: E402,F401
 
 
 def _quiet_connection_reset(loop: asyncio.AbstractEventLoop, context: dict) -> None:
@@ -464,11 +442,26 @@ class LocalServer(CaptureRoutesMixin):
 
     @staticmethod
     async def _json_body(request: web.Request) -> dict:
+        """解析 JSON 命令体；非对象/坏 JSON 抛 ValueError 由 handler 转 400（S04）。
+
+        旧实现把非法输入静默降级为 {}，`{"enabled":"false"}` 之类一路
+        200 成功——命令契约必须显式拒绝而非猜默认值。
+        """
         try:
             data = await request.json()
-        except (json.JSONDecodeError, ValueError):
-            return {}
-        return data if isinstance(data, dict) else {}
+        except (json.JSONDecodeError, ValueError) as exc:
+            raise ValueError("请求体不是有效的 JSON") from exc
+        if not isinstance(data, dict):
+            raise ValueError("请求体必须是 JSON 对象")
+        return data
+
+    @staticmethod
+    def _require_bool(body: dict, key: str) -> bool:
+        """提取必填布尔字段（严格类型：字符串 "false" 不是布尔）。"""
+        value = body.get(key)
+        if not isinstance(value, bool):
+            raise ValueError(f"字段 {key} 必须是布尔值")
+        return value
 
     # -- 状态推送 ------------------------------------------------------
     async def _push_loop(self) -> None:

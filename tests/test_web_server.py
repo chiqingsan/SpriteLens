@@ -111,6 +111,23 @@ def _http_post(url: str, token: str, payload: dict, timeout: float = 5.0) -> tup
         return exc.code, parsed
 
 
+def _http_post_raw(url: str, token: str, raw: bytes, timeout: float = 5.0) -> tuple[int, dict]:
+    """发送任意字节 body（坏 JSON 契约测试用）。"""
+    request = urllib.request.Request(url, data=raw, method="POST")
+    request.add_header("X-Local-Token", token)
+    request.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return response.status, json.loads(response.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8")
+        try:
+            parsed = json.loads(body) if body else {}
+        except json.JSONDecodeError:
+            parsed = {}
+        return exc.code, parsed
+
+
 class LocalServerTest(unittest.TestCase):
     """服务端到端：起真实 HTTP 服务（随机端口）跑请求。"""
 
@@ -313,6 +330,43 @@ class LocalServerTest(unittest.TestCase):
         )
         self.assertEqual(status, 200)
         self.assertTrue(payload["recording_requested"])
+
+    def test_capture_command_contract_rejects_invalid_body(self):
+        """S04/C03：非法命令体 → 400 且零副作用，不静默降级为 {}。
+
+        复核复现：`{"enabled":"false"}` 旧实现传 True（bool("false")）；
+        `[]` / 坏 JSON / 缺 enabled 旧实现都返回 200 且按 False 执行。
+        """
+        base = f"http://127.0.0.1:{self.server.port}"
+        recording_url = f"{base}/api/capture/recording"
+        autostart_url = f"{base}/api/capture/autostart"
+
+        # 采集中断言零副作用的对照：先记住初始状态
+        _, before = _http_get(f"{base}/api/capture", token=self.server.token)
+
+        bad_bodies = [
+            ("字符串false", b'{"enabled":"false"}'),
+            ("数组", b"[]"),
+            ("坏JSON", b"{not json"),
+            ("缺enabled", b'{"foo":1}'),
+        ]
+        for label, raw in bad_bodies:
+            status, payload = _http_post_raw(recording_url, self.server.token, raw)
+            self.assertEqual(status, 400, f"{label} 应 400，实际 {status}: {payload}")
+            self.assertIn("error", payload, f"{label} 应有可读错误")
+        for label, raw in bad_bodies:
+            status, _ = _http_post_raw(autostart_url, self.server.token, raw)
+            self.assertEqual(status, 400, f"autostart {label} 应 400")
+
+        # 零副作用：捕获状态与请求前一致（未开录制、未改 autostart）
+        _, after = _http_get(f"{base}/api/capture", token=self.server.token)
+        self.assertEqual(after["recording_requested"], before["recording_requested"])
+        self.assertEqual(after["autostart"], before["autostart"])
+
+        # 合法布尔值仍正常（契约不回归）
+        status, payload = _http_post_raw(recording_url, self.server.token, b'{"enabled":false}')
+        self.assertEqual(status, 200)
+        self.assertFalse(payload["recording_requested"])
 
     def test_manual_key_validation(self):
         base = f"http://127.0.0.1:{self.server.port}"

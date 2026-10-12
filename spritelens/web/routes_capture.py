@@ -33,7 +33,10 @@ class CaptureRoutesMixin:
 
     async def _api_capture_iface(self, request: web.Request) -> web.Response:
         body = await self._json_body(request)
-        await asyncio.to_thread(self._context.capture_vm.select_iface, str(body.get("name") or ""))
+        name = body.get("name")
+        if name is not None and not isinstance(name, str):
+            return web.json_response({"error": "字段 name 必须是字符串"}, status=400)
+        await asyncio.to_thread(self._context.capture_vm.select_iface, name or "")
         return web.json_response(self._capture_payload())
 
     async def _api_capture_start(self, request: web.Request) -> web.Response:
@@ -45,24 +48,32 @@ class CaptureRoutesMixin:
         return web.json_response(self._capture_payload())
 
     async def _api_capture_recording(self, request: web.Request) -> web.Response:
-        body = await self._json_body(request)
-        await asyncio.to_thread(
-            self._context.capture_vm.set_recording_requested, bool(body.get("enabled"))
-        )
+        try:
+            body = await self._json_body(request)
+            enabled = self._require_bool(body, "enabled")
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+        await asyncio.to_thread(self._context.capture_vm.set_recording_requested, enabled)
         return web.json_response(self._capture_payload())
 
     async def _api_capture_autostart(self, request: web.Request) -> web.Response:
-        body = await self._json_body(request)
-        await asyncio.to_thread(
-            self._context.capture_vm.set_autostart, bool(body.get("enabled"))
-        )
+        try:
+            body = await self._json_body(request)
+            enabled = self._require_bool(body, "enabled")
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+        await asyncio.to_thread(self._context.capture_vm.set_autostart, enabled)
         return web.json_response(self._capture_payload())
 
     async def _api_capture_key(self, request: web.Request) -> web.Response:
-        body = await self._json_body(request)
-        ok, message = await asyncio.to_thread(
-            self._context.capture_vm.apply_manual_key, str(body.get("text") or "")
-        )
+        try:
+            body = await self._json_body(request)
+        except ValueError as exc:
+            return web.json_response({"error": str(exc), "ok": False}, status=400)
+        text = body.get("text")
+        if not isinstance(text, str):
+            return web.json_response({"error": "字段 text 必须是字符串", "ok": False}, status=400)
+        ok, message = await asyncio.to_thread(self._context.capture_vm.apply_manual_key, text)
         return web.json_response({"ok": ok, "message": message}, status=200 if ok else 400)
 
     async def _api_npcap_install(self, request: web.Request) -> web.Response:
