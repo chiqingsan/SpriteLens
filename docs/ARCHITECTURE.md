@@ -6,7 +6,11 @@
 
 状态：当前架构说明。新的稳定性与模块化演进以 [ROADMAP](ROADMAP.md) 为准；
 历史技术选型记录仍见 `ARCHITECTURE_DECISION.md`。当前已知缺陷及证据见
-[2026-10-12 项目审查](reviews/PROJECT_REVIEW_2026-10-12.md)，不要把设计约束解释为所有异常路径已验证。
+[初审](reviews/PROJECT_REVIEW_2026-10-12.md) 与 [改动复核](reviews/ARCHITECTURE_FOLLOWUP_2026-10-13.md)，
+不要把设计约束解释为所有异常路径已验证。
+
+2026-10-13 已确认前端采用 Vue 3 + TypeScript + Vite，当前生产仍为原生 JS，尚未实施迁移。
+工程/状态/发布方向见 [Vue 演进决策](VUE3_MIGRATION.md)，下文前端结构描述当前代码。
 
 ## 分层与依赖方向
 
@@ -48,8 +52,23 @@
 
 当前过渡边界：PacketEvent 已移入中立叶子模块 `spritelens/events.py`（2026-10-12），
 domain 的5个事件提取模块改从该叶子导入，domain→services 反向依赖与包级豁免已移除；
-剩余过渡边界为 Monitor延迟导入identity 与 CaptureViewModel构造抓包源并控制录制/安装线程。
-后续将运行副作用移入应用服务，具体拆分与兼容方式见路线图。新功能不得继续扩大这些例外。
+CaptureService 已接管 source 创建、录制 tee、密钥与运行命令；CaptureViewModel 保留偏好、校验与安装/探测线程。
+剩余过渡点包括资源 loader IO、VM 安装线程、routes mixin 对宿主状态的隐式依赖；
+录制切换仍跨 VM/service 分步修改状态，完整串行语义待修复。新功能不得扩大这些例外。
+
+### 当前状态与资源所有者
+
+| 状态 / 资源 | 当前所有者 | 读取与限制 |
+|---|---|---|
+| 抓包源、录制器、手动密钥命令 | CaptureService；VM 提供页面命令与偏好 | 运行命令有锁，但录制意愿/持久化仍跨两层分步更新 |
+| 协议会话、密钥接续、管线统计 | MonitorService / SessionTracker | monitor 锁保护管线；checkpoint 仍有同步 IO |
+| 宠物、箱位、身份与域版本 | PetRepository | consistent_snapshot 一次取齐；PetView 用于 /api/pets，bootstrap/概览/WS 尚未统一 |
+| 蛋仓、槽位、家园、花田与域版本 | 各域 repository | 账号判断共用 AccountTracker 规则；不是同一全局原子快照 |
+| SQLite 连接与最终清理 | AppContext 持有 Database，各 Store 使用连接 | AppContext.close 尝试清理每项；装配失败及外层入口仍有遗漏 |
+| 页状态、请求序号与 DOM 绑定 | 蛋图鉴页面模块；其余主要在 app.js | 蛋图鉴 bind 幂等；其它页面迁移及账号相关失效待落实 |
+
+读取方不修改所有者私有字段；有界等待与资源实际退出分别判断。
+下面描述的是当前链路，后续任务与验收统一在路线图。
 
 ### 应用层管线（宠物仓库为例）
 
@@ -59,7 +78,7 @@ PacketEvent → MonitorService.add_packet_listener
   → domain.pets.extract_pets（形状搜索 + 字段号取值：六维/技能/外观/物种键）
   → PetRepository（按 gid 合并,版本号递增；带 uid 时分流到 PetStore）
   → PetStore.put（仅并入待写表，零 IO）→ worker 线程批量 upsert → SQLite
-  → PetViewModel.filtered_pets（多维筛选/排序）
+  → PetRepoSnapshot → 请求级 PetView（锁外多维筛选/排序；/api/pets）
   → payloads.pets_payload（JSON 契约）→ 前端 app.js 渲染
     （点阵/卡片/表格三视图；系别/性格/六维条/天赋徽章）
   ← domain.static_data 提供物种/性格/技能中文名（base_conf_id 关联）
@@ -75,7 +94,7 @@ PacketEvent → MonitorService.add_packet_listener
 **分层**：`repositories/database.py` 管连接与迁移（`PRAGMA user_version`，
 追加式迁移可安全升级历史库；每个版本的多条 DDL 在单事务内执行、失败整体
 回滚——不留「半迁移」状态；对历史半迁移库按「列已存在即跳过」自修复；
-文件损坏自动备份重建，不阻断启动）。各域网关同构（适配器模式，调用方只见
+仅确认文件损坏时备份重建；备份失败保留原文件并报告失败）。各域网关同构（适配器模式，调用方只见
 域对象）：宠物 `pet_store.py`、蛋仓 `egg_store.py`，均为 write-behind；
 事件日志由 `services/event_logger.py` 有界队列 + worker 批量落盘。
 
@@ -85,7 +104,8 @@ UI 的 `drain_events` 与后续帧处理——实测事件日志每条 `flush()`
 蛋仓的 `put()` 只并入内存待写表，落盘由各自 worker 按间隔批量执行（同一
 `(uid,gid)` 自动合并，百只级突发最终只产生一次 upsert）；事件日志走有界
 队列 + worker 批量落盘（队列满丢新条并计数）。`close()` 做最终 flush，
-退出不丢数据。写库失败整批回滚回待写表留待下轮重试。
+正常退出尝试最终落盘。Store 批次换出、写入与失败回填由落盘锁串行化，旧批次不覆盖新值；
+写库失败回填待写表留待重试。慢盘退出和最终 flush 失败尚没有“退出不丢数据”的保证。
 
 **身份归属**：宠物入库需要知道属于哪个账号，uid 来源是 `ZoneEnterSceneRsp`
 (0x0152) 的 `self_info.avatar.base.logic_id`（实测 = 101384922，与外部工具
@@ -97,7 +117,8 @@ UI 的 `drain_events` 与后续帧处理——实测事件日志每条 `flush()`
 家园/花田）；同 uid 重复身份帧与「离线加载账号登录」不算切换——判定统一
 走 `services/account_tracker.py`，避免历史数据误清或新账号数据串档。
 
-**离线可读**：启动即 `load_last_account()` 载入最近账号的历史宠物与蛋仓，
+**离线可读**：组合根从 accounts 表统一选择 display uid，再分别 `load_persisted(uid)` 和 `load_account(uid)`，
+载入该账号的历史宠物与蛋仓；无该域缓存时显示空态，不借其它账号补齐。
 未开始采集也能看到上次的数据；历史只补缺失 gid，不覆盖本次会话的新数据，
 并恢复炫彩形态 id→名字的学习表（花田载荷不退化 `#id`）。
 
@@ -138,7 +159,7 @@ v1 老库自动逐级升级、历史数据保留
 - **MITM 代理（预留）**：实现同一协议即可整体替换。socket 直读天然有序，
   无需重组——这正是重组放在接入层而非协议层的原因。
 
-替换点只在 `CaptureViewModel.start()` 的 source 构造，
+替换点在 `CaptureService.start()` 的 source 构造，
 `MonitorService` 及其上全部复用。注意：MITM 属于写入型能力（可注入/改包），
 风险等级与被动旁听不同，接入前须重新评估。
 
@@ -223,7 +244,8 @@ schema 为外挂数据文件，游戏版本更新只换文件不改代码。
        │        /api/capture/*（启停/录制/密钥/网卡/安装）
        │        /api/events /api/state
        └─ WebSocket /ws：状态增量推送（每 0.5s，内容不变则不推）
-  → spritelens/web/payloads.py 业务对象 → JSON 契约（唯一序列化点）
+  → web/payloads.py + payloads_catalog.py 按功能域转换 JSON
+    capture/state JSON 当前仍在 routes_capture mixin 中
   → spritelens/app_context.py  装配根（管线/库/VM/自动采集）
 ```
 
@@ -233,7 +255,8 @@ schema 为外挂数据文件，游戏版本更新只换文件不改代码。
 index.html   侧栏（14 页，分组导航）+ 顶栏（角色/状态胶囊/启停）+ 各页面骨架
 app.css      design token 体系（间距/字号/圆角/阴影/表面分层）+ 布局 + 组件样式
 themes.css   三套浅色主题（喵喵/火花/水蓝蓝）的色值覆盖，data-theme 切换
-app.js       导航、REST 调用、WebSocket 消费、各页渲染
+app.js       导航、REST 调用、WebSocket 消费、尚未迁出的各页状态/渲染
+pages/egg-dex.js   蛋图鉴 state/load/render/bind（显式注入协作函数）
 appearance.js      主题/显示字段/图片模式偏好（GET/POST /api/ui/preferences）
 pet-presentation.js 头像/色卡/稀有标记/奖牌渲染帮手（三视图共用）
 pet-filters.js     蛋组 any/all、m/kg/dB 绝对范围与范围位置筛选
@@ -270,7 +293,9 @@ type-icons/  系别图标雪碧图（来自 roco-helper 素材）
 **服务运行方式**：aiohttp 跑在专属线程的独立事件循环（桌面壳占主线程），
 阻塞命令经 `asyncio.to_thread` 调用，部分同步快照/载荷仍在事件循环中构造；停止时
 `run_coroutine_threadsafe` 优雅收尾。
-目前副作用命令尚未统一串行化，Store提交顺序和跨读取快照一致性仍待修复，不能把线程池调用本身作为线程安全保证。
+CaptureService 的运行副作用已有命令锁，Store flush 批次已串行化；录制意愿/偏好/立即启停仍未形成完整命令顺序。
+PetView 使用单次仓库快照，但 bootstrap、概览、WS 与蛋仓等仍有多次独立读取。
+不能把线程池调用本身当作线程安全保证，或把局部快照推广成所有接口保证。
 
 ## 单实例控制
 
@@ -299,16 +324,15 @@ type-icons/  系别图标雪碧图（来自 roco-helper 素材）
 - WebView2 主线程：pywebview 开窗；页面数据全部经本地服务
 - 本地服务线程：aiohttp 事件循环，0.5s 推送状态；业务调用经 `asyncio.to_thread`
   回到同步世界，绝不跨线程回调
-- 录制器与解析器共享一个 tee 入口（`CaptureViewModel._tee_chunk`），各自线程安全
+- 录制器与解析器共享 tee 入口（`CaptureService._tee_chunk`）；append 仍同步写盘，慢盘影响待测
 
 ## 当前健壮性债务与演进入口
 
-审查确认的 R01–R09 缺陷已于 2026-10-12 全部修复（顺序与验收见 [ROADMAP](ROADMAP.md) 阶段0）：
-坏库恢复只针对真损坏且备份失败保留原文件；Store 批次串行化；抓包启动失败回滚、停止有界；
-组合根持有 Database 并逆序清理、采集命令串行化；坏行逐行隔离；离线恢复统一展示 uid（蛋仓
-载荷带 uid 归属）；孵化槽快照按 uid 持久化（v8 迁移 `egg_hatch_slots`）；schema 递归只用传入
-实例；/api/pets 请求级筛选不写共享 VM。
+R01–R08 已有修复及回归：坏库备份保护、Store 批次顺序、启动失败 worker 回滚与满队列通知、
+坏行隔离、统一离线 uid、v8 孵化槽持久化、schema 实例递归与请求级宠物筛选。
+R09 已落实 Database 所有权与 AppContext 内部容错关闭，但装配失败回滚、外层清理和 HTTP 校验未闭环；
+采集服务抽取后录制切换产生一致性回归。队列通知/join 有界也不代表整个 source/Store 停止有界。
 
 下一阶段保护三项边界：资源由组合根明确持有并按逆序释放；业务返回单一uid/version快照；页面和请求状态按功能隔离。
-`app.js`、`server.py`、`payloads.py` 是优先控制职责增长的位置；原始流录制与checkpoint的同步IO需要实际慢盘验证。
+`app.js`、`server.py`、`payloads_catalog.py` 是优先控制职责增长的位置；原始流录制与checkpoint的同步IO需要实际慢盘验证。
 资源流水线先明确来源、版本、临时输出验证和发布清单，再处理体积，保留当前兜底资源与可追溯原图。

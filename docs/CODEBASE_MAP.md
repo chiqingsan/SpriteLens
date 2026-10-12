@@ -4,6 +4,7 @@
 
 界面形态：**只有 Web 一套**（pywebview 窗口 + 本地服务 + 原生 JS 前端）；
 历史 PyQt 原生界面已于 2026-10 退役，`requirements.txt` 不再含 PyQt6。
+Vue 3 + TypeScript + Vite 已确认采用，工程尚未创建；下表描述当前文件，规划见 `VUE3_MIGRATION.md`。
 
 ## 根目录
 
@@ -41,8 +42,10 @@
 | 文件 | 职责 |
 |---|---|
 | `docs/AI_CONTEXT.md` | 新开发者/AI快速上下文与当前风险导航 |
-| `docs/ROADMAP.md` | 待实施稳定性修复、模块演进和各阶段验收；唯一任务顺序入口 |
+| `docs/ROADMAP.md` | 已落实范围、待办顺序与验收；唯一持续任务状态入口 |
+| `docs/VUE3_MIGRATION.md` | 已确认的 Vue 前端工程/接口/状态与渐进迁移决策；不代表已实现 |
 | `docs/reviews/PROJECT_REVIEW_2026-10-12.md` | 基于114be08的审查快照、复现证据与资源/文档风险；不代表已修复 |
+| `docs/reviews/ARCHITECTURE_FOLLOWUP_2026-10-13.md` | 基于240b94c的改动复核、确定性复现与完成范围校正 |
 
 路线图中的新模块路径是规划，尚未加入下面的当前源码地图。
 
@@ -84,15 +87,15 @@
 | `domain/home.py` | 家园语义层：0x014A 快照 → 居民/家具/产蛋窝（实证字段映射 + NEST_TYPES） |
 | `domain/flowers.py` | 花种语义层：0x0375 花田帧 → 自己的花/好友花田（含宠物三维） |
 | `domain/display.py` | 展示常量：系别配色、六维标签、天赋阶配色（框架无关） |
-| `repositories/database.py` | SQLite 底座：连接、PRAGMA user_version迁移（v5佩戴奖牌及箱位快照，v6试用个体、v7好友镜像标记；整组事务化 + 半迁移自修复）、损坏自恢复 |
+| `repositories/database.py` | SQLite 底座：连接、user_version 追加迁移至 v8（孵化槽），整组事务化 + 半迁移自修复；真损坏备份恢复，备份失败保留原文件 |
 | `repositories/pet_store.py` | 宠物持久化网关：write-behind 批量落盘 + 读取（适配器模式） |
-| `repositories/egg_store.py` | 蛋仓持久化网关：write-behind 批量落盘 + load_latest（v3 eggs 表） |
+| `repositories/egg_store.py` | 蛋仓持久化网关：write-behind 批量落盘，按 uid 读取蛋与 v8 孵化槽快照 |
 | `repositories/settings.py` | JSON 配置仓库（原子写、脏值归一、窗口几何） |
 | `services/monitor_service.py` | 采集管线编排：字节流 → 帧 → 解密 → 解码 → PacketEvent；会话释放/空闲回收/硬上限 |
 | `services/capture_service.py` | 采集运行服务：接入层创建与生命周期、录制 tee、手动密钥、副作用命令串行化（阶段1.3 自 capture_vm 抽出） |
 | `services/session_tracker.py` | 会话表（LRU，支持 drop）与全局统计 |
 | `services/account_tracker.py` | 账号切换判定（uid 变化才清快照；同 uid 重复帧/离线加载登录不算切换） |
-| `services/pet_repository.py` | 宠物聚合（内存快照 + 身份归属/切号清空 + 彩名学习表恢复 + 入库出口） |
+| `services/pet_repository.py` | 宠物聚合、身份/切号、彩名学习与入库；consistent_snapshot 单次取齐宠物/箱位/位置/uid/version |
 | `services/egg_repository.py` | 蛋仓聚合（instance_id 去重 + 版本号 + 切号清空 + 入库出口） |
 | `services/home_repository.py` | 家园聚合（快照覆盖 + 切号清空 + 增量帧版本提示） |
 | `services/flower_repository.py` | 花田聚合（快照覆盖 + 切号清空 + 版本号） |
@@ -100,7 +103,7 @@
 | `recording/recorder.py` | StreamChunk jsonl 录制/读回 |
 | `recording/replay.py` | ReplaySource + CLI 回放摘要输出 |
 | `logs/local_logger.py` | 双文件 RotatingFileHandler + 崩溃兜底 `install_excepthook`（crash.log） |
-| `view_models/pet_vm.py` | 宠物页 VM（多维筛选/排序/聚合统计/箱位查询，纯 Python） |
+| `view_models/pet_vm.py` | 宠物 VM + 请求级 PetView；后者持一致快照在锁外筛选/排序，不改共享条件 |
 | `view_models/ui_preferences.py` | UI 偏好 VM：主题/视图/显示字段/快捷条件白名单校验与快照 |
 | `view_models/capture_vm.py` | 采集页 VM（Npcap 安装状态机、自动采集开关、偏好持久化、快照组装；运行命令委托 capture_service） |
 | `view_models/events_vm.py` | 协议流页 VM（行视图/详情缓存） |

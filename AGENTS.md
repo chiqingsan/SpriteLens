@@ -11,8 +11,15 @@
 
 - 先读 `docs/AI_CONTEXT.md`、`docs/DEVELOPMENT_GUIDE.md`；涉及边界读 `docs/ARCHITECTURE.md`，后续演进读 `docs/ROADMAP.md`。
 - 当前事实以代码和维护文档为准；`docs/reviews/` 是带日期的审查快照，历史方案不自动代表已实现。
-- 默认沿用 Python + aiohttp + pywebview + 原生 JS；新增能力沿用现有层次，抽象应有可验证收益。
-- `web/static/app.js`、`web/server.py`、`web/payloads.py` 是复杂度关注区；新增页面先确定模块归属，不继续吸收整页职责。
+- 后端沿用 Python + aiohttp + pywebview；前端已确认演进为 Vue 3 + TypeScript + Vite，当前仍有原生 JS。实施前读 `docs/VUE3_MIGRATION.md`，按页面渐进迁移。
+- `web/static/app.js`、`web/server.py`、`web/payloads_catalog.py` 是复杂度关注区；新增页面先确定模块归属，不继续吸收整页职责。
 - 账号、快照、线程、持久化、协议和资源导入修改必须写明失败分支及验证。运行数据、密钥、录制和本机临时路径不得作为可提交测试样本。
 - Python 使用 unittest，完整入口为 `.venv\Scripts\python.exe -B tools\run_build_tests.py`；按开发指南选择相关测试、源码 smoke、JS/资源与GUI验收。
 - 文档使用 UTF-8/LF，新增文档同步索引并说明状态、读者和维护边界。
+
+## 架构与实现交接
+
+- 具体实现主要由 GLM 3.8f 承接，Codex 负责架构边界、路线与改动复核；按用户当前指令调整分工。
+- 实现按 ROADMAP 的单个编号推进，使用开发指南的任务模板写明范围、状态所有者、失败分支和验收；不自动展开整个阶段。
+- 不以文件抽取、提交标题或测试全绿宣告整阶段完成；任务状态以实际覆盖和验证证据更新。
+- 不跨层修改私有状态，不用包级豁免放行反向依赖；资源创建失败回滚、关闭失败和请求期间切号均需按相关风险验收。

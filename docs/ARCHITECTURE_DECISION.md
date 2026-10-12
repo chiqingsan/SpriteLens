@@ -1,5 +1,8 @@
 # 架构决策：是否照搬蛋神助手重构，以及更优方案
 
+> 新决策（2026-10-13）：已确认前端演进为 Vue 3 + TypeScript + Vite，保留 Python/aiohttp/pywebview。
+> 下文“原生 JS / 无构建链”是历史选择；当前迁移边界见 [VUE3_MIGRATION](VUE3_MIGRATION.md)，任务状态见路线图。
+
 > 阅读边界（2026-10-12）：本文保留技术选型与迁移过程，旧阶段表、测试数量、体积与性能数字均为当时快照。
 > 当前实现见 [ARCHITECTURE](ARCHITECTURE.md)，新一轮健壮性与模块化演进见 [ROADMAP](ROADMAP.md)，
 > 当前实测基线与风险见 [项目审查](reviews/PROJECT_REVIEW_2026-10-12.md)。Nuitka已经落地、PyQt已退役，

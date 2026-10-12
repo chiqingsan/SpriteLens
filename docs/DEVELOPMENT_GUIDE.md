@@ -24,7 +24,7 @@
 - 超过 1200 行：高风险文件，只接受小范围 bugfix、删除、抽取或必要兼容补丁
 - 测试文件超 500 行：按行为域拆分
 
-当前复杂度关注区：`web/static/app.js`、`web/server.py`、`web/payloads.py`。
+当前复杂度关注区：`web/static/app.js`、`web/server.py`、`web/payloads_catalog.py`。
 新增页面不得继续向 `app.js` 加整页状态、加载、渲染与事件绑定；先建立该页模块。
 `server.py` 与 `payloads.py` 新增功能前先判断能否形成独立功能路由与载荷模块。
 现有超限文件在相关任务中渐进抽取，不为满足行数单独改格式、压缩行或机械拆段。
@@ -42,8 +42,9 @@ app_context 是装配根；capture 可依赖 protocol，domain 不应依赖 serv
 
 - `web/server.py`：本地服务路由与鉴权；只做「解析请求 → 调 VM → 序列化」，
   业务逻辑一律不进路由函数；`asyncio.to_thread` 包裹同步业务调用
-- `web/payloads.py`：业务对象/VM 快照 → JSON 的唯一序列化点；前端契约稳定在此模块，
-  不依赖 aiohttp 与 pywebview，可被测试直接驱动
+- `web/payloads.py` / `web/payloads_catalog.py`：业务对象/VM 快照 → JSON；按功能域维护前端契约，
+  不依赖 aiohttp 与 pywebview，可被测试直接驱动。当前 capture/state 载荷仍在 routes_capture mixin 中，
+  后续修改该域时收口为可独立验收的转换，不继续增加隐式宿主依赖
 - `view_models`：页面状态与命令；纯 Python 类，不依赖任何 UI 框架/异步运行时，
   视图数据用 frozen dataclass
 - `services`：管线、运行命令与会话/账号状态编排；副作用必须有明确所有者
@@ -59,8 +60,8 @@ web（aiohttp/pywebview）；protocol 不反向依赖 services/capture；线程�
 **保序**）运行于投递线程，MonitorService 内部加锁，服务线程只做拉取
 （drain/snapshot），不做跨线程回调。
 
-当前 VM构造抓包源与控制安装线程等例外见
-`ARCHITECTURE.md` 的已知边界。新代码不得扩大例外；类型与纯规则应放无IO的下层模块
+接入层创建、录制与运行命令已由 CaptureService 承接；VM 仍控制安装/环境探测线程，
+其它过渡边界见 `ARCHITECTURE.md`。新代码不得扩大例外；类型与纯规则应放无IO的下层模块
 （事件类型用 `spritelens.events.PacketEvent`，不得再从 monitor_service 导入）。
 命令、快照与落盘的并发保证分别验证，不能因为方法经 `to_thread` 调用就认定线程安全。
 
@@ -79,20 +80,29 @@ web（aiohttp/pywebview）；protocol 不反向依赖 services/capture；线程�
 .venv\Scripts\python.exe -c "import sys; import tests.test_pets; assert not [m for m in sys.modules if m.split('.')[0] in {'aiohttp','webview'}], '业务层引入了 Web 依赖'"
 ```
 
-## 前端约定（web/static，零框架零构建）
+## 前端约定（Vue 3 演进，现有 web/static 渐进迁移）
+
+Vue 3 + TypeScript strict + Vite 是已确认方向，当前生产页面仍为原生 JS。
+工程、导航/状态、测试和发布边界见 [VUE3_MIGRATION](VUE3_MIGRATION.md)；按路线图逐页迁移，
+不要再把“零框架零构建”作为新增功能约束，也不要同时扩大原生实现和 Vue 实现。
 
 - **UI 视觉与组件一律遵循 `docs/UI_GUIDE.md`**（token 速查/组件清单/反面清单）
 - **界面颜色走 CSS 变量**（布局token在 `app.css`，三主题色值在 `themes.css`），新增样式禁止
   硬编码界面色值。系别色/天赋阶色属于业务常量，由 `domain/display.py` 经
   payloads 下发（前端不复制色表）
-- **无构建步骤**：原生现代 JS，沿用现有 IIFE 模块风格；使用系统 WebView2 已支持能力，新增依赖须有实际收益
-- **DOM 渲染必须先转义**：所有插入 innerHTML 的后端文本经 `esc()`；解码树
-  等需着色内容走 `colorizeDecoded()` 白名单着色，不得直接拼接原始文本
+- **组件与类型**：新工程使用 Vue SFC / Composition API / script setup，TS strict；公共载荷与 WS 类型集中定义，
+  不用 any 或强制断言跳过接口检查。Pinia 管应用共享状态，页面筛选/选择/详情保留局部
+- **构建与分发**：npm 锁文件 + npm ci，Vite 先构建到暂存目录；校验后发布 HTML/JS/CSS。
+  不清空现有图片目录，不分发 Node、node_modules 或 source map；构建前置与过期产物检查必须进入发布门禁
+- **DOM 与转义**：Vue 使用模板插值/属性绑定；v-html 限于经过安全转换的明确场景。
+  旧 innerHTML 路径仍须 esc()/白名单着色；Vue 挂载子树不允许旧模块继续操作
 - **更新节拍**：初始数据走 `/api/bootstrap` 一次聚合；实时状态走 `/ws`
   WebSocket 推送（0.5s，内容不变不推）；列表页按需 REST 拉取
-- **加页面**：`index.html` 增加必要骨架和导航；该页独立管理 state/load/render/bind，
-  `app.js` 仅协调导航与启动。路由/载荷按功能归属，保留兼容契约；具体迁移次序见 `ROADMAP.md`
+- **加页面**：归属 Vue page，渲染进 component，请求/订阅进 composable；业务计算在 Python service/domain。
+  新工程尚未就绪时先做后端契约/工程前置，不默认向 app.js 添加整页逻辑；维护补丁保持局部
 - **请求时序**：筛选请求处理乱序响应；切号/离页后的旧响应不得覆盖当前页面，初始化和事件订阅应幂等
+- **接口边界**：fetch/token/错误/取消集中，应用持单一 WS；TS 类型不能替代运行时校验。
+  64 位 ID 在后端按字段转十进制字符串，不能 JSON.parse 丢精度后再补救；兼容变更覆盖旧消费者
 - **图标**：复用 `icons.js` 与本地 Tabler SVG sprite，新增图标更新来源清单；不依赖在线图标库
 
 ## 视觉验收
@@ -114,8 +124,8 @@ web（aiohttp/pywebview）；protocol 不反向依赖 services/capture；线程�
   离线加载账号登录不算切换——判定统一走 `services/account_tracker.py`。
 - 改表结构后跑 `tests.test_persistence`；损坏恢复路径已覆盖（备份重建）。
 
-上面的规则是新代码要求；审查发现原始流录制/checkpoint仍同步写盘、Store并发flush存在顺序风险，
-坏库备份失败与单条坏数据隔离也未充分覆盖，不能照搬这些路径当作正确模板。
+Store 并发批次顺序、坏库备份失败保护与坏行隔离已有修复及回归。
+原始流录制/checkpoint 仍同步写盘，慢盘/最终 flush 失败与停止超时语义仍待验证；不能照搬这些路径当作正确模板。
 新增持久化能力应验证批次顺序、失败回填、坏行隔离、账号一致性、停止超时和未写数据提示。
 离线恢复统一选择展示uid，所有业务域按该uid加载；载荷应来自同一版本快照。
 没有完整分页/删除事件证据时，只能声明观察集合或历史缓存，不能推断当前仓库已完整。
@@ -168,8 +178,9 @@ web（aiohttp/pywebview）；protocol 不反向依赖 services/capture；线程�
 记录，**只减不增**（原 `domain → services.PacketEvent` 例外已随事件类型移入
 `spritelens/events.py` 而移除）。
 
-当前测试把domain→services按整个包豁免，且未完整解析相对导入；它不能证明所有上述约束已被执行。
-后续收紧时按模块/符号登记例外及删除条件，不以增加包级白名单让测试变绿。
+domain→services 豁免已移除；当前测试仍未真正检查相对导入与根级 events 的源依赖，
+禁止特定 import 也不能证明零文件 IO。它不能证明所有上述约束已执行。
+收紧任务见路线图 G01；例外按模块/符号及删除条件登记，不增加包级白名单让测试变绿。
 
 ## 测试
 
@@ -179,7 +190,8 @@ web（aiohttp/pywebview）；protocol 不反向依赖 services/capture；线程�
   新的请求级校验可用aiohttp测试客户端，均不得依赖真实驱动或游戏
 - 不写依赖时序/网络的 flaky 断言；随机数据一律用确定种子
 - 并发故障优先用Event/Barrier控制顺序，避免靠sleep碰运气；外部驱动/磁盘/下载用可注入替身
-- JavaScript纯规则与请求时序可用原生Node测试；语法与资源检查不能替代浏览器交互验收
+- 旧 JavaScript 纯规则/请求时序可用 Node 测试；Vue 工程用 vue-tsc、Vitest/Vue Test Utils 与关键 Playwright 用例。
+  语法/类型与资源检查不能替代浏览器交互；Chromium 验收不能代替 WebView2 发布实机验收
 
 ### 测试分级（按改动范围选命令）
 
@@ -189,6 +201,7 @@ web（aiohttp/pywebview）；protocol 不反向依赖 services/capture；线程�
 | 单一 domain / repository / view_model | 对应测试文件 + `compileall` |
 | 协议层（frames/crypto/records/wire/schema） | `tools/run_build_tests.py`（协议是全链路地基） |
 | Web 前端 / 路由 / 组合根 | `run_build_tests.py` + `python -m spritelens --smoke-test` + 浏览器过一遍 |
+| Vue / TS / 前端构建（工程落地后） | 相关组件/规则测试 + 类型/ESLint 检查 + Vite 构建/引用检查；交互改动跑关键 Playwright；接口/入口变更加 Python/源码 smoke |
 | 持久化 schema / 打包入口 / 发布前 | 上面全部 |
 | 资源导入 / 映射 | 对应工具与资源测试、JSON/图片/引用校验、覆盖/冲突差异；涉发布再做exe验收 |
 
@@ -218,6 +231,45 @@ web（aiohttp/pywebview）；protocol 不反向依赖 services/capture；线程�
 - 开发约定（本文件）随实践更新：踩过的坑要写进来，避免重复犯
 - 待办、优先级与验收 → `docs/ROADMAP.md`；带日期的审查证据 → `docs/reviews/`
 - 新文档写明状态、读者、用途；当前入口不重复维护历史评估数字或多份任务状态
+
+## 架构与实现协作
+
+具体实现主要交给 GLM 3.8f，Codex 维护架构与路线、拆解任务、复核改动和验收证据。
+实现者按路线图的单个编号推进；涉及新的依赖方向、持久化语义或前端契约时，先写明取舍及兼容方式。
+这套约定用于交接与复核，不要求每次局部修改都等待额外批准。
+
+### 任务交接模板
+
+```text
+任务：ROADMAP 编号与目标（一次只做一个可独立验收的切片）
+基线：commit、git status；保留哪些已有改动
+假设：输入证据、已知/未知；存在多种语义时写明选择
+范围：涉及模块、状态所有者、依赖方向、对外契约
+实现边界：最小改动；不扩大大文件职责/架构豁免；兼容与迁移条件
+失败分支：启动、运行、停止、写失败、并发/切号（按实际相关性列出）
+验收：先失败后通过的用例、相关测试、smoke/JS/交互或资源检查
+交付：改动摘要、验证结果、未验证项、遗留编号、回退条件
+```
+
+### 实现时守住的边界
+
+- **状态与命令**：同一状态只有一个权威所有者；跨层不写对方私有字段。
+  串行化覆盖完整命令，而非仅包住最后一次副作用；命令锁可包含必要 IO，必须说明等待与失败策略。
+  快照状态锁保持短小，序列化/渲染在锁外；不得把“锁内零 IO”误用于所有类型的锁。
+- **资源生命周期**：创建即登记释放，成功装配后转交唯一所有者；失败回滚、正常退出与重复关闭分别测试。
+  超时返回不代表 worker 已退；没有清理证据不能丢掉句柄或宣告数据保存成功。
+- **数据读契约**：返回同域的 uid/version/业务数据快照，静态配置独立；跨域检查归属，保留历史、不完整与未知。
+  frozen 外壳不保护内层 dict，读取方不得修改；不靠多次带锁 getter 拼响应。
+- **页面与请求**：页面自持状态、加载与绑定；导航/推送只分发。绑定幂等，账号相关请求能失效，旧响应不能覆盖新账号。
+  Vue 逐页承接状态/组件，临时桥接不共享 DOM 所有权；共享模块须有真实调用方，先锁行为再迁移。
+- **资源与发布**：输入可追溯，暂存输出验证后发布；缺图与数据缺失分开处理，未裁定冲突保持可见。
+
+### 复核与完成
+
+复核看状态所有权、事务范围、线程停止、账号归属、依赖与兼容契约；不以“测试变多”“文件拆小”单独判断完成。
+按改动范围选择必要验证，不为凑覆盖率写镜像实现的测试；修复并发风险使用 Event/Barrier。
+实现者提交证据后，路线图才从“已实现待验收”改为“已验收”；缺 GUI/驱动/新环境验证须保留具体待验收项。
+单次审查写入带日期的 review，只有路线图维护持续任务状态。
 
 ## 删除和归档规则
 

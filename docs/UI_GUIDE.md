@@ -1,6 +1,6 @@
-# UI 规范（web/static）
+# UI 规范（现有 web/static 与 Vue 组件）
 
-适用范围：`spritelens/web/static/` 下的全部界面工作。加新页面、改组件、调样式
+适用范围：当前 `spritelens/web/static/` 与后续 `frontend/` Vue 工程中的全部界面工作。加新页面、改组件、调样式
 之前先读这份；与 `DEVELOPMENT_GUIDE.md` 的前端约定配合使用（那边管架构与
 安全转义，这边管视觉与组件）。
 
@@ -16,7 +16,8 @@
   浅绿 `#E1EC8F` 仅搭配深字。精灵立绘、色卡和系别配色保持业务含义。
 - **shadcn/ui**（命名思想参照）：语义化变量命名（什么用途，而不是什么颜色）。
   我们的 `--surface-2`、`--ink-soft`、`--amber-ink` 都是这个思路。
-- 约束不变：零框架零构建、不引入 Tailwind/React、不在线引用任何资源。
+- 前端已确认采用 Vue 3 + TypeScript + Vite；视觉 tokens、紧凑布局和离线资源约束保留。
+  初期复用 CSS 变量与组件语义，不引入第二套主题体系；组件库按实际需要评估，迁移方法见 [VUE3_MIGRATION](VUE3_MIGRATION.md)。
 
 ## 2. Token 速查（颜色预设在 themes.css，布局在 app.css，禁止绕过）
 

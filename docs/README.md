@@ -1,7 +1,7 @@
 # 文档索引
 
 状态：当前文档总入口。读者：用户、维护者、开发者与 AI 协作者。
-当前事实以代码与维护文档为准；路线图中的方案是待实施任务，带日期的核验/审查只代表当时证据。
+当前事实以代码与维护文档为准；路线图区分已落实范围与待办，带日期的核验/审查只代表当时证据。
 
 阅读顺序：
 
@@ -13,10 +13,12 @@
 6. `CODEBASE_MAP.md` — 文件级代码地图
 7. `PROTOCOL_NOTES.md` — 排障自查清单、未解事项、版本适配指引
 8. `UI_GUIDE.md` — 前端视觉与组件规范（改 UI 前必读：token 速查/组件清单/反面清单）
+9. [VUE3_MIGRATION.md](VUE3_MIGRATION.md) — 已确认的 Vue 3 技术方向、配套工程、接口/状态与逐页迁移边界（待实施）
 
 方向与决策（按需查阅）：
 
-- [reviews/PROJECT_REVIEW_2026-10-12.md](reviews/PROJECT_REVIEW_2026-10-12.md) — 全项目审查快照：基线、可复现缺陷、代码/资源/文档风险；缺陷尚未修复
+- [reviews/PROJECT_REVIEW_2026-10-12.md](reviews/PROJECT_REVIEW_2026-10-12.md) — `114be08` 全项目初审快照；当前修复状态见路线图
+- [reviews/ARCHITECTURE_FOLLOWUP_2026-10-13.md](reviews/ARCHITECTURE_FOLLOWUP_2026-10-13.md) — `240b94c` 改动复核：录制回归、生命周期/HTTP 缺口与完成范围校正
 
 - `ARCHITECTURE_DECISION.md` — 架构决策：目标形态（pywebview + 本地服务 + Web UI）、
   Tauri 评估、阶段划分与量化判据
