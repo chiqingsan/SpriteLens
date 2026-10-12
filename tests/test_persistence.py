@@ -376,6 +376,85 @@ class DatabaseMigrationTest(unittest.TestCase):
         finally:
             db.close()
 
+    def test_corrupt_backup_failure_keeps_original_file(self):
+        """备份失败必须保留原文件：注入 Path.replace 抛 OSError，原字节不得消失。
+
+        旧实现备份失败后 unlink 原文件再建空库，使「原数据留证」保证失效。
+        """
+        import sqlite3
+
+        bad = self.tmp_path / "bad.sqlite"
+        original_bytes = b"this is not a sqlite database" * 10
+        bad.write_bytes(original_bytes)
+
+        import spritelens.repositories.database as db_mod
+
+        original_replace = Path.replace
+
+        def failing_replace(self: Path, target):  # type: ignore[no-untyped-def]
+            raise OSError("注入：备份目标不可写")
+
+        Path.replace = failing_replace  # type: ignore[method-assign]
+        try:
+            with self.assertRaises(OSError):
+                Database(bad)
+        finally:
+            Path.replace = original_replace  # type: ignore[method-assign]
+
+        # 原文件字节不变（未被删除、未被空库覆盖）
+        self.assertEqual(bad.read_bytes(), original_bytes)
+        # 没有产生半个备份文件
+        self.assertEqual(list(self.tmp_path.glob("bad.corrupt-*.sqlite")), [])
+        # 备份问题解决后，同一个坏文件仍能走正常备份重建路径
+        db = Database(bad)
+        try:
+            self.assertGreaterEqual(db.schema_version, 1)
+            backups = list(self.tmp_path.glob("bad.corrupt-*.sqlite"))
+            self.assertEqual(len(backups), 1)
+        finally:
+            db.close()
+
+    def test_access_error_does_not_delete_database(self):
+        """非损坏类错误（如访问/锁定失败）不得删除或覆盖原库文件。
+
+        旧实现对任何 sqlite3.DatabaseError（含 OperationalError 子类）都走
+        「备份重建」，备份再失败就把好库删了。恢复只应针对真正的损坏。
+        """
+        import sqlite3
+
+        good = self.tmp_path / "locked.sqlite"
+        original_bytes = good.read_bytes() if good.exists() else b""
+
+        import spritelens.repositories.database as db_mod
+
+        real_connect = sqlite3.connect
+
+        def failing_first_read(*args, **kwargs):  # type: ignore[no-untyped-def]
+            conn = real_connect(*args, **kwargs)
+
+            class Guarded:
+                def __getattr__(self, name):  # type: ignore[no-untyped-def]
+                    return getattr(conn, name)
+
+                def execute(self, sql, params=()):  # type: ignore[no-untyped-def]
+                    if "user_version" in sql:
+                        raise sqlite3.OperationalError("database is locked")
+                    return conn.execute(sql, params)
+
+            return Guarded()
+
+        db_mod.sqlite3.connect = failing_first_read  # type: ignore[assignment]
+        good.write_bytes(b"placeholder")  # 便于确认全程未被覆盖
+        try:
+            with self.assertRaises(sqlite3.OperationalError):
+                Database(good)
+        finally:
+            db_mod.sqlite3.connect = real_connect  # type: ignore[assignment]
+
+        self.assertEqual(good.read_bytes(), b"placeholder")
+        self.assertEqual(original_bytes, b"")  # 前置自检：测试开始前文件不存在
+        self.assertEqual(list(self.tmp_path.glob("locked.corrupt-*.sqlite")), [])
+
     def test_v1_database_upgrades_to_v2(self):
         """已发布的 v1 库（无六维/外观列）能直接升至 v2，历史数据保留。"""
         import sqlite3

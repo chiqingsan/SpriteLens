@@ -155,12 +155,19 @@ class Database:
             self._apply_migrations_locked()
 
     def _open_or_recover(self) -> sqlite3.Connection:
-        """打开库；文件损坏时备份原文件并重建（不阻断启动，原数据留证）。"""
+        """打开库；文件损坏时备份原文件并重建（不阻断启动，原数据留证）。
+
+        只有真正的损坏（NOTADB / CORRUPT）才走恢复；锁定、磁盘 IO 等
+        其他数据库错误原样抛出——把好库误判损坏会改名重建成空库。
+        备份失败保留原文件并明确失败，绝不删除原文换来空库。
+        """
         try:
             conn = sqlite3.connect(str(self.path), check_same_thread=False)
             conn.execute("PRAGMA user_version").fetchone()  # 触发一次真实读取
         except sqlite3.DatabaseError as exc:
-            logger.warning("数据库文件不可用（%s），备份后重建: %s", exc, self.path)
+            if not self._is_corruption(exc):
+                raise
+            logger.warning("数据库文件损坏（%s），备份后重建: %s", exc, self.path)
             try:
                 conn.close()
             except Exception:  # noqa: BLE001 - 关闭失败不影响重建
@@ -168,14 +175,31 @@ class Database:
             if str(self.path) != ":memory:" and self.path.exists():
                 backup = self.path.with_suffix(f".corrupt-{int(time.time())}.sqlite")
                 try:
-                    self.path.replace(backup)
+                    # WAL/SHM 与主库一起移走，避免残件干扰新库恢复
+                    for suffix in ("", "-wal", "-shm"):
+                        source = Path(str(self.path) + suffix)
+                        if suffix and not source.exists():
+                            continue
+                        source.replace(Path(str(backup) + suffix))
                     logger.warning("原库已备份到: %s", backup)
                 except OSError as move_exc:
-                    logger.warning("备份失败，将覆盖原文件: %s", move_exc)
-                    self.path.unlink(missing_ok=True)
+                    logger.error("备份失败，保留原文件不重建: %s", move_exc)
+                    raise
             conn = sqlite3.connect(str(self.path), check_same_thread=False)
         conn.row_factory = sqlite3.Row
         return conn
+
+    @staticmethod
+    def _is_corruption(exc: sqlite3.DatabaseError) -> bool:
+        """区分真正损坏与锁定/访问等其他数据库错误。
+
+        Python 3.11+ 提供 sqlite_errorcode；取不到时按消息兜底。
+        """
+        code = getattr(exc, "sqlite_errorcode", None)
+        if code is not None:
+            return code in (sqlite3.SQLITE_NOTADB, sqlite3.SQLITE_CORRUPT)
+        message = str(exc).lower()
+        return "file is not a database" in message or "malformed" in message
 
     # -- 迁移 ----------------------------------------------------------
     def _apply_migrations_locked(self) -> None:
