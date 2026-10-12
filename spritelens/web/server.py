@@ -149,13 +149,23 @@ class LocalServer(CaptureRoutesMixin):
         return self._runner is not None and not self._stopped
 
     def start(self, *, timeout: float = 15.0) -> None:
-        """启动后台事件循环并等待端口就绪（失败抛异常，由入口决定提示）。"""
+        """启动后台事件循环并等待端口就绪（失败抛异常，由入口决定提示）。
+
+        超时回收（S02）：等待超时不能把仍在后台启动的事件循环留在进程
+        里——标记停止并请求循环退出，让启动线程尽快收尾。
+        """
         if self._thread is not None:
             raise RuntimeError("服务已启动")
         self._thread = threading.Thread(target=self._run_loop, name="spritelens-http", daemon=True)
         self._thread.start()
         if not self._ready.wait(timeout):
-            raise RuntimeError(f"本地服务启动超时（{timeout}s）")
+            # 超时：通知后台循环停止（若它稍后才完成绑定，_shutdown 会收掉）
+            logger.error("本地服务启动超时（%ss），回收后台启动", timeout)
+            self._stopped = True
+            loop = self._loop
+            if loop is not None and loop.is_running():
+                loop.call_soon_threadsafe(loop.stop)
+            raise TimeoutError(f"本地服务启动超时（{timeout}s）")
         if self._start_error is not None:
             raise self._start_error
         logger.info("本地服务已启动: http://%s:%d", self._host, self._bound_port or 0)

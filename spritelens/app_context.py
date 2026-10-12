@@ -107,7 +107,28 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
     """装配业务环境（不含任何 UI）；调用方负责日志初始化与单实例守卫。
 
     autostart：装配完成后是否按配置自动开始采集（打开即采集，默认开）。
+
+    装配失败回滚（S02）：每个资源创建成功即登记，任一节点抛异常时
+    逆序清理已登记资源（EventLogWriter 构造即启动 worker，不清理会
+    泄漏线程），然后原样抛出让入口给出可读失败。
     """
+    created: list = []
+
+    def _created(cleanup) -> None:
+        created.append(cleanup)
+
+    try:
+        return _build_app_context_inner(_created, autostart=autostart)
+    except BaseException:
+        for cleanup in reversed(created):
+            try:
+                cleanup()
+            except Exception as exc:  # noqa: BLE001 - 回滚失败不阻断其余清理
+                logger.warning("装配回滚清理失败: %s", exc)
+        raise
+
+
+def _build_app_context_inner(_created, *, autostart: bool) -> AppContext:
     settings = SettingsRepository(config_path())
     load_library(schema_dir())
     static_data = load_static_data(static_dir())
@@ -124,7 +145,9 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
 
     # 应用层组装：宠物仓库订阅协议事件流（语义化 → 状态聚合 → 持久化）
     database = Database(database_path())
+    _created(database.close)
     pet_store = PetStore(database)
+    _created(pet_store.close)
     pet_repository = PetRepository(store=pet_store)
     monitor.add_packet_listener(pet_repository.handle_packet)
 
@@ -138,6 +161,7 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
 
     # 事件日志落盘（复盘用）：data/eventlog/eventlog_YYYYMMDD.jsonl
     event_log = EventLogWriter(data_root() / "eventlog")
+    _created(event_log.close)  # 构造即启动 worker：失败必须回收线程
     monitor.add_packet_listener(event_log.handle_packet)
 
     # 家园快照聚合（0x014A 全量 + 增量版本提示）
@@ -150,6 +174,7 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
 
     # 蛋仓聚合：订阅协议事件流 + SQLite 持久化（重启不丢，离线可看）
     egg_store = EggStore(database)
+    _created(egg_store.close)
     egg_box = EggBoxRepository(store=egg_store)
     monitor.add_packet_listener(egg_box.handle_packet)
     if display_uid:
@@ -187,6 +212,8 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
     )
     if autostart and capture_vm.start_if_autostart():
         logger.info("已自动开始采集（可在采集页关闭「打开即采集」）")
+    # 装配完成：资源所有权转交 context.close（回滚登记失效，避免双重清理）
+    created.clear()
     return context
 
 

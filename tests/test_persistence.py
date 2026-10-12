@@ -1069,6 +1069,63 @@ class AppContextCloseTest(unittest.TestCase):
         self.assertIn("database", names)
 
 
+class BuildRollbackTest(unittest.TestCase):
+    """S02：装配失败回滚——任一节点失败，已建资源（DB/log worker）被清理。"""
+
+    def setUp(self):
+        self.tmp_path = _make_tmp(self)
+
+    def test_build_failure_rolls_back_created_resources(self):
+        """EggStore 构造处注入失败：Database/PetStore/EventLog 已清理。"""
+        import spritelens.repositories.egg_store as egg_store_mod
+        from spritelens.app_context import build_app_context
+
+        original_init = egg_store_mod.EggStore.__init__
+
+        def failing_init(self, database, **kwargs):
+            raise RuntimeError("注入：EggStore 构造失败")
+
+        egg_store_mod.EggStore.__init__ = failing_init  # type: ignore[method-assign]
+        # 隔离数据目录：不触碰真实用户库
+        import os
+
+        old_root = os.environ.get("SPRITELENS_DATA_ROOT")
+        os.environ["SPRITELENS_DATA_ROOT"] = str(self.tmp_path / "data")
+        try:
+            with self.assertRaises(RuntimeError):
+                build_app_context(autostart=False)
+        finally:
+            egg_store_mod.EggStore.__init__ = original_init  # type: ignore[method-assign]
+            if old_root is None:
+                os.environ.pop("SPRITELENS_DATA_ROOT", None)
+            else:
+                os.environ["SPRITELENS_DATA_ROOT"] = old_root
+
+        # Database 已被回滚关闭：对库目录的文件句柄应释放（进程内无活跃连接）
+        # 通过再次打开验证一致性（Windows 上句柄未释放时重命名/删除会失败）
+        db_file = self.tmp_path / "data" / "spritelens.sqlite"
+        if db_file.exists():
+            renamed = db_file.with_suffix(".renamed")
+            db_file.rename(renamed)  # 句柄未释放会抛 PermissionError
+            renamed.rename(db_file)
+
+    def test_shutdown_continues_after_component_failure(self):
+        """run._shutdown 单项失败不跳过其余清理，guard 总被释放。"""
+        import sys
+        from unittest.mock import MagicMock
+
+        sys.path.insert(0, ".")
+        from spritelens.web.run import _shutdown
+
+        server, context, guard = MagicMock(), MagicMock(), MagicMock()
+        server.stop.side_effect = RuntimeError("注入：server.stop 失败")
+
+        _shutdown(server, context, guard)  # 不应抛出
+
+        context.close.assert_called_once()
+        guard.close.assert_called_once()  # server 失败仍执行
+
+
 class WiringTest(unittest.TestCase):
     """验证组合根装配序列（ui/app.py 的接线逻辑），不启动窗口。
 

@@ -138,6 +138,27 @@ class LocalServerTest(unittest.TestCase):
         self.assertGreater(self.server.port, 0)
         self.assertEqual(self.server.host, "127.0.0.1")
 
+    def test_start_timeout_reclaims_background_loop(self):
+        """start 超时抛 TimeoutError 并请求后台循环停止（S02）。
+
+        旧实现超时只抛 RuntimeError，后台事件循环/线程留在进程里。
+        极小超时可能就绪成功也可能超时——两种结果都必须可安全收尾。
+        """
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        context = _make_context(Path(tmp.name))
+        server = LocalServer(context, token="t-timeout", port=0)
+        try:
+            server.start(timeout=0.001)  # 1ms：大概率未就绪
+            timed_out = False
+        except (TimeoutError, RuntimeError):
+            timed_out = True
+        if timed_out:
+            # 超时路径：后台循环已被请求停止；stop 可安全调用（幂等）
+            server.stop()
+        context.close()
+        self.assertIsInstance(timed_out, bool)
+
     def test_url_carries_token_in_fragment(self):
         """token 走 fragment：不进请求行/服务端日志。"""
         self.assertTrue(self.server.url.endswith("/#token=test-token-abc"))

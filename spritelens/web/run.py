@@ -57,8 +57,7 @@ def run_web(*, open_browser: bool = False) -> int:
     except Exception as exc:  # noqa: BLE001 - 端口/绑定失败直接给出可读提示
         logger.exception("本地服务启动失败")
         _fatal("本地服务启动失败", f"{exc}\n\n日志目录：{logs_dir()}")
-        context.close()
-        guard.close()
+        _shutdown(server, context, guard)
         return 1
 
     logger.info("Web 界面入口: %s", f"http://{server.host}:{server.port}/")
@@ -272,9 +271,26 @@ def _wait_until_interrupted(server: "LocalServer") -> None:
 
 
 def _shutdown(server: "LocalServer", context, guard: SingleInstanceGuard) -> None:
-    server.stop()
-    context.close()
-    guard.close()
+    """退出清理（S02）：逐项尝试、单项失败不跳过其余，守卫最后释放。
+
+    复核 C02：原实现任一项抛异常会跳过后续清理（guard 未释放导致
+    重复启动被误唤醒拦截）。
+    """
+    failures: list[tuple[str, Exception]] = []
+    for label, action in (("server", server.stop), ("context", context.close)):
+        try:
+            action()
+        except Exception as exc:  # noqa: BLE001 - 退出路径尽量多释放
+            failures.append((label, exc))
+            logger.warning("关闭 %s 失败: %s", label, exc)
+    try:
+        guard.close()
+    except Exception as exc:  # noqa: BLE001
+        failures.append(("guard", exc))
+        logger.warning("关闭 guard 失败: %s", exc)
+    if failures:
+        label, exc = failures[0]
+        logger.error("退出清理存在失败项（首项 %s）: %s", label, exc)
     logger.info("Web 界面已退出")
 
 
