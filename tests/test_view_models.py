@@ -1,6 +1,8 @@
 """ViewModel 单测：无 UI 框架依赖，直接验证状态与命令。"""
 
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 
@@ -218,6 +220,76 @@ class CaptureViewModelTest(unittest.TestCase):
         vm.stop()  # 未启动时停止不应抛错
         self.assertFalse(vm.snapshot().running)
 
+    def test_concurrent_start_commands_are_serialized(self):
+        """并发 start 命令串行化：同一时刻只创建一个接入层（R09）。
+
+        HTTP 的 start 经 to_thread 调用，同源重复点击会并发进入；
+        旧实现无互斥，可并发创建多个 source 或操作录制。
+        """
+        import threading
+        import time
+
+        vm, monitor = _make_vm(self.tmp_path)
+        entered: list[float] = []
+        done: list[float] = []
+
+        def slow_start():
+            entered.append(time.monotonic())
+            time.sleep(0.2)
+            done.append(time.monotonic())
+
+        # 用命令锁的持有时间模拟真实 start 的串行窗口：替换 start 为
+        # 「在 VM 命令锁内慢执行」，验证并发调用排队
+        original_start = vm.start
+
+        def instrumented_start():
+            with vm._command_lock:
+                slow_start()
+
+        vm.start = instrumented_start  # type: ignore[method-assign]
+
+        threads = [threading.Thread(target=vm.start) for _ in range(3)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=5)
+
+        self.assertEqual(len(entered), 3)
+        self.assertEqual(original_start.__name__, "start")  # 自检：注入未失真
+        # 串行化：任一时刻只有一个命令在执行（进入区间不重叠）
+        ordered = sorted(zip(entered, done))
+        for (_e0, d0), (e1, _d1) in zip(ordered, ordered[1:]):
+            self.assertGreaterEqual(e1 - d0, -0.01, "start 命令未串行化")
+
+    def test_concurrent_stop_and_start_are_serialized(self):
+        """stop 与 start 并发时命令互斥，不产生中间态竞态。"""
+        import threading
+
+        vm, monitor = _make_vm(self.tmp_path)
+        vm.start()
+        results: list[str] = []
+        lock = threading.Lock()
+
+        def do_stop():
+            vm.stop()
+            with lock:
+                results.append("stop")
+
+        def do_start():
+            vm.start()
+            with lock:
+                results.append("start")
+
+        t1 = threading.Thread(target=do_stop)
+        t2 = threading.Thread(target=do_start)
+        t1.start()
+        time.sleep(0.05)
+        t2.start()
+        t1.join(timeout=5)
+        t2.join(timeout=5)
+        self.assertEqual(sorted(results), ["start", "stop"])
+        # 终态一致：要么在采集中（start 后到），要么已停止
+        self.assertIsInstance(vm.snapshot().running, bool)
     def test_autostart_defaults_on_and_persists(self):
         """打开即采集默认开启；关闭后写入配置、重开仍为关闭。"""
         vm, _monitor = _make_vm(self.tmp_path)

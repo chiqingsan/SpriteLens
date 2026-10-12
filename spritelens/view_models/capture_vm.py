@@ -114,6 +114,10 @@ class CaptureViewModel:
         self._install_message = ""
         self._install_progress: float | None = None
         self._installing = False
+        # 副作用命令串行化（R09）：start/stop/录制切换/手动密钥经 HTTP 的
+        # to_thread 并发进入时互斥执行，避免并发创建来源或操作录制；
+        # 快照走 monitor 自身锁，不取该锁、不做等待与磁盘 IO。
+        self._command_lock = threading.Lock()
         from spritelens.paths import data_root
 
         self._installer_dir = installer_dir or (data_root() / "downloads")
@@ -170,26 +174,31 @@ class CaptureViewModel:
 
     # -- 启停 ----------------------------------------------------------
     def start(self) -> None:
-        """构造接入层并启动；失败转 last_error 供页面提示。"""
-        if self._monitor.is_running:
-            return
-        self._last_error = ""
-        source = NpcapCaptureSource(
-            self._port,
-            on_chunk=self._tee_chunk,
-            on_event=self._handle_source_event,
-            iface=self._iface or None,
-            extra_ports=self._extra_ports,
-        )
-        self._source = source  # 先挂引用：启动期间的快照也能读到丢弃计数
-        try:
-            self._monitor.bind(source)
-            self._monitor.start()
-        except SourceError as exc:
-            self._last_error = str(exc)
-            logger.warning("采集启动失败: %s", exc)
-        if self._recording_requested and self._monitor.is_running:
-            self._start_recording()
+        """构造接入层并启动；失败转 last_error 供页面提示。
+
+        命令锁内执行：并发调用（同源重复点击）排队串行，靠 monitor 的
+        is_running 判定去重，不会重复创建来源。
+        """
+        with self._command_lock:
+            if self._monitor.is_running:
+                return
+            self._last_error = ""
+            source = NpcapCaptureSource(
+                self._port,
+                on_chunk=self._tee_chunk,
+                on_event=self._handle_source_event,
+                iface=self._iface or None,
+                extra_ports=self._extra_ports,
+            )
+            self._source = source  # 先挂引用：启动期间的快照也能读到丢弃计数
+            try:
+                self._monitor.bind(source)
+                self._monitor.start()
+            except SourceError as exc:
+                self._last_error = str(exc)
+                logger.warning("采集启动失败: %s", exc)
+            if self._recording_requested and self._monitor.is_running:
+                self._start_recording()
 
     def _handle_source_event(self, kind: str, detail: str) -> None:
         """接入层生命周期事件：连接关闭贯穿到协议层释放会话状态。
@@ -231,8 +240,9 @@ class CaptureViewModel:
         return self._monitor.is_running
 
     def stop(self) -> None:
-        self._recorder.stop()
-        self._monitor.stop()
+        with self._command_lock:
+            self._recorder.stop()
+            self._monitor.stop()
 
     @property
     def is_running(self) -> bool:
@@ -244,13 +254,14 @@ class CaptureViewModel:
         return self._recording_requested
 
     def set_recording_requested(self, enabled: bool) -> None:
-        self._recording_requested = enabled
-        self._settings.set(RECORD_SETTING_KEY, enabled)
-        # 勾选立即生效：采集进行中时同步开/停录制，而不是等下次启动
-        if enabled and self._monitor.is_running and not self._recorder.is_recording:
-            self._start_recording()
-        elif not enabled and self._recorder.is_recording:
-            self._recorder.stop()
+        with self._command_lock:
+            self._recording_requested = enabled
+            self._settings.set(RECORD_SETTING_KEY, enabled)
+            # 勾选立即生效：采集进行中时同步开/停录制，而不是等下次启动
+            if enabled and self._monitor.is_running and not self._recorder.is_recording:
+                self._start_recording()
+            elif not enabled and self._recorder.is_recording:
+                self._recorder.stop()
 
     def _start_recording(self) -> None:
         name = f"capture_{time.strftime('%Y%m%d_%H%M%S')}.jsonl"
@@ -262,9 +273,10 @@ class CaptureViewModel:
             key = parse_key_text(text)
         except ValueError as exc:
             return False, str(exc)
-        self._preset_key = key
-        self._key_store.save_latest(key, "(manual)")
-        self._monitor.set_preset_key(key)
+        with self._command_lock:
+            self._preset_key = key
+            self._key_store.save_latest(key, "(manual)")
+            self._monitor.set_preset_key(key)
         return True, "密钥已应用（对新旧会话生效）"
 
     # -- Npcap 环境 ----------------------------------------------------

@@ -14,10 +14,14 @@ from pathlib import Path
 
 from spritelens.domain.identity import extract_identity
 from spritelens.domain.pets import Pet
+from spritelens.capture.key_store import KeyStore
+from spritelens.protocol.opcodes import OpcodeCatalog
 from spritelens.repositories.database import Database
 from spritelens.repositories.pet_store import PetStore
-from spritelens.services.monitor_service import PacketEvent
+from spritelens.repositories.settings import SettingsRepository
+from spritelens.services.monitor_service import MonitorService, PacketEvent
 from spritelens.services.pet_repository import PetRepository
+from spritelens.view_models import CaptureViewModel, PetViewModel
 
 UID = 101384922
 OTHER_UID = 999999999
@@ -917,6 +921,87 @@ class DatabaseMigrationTest(unittest.TestCase):
 
 
 # --- 5. 组合根装配（含关闭落盘）----------------------------------------
+
+
+class AppContextCloseTest(unittest.TestCase):
+    """组合根资源所有权：Database 持有、逆序清理、单项失败不阻断其余（R09）。"""
+
+    def setUp(self):
+        self.tmp_path = _make_tmp(self)
+
+    def _make_context(self):
+        """最小装配：真实 Database + PetStore，事件日志用假对象观察调用。"""
+        from spritelens.app_context import AppContext
+        from spritelens.protocol.opcodes import OpcodeCatalog
+        from spritelens.view_models import EventsViewModel
+
+        db_path = self.tmp_path / "ctx.sqlite"
+        database = Database(db_path)
+        pet_store = PetStore(database)
+        repo = PetRepository(store=pet_store)
+        settings = SettingsRepository(self.tmp_path / "config.json")
+        monitor = MonitorService(
+            catalog=OpcodeCatalog({}), key_store=KeyStore(self.tmp_path / "keys")
+        )
+
+        class _FakeEventLog:
+            def __init__(self):
+                self.closed = False
+
+            def close(self):
+                self.closed = True
+                raise RuntimeError("注入：事件日志关闭失败")
+
+        capture_vm = CaptureViewModel(
+            monitor=monitor,
+            settings=settings,
+            keys_dir=self.tmp_path / "keys",
+            recordings_dir=self.tmp_path / "recordings",
+            port=8195,
+            probe_environment=False,
+        )
+        context = AppContext(
+            settings=settings,
+            static_data=None,
+            monitor=monitor,
+            pet_repository=repo,
+            capture_vm=capture_vm,
+            events_vm=EventsViewModel(monitor=monitor),
+            pet_vm=PetViewModel(repo, static_data=None),
+            pet_store=pet_store,
+            event_log=_FakeEventLog(),
+        )
+        context.database = database  # 组合根应持有 Database 并负责关闭
+        return context, database
+
+    def test_close_closes_database_and_is_idempotent(self):
+        context, database = self._make_context()
+        # 事件日志注入了关闭失败：close 汇总后仍应抛出（调用方感知）
+        with self.assertRaises(RuntimeError):
+            context.close()
+        # Database 已被组合根关闭（再次执行查询应报错）
+        with self.assertRaises(Exception):
+            database.query("SELECT 1")
+        context.close()  # 幂等：重复关闭不再抛错（含首次失败项）
+
+    def test_close_continues_after_component_failure(self):
+        """某一项 close 抛错仍尝试其余清理（R09：旧实现提前置位后跳过）。"""
+        context, database = self._make_context()
+        with self.assertRaises(RuntimeError):
+            context.close()
+        # 事件日志失败后，PetStore/Database 仍应完成清理
+        with self.assertRaises(Exception):
+            database.query("SELECT 1")  # 已关闭
+        self.assertEqual(context.pet_store.pending_count, 0)
+
+    def test_database_survives_in_context_for_new_code(self):
+        """AppContext 构造可直接携带 database 字段（dataclass 契约）。"""
+        from dataclasses import fields
+
+        from spritelens.app_context import AppContext
+
+        names = {f.name for f in fields(AppContext)}
+        self.assertIn("database", names)
 
 
 class WiringTest(unittest.TestCase):

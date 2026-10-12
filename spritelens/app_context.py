@@ -65,19 +65,40 @@ class AppContext:
     egg_box: EggBoxRepository | None = None  # 蛋仓聚合（缺失时蛋仓页面空态）
     home_repo: HomeRepository | None = None  # 家园快照（缺失时家园页空态）
     flower_repo: FlowerRepository | None = None  # 花田快照（缺失时花种页空态）
+    database: Database | None = None  # 组合根持有并负责关闭（R09）
 
     def close(self) -> None:
-        """停监听、落盘、关日志（幂等；退出路径唯一）。"""
+        """停监听、落盘、关日志（幂等；退出路径唯一）。
+
+        资源逆序清理（R09）：先停采集，再关事件日志与两个 Store（各自
+        做最终 flush），最后关 Database。某一项失败记录并继续，不跳过
+        其余资源——退出路径必须尽量多释放；首个异常重新抛出让调用方
+        感知（调用方通常在 finally 中调用 close，不影响退出）。
+        """
         if self._closed:
             return
         self._closed = True
-        self.capture_vm.stop()
+        failures: list[tuple[str, BaseException]] = []
+
+        def _try(label: str, action) -> None:
+            try:
+                action()
+            except Exception as exc:  # noqa: BLE001 - 清理失败不阻断其余资源
+                failures.append((label, exc))
+                logger.warning("关闭 %s 失败: %s", label, exc)
+
+        _try("采集", self.capture_vm.stop)
         if self.event_log is not None:
-            self.event_log.close()
+            _try("事件日志", self.event_log.close)
         if self.pet_store is not None:
-            self.pet_store.close()
+            _try("宠物仓库", self.pet_store.close)
         if self.egg_store is not None:
-            self.egg_store.close()
+            _try("蛋仓仓库", self.egg_store.close)
+        if self.database is not None:
+            _try("数据库", self.database.close)
+        if failures:
+            label, exc = failures[0]
+            raise RuntimeError(f"关闭 {label} 失败: {exc}") from exc
 
     _closed: bool = False
 
@@ -156,6 +177,7 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
         egg_store=egg_store,
         home_repo=home_repo,
         flower_repo=flower_repo,
+        database=database,
     )
     if autostart and capture_vm.start_if_autostart():
         logger.info("已自动开始采集（可在采集页关闭「打开即采集」）")
