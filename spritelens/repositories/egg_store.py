@@ -71,6 +71,7 @@ class EggStore:
         # 保证读到的批次顺序与取出顺序一致。
         self._flush_lock = threading.Lock()
         self._pending: dict[tuple[int, int], EggBoxEntry] = {}
+        self._pending_slots: dict[int, frozenset[int]] = {}
         self._stop = threading.Event()
         self._worker: threading.Thread | None = None
         self._closed = False
@@ -102,14 +103,38 @@ class EggStore:
         """
         with self._lock:
             pending = self._pending
+            pending_slots = self._pending_slots
             self._pending = {}
-        if not pending:
+            self._pending_slots = {}
+        if not pending and not pending_slots:
             return 0
         with self._flush_lock:
-            return self._commit_batch(pending)
+            return self._commit_batch(pending, pending_slots)
 
-    def _commit_batch(self, pending: dict[tuple[int, int], EggBoxEntry]) -> int:
+    def _commit_batch(
+        self,
+        pending: dict[tuple[int, int], EggBoxEntry],
+        pending_slots: dict[int, frozenset[int]],
+    ) -> int:
         now = time.time()
+        if pending_slots:
+            try:
+                self._db.execute_many(
+                    "INSERT INTO egg_hatch_slots (uid, slots_json, collected_at) VALUES (?, ?, ?)"
+                    " ON CONFLICT(uid) DO UPDATE SET slots_json = excluded.slots_json,"
+                    " collected_at = excluded.collected_at",
+                    [
+                        (uid, json.dumps(sorted(slots)), now)
+                        for uid, slots in pending_slots.items()
+                    ],
+                )
+            except sqlite3.Error as exc:
+                logger.warning("孵化槽快照写库失败，留待下轮重试: %s", exc)
+                with self._lock:
+                    for uid, slots in pending_slots.items():
+                        self._pending_slots.setdefault(uid, slots)
+        if not pending:
+            return 0
         rows = [
             (
                 uid,
@@ -205,6 +230,42 @@ class EggStore:
             return 0, ()
         uid = int(rows[0]["uid"])
         return uid, self.load(uid)
+
+    # -- 孵化槽快照（R06）----------------------------------------------
+    def put_hatch_slots(self, uid: int, slots: set[int]) -> None:
+        """按账号保存孵化槽快照（槽中蛋 id 集合 + 采集时间）。
+
+        空集合也是有效快照（服务器明确告知无槽中蛋），语义是「最后观察
+        到的槽位」：切号/新账号用它清旧状态，恢复时标记为历史状态。
+        """
+        if uid <= 0:
+            return
+        with self._lock:
+            if self._closed:
+                return
+            self._pending_slots[uid] = frozenset(slot for slot in slots if slot > 0)
+            self._ensure_worker_locked()
+
+    def load_hatch_slots(self, uid: int) -> set[int]:
+        """读取某账号的孵化槽快照；无记录返回空集合。"""
+        self.flush()
+        try:
+            rows = self._db.query(
+                "SELECT slots_json FROM egg_hatch_slots WHERE uid = ?", (uid,)
+            )
+        except Exception as exc:  # noqa: BLE001 - 快照读取失败降级为空
+            logger.warning("孵化槽快照读取失败: %s", exc)
+            return set()
+        if not rows:
+            return set()
+        try:
+            raw = json.loads(rows[0]["slots_json"])
+        except (ValueError, TypeError):
+            logger.warning("孵化槽快照损坏，按空处理: uid=%s", uid)
+            return set()
+        if not isinstance(raw, list):
+            return set()
+        return {int(item) for item in raw if isinstance(item, int) and item > 0}
 
     # -- 生命周期 ------------------------------------------------------
     def close(self) -> None:

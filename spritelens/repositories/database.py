@@ -137,6 +137,21 @@ _MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
             "ALTER TABLE pets ADD COLUMN is_mirror_pet INTEGER NOT NULL DEFAULT 0",
         ),
     ),
+    (
+        8,
+        (
+            # 孵化槽快照（R06）：slots 帧驱动的「槽中蛋 id」与采集时间独立
+            # 落库，重启恢复为历史状态——蛋条目自身的时间字段不可靠（实测
+            # 全 0 时槽位帧是唯一在孵证据）
+            """
+            CREATE TABLE IF NOT EXISTS egg_hatch_slots (
+                uid          INTEGER PRIMARY KEY,
+                slots_json   TEXT NOT NULL,
+                collected_at REAL NOT NULL
+            )
+            """,
+        ),
+    ),
 )
 
 

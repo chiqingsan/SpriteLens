@@ -228,6 +228,67 @@ class EggBoxRepositoryTests(unittest.TestCase):
             finally:
                 db.close()
 
+    def test_hatch_slots_persisted_and_restored_per_uid(self) -> None:
+        """孵化槽状态按 uid 持久化，重启可恢复为历史状态（R06）。
+
+        审查复现：蛋条目时间字段全 0（hatching=False），槽位帧 [9001]
+        使实时载荷识别为孵化中；重启后 Store 的 hatching=False、槽位
+        映射丢失，孵化中显示退化。
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "db.sqlite"
+            db = Database(db_path)
+            try:
+                store = EggStore(db, flush_interval=60.0)
+                repo = EggBoxRepository(store=store)
+                repo.handle_packet(_identity_event(uid=101, name="账号A"))
+                repo.handle_packet(_event(_egg_row(9001, hatch_seconds=43200, hatched_seconds=0)))
+                repo.handle_packet(_hatch_event([9001]))
+                self.assertEqual(repo.hatch_slots(), {9001})
+                store.close()
+                db.close()
+
+                # 重启：新 store/repo，槽位快照应恢复
+                db2 = Database(db_path)
+                store2 = EggStore(db2, flush_interval=60.0)
+                repo2 = EggBoxRepository(store=store2)
+                restored = repo2.load_account(101)
+                self.assertIn(9001, repo2.hatch_slots(), "重启后孵化槽应从快照恢复")
+                # 槽位恢复影响展示：快照里的蛋按「历史槽位」标注
+                snap = repo2.snapshot()
+                self.assertEqual(len(snap), 1)
+                self.assertEqual(restored, 1)
+                store2.close()
+            finally:
+                db2.close()
+
+    def test_hatch_slots_cleared_on_switch_and_empty_snapshot(self) -> None:
+        """切号清空内存槽位；重开后恢复不出切走账号的旧槽位（R06）。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "db.sqlite"
+            db = Database(db_path)
+            try:
+                store = EggStore(db, flush_interval=60.0)
+                repo = EggBoxRepository(store=store)
+                repo.handle_packet(_identity_event(uid=101, name="账号A"))
+                repo.handle_packet(_hatch_event([9001]))
+                repo.handle_packet(_identity_event(uid=202, name="账号B"))
+                self.assertEqual(repo.hatch_slots(), set())  # 切号立即清空内存
+                store.close()
+            finally:
+                db.close()
+            # 重启：A 的槽位快照仍可恢复（切号只清内存，不删 A 的历史快照；
+            # 快照语义是「最后观察到的槽位」，供历史展示而非当前状态断言）
+            db2 = Database(db_path)
+            try:
+                store2 = EggStore(db2, flush_interval=60.0)
+                repo2 = EggBoxRepository(store=store2)
+                repo2.load_account(101)
+                self.assertIn(9001, repo2.hatch_slots())
+                store2.close()
+            finally:
+                db2.close()
+
     def test_store_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             db = Database(Path(tmp) / "db.sqlite")

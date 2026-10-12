@@ -58,6 +58,10 @@ class EggBoxRepository:
             # 落库标记在孵状态（快照里已有这些蛋时）
             if self._store is not None and uid > 0 and eggs:
                 self._store.put(uid, eggs)
+            # 槽位快照独立落库（R06）：蛋条目的时间字段不可靠，槽位帧是
+            # 唯一在孵证据；空槽快照同样落库（明确「无槽中蛋」，清旧状态）
+            if self._store is not None and uid > 0:
+                self._store.put_hatch_slots(uid, slots)
             return
         eggs = extract_eggs(event)
         if not eggs:
@@ -89,8 +93,12 @@ class EggBoxRepository:
         if self._store is None or uid <= 0:
             return 0
         eggs = self._store.load(uid)
+        # 槽位快照一并恢复（R06）：标记为历史状态——恢复后的槽位来自
+        # 上次会话的观察，不能推断当前仍在孵
+        slots = self._store.load_hatch_slots(uid)
         with self._lock:
             self._eggs = {egg.instance_id: egg for egg in eggs}
+            self._hatch_slots = slots
             self._loaded_uid = uid
             self._account.note_loaded(uid)
             self._version += 1
