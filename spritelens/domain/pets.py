@@ -11,7 +11,7 @@ field_N），而字段号与 raw 值稳定，因此关键字段一律以字段�
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from spritelens.services.monitor_service import PacketEvent
 
@@ -120,7 +120,10 @@ class Pet:
     colorful_conf_id: int = 0  # 炫彩形态 id（花种帧按它引用；0=未知）
     glass_type: int = 0  # glass 外观参数（色卡底色维度；0=帧中无）
     glass_value: int = 0  # glass 混色维度
+    worn_medal_id: int = 0  # 服务端佩戴奖牌，不从体型阈值推算
     skills: tuple[PetSkill, ...] = ()
+    is_trial_pet: bool = False  # 服务端试用个体，不属于自己的精灵库存
+    is_mirror_pet: bool = False  # 好友队伍镜像，不属于自己的精灵库存
 
     def attribute(self, slot: str) -> PetAttribute:
         """按名称（hp/atk/spa/def/spd/spe）取某一维；越界返回零值。"""
@@ -263,7 +266,9 @@ def _extend_pet(base: Pet, node: list[dict]) -> Pet:
         colorful_conf_id=_coerce_int(_raw_by_no(node, _NO_COLORFUL_CONF_ID)),
         glass_type=_glass_dim(node, _GLASS_TYPE),
         glass_value=_glass_dim(node, _GLASS_VALUE),
+        worn_medal_id=_coerce_int(_raw_by_no(node, 73)),
         skills=_skills_from_children(_children_by_no(node, _NO_SKILL)),
+        is_trial_pet=bool(_coerce_int(_raw_by_no(node, 81))),
     )
 
 
@@ -275,21 +280,21 @@ def _glass_dim(node: dict[str, object], child_no: int) -> int:
     return _coerce_int(_raw_by_no(children, child_no))
 
 
-def _walk(fields: list[dict], out: list[Pet]) -> None:
+def _walk(fields: list[dict], out: list[Pet], *, mirror: bool = False) -> None:
     node = _node_fields(fields)
     if node is not None:
-        out.append(_extend_pet(_coerce_pet(node), fields))
+        out.append(replace(_extend_pet(_coerce_pet(node), fields), is_mirror_pet=mirror))
         return  # 命中后不再下钻（宠物内的嵌套属性不是独立宠物）
     for field_dict in fields:
         children = field_dict.get("children")
         if isinstance(children, list):
-            _walk(children, out)
+            _walk(children, out, mirror=mirror or field_dict.get("name") == "mirror_pet_data")
 
 
-def extract_pets(event: PacketEvent) -> list[Pet]:
-    """从一条协议事件中提取宠物列表；无命中返回空列表。"""
+def extract_pets(event: PacketEvent, *, include_non_owned: bool = False) -> list[Pet]:
+    """提取宠物；默认排除试用/镜像，仓库保留归属标记以修正历史误收。"""
     if event.direction != "s2c" or not event.decoded:
         return []
     pets: list[Pet] = []
     _walk(event.decoded, pets)
-    return pets
+    return pets if include_non_owned else [pet for pet in pets if not pet.is_trial_pet and not pet.is_mirror_pet]

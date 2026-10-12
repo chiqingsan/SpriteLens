@@ -29,6 +29,7 @@ from spritelens.domain.flowers import FlowerRecord, FlowerSnapshot
 from spritelens.domain.eggs import EggCatalog
 from spritelens.domain.identity import PlayerIdentity
 from spritelens.domain.pets import Pet, PetAttribute, PetSkill
+from spritelens.domain.pet_locations import Backpack, PetBox
 from spritelens.domain.static_data import load_static_data
 from spritelens.logs import setup_logger
 from spritelens.paths import logs_dir, schema_dir, static_dir
@@ -117,7 +118,7 @@ def build_demo_context(tmp: Path, count: int) -> AppContext:
                 for _ in _ATTR_SLOTS
             ),
             height=rng.randint(70, 200), weight=rng.randint(20000, 100000),
-            voice=rng.randint(-100, 100), mutation_type=1 if i % 4 == 0 else 0,
+            voice=rng.randint(-100, 100), mutation_type=9 if i % 4 == 0 else (8 if i % 4 == 1 else 0),
             glass_type=2 if i % 7 == 0 else 1,
             glass_value=(1 if i % 7 == 0 else rng.choice((7, 29, 1048605, 1048597, 2097156))),
             classis=i % 18, breakthrough_lv=level // 10, speciality_id=100 + i,
@@ -127,6 +128,22 @@ def build_demo_context(tmp: Path, count: int) -> AppContext:
                 for k, sid in enumerate((7050210 + i * 10, 7050190, 7050270, 200107))
             ),
         )
+    # 留出空箱、筛选空格与一组位置未知个体，验证真实箱模式。
+    gids = list(repository._pets)
+    boxes = {}
+    for index in range(0, max(0, len(gids) - 3), 24):
+        slots = [0] * 30
+        for slot, gid in enumerate(gids[index:min(index + 24, len(gids) - 3)]):
+            slots[slot] = gid
+        box_id = index // 24 + 1
+        boxes[box_id] = PetBox(box_id, tuple(slots), "常用精灵" if box_id == 1 else "")
+    boxes[len(boxes) + 1] = PetBox(len(boxes) + 1, (0,) * 30)
+    teams = (PetBox(1, tuple(gids[:6])), PetBox(2, tuple(gids[6:12])), PetBox(3, tuple([0] * 6))) if count >= 12 else ()
+    if teams:
+        team_gids = set(gids[:12])
+        boxes = {key: PetBox(key, tuple(0 if gid in team_gids else gid for gid in box.slots), box.name) for key, box in boxes.items()}
+    repository._backpack = Backpack(boxes, teams, 1 if teams else None)
+    repository._locations = repository._backpack.locations()
     repository._version += 1
     repository._account.observe(PlayerIdentity(uid=101384922, name="话绵雨", level=60))
 

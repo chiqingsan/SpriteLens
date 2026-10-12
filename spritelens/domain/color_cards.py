@@ -76,6 +76,8 @@ class ColorCatalog:
             seasonal = glass_value & _VALUE_MASK
             if seasonal and str(seasonal) in _SEASON_IDS:
                 return f"s{seasonal}"
+            if seasonal == 1000:
+                return "1000"
             return ""
         packed = str(glass_value & _VALUE_MASK)
         return packed if packed in self._cards else ""
@@ -83,6 +85,19 @@ class ColorCatalog:
     @property
     def available(self) -> bool:
         return bool(self._cards)
+
+    def effect_for(self, glass_type: int, glass_value: int) -> dict | None:
+        """低 20 位为卡号，高位 1..4 为粒子；未知粒子不猜测。"""
+        card_id = self.card_id_for(glass_type, glass_value)
+        card = self.card(card_id)
+        if card is None:
+            return None
+        particle = glass_value >> 20
+        names = {1: "四角星", 2: "爱心", 3: "方块", 4: "镂空五角星"}
+        return {"card_id": card_id, "base_color": card.base_color, "mix_color": card.mix_color,
+                "name": f"{card.mix_name} · {card.base_name}",
+                "particle_id": particle if particle in names else 0,
+                "particle_name": names.get(particle, "暂无粒子数据")}
 
 
 __all__ = ["ColorCard", "ColorCatalog"]

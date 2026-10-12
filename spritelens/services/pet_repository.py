@@ -15,6 +15,7 @@ import threading
 
 from spritelens.domain.identity import PlayerIdentity, extract_identity
 from spritelens.domain.pets import Pet, extract_pets
+from spritelens.domain.pet_locations import Backpack, PetBox, PetLocation, update_backpack
 from spritelens.repositories.pet_store import PetStore
 from spritelens.services.account_tracker import AccountTracker
 from spritelens.services.monitor_service import PacketEvent
@@ -28,10 +29,13 @@ class PetRepository:
     def __init__(self, store: PetStore | None = None) -> None:
         self._lock = threading.Lock()
         self._pets: dict[int, Pet] = {}
+        self._locations: dict[int, PetLocation] = {}
+        self._backpack = Backpack()
         self._colorful_names: dict[int, str] = {}
         self._version = 0
         self._store = store
         self._account = AccountTracker()
+        self._cached_identity: PlayerIdentity | None = None
 
     def handle_packet(self, event: PacketEvent) -> None:
         """PacketEvent 监听回调：先认身份，再提取宠物并合并（新的覆盖旧的）。"""
@@ -46,14 +50,26 @@ class PetRepository:
         if identity is not None:
             with self._lock:
                 switched = self._account.observe(identity)
+                self._cached_identity = identity
                 if switched:
                     # 切换账号：旧账号快照整体作废，新账号数据随后分帧到达
                     self._pets.clear()
+                    self._locations.clear()
+                    self._backpack = Backpack()
                     self._version += 1
             if self._store is not None:
                 self._store.put_account(identity.uid, identity.name, identity.level)
 
-        pets = extract_pets(event)
+        with self._lock:
+            backpack = update_backpack(event, self._backpack)
+            if backpack is not None:
+                self._backpack = backpack
+                self._locations = backpack.locations()
+                self._version += 1
+            uid = self._account.uid
+        if backpack is not None and self._store is not None and uid > 0:
+            self._store.put_backpack(uid, backpack)
+        pets = extract_pets(event, include_non_owned=True)
         if not pets:
             return
         with self._lock:
@@ -74,7 +90,7 @@ class PetRepository:
     def snapshot(self) -> tuple[Pet, ...]:
         """当前全部宠物（按 gid 排序）；UI 按版本号判断是否需要重建表。"""
         with self._lock:
-            return tuple(sorted(self._pets.values(), key=lambda p: p.gid))
+            return tuple(sorted((pet for pet in self._pets.values() if not pet.is_trial_pet and not pet.is_mirror_pet), key=lambda p: p.gid))
 
     @property
     def version(self) -> int:
@@ -85,6 +101,19 @@ class PetRepository:
     def identity(self) -> PlayerIdentity | None:
         with self._lock:
             return self._account.identity
+
+    @property
+    def cached_identity(self) -> PlayerIdentity | None:
+        with self._lock:
+            return self._cached_identity
+
+    def location(self, gid: int) -> PetLocation | None:
+        with self._lock:
+            return self._locations.get(gid)
+
+    def backpack(self) -> Backpack:
+        with self._lock:
+            return Backpack(dict(self._backpack.boxes), self._backpack.teams, self._backpack.active_team)
 
     def load_persisted(self, uid: int) -> int:
         """载入历史宠物（只补缺失的 gid，不覆盖本次会话已收到的新数据）。
@@ -98,20 +127,36 @@ class PetRepository:
         with self._lock:
             existing = set(self._pets)
         loaded = self._store.load(uid)
-        if not loaded:
+        backpack = self._store.load_backpack(uid)
+        account = self._store.load_account(uid)
+        if not loaded and not backpack.boxes and not backpack.teams and not account:
             return 0
         added = 0
         with self._lock:
             # 记住离线数据的归属：该账号登录时不算「切换」，不清快照
             self._account.note_loaded(uid)
+            if self._account.identity is None and account:
+                self._cached_identity = PlayerIdentity(*account)
+            current = self._backpack
+            current_gids = set(current.locations()) | {gid for team in current.teams for gid in team.slots if gid}
+            boxes = {box_id: PetBox(box_id, tuple(0 if gid in current_gids else gid for gid in box.slots), box.name, box.historical)
+                     for box_id, box in backpack.boxes.items()}
+            boxes.update(current.boxes)
+            teams = current.teams or tuple(PetBox(team.box_id, tuple(0 if gid in current_gids else gid for gid in team.slots), team.name, team.historical)
+                                           for team in backpack.teams)
+            team_gids = {gid for team in teams for gid in team.slots if gid}
+            boxes = {box_id: PetBox(box_id, tuple(0 if gid in team_gids else gid for gid in box.slots), box.name, box.historical)
+                     for box_id, box in boxes.items()}
+            self._backpack = Backpack(boxes, teams, current.active_team or backpack.active_team)
+            self._locations = self._backpack.locations()
             for pet in loaded:
-                if pet.colorful_conf_id > 0 and pet.name:
+                if not pet.is_trial_pet and not pet.is_mirror_pet and pet.colorful_conf_id > 0 and pet.name:
                     self._colorful_names.setdefault(pet.colorful_conf_id, pet.name)
                 if pet.gid in existing:
                     continue
                 self._pets[pet.gid] = pet
-                added += 1
-            if added:
+                added += int(not pet.is_trial_pet and not pet.is_mirror_pet)
+            if added or backpack.boxes or backpack.teams:
                 self._version += 1
         return added
 
@@ -132,6 +177,8 @@ class PetRepository:
     def clear(self) -> None:
         with self._lock:
             self._pets.clear()
+            self._locations.clear()
+            self._backpack = Backpack()
             self._version += 1
 
 

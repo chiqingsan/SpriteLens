@@ -117,6 +117,13 @@ class EggCatalog:
             entries.append(info)
         entries.sort(key=lambda e: (e.dex_no, e.egg_conf_id))
         self._entries = tuple(entries)
+        by_key = {info.egg_key: info for info in entries}
+        for conf_id, egg_key in (data.get("egg_conf_index") or {}).items():
+            if str(conf_id).isdigit() and egg_key in by_key:
+                self._eggs.setdefault(int(conf_id), by_key[egg_key])
+        for base_id, egg_key in (data.get("egg_base_index") or {}).items():
+            if str(base_id).isdigit() and egg_key in by_key:
+                self._by_base_id[int(base_id)] = by_key[egg_key]
 
     # -- 查询 ----------------------------------------------------------
     def egg(self, egg_conf_id: int) -> EggInfo | None:

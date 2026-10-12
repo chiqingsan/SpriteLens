@@ -23,14 +23,14 @@ class PackagedAssetsTest(unittest.TestCase):
         self.assertTrue(STATIC_DIR.is_dir(), f"前端静态目录缺失: {STATIC_DIR}")
 
     def test_frontend_entry_files_exist(self):
-        for name in ("index.html", "boot.js", "ui.js", "app.js", "app.css", "ui.css"):
+        for name in ("index.html", "boot.js", "ui.js", "app.js", "app.css", "ui.css", "themes.css", "appearance.js", "pet-presentation.js", "pet-filters.js", "backpack-controls.js", "icons.js", "icons/sprite.svg"):
             with self.subTest(file=name):
                 self.assertTrue((STATIC_DIR / name).is_file(), f"前端文件缺失: {name}")
 
     def test_static_tables_exist(self):
         static_dir = paths.static_dir()
         self.assertTrue(static_dir.is_dir(), f"静态映射表目录缺失: {static_dir}")
-        for name in ("species.json", "natures.json", "types.json", "skills.json"):
+        for name in ("species.json", "natures.json", "types.json", "skills.json", "pet_media.json"):
             with self.subTest(file=name):
                 self.assertTrue((static_dir / name).is_file(), f"静态表缺失: {name}")
 

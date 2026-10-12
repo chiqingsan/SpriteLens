@@ -118,6 +118,25 @@ _MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
             "ALTER TABLE pets ADD COLUMN glass_value      INTEGER NOT NULL DEFAULT 0",
         ),
     ),
+    (
+        5,
+        (
+            "ALTER TABLE pets ADD COLUMN worn_medal_id INTEGER NOT NULL DEFAULT 0",
+            "CREATE TABLE IF NOT EXISTS pet_locations (uid INTEGER PRIMARY KEY, snapshot_json TEXT NOT NULL)",
+        ),
+    ),
+    (
+        6,
+        (
+            "ALTER TABLE pets ADD COLUMN is_trial_pet INTEGER NOT NULL DEFAULT 0",
+        ),
+    ),
+    (
+        7,
+        (
+            "ALTER TABLE pets ADD COLUMN is_mirror_pet INTEGER NOT NULL DEFAULT 0",
+        ),
+    ),
 )
 
 

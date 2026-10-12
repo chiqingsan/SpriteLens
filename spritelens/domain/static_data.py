@@ -57,6 +57,7 @@ class SpeciesInfo:
     height_range: tuple[int, int] = (0, 0)
     weight_range: tuple[int, int] = (0, 0)
     has_shiny: bool = False
+    chain_members: tuple[int, ...] = ()
 
     @property
     def stat_sum(self) -> int:
@@ -108,8 +109,12 @@ def _load_table(directory: Path, filename: str) -> dict:
 class StaticData:
     """静态表只读索引；全量加载一次，进程内共享。"""
 
+    def medal_name(self, medal_id: int) -> str:
+        return str(self._medals.get(str(medal_id)) or f"奖牌 #{medal_id}")
+
     def __init__(self, directory: Path | None) -> None:
         self.directory = directory
+        self._medals = _load_table(directory, "medals.json") if directory and (directory / "medals.json").is_file() else {}
         self._species: dict[str, SpeciesInfo] = {}
         self._natures: dict[int, NatureInfo] = {}
         self._types: dict[int, TypeInfo] = {}
@@ -169,6 +174,7 @@ class StaticData:
                     int(weight_range[1] or 0) if len(weight_range) > 1 else 0,
                 ),
                 has_shiny=bool(entry.get("has_shiny")),
+                chain_members=tuple(int(e) for e in (entry.get("chain_members") or []) if isinstance(e, int)),
             )
 
         for key, entry in _load_table(self.directory, _TABLE_FILES["natures"]).items():

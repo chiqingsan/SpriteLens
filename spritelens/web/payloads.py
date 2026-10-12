@@ -10,6 +10,9 @@ from spritelens.domain.static_data import StaticData
 from spritelens.services.pet_repository import PetRepository
 from spritelens.view_models.pet_vm import SORT_KEYS, PetViewModel
 from spritelens.domain.display import STAT_LABELS, TALENT_RANK_COLORS, TYPE_COLORS
+from spritelens.domain.measurements import range_position, range_text
+from spritelens.web.pet_media import pet_images
+from spritelens.domain.pet_marks import pet_marks
 
 
 def _stat_bars(pet: Pet, peak: int) -> tuple[dict, ...]:
@@ -45,6 +48,7 @@ def pet_row(
     height_max: int,
     weight_max: int,
     color_catalog=None,
+    egg_catalog=None,
 ) -> dict:
     """一行宠物的完整展示数据（表格与详情共用，避免两处各算一遍）。"""
     species = static.species(pet.base_conf_id) if static is not None else None
@@ -55,6 +59,11 @@ def pet_row(
     stat_values = [a.final_value for a in pet.attributes]
     peak = max(stat_values) if stat_values else 0
     bars = _stat_bars(pet, peak) if pet.attributes else ()
+    height_range = species.height_range if species else (0, 0)
+    weight_range = species.weight_range if species else (0, 0)
+    height_position = range_position(pet.height, height_range)
+    weight_position = range_position(pet.weight, weight_range)
+    egg = egg_catalog.egg_by_base_id(pet.base_conf_id) if egg_catalog else None
 
     return {
         "gid": pet.gid,
@@ -70,7 +79,6 @@ def pet_row(
         "gender": pet.gender,
         "talent_rank": pet.talent_rank,
         "talent_color": _talent_color(pet.talent_rank),
-        "is_first_catch": pet.is_first_catch,
         "species_name": species.name if species is not None else "",
         "icon_url": species_icon_url(pet.base_conf_id) if pet.base_conf_id else "",
         "dex_no": species.dex_no if species is not None else 0,
@@ -86,11 +94,22 @@ def pet_row(
         "weight": pet.weight,
         "glass_colors": _glass_colors(pet, color_catalog),
         "voice": pet.voice,
-        "height_text": f"{pet.height / 100:.2f}m" if pet.height else "—",
-        "weight_text": f"{pet.weight / 1000:.1f}kg" if pet.weight else "—",
-        "height_pct": round(min(1.0, pet.height / height_max), 4) if pet.height and height_max else 0.0,
-        "weight_pct": round(min(1.0, pet.weight / weight_max), 4) if pet.weight and weight_max else 0.0,
-        "voice_text": f"{pet.voice:+d}" if pet.voice else "—",
+        "is_colorful": bool(pet.mutation_type & 8),
+        "is_shiny": bool(pet.mutation_type & 1),
+        **pet_images(pet.base_conf_id, bool(pet.mutation_type & 1)),
+        "color_card": color_catalog.effect_for(pet.glass_type, pet.glass_value) if color_catalog and pet.mutation_type & 8 else None,
+        "worn_medal_id": pet.worn_medal_id,
+        "medal_marks": pet_marks(pet, weight_range),
+        "worn_medal_name": static.medal_name(pet.worn_medal_id) if static and pet.worn_medal_id else (f"奖牌 #{pet.worn_medal_id}" if pet.worn_medal_id else ""),
+        "height_text": f"{pet.height / 100:.2f} m" if pet.height else "暂无数据",
+        "weight_text": f"{pet.weight / 1000:.2f} kg" if pet.weight else "暂无数据",
+        "height_pct": max(0, min(1, height_position["ratio"])) if height_position["ratio"] is not None else 0,
+        "weight_pct": max(0, min(1, weight_position["ratio"])) if weight_position["ratio"] is not None else 0,
+        "reference_ranges": {"height": range_text(height_range, 100, "m"), "weight": range_text(weight_range, 1000, "kg")},
+        "range_positions": {"height": height_position, "weight": weight_position},
+        "egg_ranges": {"height": range_text((egg.height_low, egg.height_high), 100, "m") if egg else "暂无数据",
+                       "weight": range_text((egg.weight_low, egg.weight_high), 1000, "kg") if egg else "暂无数据"},
+        "voice_text": f"{pet.voice:+d}" if pet.voice else "暂无数据",
         "voice_pct": round(min(1.0, abs(pet.voice) / 100.0), 4) if pet.voice else 0.0,
         "species_stats": dict(species.stats) if species is not None else {},
         "species_stat_sum": species.stat_sum if species is not None else 0,
@@ -121,6 +140,7 @@ def pets_payload(
     vm: PetViewModel,
     static: StaticData | None,
     color_catalog=None,
+    egg_catalog=None,
 ) -> dict:
     """宠物列表页载荷：行数据 + 可选值与当前筛选状态（一次给全）。"""
     pets = vm.filtered_pets()
@@ -128,10 +148,33 @@ def pets_payload(
     weight_max = max((p.weight for p in pets), default=0)
     filters = vm.filters
     sort_key, sort_desc = vm.sort_state
+    backpack = vm.backpack()
+    matched = {pet.gid for pet in pets}
+    all_gids = {pet.gid for pet in vm.all_pets()}
+    locations = backpack.locations()
+    located_gids = set(locations) | {gid for team in backpack.teams for gid in team.slots if gid}
+    def slot_payload(gid):
+        return {"gid": gid, "state": "unknown" if gid is None else "empty" if gid == 0
+                else "missing" if gid not in all_gids else "matched" if gid in matched else "filtered"}
     return {
-        "pets": [pet_row(p, static, height_max, weight_max, color_catalog) for p in pets],
+        "pets": [dict(pet_row(p, static, height_max, weight_max, color_catalog, egg_catalog), location=vm.location_of(p)) for p in pets],
         "total": vm.total_count(),
         "shown": len(pets),
+        "backpack": {
+            "boxes": [{"box_id": box.box_id, "name": box.name, "historical": box.historical,
+                       "slots": [slot_payload(gid) for gid in box.slots],
+                       "matched": sum(gid in matched for gid in box.slots if gid),
+                       "occupied": sum(bool(gid) for gid in box.slots),
+                       "unknown": sum(gid is None for gid in box.slots)}
+                      for box in sorted(backpack.boxes.values(), key=lambda box: box.box_id)],
+            "teams": [{"team_id": team.box_id, "name": team.name, "historical": team.historical,
+                       "slots": [slot_payload(gid) for gid in team.slots],
+                       "matched": sum(gid in matched for gid in team.slots if gid)} for team in backpack.teams],
+            "active_team": backpack.active_team,
+            "unlocated_total": sum(gid not in located_gids for gid in all_gids),
+            "unlocated_shown": sum(gid not in located_gids for gid in matched),
+            "filtering": filters.active,
+        },
         "version": vm.version(),
         "filters": {
             "search": filters.search,
@@ -140,13 +183,17 @@ def pets_payload(
             "natures": sorted(filters.natures),
             "types": sorted(filters.type_names),
             "talent_min": filters.talent_min,
-            "first_catch_only": filters.first_catch_only,
             "gender": filters.gender,
+            "egg_groups": sorted(filters.egg_groups),
+            "egg_mode": filters.egg_mode,
+            **{key: getattr(filters, key) for key in ("height_min", "height_max", "weight_min", "weight_max", "voice_min", "voice_max",
+                "height_position_min", "height_position_max", "weight_position_min", "weight_position_max")},
         },
         "sort": {"key": sort_key, "desc": sort_desc},
         "options": {
             "natures": [{"id": i, "name": n} for i, n in vm.nature_options()],
             "types": list(vm.type_options()),
+            "egg_groups": list(vm.egg_group_options()),
             "sorts": [{"key": k, "label": label} for k, label in SORT_KEYS],
             "talent_max": vm.talent_rank_max(),
             "stat_labels": [label for _, label in STAT_LABELS],
@@ -158,15 +205,16 @@ def overview_payload(vm: PetViewModel, repository: PetRepository, static: Static
     """概览载荷：账号身份 + 聚合统计 + 静态表状态。"""
     stats = vm.stats()
     identity = repository.identity
+    cached = repository.cached_identity
     return {
         "identity": (
             {"uid": identity.uid, "name": identity.name, "level": identity.level}
             if identity is not None
             else None
         ),
+        "cached_identity": {"uid": cached.uid, "name": cached.name, "level": cached.level} if cached else None,
         "stats": {
             "total": stats.total,
-            "first_catch": stats.first_catch,
             "maxed": stats.maxed,
             "max_level": stats.max_level,
             "types": [
@@ -249,6 +297,7 @@ def handbook_payload(
                 "gender_ratio": list(info.gender_ratio),
                 "height_range": list(info.height_range),
                 "weight_range": list(info.weight_range),
+                "reference_ranges": {"height": range_text(info.height_range, 100, "m"), "weight": range_text(info.weight_range, 1000, "kg")},
                 "has_shiny": info.has_shiny,
                 "type_names": list(info.type_names),
                 "type_colors": [type_color_for(static, name) for name in info.type_names],
@@ -262,6 +311,8 @@ def handbook_payload(
                     for e in info.evolutions
                     if (evo := static.species(e)) is not None
                 ],
+                "chain_members": [{"key": str(e), "name": member.name}
+                                  for e in info.chain_members if (member := static.species(e)) is not None],
                 "collected": own is not None,
                 "owned_count": own["count"] if own else 0,
                 "best_level": own["max_level"] if own else 0,
@@ -397,7 +448,7 @@ def colors_payload(pet_repository, catalog, static: StaticData | None) -> dict:
     unknown: list[dict] = []
     total = 0
     for pet in (pet_repository.snapshot() if pet_repository is not None else ()):
-        if not pet.glass_type and not pet.glass_value:
+        if not pet.mutation_type & 8 or (not pet.glass_type and not pet.glass_value):
             continue
         if catalog is None:
             continue
@@ -409,6 +460,8 @@ def colors_payload(pet_repository, catalog, static: StaticData | None) -> dict:
             "gender": pet.gender,
             "icon_url": species_icon_url(pet.base_conf_id),
             "card_id": card_id,
+            **pet_images(pet.base_conf_id, bool(pet.mutation_type & 1)),
+            "color_card": catalog.effect_for(pet.glass_type, pet.glass_value),
         }
         total += 1
         if card_id.startswith("s"):
@@ -507,6 +560,8 @@ def egg_box_payload(egg_box, catalog) -> dict:
                 "category": egg.category,
                 "height_cm": egg.height_cm,
                 "weight_g": egg.weight_g,
+                "reference_ranges": {"height": range_text((info.height_low, info.height_high), 100, "m") if info else "暂无数据",
+                                     "weight": range_text((info.weight_low, info.weight_high), 1000, "kg") if info else "暂无数据"},
             }
         )
     return {
@@ -522,6 +577,7 @@ def egg_box_payload(egg_box, catalog) -> dict:
 def egg_dex_payload(
     catalog,
     *,
+    static: StaticData | None = None,
     search: str = "",
     group: str = "",
     egg_type: str = "",
@@ -532,7 +588,9 @@ def egg_dex_payload(
     keyword = search.strip().lower()
     rows: list[dict] = []
     for info in entries:
-        if keyword and keyword not in info.name_key.lower() and keyword not in str(info.egg_conf_id):
+        if keyword and not any(keyword in value.lower() for value in (
+            info.name_key, info.name, info.egg_name, str(info.egg_conf_id),
+        )):
             continue
         if group and group not in info.egg_group_names:
             continue
@@ -565,7 +623,10 @@ def egg_dex_payload(
                 ),
                 "height": [info.height_low, info.height_high],
                 "weight": [info.weight_low, info.weight_high],
+                "reference_ranges": {"height": range_text((info.height_low, info.height_high), 100, "m"), "weight": range_text((info.weight_low, info.weight_high), 1000, "kg")},
                 "chain": list(info.chain_members),
+                "chain_names": {str(base): member.name for base in info.chain_members
+                                if static is not None and (member := static.species(base)) is not None},
             }
         )
     return {

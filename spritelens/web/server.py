@@ -27,6 +27,7 @@ from aiohttp import WSMsgType, web
 
 from spritelens.app_context import AppContext
 from spritelens.logs import get_logger
+from spritelens.view_models.ui_preferences import UIPreferencesViewModel
 from spritelens.web.payloads import (
     egg_box_payload,
     home_payload,
@@ -196,8 +197,9 @@ class LocalServer:
         app.router.add_get("/favicon.ico", self._favicon)
         app.router.add_static("/static", self._static_dir, name="static")
         app.router.add_get("/api/bootstrap", self._api_bootstrap)
+        app.router.add_get("/api/ui/preferences", self._api_ui_preferences)
+        app.router.add_post("/api/ui/preferences", self._api_save_ui_preferences)
         app.router.add_get("/api/pets", self._api_pets)
-        app.router.add_post("/api/pets/clear", self._api_pets_clear)
         app.router.add_get("/api/handbook", self._api_handbook)
         app.router.add_get("/api/eggs", self._api_eggs)
         app.router.add_get("/api/egg-box", self._api_egg_box)
@@ -205,7 +207,6 @@ class LocalServer:
         app.router.add_get("/api/home", self._api_home)
         app.router.add_get("/api/flowers", self._api_flowers)
         app.router.add_get("/api/colors", self._api_colors)
-        app.router.add_post("/api/egg-box/clear", self._api_egg_box_clear)
         app.router.add_get("/api/events", self._api_events)
         app.router.add_get("/api/events/detail", self._api_event_detail)
         app.router.add_get("/api/capture", self._api_capture)
@@ -305,16 +306,30 @@ class LocalServer:
                 "version": _app_version(),
             },
             "overview": overview_payload(ctx.pet_vm, ctx.pet_repository, ctx.static_data),
-            "pets": pets_payload(ctx.pet_vm, ctx.static_data, ctx.color_catalog),
+            "pets": pets_payload(ctx.pet_vm, ctx.static_data, ctx.color_catalog, ctx.egg_catalog),
             "capture": self._capture_payload(),
             "state": self._state_payload(),
+            "ui_preferences": UIPreferencesViewModel(ctx.settings).snapshot(),
         }
         return web.json_response(payload)
+
+    async def _api_ui_preferences(self, request: web.Request) -> web.Response:
+        return web.json_response(UIPreferencesViewModel(self._context.settings).snapshot())
+
+    async def _api_save_ui_preferences(self, request: web.Request) -> web.Response:
+        try:
+            changes = await request.json()
+            result = await asyncio.to_thread(UIPreferencesViewModel(self._context.settings).update, changes)
+            return web.json_response(result)
+        except (ValueError, TypeError):
+            return web.json_response({"error": "偏好格式无效，请检查主题、视图、显示字段或快捷条件"}, status=400)
+        except OSError:
+            return web.json_response({"error": "偏好保存失败，请检查配置目录是否可写"}, status=500)
 
     async def _api_pets(self, request: web.Request) -> web.Response:
         self._apply_pet_query(request.query)
         return web.json_response(
-            pets_payload(self._context.pet_vm, self._context.static_data, self._context.color_catalog)
+            pets_payload(self._context.pet_vm, self._context.static_data, self._context.color_catalog, self._context.egg_catalog)
         )
 
     def _apply_pet_query(self, query) -> None:
@@ -324,16 +339,12 @@ class LocalServer:
         vm.set_natures(frozenset(_id_set(query.get("natures"))))
         vm.set_types(frozenset(_name_set(query.get("types"))))
         vm.set_talent_min(_as_int(query.get("talent_min"), 0))
-        vm.set_first_catch_only(_as_bool(query.get("first_catch")))
         vm.set_gender(_as_int(query.get("gender"), 0))
+        vm.set_egg_groups(frozenset(_name_set(query.get("egg_groups"))), query.get("egg_mode", "any"))
+        vm.set_measurement_ranges(**{key: query.get(key) for key in (
+            "height_min", "height_max", "weight_min", "weight_max", "voice_min", "voice_max",
+            "height_position_min", "height_position_max", "weight_position_min", "weight_position_max")})
         vm.set_sort(query.get("sort") or "gid", descending=_as_bool(query.get("desc")))
-
-    async def _api_pets_clear(self, request: web.Request) -> web.Response:
-        """清空会话内宠物快照（本地库历史不受影响）。"""
-        await asyncio.to_thread(self._context.pet_vm.clear)
-        return web.json_response(
-            pets_payload(self._context.pet_vm, self._context.static_data, self._context.color_catalog)
-        )
 
     async def _api_handbook(self, request: web.Request) -> web.Response:
         query = request.query
@@ -353,6 +364,7 @@ class LocalServer:
         return web.json_response(
             egg_dex_payload(
                 self._context.egg_catalog,
+                static=self._context.static_data,
                 search=query.get("search", ""),
                 group=query.get("group", ""),
                 egg_type=query.get("egg_type", ""),
@@ -361,13 +373,6 @@ class LocalServer:
         )
 
     async def _api_egg_box(self, request: web.Request) -> web.Response:
-        return web.json_response(
-            egg_box_payload(self._context.egg_box, self._context.egg_catalog)
-        )
-
-    async def _api_egg_box_clear(self, request: web.Request) -> web.Response:
-        """清空会话内蛋仓快照（本地库历史不受影响）。"""
-        self._context.egg_box.clear()
         return web.json_response(
             egg_box_payload(self._context.egg_box, self._context.egg_catalog)
         )
@@ -547,6 +552,7 @@ class LocalServer:
         ctx = self._context
         capture = ctx.capture_vm.snapshot()
         identity = ctx.pet_repository.identity
+        cached = ctx.pet_repository.cached_identity
         stats = ctx.pet_vm.stats()
         return {
             "egg_box_version": ctx.egg_box.version() if ctx.egg_box is not None else 0,
@@ -561,9 +567,9 @@ class LocalServer:
                 if identity is not None
                 else None
             ),
+            "cached_identity": {"uid": cached.uid, "name": cached.name, "level": cached.level} if cached else None,
             "stats": {
                 "total": stats.total,
-                "first_catch": stats.first_catch,
                 "maxed": stats.maxed,
                 "max_level": stats.max_level,
                 "types": [

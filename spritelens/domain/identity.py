@@ -1,7 +1,8 @@
 """玩家身份语义层：从 PacketEvent 字段树中提取「自己」的账号标识。
 
-与 pets.py 同源思路（形状搜索，不绑定 opcode/消息名）：只认结构
-`self_info → avatar → base`。必须严格走 self_info 路径——实测
+只认当前玩家的两条已核验路径：登录响应 0x0102 的
+`player_info → brief_info`，以及进场景的 `self_info → avatar → base`。
+不能递归搜索所有玩家结构——实测
 ZoneSceneClientEnterSceneFinishNtyAck 的 other_actors 下 NPC 也带
 logic_id（如「护主犬」435444924297510922），误取会把 NPC 编号当账号。
 
@@ -72,8 +73,16 @@ def _raw_text(field: dict | None) -> str:
 
 def extract_identity(event: PacketEvent) -> PlayerIdentity | None:
     """从一条 s2c 事件中提取当前角色身份；无命中返回 None。"""
-    if event.direction != "s2c" or not event.decoded:
+    if event.direction != "s2c":
         return None
+    # 登录响应早于进场景；只认经核验的当前玩家路径，不能搜索其他玩家/NPC。
+    if getattr(event, "opcode", None) == 0x0102:
+        brief = _descend(event.decoded, "player_info", "brief_info")
+        if brief is not None:
+            children = brief.get("children") or []
+            uid = _raw_int(_find(children, "uin"))
+            if uid > 0:
+                return PlayerIdentity(uid, _raw_text(_find(children, "name")), _raw_int(_find(children, "role_level")))
     for node in event.decoded:
         if node.get("name") != _SELF_INFO:
             continue
@@ -89,7 +98,8 @@ def extract_identity(event: PacketEvent) -> PlayerIdentity | None:
             name=_raw_text(_find(children, _NAME)),
             level=_raw_int(_find(children, _LEVEL)),
         )
-    return None
+    resumed = getattr(event, "resumed_identity", None)
+    return PlayerIdentity(*resumed) if resumed is not None else None
 
 
 __all__ = ["PlayerIdentity", "extract_identity"]

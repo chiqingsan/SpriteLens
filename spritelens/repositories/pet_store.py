@@ -21,6 +21,7 @@ import time
 from collections.abc import Iterable
 
 from spritelens.domain.pets import Pet, PetAttribute, PetSkill
+from spritelens.domain.pet_locations import Backpack, PetLocation
 from spritelens.logs import get_logger
 from spritelens.repositories.database import Database
 
@@ -47,8 +48,8 @@ INSERT INTO pets (
     attr_hp, attr_atk, attr_spa, attr_def, attr_spd, attr_spe,
     height, weight, voice, mutation_type, classis, breakthrough_lv,
     speciality_id, ball_id, attributes_json, skills_json, base_conf_id,
-    colorful_conf_id, glass_type, glass_value
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    colorful_conf_id, glass_type, glass_value, worn_medal_id, is_trial_pet, is_mirror_pet
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(uid, gid) DO UPDATE SET
     conf_id        = excluded.conf_id,
     name           = excluded.name,
@@ -79,6 +80,9 @@ ON CONFLICT(uid, gid) DO UPDATE SET
     colorful_conf_id = excluded.colorful_conf_id,
     glass_type     = excluded.glass_type,
     glass_value    = excluded.glass_value,
+    worn_medal_id  = excluded.worn_medal_id,
+    is_trial_pet   = excluded.is_trial_pet,
+    is_mirror_pet  = excluded.is_mirror_pet,
     updated_at     = excluded.updated_at
 """
 
@@ -87,7 +91,7 @@ SELECT gid, conf_id, name, level, exp, nature, gender, blood_id, talent_rank, is
        attr_hp, attr_atk, attr_spa, attr_def, attr_spd, attr_spe,
        height, weight, voice, mutation_type, classis, breakthrough_lv,
        speciality_id, ball_id, attributes_json, skills_json, base_conf_id,
-       colorful_conf_id, glass_type, glass_value
+       colorful_conf_id, glass_type, glass_value, worn_medal_id, is_trial_pet, is_mirror_pet
 FROM pets WHERE uid = ? ORDER BY gid
 """
 
@@ -188,6 +192,7 @@ class PetStore:
         self._lock = threading.Lock()
         self._pending: dict[tuple[int, int], Pet] = {}
         self._pending_accounts: dict[int, tuple[str, int]] = {}
+        self._pending_locations: dict[int, Backpack] = {}
         self._stop = threading.Event()
         self._worker: threading.Thread | None = None
         self._closed = False
@@ -219,6 +224,28 @@ class PetStore:
             self._ensure_worker_locked()
 
     # -- 落盘 ----------------------------------------------------------
+    def put_locations(self, uid: int, locations: dict[int, PetLocation]) -> None:
+        self.put_backpack(uid, Backpack.from_locations(locations))
+
+    def put_backpack(self, uid: int, backpack: Backpack) -> None:
+        if uid <= 0:
+            return
+        with self._lock:
+            if not self._closed:
+                self._pending_locations[uid] = Backpack(dict(backpack.boxes), backpack.teams, backpack.active_team)
+                self._ensure_worker_locked()
+
+    def load_locations(self, uid: int) -> dict[int, PetLocation]:
+        return self.load_backpack(uid).locations()
+
+    def load_backpack(self, uid: int) -> Backpack:
+        rows = self._db.query("SELECT snapshot_json FROM pet_locations WHERE uid = ?", (uid,))
+        try:
+            raw = json.loads(rows[0]["snapshot_json"]) if rows else []
+            return Backpack.restore(raw)
+        except (ValueError, TypeError, KeyError, AttributeError):
+            return Backpack()
+
     def flush(self) -> int:
         """把待写表批量写入 SQLite；返回本次写入的宠物条数。
 
@@ -227,9 +254,11 @@ class PetStore:
         with self._lock:
             pets = self._pending
             accounts = self._pending_accounts
+            locations = self._pending_locations
             self._pending = {}
             self._pending_accounts = {}
-        if not pets and not accounts:
+            self._pending_locations = {}
+        if not pets and not accounts and not locations:
             return 0
         now = time.time()
         try:
@@ -252,10 +281,17 @@ class PetStore:
                             pet.height, pet.weight, pet.voice, pet.mutation_type,
                             pet.classis, pet.breakthrough_lv, pet.speciality_id, pet.ball_id,
                             _attributes_to_json(pet), _skills_to_json(pet), pet.base_conf_id,
-                            pet.colorful_conf_id, pet.glass_type, pet.glass_value,
+                            pet.colorful_conf_id, pet.glass_type, pet.glass_value, pet.worn_medal_id,
+                            int(pet.is_trial_pet),
+                            int(pet.is_mirror_pet),
                         )
                         for (uid, _gid), pet in pets.items()
                     ],
+                )
+            if locations:
+                self._db.execute_many(
+                    "INSERT INTO pet_locations (uid, snapshot_json) VALUES (?, ?) ON CONFLICT(uid) DO UPDATE SET snapshot_json = excluded.snapshot_json",
+                    [(uid, json.dumps(snapshot.record(), ensure_ascii=False)) for uid, snapshot in locations.items()],
                 )
         except sqlite3.Error as exc:
             logger.warning("宠物写库失败，留待下轮重试: %s", exc)
@@ -264,6 +300,8 @@ class PetStore:
                     self._pending.setdefault(key, pet)
                 for uid, info in accounts.items():
                     self._pending_accounts.setdefault(uid, info)
+                for uid, snapshot in locations.items():
+                    self._pending_locations.setdefault(uid, snapshot)
             return 0
         with self._lock:
             self._written += len(pets)
@@ -300,6 +338,9 @@ class PetStore:
                 colorful_conf_id=int(row["colorful_conf_id"]),
                 glass_type=int(row["glass_type"]),
                 glass_value=int(row["glass_value"]),
+                worn_medal_id=int(row["worn_medal_id"]),
+                is_trial_pet=bool(row["is_trial_pet"]),
+                is_mirror_pet=bool(row["is_mirror_pet"]),
                 skills=_skills_from_json(str(row["skills_json"] or "")),
             )
             for row in rows
@@ -309,6 +350,10 @@ class PetStore:
         """本地库中有历史的账号（uid, 名字），按最近活跃优先。"""
         rows = self._db.query(_SELECT_ACCOUNTS)
         return tuple((int(row["uid"]), str(row["name"])) for row in rows)
+
+    def load_account(self, uid: int) -> tuple[int, str, int] | None:
+        rows = self._db.query("SELECT uid, name, level FROM accounts WHERE uid = ?", (uid,))
+        return (int(rows[0]["uid"]), str(rows[0]["name"]), int(rows[0]["level"])) if rows else None
 
     # -- 生命周期 ------------------------------------------------------
     def close(self) -> None:

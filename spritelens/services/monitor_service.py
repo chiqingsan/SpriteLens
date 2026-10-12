@@ -12,13 +12,13 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from spritelens.capture.base import CaptureSource, SourceCallback, StreamChunk
-from spritelens.capture.key_store import KeyStore, parse_key_text
+from spritelens.capture.key_store import KeyStore, SessionCheckpoint, parse_key_text
 from spritelens.logs import get_logger
 from spritelens.protocol.crypto import extract_ack_key, iter_decrypt_variants
-from spritelens.protocol.frames import FrameStream, GcpFrame
+from spritelens.protocol.frames import CMD_SYN, FrameStream, GcpFrame
 from spritelens.protocol.opcodes import OpcodeCatalog
 from spritelens.protocol.records import Direction, Record, split_record
 from spritelens.protocol.schema import SchemaLibrary, get_library
@@ -46,17 +46,22 @@ class PacketEvent:
     opcode_name: str
     payload_len: int
     decoded: list[dict]
+    resumed_identity: tuple[int, str, int] | None = None
 
 
 class _SessionState:
     """单会话可变状态（由 MonitorService 锁保护）。"""
 
-    __slots__ = ("streams", "key", "last_activity")
+    __slots__ = ("streams", "key", "last_activity", "identity", "resume_checked", "checkpoint_at", "server_sequence")
 
     def __init__(self) -> None:
         self.streams: dict[str, FrameStream] = {Direction.C2S: FrameStream(), Direction.S2C: FrameStream()}
         self.key: bytes | None = None
         self.last_activity = time.monotonic()
+        self.identity: tuple[int, str, int] | None = None
+        self.resume_checked = False
+        self.checkpoint_at = 0.0
+        self.server_sequence = 0
 
 
 class MonitorService:
@@ -80,6 +85,9 @@ class MonitorService:
         self._events: deque[PacketEvent] = deque(maxlen=MAX_BUFFERED_EVENTS)
         self._source: CaptureSource | None = None
         self._preset_key = preset_key
+        self._checkpoint = key_store.load_session()
+        if self._preset_key is None and self._checkpoint is not None:
+            self._preset_key = self._checkpoint.key
         self._packet_listeners: list[Callable[[PacketEvent], None]] = []
         self._last_sweep = 0.0
         # 实例属性绑定回调，供接入层以 SourceCallback 协议持有
@@ -103,6 +111,12 @@ class MonitorService:
     def stop(self) -> None:
         if self._source is not None:
             self._source.stop()
+        with self._lock:
+            confirmed = [(sid, state) for sid, state in self._sessions.items() if state.identity and state.key]
+            if confirmed:
+                sid, state = max(confirmed, key=lambda item: item[1].last_activity)
+                self._checkpoint = SessionCheckpoint(sid, state.key, state.identity, state.server_sequence)
+                self._key_store.save_session(self._checkpoint)
         # 停止即落一条最终统计，事后诊断不再靠猜
         _sessions, totals = self._tracker.snapshot()
         logger.info(
@@ -134,6 +148,9 @@ class MonitorService:
         """
         with self._lock:
             removed = self._sessions.pop(session_id, None)
+            if self._checkpoint is not None and self._checkpoint.flow_id == session_id:
+                self._checkpoint = replace(self._checkpoint, identity=None)
+                self._key_store.save_session(self._checkpoint)
         if removed is not None:
             self._tracker.drop(session_id)
 
@@ -193,17 +210,30 @@ class MonitorService:
     def _handle_frame(
         self, session_id: str, direction: str, frame: GcpFrame, state: _SessionState, key: bytes | None
     ) -> None:
+        if frame.command == CMD_SYN:
+            state.resume_checked = True
+            state.identity = None
+            if self._checkpoint is not None and self._checkpoint.flow_id == session_id:
+                self._checkpoint = replace(self._checkpoint, identity=None)
+                self._key_store.save_session(self._checkpoint)
+            return
         if frame.is_ack:
+            state.identity = None
+            state.resume_checked = True
+            if self._checkpoint is not None and self._checkpoint.flow_id == session_id:
+                self._checkpoint = replace(self._checkpoint, identity=None)
+                self._key_store.save_session(self._checkpoint)
             key_candidate = extract_ack_key(frame.header_extra)
             if key_candidate is None:
-                # 密钥提取失败曾有静默盲区：dump 原始字节以便诊断 ACK 布局差异
                 logger.warning(
-                    "[ack] 0x1002 未提取到密钥: flow=%s header_extra=%s body=%s",
-                    session_id, frame.header_extra.hex(), frame.body.hex()[:64],
+                    "[ack] 0x1002 未提取到密钥: flow=%s header_extra_len=%d body_len=%d",
+                    session_id, len(frame.header_extra), len(frame.body),
                 )
-            if key_candidate is not None and key_candidate != key:
+            if key_candidate is not None:
                 state.key = key_candidate
                 self._key_store.save_latest(key_candidate, session_id)
+                self._checkpoint = SessionCheckpoint(session_id, key_candidate)
+                self._key_store.save_session(self._checkpoint)
                 self._tracker.mark_key(session_id)
                 logger.info("[ack] 会话 %s 捕获会话密钥", session_id)
             return
@@ -219,7 +249,7 @@ class MonitorService:
             self._tracker.count(session_id, "parse_fail")
             logger.debug("拆分失败 session=%s dir=%s seq=%s", session_id, direction, frame.sequence)
             return
-        self._emit(session_id, record)
+        self._emit(session_id, record, state, frame.sequence)
 
     def _decrypt_and_split(
         self, key: bytes, body: bytes, direction: str, session_id: str
@@ -237,7 +267,7 @@ class MonitorService:
         self._tracker.count(session_id, "decrypt_fail")
         return None
 
-    def _emit(self, session_id: str, record: Record) -> None:
+    def _emit(self, session_id: str, record: Record, state: _SessionState, sequence: int) -> None:
         self._tracker.count(session_id, "decrypt_ok")
         info = self._catalog.lookup(record.opcode)
         message = info.message if info else None
@@ -255,6 +285,33 @@ class MonitorService:
             payload_len=len(record.payload),
             decoded=decoded,
         )
+        # 延迟导入：identity 语义层使用 PacketEvent，不在模块初始化时形成环。
+        from spritelens.domain.identity import extract_identity
+        identity = extract_identity(event)
+        resumed = False
+        if record.direction == "s2c":
+            if identity is not None:
+                state.identity = (identity.uid, identity.name, identity.level)
+            elif not state.resume_checked:
+                checkpoint = self._checkpoint
+                if (checkpoint is not None and checkpoint.identity is not None
+                        and checkpoint.flow_id == session_id and checkpoint.key == state.key
+                        and sequence > checkpoint.server_sequence):
+                    state.identity = checkpoint.identity
+                    event = replace(event, resumed_identity=checkpoint.identity)
+                    resumed = True
+                    logger.info("已确认原会话接续: %s", session_id)
+                elif checkpoint is not None and checkpoint.flow_id == session_id:
+                    # 首帧不连续时使旧关联失效，不能等新连接序号涨过旧值后再误恢复。
+                    self._checkpoint = replace(checkpoint, identity=None)
+                    self._key_store.save_session(self._checkpoint)
+            state.resume_checked = True
+            state.server_sequence = sequence
+            now = time.monotonic()
+            if state.identity and state.key and (identity is not None or resumed or now - state.checkpoint_at >= 5):
+                self._checkpoint = SessionCheckpoint(session_id, state.key, state.identity, sequence)
+                self._key_store.save_session(self._checkpoint)
+                state.checkpoint_at = now
         self._events.append(event)
         for listener in self._packet_listeners:
             try:

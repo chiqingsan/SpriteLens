@@ -5,7 +5,7 @@
   var activePanel = null;
   var returnTarget = null;
   var narrow = window.matchMedia("(max-width: 1360px)");
-  var petNarrow = window.matchMedia("(max-width: 960px)");
+  var petNarrow = window.matchMedia("(max-width: 1360px)");
   var backdrop = document.getElementById("detail-backdrop");
   var observer = new MutationObserver(decorateDetail);
   var inertNodes = [];
@@ -75,7 +75,7 @@
     }
   }
 
-  function closeDetail(restoreFocus) {
+  function closeDetail(restoreFocus, preserveSelection) {
     if (!activePanel) { return; }
     var panel = activePanel;
     var target = returnTarget;
@@ -89,7 +89,7 @@
     activePanel = null;
     returnTarget = null;
     syncDrawer();
-    document.dispatchEvent(new CustomEvent("detailclosed", { detail: panel.id }));
+    if (!preserveSelection) { document.dispatchEvent(new CustomEvent("detailclosed", { detail: panel.id })); }
     if (restoreFocus !== false) {
       if (!target || !target.isConnected) {
         target = Array.prototype.slice.call(panel.parentNode.querySelectorAll("button, input, select, [tabindex='0']"))
@@ -124,7 +124,7 @@
   }
 
   document.addEventListener("click", function (event) {
-    if (event.target.closest(".nav-item")) { closeDetail(false); return; }
+    if (event.target.closest(".nav-item")) { return; }
     var source = event.target.closest(".point-pet, .pet-card, #pet-rows tr, #hb-grid .hb-card, #ed-grid .hb-card, #eb-grid .hb-card, #mm-matrix [data-mmkey]");
     if (!source || event.target.closest("[data-mm]")) { return; }
     var panel = source.closest(".workspace").querySelector(".detail-panel");
@@ -199,7 +199,6 @@
     }
     if (filters.search) { add("搜索：" + filters.search, function () { change("f-search", "", "input"); }); }
     if (filters.gender) { add(filters.gender === 1 ? "雄性" : "雌性", function () { change("f-gender", "0"); }); }
-    if (filters.first_catch_only) { add("只看首捕", function () { change("f-first", false); }); }
     if (filters.level_min > 1 || filters.level_max < 100) {
       add("等级 " + filters.level_min + "–" + filters.level_max, function () {
         change("f-level-min", "1", "input"); change("f-level-max", "100", "input");
@@ -216,21 +215,13 @@
       if (chip) { add("系别：" + name, function () { chip.click(); }); }
     });
     summary.hidden = !summary.childElementCount;
-    var first = document.getElementById("quick-first");
     var maxed = document.getElementById("quick-maxed");
-    first.classList.toggle("active", !!filters.first_catch_only);
-    first.setAttribute("aria-pressed", String(!!filters.first_catch_only));
     var isMaxed = filters.level_min === 60 && filters.level_max === 100;
     maxed.classList.toggle("active", isMaxed);
     maxed.setAttribute("aria-pressed", String(isMaxed));
     document.querySelectorAll("#f-natures .chip, #f-types .chip").forEach(function (node) {
       node.setAttribute("aria-pressed", String(node.classList.contains("active")));
     });
-  });
-  document.getElementById("quick-first").addEventListener("click", function () {
-    var input = document.getElementById("f-first");
-    input.checked = !input.checked;
-    input.dispatchEvent(new Event("change", { bubbles: true }));
   });
   document.getElementById("quick-maxed").addEventListener("click", function () {
     var min = document.getElementById("f-level-min");
@@ -239,9 +230,6 @@
     min.value = enabled ? "1" : "60";
     max.value = "100";
     min.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-  document.getElementById("btn-top-settings").addEventListener("click", function () {
-    document.querySelector('.nav-item[data-page="capture"]').click();
   });
 
   window.SpriteLensUI = { openDetail: openDetail, closeDetail: closeDetail };

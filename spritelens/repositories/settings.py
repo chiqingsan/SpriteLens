@@ -65,6 +65,26 @@ class SettingsRepository:
             value = self._load().get(key, default)
         return value if isinstance(value, str) else default
 
+    def get_value(self, key: str, default: Any = None) -> Any:
+        with self._lock:
+            return self._load().get(key, default)
+
+    def set_checked(self, key: str, value: Any) -> None:
+        """界面显式保存必须把失败传回调用者；写入成功后才更新内存。"""
+        self.update_checked(key, lambda previous: value)
+
+    def update_checked(self, key: str, transform) -> Any:
+        """持锁合并并保存，避免并发的部分偏好更新互相覆盖。"""
+        with self._lock:
+            value = transform(self._load().get(key))
+            pending = {**self._cache, key: value}
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self._path.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(pending, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            tmp.replace(self._path)
+            self._cache = pending
+            return value
+
     def get_bool(self, key: str, default: bool = False) -> bool:
         with self._lock:
             value = self._load().get(key, default)

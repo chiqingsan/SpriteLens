@@ -109,9 +109,12 @@ def _smoke_check_assets() -> int:
         else:
             failures.append(f"{label}缺失: {path}")
 
-    for name in ("index.html", "boot.js", "ui.js", "app.js", "app.css", "ui.css"):
+    for name in ("index.html", "boot.js", "ui.js", "app.js", "app.css", "ui.css", "themes.css", "appearance.js", "pet-presentation.js", "pet-filters.js", "backpack-controls.js", "icons.js", "icons/sprite.svg"):
         if not (STATIC_DIR / name).is_file():
             failures.append(f"前端文件缺失: {STATIC_DIR / name}")
+
+    if not (spritelens.paths.static_dir() / "pet_media.json").is_file():
+        failures.append("精灵图片映射缺失: pet_media.json")
 
     if spritelens.paths.project_root() != Path(__file__).resolve().parent.parent:
         print(f"[smoke] 冻结态资源根: {spritelens.paths.project_root()}")

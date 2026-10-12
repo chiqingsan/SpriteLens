@@ -424,6 +424,8 @@ class ColorCardTests(unittest.TestCase):
                 return SimpleNamespace(base_name="绿色", mix_name="粉色") if cid == "29" else None
             def card_id_for(self, t, v):
                 return "29"
+            def effect_for(self, t, v):
+                return {"card_id": "29", "particle_id": 1}
 
         payload = colors_payload(repo, Catalog(), None)
         self.assertEqual(payload["pet_total"], 1)
@@ -436,7 +438,7 @@ class ColorCardTests(unittest.TestCase):
             nature=1, gender=gender, blood_id=1, talent_rank=3,
             is_first_catch=False, base_conf_id=base_conf_id,
             attributes=(PetAttribute(),) * 6, height=0, weight=0, voice=0,
-            glass_type=1, glass_value=1048605, skills=(),
+            glass_type=1, glass_value=1048605, mutation_type=8, skills=(),
         )
 
 

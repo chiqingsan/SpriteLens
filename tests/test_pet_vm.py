@@ -114,10 +114,6 @@ class PetViewModelTest(unittest.TestCase):
         self.vm.set_talent_min(5)
         self.assertEqual(sorted(p.gid for p in self.vm.filtered_pets()), [1, 4])
 
-    def test_first_catch_filter(self):
-        self.vm.set_first_catch_only(True)
-        self.assertEqual(sorted(p.gid for p in self.vm.filtered_pets()), [1, 4])
-
     def test_gender_composes_and_resets(self):
         self.repo._pets[2] = replace(self.repo._pets[2], gender=2)
         self.repo._pets[3] = replace(self.repo._pets[3], gender=0)
@@ -153,7 +149,6 @@ class PetViewModelTest(unittest.TestCase):
     def test_reset_filters(self):
         self.vm.set_search("火")
         self.vm.set_level_range(50, 60)
-        self.vm.set_first_catch_only(True)
         self.assertTrue(self.vm.filters.active)
         self.vm.reset_filters()
         self.assertFalse(self.vm.filters.active)
@@ -179,7 +174,7 @@ class PetViewModelTest(unittest.TestCase):
     def test_stats(self):
         stats = self.vm.stats()
         self.assertEqual(stats.total, 4)
-        self.assertEqual(stats.first_catch, 2)
+        self.assertFalse(hasattr(stats, "first_catch"))
         self.assertEqual(stats.maxed, 1)  # gid4 Lv60
         self.assertEqual(stats.max_level, 60)
         # 系别分布：火(1+4) → 2 只，水(2) → 1，火/草(3) 主系别为火 → 并入火

@@ -172,7 +172,9 @@ class LocalServerTest(unittest.TestCase):
     def test_pets_filtering_via_query(self):
         base = f"http://127.0.0.1:{self.server.port}"
         _, payload = _http_get(f"{base}/api/pets?first_catch=1", token=self.server.token)
-        self.assertEqual([p["gid"] for p in payload["pets"]], [1])
+        self.assertEqual([p["gid"] for p in payload["pets"]], [1, 2])
+        self.assertNotIn("first_catch_only", payload["filters"])
+        self.assertNotIn("is_first_catch", payload["pets"][0])
 
         _, payload = _http_get(
             f"{base}/api/pets?search={urllib.parse.quote('火')}", token=self.server.token
@@ -196,7 +198,7 @@ class LocalServerTest(unittest.TestCase):
             self.assertEqual(payload["filters"]["gender"], 2)
 
             _, payload = _http_get(f"{base}?gender=1&first_catch=1", token=self.server.token)
-            self.assertEqual([pet["gid"] for pet in payload["pets"]], [1])
+            self.assertEqual([pet["gid"] for pet in payload["pets"]], [1, 2])
             self.assertEqual(payload["filters"]["gender"], 1)
 
             _, payload = _http_get(f"{base}?gender=99", token=self.server.token)
@@ -213,7 +215,7 @@ class LocalServerTest(unittest.TestCase):
         for key in ("gid", "name", "level", "stats", "height_text", "weight_text", "talent_color"):
             self.assertIn(key, row)
         self.assertEqual(len(row["stats"]), 6)
-        self.assertEqual(row["height_text"], "1.21m")
+        self.assertEqual(row["height_text"], "1.21 m")
 
     def test_capture_endpoints(self):
         base = f"http://127.0.0.1:{self.server.port}"
@@ -266,8 +268,8 @@ class LocalServerTest(unittest.TestCase):
         for item in payload["stats"]["types"]:
             self.assertIn("color", item)
 
-    def test_clear_snapshot_endpoint(self):
-        """清空快照：独立实例验证（class 级服务共享数据，不能污染其他用例）。"""
+    def test_removed_clear_snapshot_endpoints(self):
+        """已移除清空功能：旧接口不再清理当前会话。"""
         with tempfile.TemporaryDirectory() as tmp:
             context = _make_context(Path(tmp), pets=(_pet(9, name="临时", level=10),))
             server = LocalServer(context, token="clear-token", port=0)
@@ -277,10 +279,11 @@ class LocalServerTest(unittest.TestCase):
                 _, before = _http_get(f"{base}/api/pets", token=server.token)
                 self.assertEqual(before["total"], 1)
 
-                status, after = _http_post(f"{base}/api/pets/clear", server.token, {})
-                self.assertEqual(status, 200)
-                self.assertEqual(after["total"], 0)
-                self.assertEqual(after["pets"], [])
+                for path in ("/api/pets/clear", "/api/egg-box/clear"):
+                    status, _ = _http_post(base + path, server.token, {})
+                    self.assertEqual(status, 404)
+                _, after = _http_get(f"{base}/api/pets", token=server.token)
+                self.assertEqual(after["total"], 1)
             finally:
                 server.stop()
 
@@ -371,7 +374,7 @@ class PayloadsUnitTest(unittest.TestCase):
             payload = overview_payload(context.pet_vm, context.pet_repository, None)
             self.assertIsNone(payload["identity"])
             self.assertEqual(payload["stats"]["total"], 1)
-            self.assertEqual(payload["stats"]["first_catch"], 1)
+            self.assertNotIn("first_catch", payload["stats"])
             self.assertEqual(payload["stats"]["max_level"], 61)
             self.assertEqual(payload["stats"]["maxed"], 1)
 

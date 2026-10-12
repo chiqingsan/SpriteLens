@@ -41,92 +41,25 @@
 
   /* ── 阴影三层级：面板静置 / 卡片悬停 / 浮层。
      学蛋神克制用阴影，质感主要靠 1px 描边 + surface 分层底色 ── */
-  --shadow: 0 2px 8px rgba(52, 64, 51, .04);
-  --shadow-hover: 0 4px 12px rgba(52, 64, 51, .08);
-  --shadow-pop: 0 10px 24px rgba(35, 48, 33, .20);
-  --shadow-inset: inset 0 -6px 12px rgba(0, 0, 0, .12); /* 头像底部内阴影 */
 
   /* ── 品牌与基底 ── */
-  --bg: #f6f6ed;
-  --panel: #ffffff;          /* 白面板/白输入底（历史散布的 #fff 底色统一走它） */
-  --line: #dce1d1;
-  --line-soft: #edf0e7;      /* 表格内弱分隔，比 --line 浅一档 */
-  --ink: #344033;
-  --ink-soft: #455543;
-  --muted: #64705f;
-  --muted-2: #64705f;        /* 次要文字仍保持可读对比度 */
-  --white: #ffffff;          /* 彩色底上的白字（底色请用 --panel） */
 
   /* ── 表面分层：由浅到深（收敛历史六种近似浅灰散值） ── */
-  --surface-1: #fafbf6;      /* 工具条/分页条底 */
-  --surface-2: #f4f6ee;      /* 常用次级底：行悬停、账号行、chip */
-  --surface-3: #edf0e5;      /* 更深一档：轨道、占位头像、按钮静置底 */
-  --surface-4: #e3e9d8;      /* 按压/悬停最深档 */
-  --sidebar-bg: #eef2e7;
-  --sidebar-text: #455543;
-  --sidebar-muted: #68755f;
-  --sidebar-line: #d8e0ce;
-  --sidebar-hover: #e2e9d8;
-  --selection-mark: #455f35;
 
   /* 沿用变量名以兼容现有组件；主色采用可承载白字的深绿。 */
-  --teal: #5f7d48;
-  --teal-dark: #455f35;
-  --teal-deep: #34482c;
-  --teal-soft: #edf2df;
-  --teal-bright: #73905a;
-  --focus-ring: #5f7d48;
-  --accent: #e1ec8f;
-  --on-accent: #455543;
 
   /* 琥珀家族：处理中状态 / 提示条 */
-  --amber: #f5a623;
-  --amber-bright: #f7bd63;
-  --amber-soft: #fdf4e3;
-  --amber-line: #f0d9a8;
-  --amber-ink: #7a5a12;
-  --on-amber: #3d2c00;
-  --amber-progress: rgba(122, 90, 18, .16); /* 提示条内进度槽底 */
 
   /* 危险家族：只留给真正破坏性操作；数值下降用 --negative */
-  --danger: #e35d6a;
-  --danger-soft: #fdeaec;
-  --danger-hover: #fbdfe2;
-  --danger-ink: #a83843;
-  --positive: #4b7139;
-  --negative: #d0576a;
-  --ok: #8cbd6b;
 
   /* 性别：浅底（卡片底色）+ 强色（环形标记）+ ink（小字需对比度） */
-  --male: #eaf6ff;
-  --male-strong: #5b9dd9;
-  --male-ink: #326aa0;
-  --female: #fff0f4;
-  --female-strong: #d98ab0;
-  --female-ink: #a13d6b;
 
   /* 侧栏深底：渐变端与其上的文字/分隔/悬停 */
-  --deep-1: #2d3c2b;
-  --deep-2: #202b21;
-  --deep-text: #e5ecdc;
-  --deep-text-dim: #c3ceb8;
-  --deep-line: rgba(229, 236, 220, .16);
-  --deep-hover: rgba(229, 236, 220, .10);
-  --deep-text-faint: #aebb9f;
 
   /* 解码树语法高亮（colorizeDecoded 白名单着色，与 JS 侧类名一一对应） */
-  --code-name: #05555f;
-  --code-type: #8a6d1f;
-  --code-value: #0b3c4a;
-  --code-leaf: #9aa9ae;
-  --code-text: #7a4fb5;
 
-  --overlay: rgba(32, 43, 33, .45);
 
   /* 图表三色：体型条（身高/体重/声音），与 .body-bar i 的类名对应 */
-  --chart-h: #4f9df7;
-  --chart-w: #f0a63c;
-  --chart-v: #9a7ef0;
 
   --sidebar: 208px;
   --topbar: 74px;
@@ -228,10 +161,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 #main-nav {
   display: grid; gap: var(--space-1); padding-top: 12px;
   overflow-y: auto; min-height: 0;
-  scrollbar-width: thin;
 }
-#main-nav::-webkit-scrollbar { width: 4px; }
-#main-nav::-webkit-scrollbar-thumb { background: var(--sidebar-line); border-radius: 999px; }
 /* 采集切换按钮：开始/停止都用主色（红色带警告意味，用户反馈不协调），
    仅以文字区分；处理中为琥珀脉冲 */
 .top-actions .primary-button.toggle-busy {
@@ -363,7 +293,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .muted { color: var(--muted); font-size: var(--fs-xs); }
 
 /* 概览 */
-.stat-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-5); margin-bottom: var(--space-5); }
+.stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-5); margin-bottom: var(--space-5); }
 .stat-card {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -557,7 +487,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-soft);
   white-space: nowrap;
 }
-.first-flag { color: var(--teal); font-weight: 800; }
 
 /* 详情面板 */
 .detail-panel {
@@ -712,7 +641,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   margin-left: auto; font-weight: 800; color: var(--white);
   border-radius: var(--radius-sm); padding: 1px var(--space-1); font-size: var(--fs-3xs);
 }
-.pc-first { color: var(--teal); font-weight: 800; }
 
 /* 分页控件（对标蛋神「第 N/M 箱」） */
 .pager {
@@ -894,38 +822,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 }
 .fl-card .pc-avatar {
   width: 40px; height: 40px; border-radius: var(--radius-md); font-size: var(--fs-lg);
-  /* 花种无 glass 数据，底色不像背包卡由 glassStyle 注入——回退与图鉴占位一致 */
+  /* 花种占位沿用图鉴占位色。 */
   background: var(--surface-3); color: var(--muted-2);
 }
 .fl-info { display: grid; gap: var(--space-0); min-width: 0; }
 .fl-info b { font-size: var(--fs-md); }
 .fl-info small { color: var(--muted); }
 
-/* 点阵背包（对标蛋神默认视图）：密集小格 + hover 放大预览 */
-.pet-grid.point-grid {
-  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
-  gap: var(--space-2);
-}
-.point-pet {
-  border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--panel);
-  padding: var(--space-1); display: grid; gap: var(--space-1); justify-items: center;
-  position: relative;
-}
-.point-pet.selected { border-color: var(--teal); background: var(--teal-soft); }
-.point-avatar {
-  width: 44px; height: 44px; border-radius: var(--radius-lg); overflow: hidden;
-  display: grid; place-items: center; position: relative;
-  background: var(--surface-3); color: var(--muted-2); font-size: var(--fs-lg); font-weight: 800;
-}
-.point-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
-.point-level { font-size: var(--fs-2xs); color: var(--muted); font-variant-numeric: tabular-nums; }
-.point-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-xs); }
-.point-grid .point-pet:hover {
-  transform: translateY(-2px); z-index: 10;
-  box-shadow: var(--shadow); border-color: var(--teal);
-  background: var(--panel);
-}
-.point-grid .point-pet { transition: transform var(--motion-base) var(--motion-spring), box-shadow var(--motion-base) var(--motion-ease); }
+/* 箱位卡片组件和响应式规则集中在 ui.css。 */
 
 /* 种公母库 */
 .bl-groups { display: grid; gap: var(--space-3); }

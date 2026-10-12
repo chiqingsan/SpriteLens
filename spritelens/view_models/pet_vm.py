@@ -2,7 +2,7 @@
 
 纯 Python（零 UI 框架依赖），本地服务与前端只消费它的输出。
 筛选维度对 roco_helper 的筛选器：搜索（名字/gid/conf_id）、等级范围、
-性格多选、系别多选、天赋阶下限、只看首捕。系别筛选依赖静态物种表
+性格多选、系别多选、天赋阶下限。系别筛选依赖静态物种表
 （可选注入；缺省时该维度被忽略，不抛错）。
 """
 
@@ -12,6 +12,7 @@ from dataclasses import dataclass, field, replace
 
 from spritelens.domain.pets import Pet
 from spritelens.domain.static_data import StaticData
+from spritelens.domain.measurements import range_position
 from spritelens.services.pet_repository import PetRepository
 
 # 排序键（UI 排序菜单用）
@@ -22,6 +23,9 @@ SORT_KEYS: tuple[tuple[str, str], ...] = (
     ("talent_rank", "天赋阶"),
     ("stat_sum", "六维总和"),
     ("name", "名字"),
+    ("height", "身高"),
+    ("weight", "体重"),
+    ("voice", "声音"),
 )
 
 
@@ -35,8 +39,19 @@ class PetFilters:
     natures: frozenset[int] = frozenset()
     type_names: frozenset[str] = frozenset()
     talent_min: int = 0
-    first_catch_only: bool = False
     gender: int = 0
+    egg_groups: frozenset[str] = frozenset()
+    egg_mode: str = "any"
+    height_min: float | None = None
+    height_max: float | None = None
+    weight_min: float | None = None
+    weight_max: float | None = None
+    voice_min: float | None = None
+    voice_max: float | None = None
+    height_position_min: float | None = None
+    height_position_max: float | None = None
+    weight_position_min: float | None = None
+    weight_position_max: float | None = None
 
     @property
     def active(self) -> bool:
@@ -45,8 +60,11 @@ class PetFilters:
             or self.natures
             or self.type_names
             or self.talent_min > 0
-            or self.first_catch_only
             or self.gender
+            or self.egg_groups
+            or any(getattr(self, key) is not None for key in (
+                "height_min", "height_max", "weight_min", "weight_max", "voice_min", "voice_max",
+                "height_position_min", "height_position_max", "weight_position_min", "weight_position_max"))
             or self.level_min > 1
             or self.level_max < 100
         )
@@ -57,7 +75,6 @@ class PetStats:
     """仓库聚合统计（概览页与页内统计条共用）。"""
 
     total: int = 0
-    first_catch: int = 0
     maxed: int = 0
     max_level: int = 0
     type_counts: tuple[tuple[str, int], ...] = field(default_factory=tuple)
@@ -95,11 +112,30 @@ class PetViewModel:
     def set_talent_min(self, rank: int) -> None:
         self._filters = replace(self._filters, talent_min=max(0, int(rank)))
 
-    def set_first_catch_only(self, enabled: bool) -> None:
-        self._filters = replace(self._filters, first_catch_only=bool(enabled))
-
     def set_gender(self, gender: int) -> None:
         self._filters = replace(self._filters, gender=gender if gender in (1, 2) else 0)
+
+    def set_egg_groups(self, groups: frozenset[str], mode: str = "any") -> None:
+        self._filters = replace(self._filters, egg_groups=groups, egg_mode="all" if mode == "all" else "any")
+
+    def set_measurement_ranges(self, **values: object) -> None:
+        import math
+
+        normalized = {}
+        for field in ("height", "weight", "voice", "height_position", "weight_position"):
+            pair = []
+            for bound in ("min", "max"):
+                try:
+                    value = float(values.get(f"{field}_{bound}"))
+                    if not math.isfinite(value) or (field != "voice" and value < 0) or (field.endswith("_position") and value > 100):
+                        value = None
+                except (ValueError, TypeError):
+                    value = None
+                pair.append(value)
+            if all(v is not None for v in pair) and pair[0] > pair[1]:
+                pair.reverse()
+            normalized.update({f"{field}_min": pair[0], f"{field}_max": pair[1]})
+        self._filters = replace(self._filters, **normalized)
 
     def set_sort(self, key: str, *, descending: bool = False) -> None:
         if key not in {k for k, _ in SORT_KEYS}:
@@ -142,7 +178,7 @@ class PetViewModel:
         return self._repository.version
 
     def stats(self) -> PetStats:
-        """聚合统计：总量/首捕/满级/最高等级/系别分布（按主系别）。"""
+        """聚合统计：总量/满级/最高等级/系别分布（按主系别）。"""
         pets = self._repository.snapshot()
         if not pets:
             return PetStats()
@@ -152,7 +188,6 @@ class PetViewModel:
         ranked = tuple(sorted(counts.items(), key=lambda kv: kv[1], reverse=True))
         return PetStats(
             total=len(pets),
-            first_catch=sum(1 for p in pets if p.is_first_catch),
             maxed=sum(1 for p in pets if p.level >= 60),
             max_level=max(p.level for p in pets),
             type_counts=ranked,
@@ -161,7 +196,9 @@ class PetViewModel:
     def nature_options(self) -> tuple[tuple[int, str], ...]:
         """出现过的性格（id, 名字），供筛选器多选。"""
         seen: dict[int, str] = {}
+        counts: dict[int, int] = {}
         for pet in self._repository.snapshot():
+            counts[pet.nature] = counts.get(pet.nature, 0) + 1
             if pet.nature in seen:
                 continue
             name = str(pet.nature)
@@ -170,7 +207,7 @@ class PetViewModel:
                 if info is not None:
                     name = info.name
             seen[pet.nature] = name
-        return tuple(sorted(seen.items(), key=lambda kv: kv[0]))
+        return tuple(sorted(seen.items(), key=lambda kv: (-counts[kv[0]], kv[0])))
 
     def type_options(self) -> tuple[str, ...]:
         """出现过的系别名（依赖静态表；无静态表返回空）。"""
@@ -188,6 +225,18 @@ class PetViewModel:
         if self._static is None:
             return None
         return self._static.species(pet.base_conf_id)
+
+    def location_of(self, pet: Pet):
+        location = self._repository.location(pet.gid)
+        if location:
+            return location.payload()
+        for team in self._repository.backpack().teams:
+            if pet.gid in team.slots:
+                return {"team_id": team.box_id, "slot": team.slots.index(pet.gid) + 1, "historical": team.historical}
+        return None
+
+    def backpack(self):
+        return self._repository.backpack()
 
     def talent_rank_max(self) -> int:
         pets = self._repository.snapshot()
@@ -234,10 +283,32 @@ class PetViewModel:
                 return False
             if filters.talent_min and pet.talent_rank < filters.talent_min:
                 return False
-            if filters.first_catch_only and not pet.is_first_catch:
-                return False
             if filters.gender and pet.gender != filters.gender:
                 return False
+            for field, scale in (("height", 100), ("weight", 1000), ("voice", 1)):
+                value = getattr(pet, field) / scale
+                low, high = getattr(filters, field + "_min"), getattr(filters, field + "_max")
+                if (low is not None or high is not None) and getattr(pet, field) == 0:
+                    return False  # 当前协议模型的零值表示未取得测量值。
+                if low is not None and value < low or high is not None and value > high:
+                    return False
+            if filters.egg_groups:
+                species = static.species(pet.base_conf_id) if static else None
+                groups = set(species.egg_groups) if species else set()
+                if (filters.egg_mode == "all" and not filters.egg_groups <= groups
+                        or filters.egg_mode != "all" and not groups & filters.egg_groups):
+                    return False
+            for field in ("height", "weight"):
+                low = getattr(filters, field + "_position_min")
+                high = getattr(filters, field + "_position_max")
+                if low is None and high is None:
+                    continue
+                species = static.species(pet.base_conf_id) if static else None
+                ratio = range_position(getattr(pet, field), getattr(species, field + "_range", (0, 0)))["ratio"]
+                if ratio is None or ratio < 0 or ratio > 1:
+                    return False
+                if low is not None and ratio * 100 < low or high is not None and ratio * 100 > high:
+                    return False
             if filters.type_names:
                 if static is None:
                     return True  # 无静态表时该维度不可用，视为通过
@@ -247,6 +318,14 @@ class PetViewModel:
             return True
 
         return tuple(p for p in pets if matches(p))
+
+    def egg_group_options(self) -> tuple[str, ...]:
+        groups = set()
+        for pet in self._repository.snapshot():
+            species = self._static.species(pet.base_conf_id) if self._static else None
+            if species:
+                groups.update(species.egg_groups)
+        return tuple(sorted(groups))
 
     def _apply_sort(self, pets: tuple[Pet, ...]) -> tuple[Pet, ...]:
         key = self._sort_key

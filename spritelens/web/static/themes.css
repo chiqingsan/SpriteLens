@@ -1,0 +1,160 @@
+/* 三套初始精灵配色；组件规则共用，游戏资源色保持原值。 */
+:root {
+  --shadow: 0 2px 8px rgba(52, 64, 51, .04);
+  --shadow-hover: 0 4px 12px rgba(52, 64, 51, .08);
+  --shadow-pop: 0 10px 24px rgba(35, 48, 33, .20);
+  --shadow-inset: inset 0 -6px 12px rgba(0, 0, 0, .12);
+  --bg: #f6f6ed;
+  --panel: #ffffff;          /* 白面板/白输入底（历史散布的 #fff 底色统一走它） */
+  --line: #dce1d1;
+  --line-soft: #edf0e7;      /* 表格内弱分隔，比 --line 浅一档 */
+  --ink: #344033;
+  --ink-soft: #455543;
+  --muted: #64705f;
+  --muted-2: #64705f;        /* 次要文字仍保持可读对比度 */
+  --white: #ffffff;          /* 彩色底上的白字（底色请用 --panel） */
+  --surface-1: #fafbf6;      /* 工具条/分页条底 */
+  --surface-2: #f4f6ee;      /* 常用次级底：行悬停、账号行、chip */
+  --surface-3: #edf0e5;      /* 更深一档：轨道、占位头像、按钮静置底 */
+  --surface-4: #e3e9d8;      /* 按压/悬停最深档 */
+  --sidebar-bg: #eef2e7;
+  --sidebar-text: #455543;
+  --sidebar-muted: #68755f;
+  --sidebar-line: #d8e0ce;
+  --sidebar-hover: #e2e9d8;
+  --selection-mark: #455f35;
+  --teal: #5f7d48;
+  --teal-dark: #455f35;
+  --teal-deep: #34482c;
+  --teal-soft: #edf2df;
+  --teal-bright: #73905a;
+  --focus-ring: #5f7d48;
+  --accent: #e1ec8f;
+  --on-accent: #455543;
+  --amber: #f5a623;
+  --amber-bright: #f7bd63;
+  --amber-soft: #fdf4e3;
+  --amber-line: #f0d9a8;
+  --amber-ink: #7a5a12;
+  --on-amber: #3d2c00;
+  --amber-progress: rgba(122, 90, 18, .16); /* 提示条内进度槽底 */
+  --danger: #e35d6a;
+  --danger-soft: #fdeaec;
+  --danger-hover: #fbdfe2;
+  --danger-ink: #a83843;
+  --positive: #4b7139;
+  --negative: #d0576a;
+  --ok: #8cbd6b;
+  --male: #eaf6ff;
+  --male-strong: #5b9dd9;
+  --male-ink: #326aa0;
+  --female: #fff0f4;
+  --female-strong: #d98ab0;
+  --female-ink: #a13d6b;
+  --deep-1: #2d3c2b;
+  --deep-2: #202b21;
+  --deep-text: #e5ecdc;
+  --deep-text-dim: #c3ceb8;
+  --deep-line: rgba(229, 236, 220, .16);
+  --deep-hover: rgba(229, 236, 220, .10);
+  --deep-text-faint: #aebb9f;
+  --code-name: #05555f;
+  --code-type: #8a6d1f;
+  --code-value: #0b3c4a;
+  --code-leaf: #607079;
+  --code-text: #7a4fb5;
+  --overlay: rgba(32, 43, 33, .45);
+  --chart-h: #4f9df7;
+  --chart-w: #f0a63c;
+  --chart-v: #9a7ef0;
+}
+
+:root[data-theme="huohua"] {
+  --bg: #faf3ef;
+  --line: #e7d9d0;
+  --line-soft: #f2e7e0;
+  --ink: #48362f;
+  --ink-soft: #614238;
+  --muted: #7e6053;
+  --muted-2: #7e6053;
+  --surface-1: #fdfaf8;
+  --surface-2: #faf1eb;
+  --surface-3: #f2e5dc;
+  --surface-4: #ecd8cd;
+  --sidebar-bg: #f6e9df;
+  --sidebar-text: #664235;
+  --sidebar-muted: #82604c;
+  --sidebar-line: #e5cdbc;
+  --sidebar-hover: #eed8c8;
+  --selection-mark: #914329;
+  --teal: #a64c32;
+  --teal-dark: #823b27;
+  --teal-deep: #603023;
+  --teal-soft: #fae8dd;
+  --teal-bright: #bc6545;
+  --focus-ring: #a64c32;
+  --accent: #f5d5b2;
+  --on-accent: #663c2b;
+  --deep-1: #482e24;
+  --deep-2: #32211c;
+  --deep-text: #f3e7de;
+  --deep-text-dim: #d7c1b3;
+  --deep-text-faint: #c3a697;
+  --overlay: rgba(54, 33, 26, .45);
+  --code-name: #89432d;
+  --code-value: #653929;
+  --code-type: #826010;
+  --code-leaf: #7e6053;
+  --deep-line: rgba(243, 231, 222, .16);
+  --deep-hover: rgba(243, 231, 222, .10);
+  --shadow: 0 2px 8px rgba(54, 33, 26, .04);
+  --shadow-hover: 0 4px 12px rgba(54, 33, 26, .08);
+  --shadow-pop: 0 10px 24px rgba(54, 33, 26, .20);
+}
+
+:root[data-theme="shuilanlan"] {
+  --bg: #f0f6fa;
+  --line: #d4e1e9;
+  --line-soft: #e7eff5;
+  --ink: #293f4e;
+  --ink-soft: #39566a;
+  --muted: #5a7384;
+  --muted-2: #5a7384;
+  --surface-1: #f8fbfd;
+  --surface-2: #edf4f9;
+  --surface-3: #e4eef5;
+  --surface-4: #d7e6f1;
+  --sidebar-bg: #e5f0f7;
+  --sidebar-text: #34566e;
+  --sidebar-muted: #567488;
+  --sidebar-line: #cbdfea;
+  --sidebar-hover: #d6e7f2;
+  --selection-mark: #235e87;
+  --teal: #286d9b;
+  --teal-dark: #225775;
+  --teal-deep: #1e435b;
+  --teal-soft: #e1f0fa;
+  --teal-bright: #4387b4;
+  --focus-ring: #286d9b;
+  --accent: #c4e5f6;
+  --on-accent: #294f69;
+  --deep-1: #223d4f;
+  --deep-2: #182c3a;
+  --deep-text: #e4f0f8;
+  --deep-text-dim: #b9d0df;
+  --deep-text-faint: #9eb9cc;
+  --overlay: rgba(25, 47, 65, .45);
+  --code-name: #235f87;
+  --code-value: #234558;
+  --code-type: #816723;
+  --code-leaf: #5a7384;
+  --deep-line: rgba(228, 240, 248, .16);
+  --deep-hover: rgba(228, 240, 248, .10);
+  --shadow: 0 2px 8px rgba(25, 47, 65, .04);
+  --shadow-hover: 0 4px 12px rgba(25, 47, 65, .08);
+  --shadow-pop: 0 10px 24px rgba(25, 47, 65, .20);
+}
+
+.theme-miaomiao { --theme-preview: #edf2df; --theme-border: #73905a; }
+.theme-huohua { --theme-preview: #fae8dd; --theme-border: #bc6545; }
+.theme-shuilanlan { --theme-preview: #e1f0fa; --theme-border: #4387b4; }

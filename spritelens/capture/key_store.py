@@ -9,6 +9,9 @@
 
 from __future__ import annotations
 
+import json
+import time
+from dataclasses import dataclass
 from pathlib import Path
 
 from spritelens.logs import get_logger
@@ -17,6 +20,15 @@ logger = get_logger("key_store")
 
 KEY_LEN = 16
 _HEX_CHARS = set("0123456789abcdefABCDEF")
+
+
+@dataclass(frozen=True)
+class SessionCheckpoint:
+    flow_id: str
+    key: bytes
+    identity: tuple[int, str, int] | None = None
+    server_sequence: int = 0
+
 
 
 def parse_key_text(text: str) -> bytes:
@@ -45,6 +57,43 @@ class KeyStore:
     def __init__(self, keys_dir: Path) -> None:
         self._dir = keys_dir
         self._latest = keys_dir / "latest.key"
+        self._session = keys_dir / "session.json"
+
+    def save_session(self, checkpoint: SessionCheckpoint) -> None:
+        """原子保存会话关联；密钥仅写本地文件，不进入日志或界面。"""
+        record = {"version": 1, "flow_id": checkpoint.flow_id, "key_hex": checkpoint.key.hex(),
+                  "identity": list(checkpoint.identity) if checkpoint.identity else None,
+                  "server_sequence": checkpoint.server_sequence, "updated_at": time.time()}
+        try:
+            self._session.parent.mkdir(parents=True, exist_ok=True)
+            temporary = self._session.with_suffix(".json.tmp")
+            temporary.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
+            temporary.replace(self._session)
+        except OSError as exc:
+            logger.warning("会话接续信息保存失败: %s", exc)
+
+    def load_session(self) -> SessionCheckpoint | None:
+        try:
+            record = json.loads(self._session.read_text(encoding="utf-8"))
+            if not isinstance(record, dict) or record.get("version") != 1:
+                return None
+            key = bytes.fromhex(record["key_hex"])
+            flow = record["flow_id"]
+            sequence = record["server_sequence"]
+            identity = record.get("identity")
+            if (len(key) != KEY_LEN or not isinstance(flow, str) or not flow
+                    or type(sequence) is not int or not 0 <= sequence <= 0xFFFFFFFF):
+                return None
+            if identity is not None:
+                if (not isinstance(identity, list) or len(identity) != 3
+                        or type(identity[0]) is not int or identity[0] <= 0
+                        or not isinstance(identity[1], str)
+                        or type(identity[2]) is not int or identity[2] < 0):
+                    return None
+                identity = tuple(identity)
+            return SessionCheckpoint(flow, key, identity, sequence)
+        except (OSError, ValueError, TypeError, KeyError):
+            return None
 
     def save_latest(self, key: bytes, flow_id: str) -> None:
         text = (
@@ -64,7 +113,8 @@ class KeyStore:
             first_line = self._latest.read_text(encoding="utf-8").splitlines()[0]
             if not first_line.startswith("key_hex="):
                 return None
-            return bytes.fromhex(first_line.split("=", 1)[1].strip())
-        except (OSError, ValueError) as exc:
+            key = bytes.fromhex(first_line.split("=", 1)[1].strip())
+            return key if len(key) == KEY_LEN else None
+        except (OSError, ValueError, IndexError) as exc:
             logger.warning("key 读取失败: %s", exc)
             return None
