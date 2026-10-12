@@ -129,54 +129,93 @@ class LocalServer(CaptureRoutesMixin):
     def start(self, *, timeout: float = 15.0) -> None:
         """启动后台事件循环并等待端口就绪（失败抛异常，由入口决定提示）。
 
-        超时回收（S02）：等待超时不能把仍在后台启动的事件循环留在进程
-        里——标记停止并请求循环退出，让启动线程尽快收尾。
+        超时回收（D06）：超时后走确定性取消握手，覆盖三种到达时机——
+        loop 未创建（_run_loop 入口直接退出）、启动中（loop.stop 让
+        run_until_complete 抛出并清理半成品 runner）、绑定后（启动完成
+        前复查 _stopped，转入 _shutdown 后退出，不进入 run_forever）。
+        后台线程未在回收预算内退出时保留句柄供 stop 重试。
         """
         if self._thread is not None:
             raise RuntimeError("服务已启动")
         self._thread = threading.Thread(target=self._run_loop, name="spritelens-http", daemon=True)
         self._thread.start()
         if not self._ready.wait(timeout):
-            # 超时：通知后台循环停止（若它稍后才完成绑定，_shutdown 会收掉）
             logger.error("本地服务启动超时（%ss），回收后台启动", timeout)
-            self._stopped = True
-            loop = self._loop
-            if loop is not None and loop.is_running():
-                loop.call_soon_threadsafe(loop.stop)
+            self._abort_start()
             raise TimeoutError(f"本地服务启动超时（{timeout}s）")
         if self._start_error is not None:
+            self._thread.join(timeout=5.0)
+            self._thread = None
             raise self._start_error
         logger.info("本地服务已启动: http://%s:%d", self._host, self._bound_port or 0)
 
-    def stop(self, *, timeout: float = 5.0) -> None:
-        """停服务、关事件循环；幂等。"""
+    def _abort_start(self) -> None:
+        """启动超时的取消握手：停 loop、等线程退出（有界）、清句柄。"""
+        self._stopped = True
         loop = self._loop
+        if loop is not None and not loop.is_closed():
+            try:
+                loop.call_soon_threadsafe(loop.stop)
+            except RuntimeError:
+                pass  # 循环已关闭：不再触碰
         thread = self._thread
-        if loop is None or thread is None:
+        if thread is not None:
+            thread.join(timeout=5.0)
+            if thread.is_alive():
+                logger.warning("启动线程未在回收预算内退出；保留句柄供 stop 重试")
+                return
+        self._thread = None
+        self._loop = None
+        self._runner = None
+
+    def stop(self, *, timeout: float = 5.0) -> None:
+        """停服务、关事件循环；幂等（重复 stop 安全，不触碰已关闭循环）。"""
+        thread = self._thread
+        if thread is None:
             return
         self._stopped = True
-        try:
-            future = asyncio.run_coroutine_threadsafe(self._shutdown(), loop)
-            future.result(timeout=timeout)
-        except Exception as exc:  # noqa: BLE001 - 停止失败不阻断退出
-            logger.warning("本地服务停止异常: %s", exc)
-        loop.call_soon_threadsafe(loop.stop)
+        loop = self._loop
+        if loop is not None and not loop.is_closed():
+            try:
+                future = asyncio.run_coroutine_threadsafe(self._shutdown(), loop)
+                future.result(timeout=timeout)
+            except Exception as exc:  # noqa: BLE001 - 停止失败不阻断退出
+                logger.warning("本地服务停止异常: %s", exc)
+            try:
+                loop.call_soon_threadsafe(loop.stop)
+            except RuntimeError:
+                pass  # 循环已关闭
         thread.join(timeout=timeout)
         self._thread = None
         self._loop = None
         self._runner = None
 
     def _run_loop(self) -> None:
+        if self._stopped:  # 超时发生在 loop 创建前：不进入启动
+            self._ready.set()
+            return
         loop = asyncio.new_event_loop()
         self._loop = loop
         asyncio.set_event_loop(loop)
         # 窗口关闭时浏览器会先断开连接，asyncio 默认处理器会把它当异常打印
         # （WinError 10054）；本地服务下这是正常收尾，降为 debug 级。
         loop.set_exception_handler(_quiet_connection_reset)
+        if self._stopped:  # 创建与检查之间的竞态窗口：不绑定
+            self._ready.set()
+            loop.close()
+            return
         try:
             loop.run_until_complete(self._start_async())
         except Exception as exc:  # noqa: BLE001 - 启动失败转给 start()
-            self._start_error = exc
+            if not self._stopped:  # 取消算不上启动错误
+                self._start_error = exc
+            self._ready.set()
+            self._finish_start_abort(loop)
+            loop.close()
+            return
+        if self._stopped:
+            # 绑定完成但已被判超时：立即清整退出，绝不进入 run_forever
+            self._finish_start_abort(loop)
             self._ready.set()
             loop.close()
             return
@@ -184,7 +223,47 @@ class LocalServer(CaptureRoutesMixin):
         try:
             loop.run_forever()
         finally:
+            # 兜底（D06）：正常 stop 已清理过则 no-op；取消/异常路径确保
+            # runner 不随本地变量残留（socket 随 loop 关闭前回收）
+            self._cleanup_partial_runner(loop)
             loop.close()
+
+    def _finish_start_abort(self, loop: asyncio.AbstractEventLoop) -> None:
+        """启动取消/超时后的收尾：取消未完成任务 → 清 runner。
+
+        取消路径下 run_until_complete 被 loop.stop 打断，_start_async 与
+        push_loop 任务可能仍 pending；loop.close 前必须取消并让它们退出，
+        否则报 "Task was destroyed but it is pending" 且协程资源不回收。
+        """
+        if self._push_task is not None:
+            self._push_task.cancel()
+            self._push_task = None
+        if not loop.is_closed() and not loop.is_running():
+            try:
+                pending = [task for task in asyncio.all_tasks(loop) if not task.done()]
+            except RuntimeError:
+                pending = []
+            if pending:
+                for task in pending:
+                    task.cancel()
+                try:
+                    loop.run_until_complete(
+                        asyncio.gather(*pending, return_exceptions=True)
+                    )
+                except Exception:  # noqa: BLE001 - 收尾失败不阻断关闭
+                    pass
+        self._cleanup_partial_runner(loop)
+
+    def _cleanup_partial_runner(self, loop: asyncio.AbstractEventLoop) -> None:
+        """清理启动中途留下的 runner/site（取消或异常路径）。"""
+        runner = self._runner
+        self._runner = None
+        if runner is None or loop.is_closed() or loop.is_running():
+            return
+        try:
+            loop.run_until_complete(runner.cleanup())
+        except Exception as exc:  # noqa: BLE001 - 清理失败不阻断退出
+            logger.debug("半成品 runner 清理异常: %s", exc)
 
     async def _start_async(self) -> None:
         app = web.Application(
@@ -221,10 +300,16 @@ class LocalServer(CaptureRoutesMixin):
         app.router.add_get("/ws", self._ws)
 
         runner = web.AppRunner(app, access_log=None)
+        # 先登记 runner（D06）：启动中途被取消/超时时，_cleanup_partial_runner
+        # 才能找到半成品并 cleanup；等待点在 setup 与 site.start 之间
+        self._runner = runner
         await runner.setup()
+        if self._stopped:
+            raise RuntimeError("启动已被取消（超时回收）")
         site = web.TCPSite(runner, self._host, self._port)
         await site.start()
-        self._runner = runner
+        if self._stopped:
+            raise RuntimeError("启动已被取消（超时回收）")
         addresses = getattr(runner, "addresses", None) or []
         if addresses:
             self._bound_port = int(addresses[0][1])
@@ -248,8 +333,10 @@ class LocalServer(CaptureRoutesMixin):
             except Exception:  # noqa: BLE001
                 pass
         self._sockets.clear()
-        if self._runner is not None:
-            await self._runner.cleanup()
+        runner = self._runner
+        self._runner = None  # 置空：_run_loop 的兜底清理对正常 stop 变 no-op
+        if runner is not None:
+            await runner.cleanup()
         logger.info("本地服务已停止")
 
     # -- 鉴权 ----------------------------------------------------------

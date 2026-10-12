@@ -1075,6 +1075,86 @@ class BuildRollbackTest(unittest.TestCase):
     def setUp(self):
         self.tmp_path = _make_tmp(self)
 
+    def _isolated_root(self):
+        """隔离数据目录；返回恢复函数。"""
+        import os
+
+        old_root = os.environ.get("SPRITELENS_DATA_ROOT")
+
+        def restore():
+            if old_root is None:
+                os.environ.pop("SPRITELENS_DATA_ROOT", None)
+            else:
+                os.environ["SPRITELENS_DATA_ROOT"] = old_root
+
+        os.environ["SPRITELENS_DATA_ROOT"] = str(self.tmp_path / "data")
+        return restore
+
+    def _stub_environment_probe(self):
+        """屏蔽 Npcap 探测（避免 PowerShell），返回 mock patcher 上下文。"""
+        from unittest import mock
+
+        import spritelens.view_models.capture_vm as vm_mod
+        from spritelens.system.environment import NpcapReport
+
+        return mock.patch.object(
+            vm_mod,
+            "check_npcap",
+            lambda **kwargs: NpcapReport(installed=False, wpcap_path=None, message="(测试桩)"),
+        )
+
+    def test_successful_build_use_close_reclose(self):
+        """D01 回归：正常装配→使用→关闭→重复关闭（此前成功路径必然 NameError）。"""
+        from spritelens.app_context import build_app_context
+
+        restore = self._isolated_root()
+        try:
+            with self._stub_environment_probe():
+                context = build_app_context(autostart=False)
+        finally:
+            restore()
+        try:
+            # 使用：VM 与仓库可读
+            self.assertFalse(context.capture_vm.is_running)
+            self.assertEqual(context.pet_vm.total_count(), 0)
+            self.assertIsNotNone(context.database)
+        finally:
+            context.close()
+        context.close()  # 重复关闭幂等
+        # Database 已关闭：查询报错而不是静默可用
+        with self.assertRaises(Exception):
+            context.database.query("SELECT 1")
+
+    def test_autostart_failure_stops_capture_and_rolls_back(self):
+        """D01：autostart 阶段抛异常也必须停源并回滚已建资源。"""
+        from unittest import mock
+
+        from spritelens.app_context import build_app_context
+        from spritelens.services.capture_service import CaptureService
+        from spritelens.view_models.capture_vm import CaptureViewModel
+
+        restore = self._isolated_root()
+        stopped: list[int] = []
+        original_stop = CaptureService.stop
+
+        def spy_stop(self):
+            stopped.append(1)
+            return original_stop(self)
+
+        try:
+            with self._stub_environment_probe(), \
+                 mock.patch.object(CaptureService, "stop", spy_stop), \
+                 mock.patch.object(
+                     CaptureViewModel, "start_if_autostart",
+                     side_effect=RuntimeError("注入：autostart 失败"),
+                 ):
+                with self.assertRaises(RuntimeError):
+                    build_app_context(autostart=True)
+        finally:
+            restore()
+
+        self.assertTrue(stopped, "autostart 失败后未停源（capture.stop 未调用）")
+
     def test_build_failure_rolls_back_created_resources(self):
         """EggStore 构造处注入失败：Database/PetStore/EventLog 已清理。"""
         import spritelens.repositories.egg_store as egg_store_mod
@@ -1087,19 +1167,14 @@ class BuildRollbackTest(unittest.TestCase):
 
         egg_store_mod.EggStore.__init__ = failing_init  # type: ignore[method-assign]
         # 隔离数据目录：不触碰真实用户库
-        import os
-
-        old_root = os.environ.get("SPRITELENS_DATA_ROOT")
-        os.environ["SPRITELENS_DATA_ROOT"] = str(self.tmp_path / "data")
+        restore = self._isolated_root()
         try:
-            with self.assertRaises(RuntimeError):
-                build_app_context(autostart=False)
+            with self._stub_environment_probe():
+                with self.assertRaises(RuntimeError):
+                    build_app_context(autostart=False)
         finally:
             egg_store_mod.EggStore.__init__ = original_init  # type: ignore[method-assign]
-            if old_root is None:
-                os.environ.pop("SPRITELENS_DATA_ROOT", None)
-            else:
-                os.environ["SPRITELENS_DATA_ROOT"] = old_root
+            restore()
 
         # Database 已被回滚关闭：对库目录的文件句柄应释放（进程内无活跃连接）
         # 通过再次打开验证一致性（Windows 上句柄未释放时重命名/删除会失败）

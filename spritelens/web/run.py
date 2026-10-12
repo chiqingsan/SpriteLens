@@ -31,7 +31,13 @@ SPLASH_BG = "#074f5d"
 
 
 def run_web(*, open_browser: bool = False) -> int:
-    """启动 Web 界面；返回进程退出码。"""
+    """启动 Web 界面；返回进程退出码。
+
+    资源保护（D07）：guard 获取后所有步骤（WebView2 预检、装配、
+    server 构造与启动、等待/窗口）都在统一 finally 覆盖内；任一步失败
+    时，已创建的部分资源（context/server）随 finally 清理，guard 一定
+    释放。支持只创建部分资源的退出。
+    """
     setup_logger(logs_dir())
     _enable_dpi_awareness()
     _set_app_user_model_id()
@@ -42,44 +48,48 @@ def run_web(*, open_browser: bool = False) -> int:
         logger.info("检测到已有实例在运行（唤醒已有窗口=%s），本次启动退出", notified)
         return 0
 
-    # 开壳前预检测 WebView2：缺失时弹原生对话框引导安装，避免白屏式失败
-    from spritelens.system.webview_guard import ensure_webview2
-
-    if not ensure_webview2(logs_dir()):
-        logger.warning("WebView2 不可用，已按用户选择退出")
-        guard.close()
-        return 1
-
-    context = build_app_context()
-    server = LocalServer(context)
+    context = None
+    server = None
     try:
-        server.start()
-    except Exception as exc:  # noqa: BLE001 - 端口/绑定失败直接给出可读提示
-        logger.exception("本地服务启动失败")
-        _fatal("本地服务启动失败", f"{exc}\n\n日志目录：{logs_dir()}")
-        _shutdown(server, context, guard)
-        return 1
+        # 开壳前预检测 WebView2：缺失时弹原生对话框引导安装，避免白屏式失败
+        from spritelens.system.webview_guard import ensure_webview2
 
-    logger.info("Web 界面入口: %s", f"http://{server.host}:{server.port}/")
+        if not ensure_webview2(logs_dir()):
+            logger.warning("WebView2 不可用，已按用户选择退出")
+            return 1
 
-    if open_browser:
-        # 调试模式：用系统浏览器打开，便于 DevTools（pywebview 也可开，但外置更省事）
-        webbrowser.open(server.url)
         try:
-            _wait_until_interrupted(server)
-        finally:
-            _shutdown(server, context, guard)
-        return 0
+            context = build_app_context()
+        except Exception as exc:  # noqa: BLE001 - 装配失败给出可读提示
+            logger.exception("应用初始化失败")
+            _fatal("应用初始化失败", f"{exc}\n\n日志目录：{logs_dir()}")
+            return 1
 
-    try:
-        _run_window(server, guard)
-    except Exception as exc:  # noqa: BLE001 - WebView2 缺失等环境问题
-        logger.error("窗口创建失败: %s", exc)
-        _fatal("窗口创建失败", f"{WEBVIEW2_HINT}\n\n原始错误：{exc}\n日志目录：{logs_dir()}")
+        server = LocalServer(context)
+        try:
+            server.start()
+        except Exception as exc:  # noqa: BLE001 - 端口/绑定失败直接给出可读提示
+            logger.exception("本地服务启动失败")
+            _fatal("本地服务启动失败", f"{exc}\n\n日志目录：{logs_dir()}")
+            return 1
+
+        logger.info("Web 界面入口: %s", f"http://{server.host}:{server.port}/")
+
+        if open_browser:
+            # 调试模式：用系统浏览器打开，便于 DevTools（pywebview 也可开，但外置更省事）
+            webbrowser.open(server.url)
+            _wait_until_interrupted(server)
+            return 0
+
+        try:
+            _run_window(server, guard)
+        except Exception as exc:  # noqa: BLE001 - WebView2 缺失等环境问题
+            logger.error("窗口创建失败: %s", exc)
+            _fatal("窗口创建失败", f"{WEBVIEW2_HINT}\n\n原始错误：{exc}\n日志目录：{logs_dir()}")
+            return 1
+        return 0
+    finally:
         _shutdown(server, context, guard)
-        return 1
-    _shutdown(server, context, guard)
-    return 0
 
 
 def _fatal(title: str, message: str) -> None:
@@ -270,14 +280,19 @@ def _wait_until_interrupted(server: "LocalServer") -> None:
         pass
 
 
-def _shutdown(server: "LocalServer", context, guard: SingleInstanceGuard) -> None:
-    """退出清理（S02）：逐项尝试、单项失败不跳过其余，守卫最后释放。
+def _shutdown(server: "LocalServer | None", context, guard: SingleInstanceGuard) -> None:
+    """退出清理（S02/D07）：逐项尝试、单项失败不跳过其余，守卫最后释放。
 
-    复核 C02：原实现任一项抛异常会跳过后续清理（guard 未释放导致
-    重复启动被误唤醒拦截）。
+    支持只创建了部分资源（server/context 为 None）的退出；
+    复核 C02/D07：原实现任一项抛异常会跳过后续清理。
     """
     failures: list[tuple[str, Exception]] = []
-    for label, action in (("server", server.stop), ("context", context.close)):
+    steps: list[tuple[str, object]] = []
+    if server is not None:
+        steps.append(("server", server.stop))
+    if context is not None:
+        steps.append(("context", context.close))
+    for label, action in steps:
         try:
             action()
         except Exception as exc:  # noqa: BLE001 - 退出路径尽量多释放

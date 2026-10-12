@@ -108,17 +108,16 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
 
     autostart：装配完成后是否按配置自动开始采集（打开即采集，默认开）。
 
-    装配失败回滚（S02）：每个资源创建成功即登记，任一节点抛异常时
-    逆序清理已登记资源（EventLogWriter 构造即启动 worker，不清理会
-    泄漏线程），然后原样抛出让入口给出可读失败。
+    装配失败回滚（S02）：每个资源创建成功即登记，任一节点抛异常（含
+    autostart 阶段）时逆序清理已登记资源（EventLogWriter 构造即启动
+    worker，采集可能已起 source，不清理会泄漏线程/监听），然后原样
+    抛出。装配成功后所有权转交 context.close，登记表在**外层**作废，
+    避免成功路径再次触碰内层作用域（D01 回归：此前 clear 写在内层，
+    正常装配必然 NameError）。
     """
     created: list = []
-
-    def _created(cleanup) -> None:
-        created.append(cleanup)
-
     try:
-        return _build_app_context_inner(_created, autostart=autostart)
+        context = _build_app_context_inner(created, autostart=autostart)
     except BaseException:
         for cleanup in reversed(created):
             try:
@@ -126,9 +125,12 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
             except Exception as exc:  # noqa: BLE001 - 回滚失败不阻断其余清理
                 logger.warning("装配回滚清理失败: %s", exc)
         raise
+    created.clear()
+    return context
 
 
-def _build_app_context_inner(_created, *, autostart: bool) -> AppContext:
+def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
+    _created = created.append
     settings = SettingsRepository(config_path())
     load_library(schema_dir())
     static_data = load_static_data(static_dir())
@@ -190,6 +192,9 @@ def _build_app_context_inner(_created, *, autostart: bool) -> AppContext:
         port=settings.get_int("capture.port", DEFAULT_CAPTURE_PORT, lo=1, hi=65535),
         event_log=event_log,
     )
+    # autostart 之后失败也必须停源（D01）：capture 停机在逆序回滚里先于
+    # 存储关闭执行；未启动时 stop 幂等（recorder/monitor 各自处理空态）
+    _created(capture_vm.stop)
     events_vm = EventsViewModel(monitor=monitor)
     pet_vm = PetViewModel(pet_repository, static_data=static_data)
     context = AppContext(
@@ -212,8 +217,8 @@ def _build_app_context_inner(_created, *, autostart: bool) -> AppContext:
     )
     if autostart and capture_vm.start_if_autostart():
         logger.info("已自动开始采集（可在采集页关闭「打开即采集」）")
-    # 装配完成：资源所有权转交 context.close（回滚登记失效，避免双重清理）
-    created.clear()
+    # 成功路径不在这里作废登记：由外层 build_app_context 在拿到 context 后
+    # 统一 clear（D01：内层再来一次会在混入新语句时重新引入作用域错误）
     return context
 
 
