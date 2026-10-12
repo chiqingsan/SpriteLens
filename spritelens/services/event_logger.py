@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 
 from spritelens.logs import get_logger
-from spritelens.services.monitor_service import PacketEvent
+from spritelens.events import PacketEvent
 
 logger = get_logger("event_log")
 

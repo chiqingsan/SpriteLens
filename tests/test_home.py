@@ -6,7 +6,7 @@ import unittest
 
 from spritelens.domain.home import extract_home
 from spritelens.services.home_repository import HomeRepository
-from spritelens.services.monitor_service import PacketEvent
+from spritelens.events import PacketEvent
 from spritelens.web.payloads import home_payload
 
 

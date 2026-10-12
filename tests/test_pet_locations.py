@@ -15,7 +15,7 @@ from spritelens.protocol.opcodes import OpcodeCatalog
 from spritelens.protocol.schema import load_library
 from spritelens.repositories.database import Database
 from spritelens.repositories.pet_store import PetStore
-from spritelens.services.monitor_service import PacketEvent
+from spritelens.events import PacketEvent
 from spritelens.services.pet_repository import PetRepository
 from tests._synth import make_varint
 from tests.test_persistence import identity_event

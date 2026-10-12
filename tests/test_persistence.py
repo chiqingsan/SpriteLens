@@ -19,7 +19,8 @@ from spritelens.protocol.opcodes import OpcodeCatalog
 from spritelens.repositories.database import Database
 from spritelens.repositories.pet_store import PetStore
 from spritelens.repositories.settings import SettingsRepository
-from spritelens.services.monitor_service import MonitorService, PacketEvent
+from spritelens.events import PacketEvent
+from spritelens.services.monitor_service import MonitorService
 from spritelens.services.pet_repository import PetRepository
 from spritelens.view_models import CaptureViewModel, PetViewModel
 

@@ -12,10 +12,11 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import replace
 
 from spritelens.capture.base import CaptureSource, SourceCallback, StreamChunk
 from spritelens.capture.key_store import KeyStore, SessionCheckpoint, parse_key_text
+from spritelens.events import PacketEvent  # noqa: F401 - 过渡期重导出，见下
 from spritelens.logs import get_logger
 from spritelens.protocol.crypto import extract_ack_key, iter_decrypt_variants
 from spritelens.protocol.frames import CMD_SYN, FrameStream, GcpFrame
@@ -35,18 +36,11 @@ SESSION_IDLE_SECONDS = 30 * 60
 _SWEEP_INTERVAL = 60.0
 
 
-@dataclass(frozen=True)
-class PacketEvent:
-    """协议层产出的统一事件：功能层与 UI 的唯一消费类型。"""
-
-    ts: float
-    session_id: str
-    direction: str
-    opcode: int
-    opcode_name: str
-    payload_len: int
-    decoded: list[dict]
-    resumed_identity: tuple[int, str, int] | None = None
+# PacketEvent 已移到中立叶子模块 spritelens/events.py（解除 domain→services
+# 反向依赖）。旧调用方 `from services.monitor_service import PacketEvent`
+# 经上面这行 import 仍可用（过渡期兼容，ROADMAP 阶段1）；新代码一律
+# `from spritelens.events import PacketEvent`。全部调用方迁移完成后
+# 删除该重导出。
 
 
 class _SessionState:

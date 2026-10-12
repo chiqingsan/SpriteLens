@@ -15,7 +15,7 @@ from spritelens.domain.home import HomeSnapshot, extract_home
 from spritelens.domain.identity import extract_identity
 from spritelens.logs import get_logger
 from spritelens.services.account_tracker import AccountTracker
-from spritelens.services.monitor_service import PacketEvent
+from spritelens.events import PacketEvent
 
 logger = get_logger("home_repository")
 

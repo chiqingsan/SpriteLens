@@ -18,7 +18,7 @@ from spritelens.domain.pets import Pet, extract_pets
 from spritelens.domain.pet_locations import Backpack, PetBox, PetLocation, update_backpack
 from spritelens.repositories.pet_store import PetStore
 from spritelens.services.account_tracker import AccountTracker
-from spritelens.services.monitor_service import PacketEvent
+from spritelens.events import PacketEvent
 
 MAX_PETS = 2000
 

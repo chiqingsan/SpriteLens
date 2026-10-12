@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from spritelens.services.monitor_service import PacketEvent
+from spritelens.events import PacketEvent
 
 _SELF_INFO = "self_info"
 _AVATAR = "avatar"

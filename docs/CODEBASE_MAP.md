@@ -55,6 +55,7 @@
 | `paths.py` | 数据目录解析（SPRITELENS_DATA_ROOT 可覆盖）+ 打包态资源根（frozen/_MEIPASS） |
 | `main.py` | CLI：--smoke-test / --list-ifaces / --replay / --diagnose-net / --web-browser / 界面启动 |
 | `app_context.py` | **装配根**：管线/库/VM/清理的一次性组装（autostart 在此触发） |
+| `events.py` | 中立叶子模块：`PacketEvent` 事件类型（无 IO 无依赖；protocol/domain/services 共用，避免层间反向引用） |
 | `protocol/frames.py` | GCP 21B 大端头切帧、假 magic 同步、FrameStream |
 | `protocol/crypto.py` | AES-128-CBC 固定 IV 解密/加密、ACK 密钥提取 |
 | `protocol/records.py` | Direction、tsf4g trailer 剥离、s2c/c2s 拆分 |

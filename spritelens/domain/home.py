@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from spritelens.services.monitor_service import PacketEvent
+from spritelens.events import PacketEvent
 
 OP_HOME_SNAPSHOT = 0x014A
 OP_HOME_DELTA_A = 0x0413

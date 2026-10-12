@@ -6,7 +6,8 @@ import time
 from collections import deque
 from dataclasses import dataclass
 
-from spritelens.services.monitor_service import MonitorService, PacketEvent
+from spritelens.events import PacketEvent
+from spritelens.services.monitor_service import MonitorService
 from spritelens.view_models._shared import render_decoded
 
 MAX_ROWS = 500

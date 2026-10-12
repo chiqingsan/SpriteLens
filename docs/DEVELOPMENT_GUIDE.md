@@ -59,8 +59,9 @@ web（aiohttp/pywebview）；protocol 不反向依赖 services/capture；线程�
 **保序**）运行于投递线程，MonitorService 内部加锁，服务线程只做拉取
 （drain/snapshot），不做跨线程回调。
 
-当前 domain 运行时导入 services.PacketEvent、VM构造抓包源与控制安装线程等例外见
-`ARCHITECTURE.md` 的已知边界。新代码不得扩大例外；类型与纯规则应放无IO的下层模块。
+当前 VM构造抓包源与控制安装线程等例外见
+`ARCHITECTURE.md` 的已知边界。新代码不得扩大例外；类型与纯规则应放无IO的下层模块
+（事件类型用 `spritelens.events.PacketEvent`，不得再从 monitor_service 导入）。
 命令、快照与落盘的并发保证分别验证，不能因为方法经 `to_thread` 调用就认定线程安全。
 
 ## 业务层无 UI 可测（强制约定）
@@ -163,8 +164,9 @@ web（aiohttp/pywebview）；protocol 不反向依赖 services/capture；线程�
 
 `tests/test_architecture.py` 用 AST 静态解析校验分层约束（不导入模块，无副作用）：
 业务层不得 import aiohttp/pywebview、不得反向依赖上层、protocol 保持纯函数、
-业务层不得依赖装配根。违规立即红灯。已批准的例外（`protocol → logs`、
-`domain → services.PacketEvent`）在文件头部记录，**只减不增**。
+业务层不得依赖装配根。违规立即红灯。已批准的例外（`protocol → logs`）在文件头部
+记录，**只减不增**（原 `domain → services.PacketEvent` 例外已随事件类型移入
+`spritelens/events.py` 而移除）。
 
 当前测试把domain→services按整个包豁免，且未完整解析相对导入；它不能证明所有上述约束已被执行。
 后续收紧时按模块/符号登记例外及删除条件，不以增加包级白名单让测试变绿。

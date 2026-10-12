@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from spritelens.services.event_logger import EventLogWriter
-from spritelens.services.monitor_service import PacketEvent
+from spritelens.events import PacketEvent
 
 
 def _event(opcode: int = 0x134A, decoded: list | None = None) -> PacketEvent:

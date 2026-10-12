@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from spritelens.services.monitor_service import PacketEvent
+from spritelens.events import PacketEvent
 
 OP_FLOWER_SNAPSHOT = 0x0375
 

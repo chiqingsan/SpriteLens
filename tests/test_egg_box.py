@@ -11,7 +11,7 @@ from spritelens.domain.eggs import EggCatalog
 from spritelens.repositories.database import Database
 from spritelens.repositories.egg_store import EggStore
 from spritelens.services.egg_repository import EggBoxRepository
-from spritelens.services.monitor_service import PacketEvent
+from spritelens.events import PacketEvent
 from spritelens.web.payloads import egg_box_payload, male_matrix_payload
 
 

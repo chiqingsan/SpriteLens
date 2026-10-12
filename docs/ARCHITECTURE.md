@@ -46,9 +46,10 @@
 协议算法与域提取规则可以被合成数据驱动（测试、回放均如此）；当前目录中的schema/opcode与静态目录加载含文件IO。
 `repositories` 由 `services`、设置类ViewModel与组合根使用，不反向依赖 UI。
 
-当前过渡边界：domain的5个事件提取模块运行时依赖services中的PacketEvent，Monitor延迟导入identity；
-CaptureViewModel构造抓包源并控制录制/安装线程。后续将事件类型移到中立叶子模块，运行副作用移入应用服务，
-具体拆分与兼容方式见路线图。新功能不得继续扩大这些例外。
+当前过渡边界：PacketEvent 已移入中立叶子模块 `spritelens/events.py`（2026-10-12），
+domain 的5个事件提取模块改从该叶子导入，domain→services 反向依赖与包级豁免已移除；
+剩余过渡边界为 Monitor延迟导入identity 与 CaptureViewModel构造抓包源并控制录制/安装线程。
+后续将运行副作用移入应用服务，具体拆分与兼容方式见路线图。新功能不得继续扩大这些例外。
 
 ### 应用层管线（宠物仓库为例）
 

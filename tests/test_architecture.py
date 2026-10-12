@@ -4,9 +4,9 @@
 约束一旦被破坏即在此变红——竞品的 import 图污染正是缺了这道闸。
 
 已豁免的既有例外（在约束收紧前记录在案，不得再增加）：
-1. protocol 内的 schema/opcodes 依赖 logs（加载期告警日志）；
-2. domain 的 identity/pets 依赖 services.monitor_service 的 PacketEvent
-   （仅作为事件数据类型引用；该类型定义在管线模块中）。
+1. protocol 内的 schema/opcodes 依赖 logs（加载期告警日志）。
+（原例外2「domain 依赖 services.PacketEvent」已随事件类型移入
+  spritelens/events.py 中立叶子模块而移除，2026-10-12。）
 """
 
 from __future__ import annotations
@@ -34,7 +34,6 @@ BUSINESS_PACKAGES = (
 # 已批准的例外：(依赖方模块前缀, 被依赖模块前缀)
 APPROVED_EXCEPTIONS = {
     ("spritelens.protocol", "spritelens.logs"),
-    ("spritelens.domain", "spritelens.services"),
 }
 
 # protocol 是纯函数层：只允许标准库 + 第三方密码库 + logs 例外
@@ -94,10 +93,13 @@ class NoWebDependencyTest(unittest.TestCase):
 class LayerDirectionTest(unittest.TestCase):
     """依赖方向：上层可依赖下层，反向依赖必须报错（已批准例外除外）。"""
 
-    # 层级序号越小越底层；允许依赖序号更小的层
+    # 层级序号越小越底层；允许依赖序号更小的层。
+    # spritelens.events 是中立叶子模块（无 IO 无依赖），层级 0——任何层
+    # 都可以依赖它而不视为反向。
     LAYER_ORDER = {
         "protocol": 0,
         "logs": 0,
+        "events": 0,
         "capture": 1,
         "domain": 2,
         "repositories": 2,

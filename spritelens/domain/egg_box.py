@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from spritelens.services.monitor_service import PacketEvent
+from spritelens.events import PacketEvent
 
 _NO_INSTANCE_ID = 1
 _NO_ITEM_CONF_ID = 2

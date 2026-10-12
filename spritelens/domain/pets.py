@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from spritelens.services.monitor_service import PacketEvent
+from spritelens.events import PacketEvent
 
 # 形状指纹：gid/conf_id 必含（唯一标识 + 图鉴 ID），再加至少一个宠物特征字段。
 # 不强制 level/name——proto 可选字段未设置时 wire 上不会出现。

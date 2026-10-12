@@ -83,10 +83,10 @@
 .venv\Scripts\python.exe tools\import_assets.py
 
 # 官方目录/镜像对齐（保留有效值合并 + 冲突报告）
-.venv\Scripts\python.exe tools\sync_catalog_resources.py
+.venv\Scripts\python.exe tools\sync_catalog_resources.py '解包目录'
 
 # 官方头像/立绘导入与透明边界归一派生（生成 pet_media.json 映射）
-.venv\Scripts\python.exe tools\sync_pet_media.py
+.venv\Scripts\python.exe tools\sync_pet_media.py '解包目录'
 
 # 本地 SVG 图标（开发期联网，运行期零网络）
 .venv\Scripts\python.exe tools\sync_ui_icons.py
@@ -94,6 +94,8 @@
 
 关联键为协议字段 `base_conf_id`；名字仅作兜底，协议直带的宠物名优先。
 资源覆盖与缺口台账见 [docs/RESOURCE_COVERAGE_REPORT.md](docs/RESOURCE_COVERAGE_REPORT.md)。
+同步工具的解包目录需含 `assets/`。基础静态表导入会覆写相应表；维护资源时先明确来源和导入顺序，
+在临时输出核验覆盖与冲突，再更新正式目录，见 [开发规范](docs/DEVELOPMENT_GUIDE.md)。
 
 ## 解码字段名（schema）
 
@@ -197,7 +199,8 @@ python tools\run_build_tests.py
 .venv\Scripts\python.exe build.py --dry-run
 ```
 
-产物在 `build\SpriteLens_<版本>.exe`（约 22 MB）。打包选项（含带哪些资源、
+产物在 `build\SpriteLens_<版本>.exe`。早期约22MB的测量发生在本轮资源扩充前，
+当前体积需重新构建后实测。打包选项（含带哪些资源、
 排除哪些库）都在 `build_config.toml` 里改，不写死在脚本中。
 
 > **杀毒软件会干扰打包**：Nuitka 后处理阶段用微软 `rc.exe` 写 exe 图标与
@@ -213,6 +216,8 @@ exe 放在哪都不影响配置与历史数据。
 
 - [docs/README.md](docs/README.md) 文档索引（全部文档的阅读顺序与用途）
 - [docs/DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md) 开发规范
+- [docs/AI_CONTEXT.md](docs/AI_CONTEXT.md) 开发者与 AI 协作入口
+- [docs/ROADMAP.md](docs/ROADMAP.md) 健壮性、可维护性与架构演进路线
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 架构与协议说明
 - [docs/ARCHITECTURE_DECISION.md](docs/ARCHITECTURE_DECISION.md) 架构决策（含 Tauri 评估与 Web 化路线）
 - [docs/CODEBASE_MAP.md](docs/CODEBASE_MAP.md) 代码地图
