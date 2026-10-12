@@ -190,6 +190,10 @@ class PetStore:
         self._db = database
         self._flush_interval = max(0.05, float(flush_interval))
         self._lock = threading.Lock()
+        # 批次串行化：保护「换出批次 → 写库/失败回填」整段顺序。待写表锁
+        # 保持短促（put 不等磁盘）；落盘锁保证并发 flush 按取出顺序提交，
+        # 旧批次不会在新批次之后落库把值拉回去（R02）。
+        self._flush_lock = threading.Lock()
         self._pending: dict[tuple[int, int], Pet] = {}
         self._pending_accounts: dict[int, tuple[str, int]] = {}
         self._pending_locations: dict[int, Backpack] = {}
@@ -249,7 +253,8 @@ class PetStore:
     def flush(self) -> int:
         """把待写表批量写入 SQLite；返回本次写入的宠物条数。
 
-        线程安全：待写表在校验锁内整体换出，worker 与手动调用可并发。
+        线程安全：待写表在校验锁内整体换出；整次提交由落盘锁串行化，
+        并发调用按取得批次的先后顺序写库，旧批次不可能后到覆盖新值。
         """
         with self._lock:
             pets = self._pending
@@ -260,6 +265,15 @@ class PetStore:
             self._pending_locations = {}
         if not pets and not accounts and not locations:
             return 0
+        with self._flush_lock:
+            return self._commit_batch(pets, accounts, locations)
+
+    def _commit_batch(
+        self,
+        pets: dict[tuple[int, int], Pet],
+        accounts: dict[int, tuple[str, int]],
+        locations: dict[int, Backpack],
+    ) -> int:
         now = time.time()
         try:
             if accounts:

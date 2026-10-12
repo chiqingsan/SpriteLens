@@ -66,6 +66,10 @@ class EggStore:
         self._db = database
         self._flush_interval = max(0.05, float(flush_interval))
         self._lock = threading.Lock()
+        # 批次串行化：保护「换出批次 → 写库/失败回填」整段顺序（与 PetStore
+        # 同型，R02）；load 前的同步 flush 与 worker 的定时 flush 并发时，
+        # 保证读到的批次顺序与取出顺序一致。
+        self._flush_lock = threading.Lock()
         self._pending: dict[tuple[int, int], EggBoxEntry] = {}
         self._stop = threading.Event()
         self._worker: threading.Thread | None = None
@@ -91,12 +95,20 @@ class EggStore:
 
     # -- 落盘 ----------------------------------------------------------
     def flush(self) -> int:
-        """把待写表批量写入 SQLite；返回本次写入的条数。"""
+        """把待写表批量写入 SQLite；返回本次写入的条数。
+
+        待写表在锁内换出；整次提交由落盘锁串行化（与 PetStore 同型），
+        并发 flush 按取得批次的先后顺序落库。
+        """
         with self._lock:
             pending = self._pending
             self._pending = {}
         if not pending:
             return 0
+        with self._flush_lock:
+            return self._commit_batch(pending)
+
+    def _commit_batch(self, pending: dict[tuple[int, int], EggBoxEntry]) -> int:
         now = time.time()
         rows = [
             (

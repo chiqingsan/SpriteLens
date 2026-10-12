@@ -750,6 +750,101 @@ class DatabaseMigrationTest(unittest.TestCase):
         self.assertEqual([tuple(r) for r in db.query("SELECT a FROM t")], [(3,)])
         db.close()
 
+    def test_concurrent_flush_keeps_newest_value(self):
+        """并发 flush 批次按取出顺序提交：旧批次不得覆盖新值（R02）。
+
+        用 Event 挡住旧批次（旧值）的写库，让新批次先完成提交；旧实现
+        没有 flush 互斥，旧批次随后提交会把最终值拉回旧值。
+        """
+        import sqlite3
+        import threading
+
+        db = Database(self.db_path)
+        store = PetStore(db, flush_interval=60.0)  # 关闭自动落盘，手动控制
+        store.put(UID, [Pet(gid=1, conf_id=20508, name="旧值", level=10, exp=0, nature=0,
+                            gender=0, blood_id=0, talent_rank=0, is_first_catch=False)])
+        store.flush()
+        self.assertEqual(store.load(UID)[0].name, "旧值")
+
+        # 确定性屏障：旧批次写库时挂起，新批次先提交
+        old_gate = threading.Event()
+        old_batch_started = threading.Event()
+        real_execute_many = db.execute_many
+
+        def gated_execute_many(sql, seq_of_params):
+            if "INSERT INTO pets" in sql:
+                names = [row[3] for row in seq_of_params]
+                if "旧值" in names:  # 旧批次：挡住直到新批次提交完成
+                    old_batch_started.set()
+                    old_gate.wait(timeout=5)
+                elif "新值" not in names:
+                    raise AssertionError(f"意外的批次: {names}")
+            return real_execute_many(sql, seq_of_params)
+
+        db.execute_many = gated_execute_many  # type: ignore[method-assign]
+        try:
+            # 旧批次被挡住期间 put 仍立即返回（写路径永不等待磁盘）
+            store.put(UID, [Pet(gid=1, conf_id=20508, name="旧值", level=20, exp=0, nature=0,
+                                gender=0, blood_id=0, talent_rank=0, is_first_catch=False)])
+            old_flush = threading.Thread(target=store.flush)
+            old_flush.start()
+            self.assertTrue(old_batch_started.wait(timeout=5), "旧批次未开始写库")
+
+            store.put(UID, [Pet(gid=1, conf_id=20508, name="新值", level=30, exp=0, nature=0,
+                                gender=0, blood_id=0, talent_rank=0, is_first_catch=False)])
+            new_flush = threading.Thread(target=store.flush)
+            new_flush.start()
+            # flush 批次串行化：新批次排在旧批次之后提交，等待旧批次释放
+            old_gate.set()
+            old_flush.join(timeout=5)
+            new_flush.join(timeout=5)
+            self.assertFalse(old_flush.is_alive(), "旧批次未完成")
+            self.assertFalse(new_flush.is_alive(), "新批次被无限阻塞")
+        finally:
+            old_gate.set()
+            old_flush.join(timeout=5)
+            new_flush.join(timeout=5)
+            db.execute_many = real_execute_many  # type: ignore[method-assign]
+
+        # 最终落库值以新批次为准（旧实现：旧批次后提交，最终值回退为旧值）
+        self.assertEqual(store.load(UID)[0].name, "新值")
+        self.assertEqual(store.load(UID)[0].level, 30)
+        store.close()
+        db.close()
+
+    def test_failed_flush_retry_keeps_newest_value(self):
+        """写库失败回填不覆盖期间新写入：重试批次仍以最新值为准。"""
+        import sqlite3
+
+        db = Database(self.db_path)
+        store = PetStore(db, flush_interval=60.0)
+        store.put(UID, [Pet(gid=1, conf_id=20508, name="v1", level=10, exp=0, nature=0,
+                            gender=0, blood_id=0, talent_rank=0, is_first_catch=False)])
+        # 注入写库失败：本批回填待写表
+        real_execute_many = db.execute_many
+
+        def failing_execute_many(sql, seq_of_params):
+            if "INSERT INTO pets" in sql:
+                raise sqlite3.OperationalError("注入失败")
+            return real_execute_many(sql, seq_of_params)
+
+        db.execute_many = failing_execute_many  # type: ignore[method-assign]
+        try:
+            self.assertEqual(store.flush(), 0)
+        finally:
+            db.execute_many = real_execute_many  # type: ignore[method-assign]
+        self.assertEqual(store.pending_count, 1)
+
+        # 失败后写入更新的值：回填用 setdefault，不得把 v1 盖回 v2
+        store.put(UID, [Pet(gid=1, conf_id=20508, name="v2", level=20, exp=0, nature=0,
+                            gender=0, blood_id=0, talent_rank=0, is_first_catch=False)])
+        self.assertEqual(store.flush(), 1)
+        loaded = store.load(UID)[0]
+        self.assertEqual(loaded.name, "v2")
+        self.assertEqual(loaded.level, 20)
+        store.close()
+        db.close()
+
     def test_account_switch_clears_snapshot(self):
         """切号后内存快照不混合：B 登录后只应看到 B 的宠物，且入库分 uid 隔离。"""
         db = Database(self.db_path)
