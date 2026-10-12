@@ -43,10 +43,14 @@ class SchemaLibrary:
         """解码 payload：schema 命中 → 字段名；否则 field_N 占位。"""
         tree = wire.decode_wire(payload)
         fields = self.field_defs(message_name) if message_name else None
-        return [_field_to_dict(f, fields) for f in tree]
+        return [_field_to_dict(f, fields, self) for f in tree]
 
 
-def _field_to_dict(field: wire.WireField, defs: dict[int, dict[str, str]] | None) -> dict:
+def _field_to_dict(
+    field: wire.WireField,
+    defs: dict[int, dict[str, str]] | None,
+    library: "SchemaLibrary | None" = None,
+) -> dict:
     meta = (defs or {}).get(field.no, {})
     raw = field.value if field.children is None else None
     out: dict = {
@@ -60,10 +64,12 @@ def _field_to_dict(field: wire.WireField, defs: dict[int, dict[str, str]] | None
     if field.children is not None:
         child_defs = None
         child_type = meta.get("type", "")
-        # 嵌套消息的字段定义约定存放在 messages/<ChildType>.json
-        if child_type:
-            child_defs = get_library().field_defs(child_type)
-        out["children"] = [_field_to_dict(c, child_defs) for c in field.children]
+        # 嵌套消息的字段定义约定存放在 messages/<ChildType>.json；
+        # 递归显式使用发起解码的实例（R07）：不读全局库，多个实例库
+        # 或按游戏版本选库时互不污染，也不依赖全局加载顺序
+        if child_type and library is not None:
+            child_defs = library.field_defs(child_type)
+        out["children"] = [_field_to_dict(c, child_defs, library) for c in field.children]
     elif field.text is not None:
         out["text"] = field.text
     return out

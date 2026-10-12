@@ -101,6 +101,45 @@ class SchemaLibraryDirectTest(unittest.TestCase):
         lib = SchemaLibrary(messages={"PetAttributeData": {1: {"name": "x", "type": ""}}}, source_dir=None)
         self.assertEqual(lib.field_defs("Next.PetAttributeData"), {1: {"name": "x", "type": ""}})
 
+    def test_instance_decode_uses_injected_library_not_global(self):
+        """注入实例递归解码子消息只用当前实例的定义（R07）。
+
+        旧实现 _field_to_dict 从 get_library() 取子定义：实例库与全局库
+        不一致时（多测试库并存、未来按游戏版本选库）子消息命名被全局库
+        覆盖或退化为 field_N，且依赖全局加载顺序。
+        """
+        from spritelens.protocol import schema as schema_mod
+
+        nested = make_varint((1 << 3) | 0) + make_varint(850)
+        # Root→Child：相同字段号 1 在两个实例库中命名不同
+        lib_a = SchemaLibrary(
+            messages={
+                "Root": {1: {"name": "child_a", "type": "Child"}},
+                "Child": {1: {"name": "value_a", "type": ""}},
+            },
+            source_dir=None,
+        )
+        lib_b = SchemaLibrary(
+            messages={
+                "Root": {1: {"name": "child_b", "type": "Child"}},
+                "Child": {1: {"name": "value_b", "type": ""}},
+            },
+            source_dir=None,
+        )
+        # 全局库为空：递归若读全局库将退化为 field_1
+        saved = schema_mod._library
+        schema_mod._library = None
+        try:
+            payload = make_varint((1 << 3) | 2) + make_varint(len(nested)) + nested
+            out_a = lib_a.decode(payload, "Root")
+            out_b = lib_b.decode(payload, "Root")
+        finally:
+            schema_mod._library = saved
+        self.assertEqual(out_a[0]["name"], "child_a")
+        self.assertEqual(out_a[0]["children"][0]["name"], "value_a")
+        self.assertEqual(out_b[0]["name"], "child_b")
+        self.assertEqual(out_b[0]["children"][0]["name"], "value_b")
+
 
 class OpcodeCatalogTest(unittest.TestCase):
     def _write(self, tmp: Path, data: dict) -> Path:
