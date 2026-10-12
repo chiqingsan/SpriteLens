@@ -35,6 +35,9 @@ FLOW_IDLE_SECONDS = 30 * 60
 _FLOW_SWEEP_INTERVAL = 60.0
 # 停止时等待投递线程退出的预算（S03a）：超时转存 stale 句柄而非无限等。
 _WORKER_JOIN_TIMEOUT = 5.0
+# sniffer.stop 的预算（D05）：scapy AsyncSniffer.stop 默认 join=True 且无
+# 上限，驱动卡死时会长期占用采集命令锁；超时把句柄转 stale 留诊断。
+_SNIFFER_STOP_BUDGET = 5.0
 
 
 @dataclass(frozen=True)
@@ -81,7 +84,11 @@ class NpcapCaptureSource:
         # 超时后丢弃——restart 前可诊断 is_stale_worker_active()，避免
         # 新旧投递线程并存互踩。
         self._stale_workers: list[threading.Thread] = []
+        # 停止超时的嗅探器句柄（D05）：scapy stop 默认无上限 join，卡住时
+        # 不能把句柄当已退出丢掉；由 has_unfinished_sniffer 暴露诊断
+        self._stale_sniffers: list[object] = []
         self._worker_join_timeout = _WORKER_JOIN_TIMEOUT
+        self._sniffer_stop_budget = _SNIFFER_STOP_BUDGET
         self.dropped_chunks = 0
 
     def _build_bpf(self) -> str:
@@ -93,6 +100,13 @@ class NpcapCaptureSource:
     def start(self) -> None:
         if self._running:
             return
+        # D04：旧投递线程未退时拒绝重启——同实例共享 queue，新 worker 会
+        # 抢走旧哨兵；旧回调（on_chunk）还指向同一下游，重启即两代并存
+        self._reap_stale_workers()
+        if self.is_stale_worker_active():
+            raise SourceError("上一会话的投递线程尚未退出，暂不能重新开始采集")
+        if self.has_unfinished_sniffer():
+            raise SourceError("上一会话的嗅探器尚未停止，暂不能重新开始采集")
         try:
             from scapy.all import AsyncSniffer  # 延迟导入，见模块 docstring
         except Exception as exc:  # noqa: BLE001 - scapy/npcap 环境问题统一转 SourceError
@@ -167,19 +181,16 @@ class NpcapCaptureSource:
     def stop(self) -> None:
         """停止采集：sniffer 与 worker 各自有界，单项失败不跳过其余（S03a）。
 
-        sniffer.stop 有预算（join 嗅探线程限时）；录制器/投递线程清理
-        失败不阻断流表释放与 stopped 事件。返回即代表停止流程完成，
-        是否有迟退线程由 is_stale_worker_active() 诊断。
+        sniffer.stop 走独立预算（scapy 默认 join 无上限，卡死会长期占用
+        命令锁）；超时则句柄转入 stale 列表留诊断，不当作已退出。返回
+        即代表停止流程完成，未退线程由 stale 诊断接口暴露。
         """
         # 不以 _running 为前置：失败启动留下的 worker/流表也要能被清掉（R03）
         self._running = False
         sniffer = self._sniffer
         self._sniffer = None
         if sniffer is not None:
-            try:
-                sniffer.stop()
-            except Exception:  # noqa: BLE001 - 停止失败不影响退出
-                logger.warning("sniffer 停止异常", exc_info=True)
+            self._stop_sniffer_bounded(sniffer)
         self._signal_worker_stop()
         # 停止后不再有 FIN/RST 事件，流表与重组缓冲在这里统一释放
         with self._flow_lock:
@@ -221,14 +232,57 @@ class NpcapCaptureSource:
                 "投递线程 join 超时未退（已转存 stale 列表，restart 前应确认）: %s", worker.name
             )
 
+    def _stop_sniffer_bounded(self, sniffer) -> bool:
+        """在独立线程执行 sniffer.stop 并限时等待（D05）。
+
+        scapy 的 stop(join=True) 无上限，驱动卡死时会把采集命令锁拖住；
+        这里用预算包裹：超时把句柄转入 stale 列表并继续后续清理，
+        返回 False 表示未确认退出。
+        """
+        done = threading.Event()
+        error: list[BaseException] = []
+
+        def _runner() -> None:
+            try:
+                sniffer.stop()
+            except Exception as exc:  # noqa: BLE001 - 停止失败不影响退出
+                error.append(exc)
+            finally:
+                done.set()
+
+        thread = threading.Thread(target=_runner, name="spritelens-sniffer-stop", daemon=True)
+        thread.start()
+        if not done.wait(timeout=self._sniffer_stop_budget):
+            logger.warning(
+                "sniffer.stop 超出预算 %.1fs 未返回，句柄转 stale 留诊断", self._sniffer_stop_budget
+            )
+            self._stale_sniffers.append(sniffer)
+            return False
+        if error:
+            logger.warning("sniffer 停止异常: %s", error[0])
+        return True
+
+    def has_unfinished_sniffer(self) -> bool:
+        """是否有停止未确认的嗅探器句柄（判断当前用 running 状态收窄）。"""
+        active = [
+            sniffer
+            for sniffer in self._stale_sniffers
+            if getattr(sniffer, "running", False)
+        ]
+        self._stale_sniffers = active
+        return bool(active)
+
     def is_stale_worker_active(self) -> bool:
         """是否有超时未退的旧投递线程仍活着（restart 前的安全诊断）。"""
         return any(worker.is_alive() for worker in self._stale_workers)
 
-    def reap_stale_workers(self) -> int:
+    def _reap_stale_workers(self) -> int:
         """清理已退出的 stale 句柄；返回剩余仍活着的个数。"""
         self._stale_workers = [worker for worker in self._stale_workers if worker.is_alive()]
         return len(self._stale_workers)
+
+    # 兼容旧名（测试与外部诊断调用）
+    reap_stale_workers = _reap_stale_workers
 
     @property
     def is_running(self) -> bool:

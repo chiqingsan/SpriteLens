@@ -71,10 +71,22 @@ class CaptureService:
 
     # -- 命令（串行） ----------------------------------------------------
     def start(self) -> None:
-        """构造接入层并启动；失败转 last_error 供页面提示。"""
+        """构造接入层并启动；失败转 last_error 供页面提示。
+
+        重启前检查旧 source 的未退线程（D04）：投递 worker 或嗅探器
+        未确认退出时拒绝重启——同实例/同下游回调下两代并存会让旧回调
+        污染新会话；已退出的 stale 句柄先清再判。
+        """
         with self._command_lock:
             if self._monitor.is_running:
                 return
+            previous = self._source
+            if previous is not None:
+                previous.reap_stale_workers()
+                if previous.is_stale_worker_active() or previous.has_unfinished_sniffer():
+                    self._last_error = "上一会话的采集线程尚未退出，暂不能重新开始采集（稍后重试）"
+                    logger.warning("拒绝重启：%s", self._last_error)
+                    return
             self._last_error = ""
             source = NpcapCaptureSource(
                 self._port,
@@ -117,8 +129,12 @@ class CaptureService:
         旧实现 VM 锁外读 running 再传进来，「调用方读到运行中 → stop
         完成 → 提交旧值」可让 stop 后误开录制。persist 回调（写配置）
         也在锁内执行：命令锁可包含必要 IO，保证四个动作的顺序对并发
-        观察者原子；IO 失败不改变已生效的运行状态，异常原样抛出让
-        HTTP 层返回错误（页面意愿与实际状态仍一致）。
+        观察者原子。
+
+        失败语义（D03）：意愿与录制器状态先提交、持久化在后——持久化
+        失败（如 set_checked 抛 OSError）表示「运行状态已生效但未保存」，
+        异常原样上抛由 HTTP 层转可读错误；再次查询状态时以内存意愿为准，
+        重启后才会回到旧配置（这是唯一可接受的降级方向）。
         """
         with self._command_lock:
             self._recording_wanted = enabled
@@ -129,6 +145,11 @@ class CaptureService:
                 self._recorder.stop()
             if self._persist_recording is not None:
                 self._persist_recording(enabled)
+
+    def recording_wanted(self) -> bool:
+        """录制意愿（命令锁保护读，供快照/VM 无条件读取）。"""
+        with self._command_lock:
+            return self._recording_wanted
 
     def apply_manual_key(self, text: str) -> tuple[bool, str]:
         try:

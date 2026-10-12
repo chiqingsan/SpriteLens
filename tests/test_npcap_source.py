@@ -385,6 +385,95 @@ class NpcapSourceLogicTest(unittest.TestCase):
         # restart 语义：无活跃 stale worker，可安全重新 start
         self.assertFalse(self.src.is_stale_worker_active())
 
+    def test_restart_refused_while_stale_worker_active(self):
+        """D04 回归：旧投递线程未退时 start 拒绝重启（同实例不并存两代）。"""
+        from spritelens.capture.base import SourceError
+
+        self.src._running = True
+        gate = threading.Event()
+        worker_started = threading.Event()
+
+        def stuck_worker():
+            while True:
+                item = self.src._queue.get()
+                if item is None:
+                    return
+                worker_started.set()
+                gate.wait(timeout=30)
+
+        self.src._worker = threading.Thread(target=stuck_worker, daemon=True)
+        self.src._worker.start()
+        self.src._queue.put(b"stub")
+        self.assertTrue(worker_started.wait(timeout=5))
+        self.src.stop()  # join 超时 → stale worker
+        self.assertTrue(self.src.is_stale_worker_active())
+
+        # 重启被拒绝，且没有创建新的 worker/嗅探器
+        with self.assertRaises(SourceError):
+            self.src.start()
+        self.assertIsNone(self.src._worker)
+        self.assertFalse(self.src.is_running)
+
+        # 释放旧线程并 reap 后可正常重启（用假 scapy 模块避免真实网卡）
+        gate.set()
+        for worker in self.src._stale_workers:
+            worker.join(timeout=5)
+        self.src.reap_stale_workers()
+        self.assertFalse(self.src.is_stale_worker_active())
+
+        class _FakeSniffer:
+            exception = None
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def start(self):
+                pass
+
+            def stop(self):
+                pass
+
+        self._patch_scapy_sniffer(_FakeSniffer)
+        self.src.start()
+        self.assertTrue(self.src.is_running)
+        self.src.stop()
+
+    def test_sniffer_stop_budget_keeps_handle_on_timeout(self):
+        """D05 回归：sniffer.stop 卡死时有预算、句柄转 stale 可诊断。
+
+        旧实现直接调用 sniffer.stop()（scapy 默认无上限 join），驱动
+        卡死会长期占用采集命令锁且句柄被清空。新实现在独立线程执行
+        并限时等待，超时保留句柄。
+        """
+        self.src._running = True
+        stop_gate = threading.Event()
+
+        class _StuckSniffer:
+            running = True
+
+            def stop(self):
+                stop_gate.wait(timeout=30)  # 模拟驱动卡死
+                self.running = False
+
+        sniffer = _StuckSniffer()
+        self.src._sniffer = sniffer
+        self.src._sniffer_stop_budget = 0.3  # 测试用短预算
+
+        started = time.monotonic()
+        self.src.stop()
+        elapsed = time.monotonic() - started
+        self.assertLess(elapsed, 3, "stop 应在 sniffer 预算内返回")
+        self.assertEqual([sniffer], self.src._stale_sniffers, "超时句柄应保留")
+        self.assertTrue(self.src.has_unfinished_sniffer(), "应能诊断未停的嗅探器")
+
+        # 释放后句柄可清理（running=False → 不再算未停）
+        stop_gate.set()
+        for _ in range(100):
+            if not self.src.has_unfinished_sniffer():
+                break
+            time.sleep(0.05)
+        self.assertFalse(self.src.has_unfinished_sniffer())
+
 
 if __name__ == "__main__":
     unittest.main()

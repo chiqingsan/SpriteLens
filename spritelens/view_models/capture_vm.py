@@ -98,7 +98,6 @@ class CaptureViewModel:
         self._recordings_dir = recordings_dir
         self._event_log = event_log
         self._iface = settings.get_str(IFACE_SETTING_KEY)
-        self._recording_requested = settings.get_bool(RECORD_SETTING_KEY, False)
         # 打开即采集：默认开启（用户可关）；环境不满足时 start() 会转成可读错误
         self._autostart = settings.get_bool(AUTOSTART_SETTING_KEY, True)
         self._ifaces: list[tuple[str, str]] = []
@@ -117,11 +116,12 @@ class CaptureViewModel:
             port=port,
             extra_ports=self._extra_ports,
             iface=self._iface or None,
-            recording_wanted=self._recording_requested,
+            recording_wanted=settings.get_bool(RECORD_SETTING_KEY, False),
         )
-        # 录制偏好持久化经服务回调（S01）：与意愿/启停同一命令区间
+        # 录制偏好持久化经服务回调（S01/D03）：与意愿/启停同一命令区间；
+        # 用 set_checked——显式命令的保存失败必须传回调用者（set 会吞 OSError）
         self._service.set_recording_persist(
-            lambda enabled: settings.set(RECORD_SETTING_KEY, bool(enabled))
+            lambda enabled: settings.set_checked(RECORD_SETTING_KEY, bool(enabled))
         )
         # 快速检查（毫秒级）：只查驱动文件存在性，installed 立即可用，
         # autostart 不必等探测；RSC 检查（PowerShell 实测约 1.8s）随后异步补齐。
@@ -174,9 +174,13 @@ class CaptureViewModel:
         return self._iface
 
     def select_iface(self, name: str) -> None:
+        """选择网卡；显式命令保存失败必须可见（D03，set_checked）。
+
+        运行态已切到新网卡但配置未保存时抛 OSError，HTTP 层转可读错误。
+        """
         self._iface = name
         self._service.set_iface(name or None)
-        self._settings.set(IFACE_SETTING_KEY, name)
+        self._settings.set_checked(IFACE_SETTING_KEY, name)
 
     # -- 启停（委托运行服务；页面只做校验与状态同步）----------------------
     def start(self) -> None:
@@ -198,8 +202,9 @@ class CaptureViewModel:
         return self._autostart
 
     def set_autostart(self, enabled: bool) -> None:
+        """打开即采集开关；显式命令保存失败必须可见（D03，set_checked）。"""
         self._autostart = bool(enabled)
-        self._settings.set(AUTOSTART_SETTING_KEY, bool(enabled))
+        self._settings.set_checked(AUTOSTART_SETTING_KEY, bool(enabled))
 
     def start_if_autostart(self) -> bool:
         """启动流程调用：开关开着且环境可用时自动开始采集。
@@ -225,16 +230,17 @@ class CaptureViewModel:
     # -- 录制 ----------------------------------------------------------
     @property
     def recording_requested(self) -> bool:
-        return self._recording_requested
+        """录制意愿（单一所有者：读服务状态，VM 不保留平行缓存，D02）。"""
+        return self._service.recording_wanted()
 
     def set_recording_requested(self, enabled: bool) -> None:
         """录制开关：整条命令（意愿+启停+持久化）由服务在命令锁内完成（S01）。
 
-        VM 只转发并同步缓存字段；running 由服务在锁内判定，不存在
-        「锁外读旧 running」窗口；设置写入经服务回调也在同一区间。
+        VM 只转发、不再回写本地缓存——旧实现 `self._recording_requested =
+        enabled` 在服务锁释放后执行，能把较新的相反命令覆盖回旧值（D02）。
+        持久化失败（set_checked 抛 OSError）原样上抛，HTTP 返回可读错误。
         """
         self._service.set_recording(bool(enabled))
-        self._recording_requested = bool(enabled)
 
     # -- 手动密钥 ------------------------------------------------------
     def apply_manual_key(self, text: str) -> tuple[bool, str]:

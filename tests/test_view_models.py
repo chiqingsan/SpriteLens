@@ -298,6 +298,126 @@ class CaptureViewModelTest(unittest.TestCase):
         vm._service.set_recording(True)
         self.assertFalse(vm._service.status().recording, "停止后不得开录制")
 
+    def test_recording_intent_single_owner_after_paused_service_call(self):
+        """D02 回归：服务调用完成后暂停，VM 无锁外回写可覆盖较新意愿。
+
+        旧实现 VM 在服务调用**返回后**回写 `_recording_requested`：
+        T1（true）在服务调用完成、回写前暂停；T2（false）完整执行；
+        T1 恢复把页面意愿写回 True——服务/配置 False 而页面 True。
+        新实现意愿只有服务一个所有者，VM 属性直接读服务状态，
+        交错任意排列后页面、服务、配置三者一致。
+        """
+        vm, monitor = _make_vm(self.tmp_path)
+
+        class _RunningSource:
+            is_running = True
+
+        monitor._source = _RunningSource()
+        settings_path = self.tmp_path / "config.json"
+
+        real_set_recording = vm._service.set_recording
+        t1_done = threading.Event()
+        t1_release = threading.Event()
+
+        def paused_set_recording(enabled: bool) -> None:
+            real_set_recording(enabled)  # 完整服务调用（含持久化）
+            if enabled and not t1_release.is_set():
+                t1_done.set()
+                t1_release.wait(timeout=5)  # 暂停在服务调用返回之后
+
+        vm._service.set_recording = paused_set_recording  # type: ignore[method-assign]
+
+        t1 = threading.Thread(target=vm.set_recording_requested, args=(True,))
+        t1.start()
+        self.assertTrue(t1_done.wait(timeout=5), "T1 未到达暂停点")
+
+        # T2 完整执行相反命令（此时 T1 尚未「回写」）
+        vm.set_recording_requested(False)
+        t1_release.set()
+        t1.join(timeout=5)
+        self.assertFalse(t1.is_alive())
+
+        # 三者一致为 False（旧实现页面意愿会被 T1 恢复后写成 True）
+        self.assertFalse(vm.recording_requested, "页面意愿必须与服务一致")
+        self.assertFalse(vm._service.recording_wanted())
+        self.assertFalse(
+            SettingsRepository(settings_path).get_bool("capture.record_on_start", True),
+            "持久化配置应为 false",
+        )
+        self.assertFalse(vm._service.status().recording, "录制器不应在录")
+
+    def test_config_write_failure_is_visible(self):
+        """D03 回归：配置保存失败不再被吞——命令抛出，运行状态仍已生效。
+
+        旧实现 set() 吞 OSError：命令 200 成功、内存 True、磁盘 False，
+        重启静默回旧设置。新实现 set_checked 把失败传给调用者。
+        """
+        from unittest import mock
+
+        vm, monitor = _make_vm(self.tmp_path)
+
+        class _RunningSource:
+            is_running = True
+
+        monitor._source = _RunningSource()
+
+        with mock.patch.object(
+            SettingsRepository, "set_checked", side_effect=OSError("注入：磁盘不可写")
+        ):
+            with self.assertRaises(OSError):
+                vm.set_recording_requested(True)
+
+        # 运行状态已生效（意愿 + 实际录制），但磁盘没有写入
+        self.assertTrue(vm.recording_requested, "意愿已生效")
+        self.assertTrue(vm._service.status().recording, "录制已启动")
+        self.assertFalse(
+            (self.tmp_path / "config.json").exists(), "配置未写入（失败可见）"
+        )
+
+    def test_autostart_config_failure_is_visible(self):
+        """D03 回归：autostart 保存失败同样上抛（set_checked）。"""
+        from unittest import mock
+
+        vm, _monitor = _make_vm(self.tmp_path)
+        with mock.patch.object(
+            SettingsRepository, "set_checked", side_effect=OSError("注入：磁盘不可写")
+        ):
+            with self.assertRaises(OSError):
+                vm.set_autostart(False)
+        self.assertFalse(vm.autostart, "运行态已切到 false")
+
+    def test_recorder_start_failure_is_visible_and_retryable(self):
+        """D03 语义：录制器启动失败上抛；意愿保留、下次启动仍会尝试。
+
+        磁盘满/路径不可写时 recorder.start 抛 OSError：命令失败可见，
+        「意愿=True、实际未录、磁盘配置未写」——意愿保留是有意为之
+        （下次 start 采集时重试），不能静默吞掉。
+        """
+        from unittest import mock
+
+        from spritelens.recording.recorder import StreamRecorder
+
+        vm, monitor = _make_vm(self.tmp_path)
+
+        class _RunningSource:
+            is_running = True
+
+        monitor._source = _RunningSource()
+
+        with mock.patch.object(
+            StreamRecorder, "start", side_effect=OSError("注入：磁盘满")
+        ):
+            with self.assertRaises(OSError):
+                vm.set_recording_requested(True)
+
+        self.assertTrue(vm._service.recording_wanted(), "意愿保留（下次启动重试）")
+        self.assertFalse(vm._service.status().recording, "实际没有在录")
+        self.assertFalse((self.tmp_path / "config.json").exists(), "配置未写入")
+
+        # 环境恢复后重试成功：意愿已保留，直接开录
+        vm._service.set_recording(True)
+        self.assertTrue(vm._service.status().recording)
+
     def test_stop_without_start_is_safe(self):
         vm, _monitor = _make_vm(self.tmp_path)
         vm.stop()  # 未启动时停止不应抛错
