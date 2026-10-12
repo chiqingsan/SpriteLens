@@ -327,6 +327,48 @@ class EggBoxRepositoryTests(unittest.TestCase):
             finally:
                 db.close()
 
+    def test_load_account_uses_display_uid_not_latest_eggs(self) -> None:
+        """蛋仓恢复按组合根指定的展示 uid，不独立按 eggs.updated_at 选账号（R05）。
+
+        审查复现：A 有蛋；B 后登录只写 accounts 不更新蛋仓。旧实现
+        load_last_account 按 eggs.updated_at 选出 A，而宠物按 accounts
+        选出 B——页面宠物与蛋仓来自不同账号且无归属标记。
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Database(Path(tmp) / "db.sqlite")
+            try:
+                egg_store = EggStore(db)
+                egg_store.put(111, [EggBoxEntry(  # A(111) 的蛋
+                    instance_id=7, egg_conf_id=3001001, pet_conf_id=3001, quantity=1,
+                    obtained_at=1791661300, bag_type=8, height_cm=0, weight_g=0,
+                    hatch_seconds=0, hatched_seconds=0, hatch_updated_at=0,
+                    start_hatch_time=0, category=0, special_egg_conf_id=0,
+                    appearance_type=0, extension_type=0,
+                )])
+                egg_store.flush()
+                # B(222) 后登录：只写 accounts（经由 PetStore 的账号表），蛋仓无更新
+                from spritelens.repositories.pet_store import PetStore
+                pet_store = PetStore(db)
+                pet_store.put_account(222, "账号B", 50)
+                pet_store.flush()
+
+                repo = EggBoxRepository(store=egg_store)
+                # 组合根统一选定展示账号 B(222)：B 无蛋记录 → 明确空，不拿 A 的蛋补齐
+                restored = repo.load_account(222)
+                self.assertEqual(restored, 0)
+                self.assertEqual(repo.snapshot(), ())
+                self.assertEqual(repo.loaded_uid, 222)
+                # 同账号 B 登录不算切换（离线空数据也登记归属）
+                repo.handle_packet(_identity_event(uid=222, name="账号B"))
+                self.assertEqual(repo.snapshot(), ())
+                # 指定 A(111) 时仍可按账号恢复
+                repo2 = EggBoxRepository(store=egg_store)
+                self.assertEqual(repo2.load_account(111), 1)
+                egg_store.close()
+                pet_store.close()
+            finally:
+                db.close()
+
 
 class EggBoxPayloadTests(unittest.TestCase):
     def test_payload_joins_catalog(self) -> None:

@@ -571,6 +571,8 @@ def egg_box_payload(egg_box, catalog) -> dict:
         "hatching": hatching_count,
         "hatch_slots": len(slots),
         "version": egg_box.version() if egg_box is not None else 0,
+        # 数据归属（R05）：前端据此核对与概览身份是否一致，拒绝旧账号响应
+        "uid": egg_box.loaded_uid if egg_box is not None else 0,
     }
 
 

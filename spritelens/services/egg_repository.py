@@ -33,6 +33,7 @@ class EggBoxRepository:
         self._hatch_slots: set[int] = set()  # 0x0312 槽中蛋 id
         self._account = AccountTracker()
         self._version = 0
+        self._loaded_uid = 0  # 离线恢复的蛋仓归属（R05：载荷据此标记身份）
 
     def handle_packet(self, event: PacketEvent) -> None:
         # 身份跟踪无条件进行：账号切换要把内存蛋仓/孵化槽一起作废，
@@ -72,17 +73,36 @@ class EggBoxRepository:
             self._store.put(uid, eggs)
 
     def load_last_account(self) -> int:
-        """启动时从本地库恢复最近账号的蛋仓；返回恢复条数。"""
+        """按本地蛋仓最近活跃账号恢复（无组合根统一选号时的兼容入口）。"""
         if self._store is None:
             return 0
-        uid, eggs = self._store.load_latest()
-        if not eggs:
+        uid, _eggs = self._store.load_latest()
+        return self.load_account(uid) if uid > 0 else 0
+
+    def load_account(self, uid: int) -> int:
+        """恢复指定账号的蛋仓；返回恢复条数（R05）。
+
+        账号选择权在组合根：宠物与蛋仓必须按同一展示 uid 恢复。该账号
+        无蛋记录时保持空仓并登记归属（loaded_uid），不拿其他账号的蛋
+        补齐——宁可显示「该账号暂无蛋仓缓存」，也不展示别人的蛋。
+        """
+        if self._store is None or uid <= 0:
             return 0
+        eggs = self._store.load(uid)
         with self._lock:
             self._eggs = {egg.instance_id: egg for egg in eggs}
+            self._loaded_uid = uid
             self._account.note_loaded(uid)
             self._version += 1
         return len(eggs)
+
+    @property
+    def loaded_uid(self) -> int:
+        """当前蛋仓数据归属的账号 uid（实时会话跟随身份，离线为恢复账号）。"""
+        with self._lock:
+            if self._account.uid > 0:
+                return self._account.uid
+            return self._loaded_uid
 
     def snapshot(self) -> tuple[EggBoxEntry, ...]:
         with self._lock:

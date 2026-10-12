@@ -127,7 +127,12 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
     pet_store = PetStore(database)
     pet_repository = PetRepository(store=pet_store)
     monitor.add_packet_listener(pet_repository.handle_packet)
-    restored = pet_repository.load_last_account()
+
+    # 统一离线展示 uid（R05）：accounts 表记录最近登录（登录即写，各域
+    # 同源），宠物与蛋仓都按它恢复，避免两个域各自选号出现「宠物归 B、
+    # 蛋仓归 A」的串号。该账号无某域记录时明确空缓存，不拿别的账号补齐。
+    display_uid = next((uid for uid, _name in pet_store.list_accounts()), 0)
+    restored = pet_repository.load_persisted(display_uid) if display_uid else 0
     if restored:
         logger.info("已载入历史宠物 %d 只（来自本地库）", restored)
 
@@ -147,9 +152,10 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
     egg_store = EggStore(database)
     egg_box = EggBoxRepository(store=egg_store)
     monitor.add_packet_listener(egg_box.handle_packet)
-    restored_eggs = egg_box.load_last_account()
-    if restored_eggs:
-        logger.info("已载入历史蛋仓 %d 枚（来自本地库）", restored_eggs)
+    if display_uid:
+        restored_eggs = egg_box.load_account(display_uid)
+        if restored_eggs:
+            logger.info("已载入历史蛋仓 %d 枚（来自本地库）", restored_eggs)
 
     capture_vm = CaptureViewModel(
         monitor=monitor,
