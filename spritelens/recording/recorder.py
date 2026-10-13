@@ -25,6 +25,7 @@ class StreamRecorder:
         self._lock = threading.Lock()
         self._file = None
         self._count = 0
+        self._count_lock = threading.Lock()  # 状态查询不等待文件写入/关闭
 
     @property
     def is_recording(self) -> bool:
@@ -32,7 +33,7 @@ class StreamRecorder:
 
     @property
     def chunk_count(self) -> int:
-        with self._lock:
+        with self._count_lock:
             return self._count
 
     def start(self, path: Path) -> None:
@@ -41,7 +42,8 @@ class StreamRecorder:
                 return
             path.parent.mkdir(parents=True, exist_ok=True)
             self._file = path.open("a", encoding="utf-8")
-            self._count = 0
+            with self._count_lock:
+                self._count = 0
             logger.info("开始录制: %s", path)
 
     def stop(self) -> None:
@@ -77,7 +79,8 @@ class StreamRecorder:
                     return
                 file.write(line)
                 file.flush()  # 供外部实时读取/诊断，不做缓冲延迟
-                self._count += 1
+                with self._count_lock:
+                    self._count += 1
         except OSError as exc:
             logger.warning("录制写入失败，停止录制: %s", exc)
             self.stop()

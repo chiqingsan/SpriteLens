@@ -124,6 +124,8 @@ class Pet:
     skills: tuple[PetSkill, ...] = ()
     is_trial_pet: bool = False  # 服务端试用个体，不属于自己的精灵库存
     is_mirror_pet: bool = False  # 好友队伍镜像，不属于自己的精灵库存
+    catch_way: int = 0  # PetData 字段67，0为未提供
+    add_time: int = 0  # PetData 字段32，游戏获得时间（Unix秒），不使用落库时间
 
     def attribute(self, slot: str) -> PetAttribute:
         """按名称（hp/atk/spa/def/spd/spe）取某一维；越界返回零值。"""
@@ -267,6 +269,8 @@ def _extend_pet(base: Pet, node: list[dict]) -> Pet:
         glass_type=_glass_dim(node, _GLASS_TYPE),
         glass_value=_glass_dim(node, _GLASS_VALUE),
         worn_medal_id=_coerce_int(_raw_by_no(node, 73)),
+        catch_way=max(0, _coerce_int32(_raw_by_no(node, 67))),
+        add_time=_coerce_int(_raw_by_no(node, 32)),
         skills=_skills_from_children(_children_by_no(node, _NO_SKILL)),
         is_trial_pet=bool(_coerce_int(_raw_by_no(node, 81))),
     )

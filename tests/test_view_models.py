@@ -355,6 +355,7 @@ class CaptureViewModelTest(unittest.TestCase):
         from unittest import mock
 
         vm, monitor = _make_vm(self.tmp_path)
+        self.addCleanup(vm._service._recorder.stop)
 
         class _RunningSource:
             is_running = True
@@ -398,6 +399,7 @@ class CaptureViewModelTest(unittest.TestCase):
         from spritelens.recording.recorder import StreamRecorder
 
         vm, monitor = _make_vm(self.tmp_path)
+        self.addCleanup(vm._service._recorder.stop)
 
         class _RunningSource:
             is_running = True
@@ -458,11 +460,29 @@ class CaptureViewModelTest(unittest.TestCase):
     def test_concurrent_stop_and_start_are_serialized(self):
         """stop 与 start 并发时命令互斥，不产生中间态竞态。"""
         import threading
+        from unittest import mock
+        from spritelens.capture.npcap_source import NpcapCaptureSource
 
         vm, monitor = _make_vm(self.tmp_path)
+        # 只验证命令交错；禁止此单测启动真实 Npcap/访问驱动。
+        start_patch = mock.patch.object(NpcapCaptureSource, "_start_sniffer")
+        start_patch.start()
+        self.addCleanup(start_patch.stop)
+        self.addCleanup(vm.stop)
         vm.start()
         results: list[str] = []
         lock = threading.Lock()
+
+        stop_entered = threading.Event()
+        release_stop = threading.Event()
+        real_stop = monitor.stop
+
+        def paused_stop():
+            stop_entered.set()
+            release_stop.wait(timeout=5)
+            real_stop()
+
+        monitor.stop = paused_stop
 
         def do_stop():
             vm.stop()
@@ -477,10 +497,15 @@ class CaptureViewModelTest(unittest.TestCase):
         t1 = threading.Thread(target=do_stop)
         t2 = threading.Thread(target=do_start)
         t1.start()
-        time.sleep(0.05)
-        t2.start()
-        t1.join(timeout=5)
-        t2.join(timeout=5)
+        try:
+            self.assertTrue(stop_entered.wait(timeout=2))
+            t2.start()
+            t2.join(timeout=2)
+            self.assertFalse(t2.is_alive(), "停止期间 start 应拒绝，不等待旧命令")
+            self.assertFalse(vm._service.status().last_error == "")
+        finally:
+            release_stop.set()
+            t1.join(timeout=5)
         self.assertEqual(sorted(results), ["start", "stop"])
         # 终态一致：要么在采集中（start 后到），要么已停止
         self.assertIsInstance(vm.snapshot().running, bool)

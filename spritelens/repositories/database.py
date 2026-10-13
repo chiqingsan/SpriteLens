@@ -152,6 +152,10 @@ _MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
             """,
         ),
     ),
+    (9, (
+        "ALTER TABLE pets ADD COLUMN catch_way INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE pets ADD COLUMN add_time INTEGER NOT NULL DEFAULT 0",
+    )),
 )
 
 

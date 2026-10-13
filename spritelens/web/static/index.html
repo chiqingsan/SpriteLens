@@ -5,27 +5,70 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>小洛探探 SpriteLens</title>
   <link rel="icon" type="image/png" href="/favicon.ico">
+  <!-- 启动样式内联：外部 CSS 尚未加载或加载失败时仍有可见的状态。 -->
+  <style>
+    :root { --bg: #f6f6ed; --ink: #344033; --muted: #64705f; --teal: #5f7d48; --line: #dce1d1; --panel: #ffffff; }
+    [hidden] { display: none !important; }
+    .desktop-startup #startup { visibility: hidden; }
+    html, body { margin: 0; width: 100%; height: 100%; background: var(--bg); }
+    .startup {
+      position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: var(--bg); color: var(--ink); font-family: "Microsoft YaHei UI", system-ui, sans-serif;
+      opacity: 1; transition: opacity var(--motion-base, 220ms) ease;
+    }
+    .startup img { position: absolute; top: calc(50% - 121px); width: 80px; height: 80px; border-radius: 12px; }
+    .startup strong { position: absolute; top: calc(50% - 25px); height: 32px; line-height: 32px; font-size: 20px; }
+    .startup p { position: absolute; top: calc(50% + 19px); margin: 0; width: calc(100% - 48px); height: 64px; max-width: 680px; line-height: 1.5; color: var(--muted); font-size: 13px; text-align: center; }
+    .startup-actions { position: absolute; top: calc(50% + 87px); height: 34px; }
+    .startup button { padding: var(--space-3, 8px) var(--space-6, 16px); border: 0; border-radius: var(--radius-md, 8px); background: var(--teal); color: var(--panel); font: inherit; cursor: pointer; }
+    .startup-ready { opacity: 0; pointer-events: none; }
+    @media (prefers-reduced-motion: reduce) { .startup { transition: none; } }
+  </style>
+  <script src="/static/boot.js"></script>
   <link rel="stylesheet" href="/static/app.css">
   <link rel="stylesheet" href="/static/themes.css">
   <link rel="stylesheet" href="/static/ui.css">
+  <link rel="stylesheet" href="/static/desktop-shell.css">
+  <link rel="stylesheet" href="/static/backpack-layout.css">
 </head>
 <body>
+  <header id="desktop-titlebar" class="desktop-titlebar" hidden>
+    <div class="window-drag-area">
+      <img src="/static/favicon.png" alt="">
+      <strong>小洛探探</strong><span>SpriteLens</span>
+      <span id="window-error" role="status"></span>
+    </div>
+    <div class="window-controls" aria-label="窗口操作">
+      <button class="window-button" data-window-action="minimize" title="最小化" aria-label="最小化"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10"></path></svg></button>
+      <button id="window-maximize" class="window-button" data-window-action="toggle_maximize" title="最大化" aria-label="最大化"><svg class="window-maximize-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9"></rect></svg><svg class="window-restore-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 5.5v-2h7v7h-2"></path><rect x="3.5" y="5.5" width="7" height="7"></rect></svg></button>
+      <button class="window-button window-button-close" data-window-action="close" title="关闭" aria-label="关闭"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 3.5 9 9m0-9-9 9"></path></svg></button>
+    </div>
+  </header>
+  <div class="window-resize window-resize-left" data-resize-edge="1"></div>
+  <div class="window-resize window-resize-right" data-resize-edge="2"></div>
+  <div class="window-resize window-resize-top" data-resize-edge="3"></div>
+  <div class="window-resize window-resize-top-left" data-resize-edge="4"></div>
+  <div class="window-resize window-resize-top-right" data-resize-edge="5"></div>
+  <div class="window-resize window-resize-bottom" data-resize-edge="6"></div>
+  <div class="window-resize window-resize-bottom-left" data-resize-edge="7"></div>
+  <div class="window-resize window-resize-bottom-right" data-resize-edge="8"></div>
   <div id="startup" class="startup" role="status" aria-live="polite">
+    <img src="/static/favicon.png" alt="">
     <strong>小洛探探 SpriteLens</strong>
     <p data-startup-message>正在启动…</p>
-    <button type="button" hidden onclick="window.location.reload()">重新加载</button>
+    <div class="startup-actions">
+      <button type="button" hidden onclick="window.location.reload()">重新加载</button>
+    </div>
   </div>
 
   <div id="app" class="app-shell" hidden>
     <!-- 侧栏 -->
     <aside class="sidebar">
-      <div class="brand">
-        <img class="brand-mark" src="/static/favicon.png" alt="">
-        <div class="brand-copy">
-          <strong>小洛探探</strong>
-          <span>SpriteLens</span>
-        </div>
-      </div>
+      <section id="account-card" class="account-card account-empty" aria-label="账号信息">
+        <details class="account-information"><summary><img class="account-avatar" src="/static/favicon.png" alt=""><span class="account-copy"><strong id="role-name">尚未识别账号</strong><small id="role-label">登录游戏后识别</small></span><svg class="ui-icon" aria-hidden="true"><use href="/static/icons/sprite.svg#chevron-down"></use></svg></summary><div class="account-extra"><span id="role-level">暂无角色等级</span></div></details>
+        <div class="account-uid-row"><span id="role-uid">UID —</span><button id="btn-uid-visibility" class="icon-button" aria-label="隐藏 UID" aria-pressed="false" hidden><svg class="ui-icon" aria-hidden="true"><use href="/static/icons/sprite.svg#eye"></use></svg></button></div>
+      </section>
       <nav id="main-nav" aria-label="主导航">
         <button class="nav-item active" data-page="overview">
           <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/static/icons/sprite.svg#layout-dashboard"></use></svg>
@@ -93,32 +136,22 @@
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/static/icons/sprite.svg#activity"></use></svg>
             协议流
           </button>
-          <button class="nav-item nav-subitem" data-page="capture">
-            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/static/icons/sprite.svg#settings"></use></svg>
-            采集与设置
-          </button>
+
         </div>
       </nav>
-      <div class="sidebar-foot">
-        <span class="privacy-dot" title="纯本地运行：数据不出本机"></span>
-        <span id="app-version">—</span>
-      </div>
+      <div class="sidebar-foot"><button class="nav-item sidebar-settings" data-page="capture"><svg class="nav-icon" aria-hidden="true"><use href="/static/icons/sprite.svg#settings"></use></svg>设置<svg class="ui-icon" aria-hidden="true"><use href="/static/icons/sprite.svg#chevron-right"></use></svg></button></div>
     </aside>
 
     <!-- 主区 -->
     <main class="main-shell">
       <header class="topbar">
-        <div class="role-block">
-          <span id="role-label" class="role-label">当前角色</span>
-          <strong id="role-name">等待识别角色</strong>
-          <small id="role-uid">UID —</small>
-        </div>
+        <h1 id="page-title">概览</h1>
         <div class="capture-summary">
           <span id="pill-listen" class="status-pill idle">采集：未启动</span>
-          <span id="pill-key" class="status-pill idle">密钥：未获取</span>
-          <span id="pill-record" class="status-pill idle">录制：关</span>
-          <span id="pill-pets" class="status-pill idle">宠物：0 只</span>
-          <span id="capture-message" class="status-copy" role="status">开始采集后登录游戏，自动同步数据</span>
+          <span id="pill-key" hidden class="status-pill idle">密钥：未获取</span>
+          <span id="pill-record" hidden class="status-pill idle">录制：关</span>
+          <span id="pill-pets" class="status-pill idle">精灵：0 只</span>
+          <span id="capture-message" hidden class="status-copy" role="status">开始采集后登录游戏，自动同步数据</span>
         </div>
         <div class="top-actions">
           <button id="btn-toggle" class="primary-button">开始采集</button>
@@ -163,111 +196,24 @@
 
           <section class="content-panel">
             <div class="panel-toolbar pet-toolbar">
-              <div class="segmented" id="pet-view" aria-label="背包视图">
-                <button data-view="point" class="active" aria-pressed="true">游戏箱位</button>
-                <button data-view="card" aria-pressed="false">属性卡片</button>
-                <button data-view="table" aria-pressed="false">对比表格</button>
-              </div>
+              <div class="segmented" id="pet-view" aria-label="背包视图" data-vue-page></div>
+              <div class="pet-search-results"><div id="pet-search-controls" class="pet-tools"></div><span id="pet-count-root" data-vue-page></span></div>
               <button id="btn-pet-filters" class="ghost-button small" aria-expanded="false" aria-controls="pet-filters">筛选条件</button>
               <details class="pet-view-settings"><summary>显示设置</summary><div class="pet-display-options"><label class="check-row"><input type="checkbox" data-pet-field="groups" checked><span>显示蛋组</span></label><label class="check-row"><input type="checkbox" data-pet-field="height" checked><span>显示身高</span></label><label class="check-row"><input type="checkbox" data-pet-field="weight" checked><span>显示体重</span></label><label class="check-row"><input type="checkbox" data-pet-field="voice" checked><span>显示声音</span></label><label class="check-row"><input type="checkbox" data-pet-field="positions"><span>属性卡片附加百分比</span></label></div></details>
-              <span id="pet-count" class="count-badge" role="status">显示 0 / 0 只</span>
+
             </div>
-            <div class="panel-toolbar pet-tools">
-              <label class="pet-search"><span class="sr-only">搜索名字、编号或图鉴 ID</span>
-                <input id="f-search" type="text" placeholder="搜索名字 / 编号 / 图鉴 ID" autocomplete="off">
-              </label>
-              <label class="inline-field">排序
-                <select id="f-sort"></select>
-              </label>
-              <label class="check-row compact">
-                <input id="f-desc" type="checkbox"><span>降序</span>
-              </label>
-            </div>
-            <div id="pet-active-filters" class="active-filters" aria-label="已选筛选条件" hidden></div>
-            <div id="pet-box-navigation" class="pet-box-navigation" aria-label="游戏箱号导航" hidden></div>
-            <div class="table-wrap">
-              <div id="pet-grid" class="pet-grid" hidden></div>
-              <table class="pet-table" id="pet-table">
-                <thead>
-                  <tr>
-                    <th class="col-pet">宠物</th>
-                    <th class="col-types">系别</th>
-                    <th class="col-nature">性格</th>
-                    <th class="col-stats">六维</th>
-                    <th class="col-talent">天赋</th>
-                    <th class="col-body">体型 / 声音</th>
-                    <th class="col-skills">技能</th>
-                    <th class="col-gid">编号</th>
-                  </tr>
-                </thead>
-                <tbody id="pet-rows"></tbody>
-              </table>
-              <div id="pet-empty" class="empty-hint" role="status">
-                <p id="pet-empty-copy">暂无精灵数据：开始采集后登录游戏，等待数据同步</p>
-                <div class="button-row"><button id="btn-empty-reset" class="ghost-button small" hidden>清除筛选</button></div>
-              </div>
-            </div>
-            <div id="pet-pager" class="pager" hidden></div>
+
+            <div id="pet-list-root" class="vue-filter-root" data-vue-page></div>
+
           </section>
 
           <aside class="filter-rail" id="pet-filters" aria-label="精灵筛选">
-            <div class="filter-head"><h2>筛选精灵</h2><div class="button-row"><button id="btn-close-pet-filters" class="ghost-button small">收起筛选</button><button id="btn-reset-filters" class="ghost-button small">重置</button></div></div>
-            <p class="filter-note">条件即时生效，只改变当前显示结果。</p>
-            <div class="field">
-              <div class="quick-filter-head"><span>快捷条件</span><button id="btn-pin-filters" class="ghost-button small">固定当前条件</button></div>
-              <div class="quick-filters">
-                <button type="button" class="chip" id="quick-maxed" aria-pressed="false">满级 60+</button>
-              </div>
-            </div>
-            <div id="saved-shortcuts" class="saved-shortcuts" aria-label="已固定快捷条件"></div>
-            <form id="shortcut-editor" class="shortcut-editor" hidden>
-              <label class="field"><span>快捷条件名称</span><input id="shortcut-name" maxlength="40" required autocomplete="off"></label>
-              <div class="button-row"><button type="submit" class="primary-button small">保存</button><button id="btn-cancel-shortcut" type="button" class="ghost-button small">取消</button></div>
-            </form>
-            <label class="field"><span>性别</span>
-              <select id="f-gender"><option value="0">不限性别</option><option value="1">雄性</option><option value="2">雌性</option></select>
-            </label>
-            <label class="field">
-              <span>等级范围 <b id="f-level-label">1 – 100</b></span>
-              <div class="range-row">
-                <input id="f-level-min" type="range" min="1" max="100" value="1" aria-label="最低等级">
-                <input id="f-level-max" type="range" min="1" max="100" value="100" aria-label="最高等级">
-              </div>
-            </label>
-            <details class="filter-section" open>
-              <summary>性格 <small data-filter-summary="natures">不限</small></summary>
-              <p class="filter-note">优先显示当前背包中常见的性格。</p><div id="f-natures" class="chip-group"></div><button id="btn-more-natures" type="button" class="ghost-button small" aria-expanded="false">更多性格</button>
-            </details>
-            <details class="filter-section">
-              <summary>系别 <small data-filter-summary="types">不限</small></summary>
-              <div id="f-types" class="chip-group"></div>
-            </details>
-            <details class="filter-section" open><summary>蛋组 <small data-filter-summary="egg_groups">不限</small></summary>
-              <label class="field"><span class="sr-only">蛋组匹配方式</span><select id="f-egg-mode"><option value="any">匹配任一</option><option value="all">同时匹配</option></select></label>
-              <div id="f-egg-groups" class="chip-group"></div>
-            </details>
-            <details class="filter-section"><summary>实际值范围 <small data-filter-summary="measurements">不限</small></summary><p class="filter-note">按个体实际值筛选，留空不限。</p>
-<div class="measurement-inputs"><span>身高（m）</span><input type="number" step=".01" data-measure-filter="height_min" aria-label="最低身高" placeholder="最低"><span>至</span><input type="number" step=".01" data-measure-filter="height_max" aria-label="最高身高" placeholder="最高"></div>
-<div class="measurement-inputs"><span>体重（kg）</span><input type="number" step=".001" data-measure-filter="weight_min" aria-label="最低体重" placeholder="最低"><span>至</span><input type="number" step=".001" data-measure-filter="weight_max" aria-label="最高体重" placeholder="最高"></div>
-<div class="measurement-inputs"><span>声音（dB）</span><input type="number" step="1" data-measure-filter="voice_min" aria-label="最低声音" placeholder="最低"><span>至</span><input type="number" step="1" data-measure-filter="voice_max" aria-label="最高声音" placeholder="最高"></div>
-            </details>
-              <div class="range-presets"><span>声音预设</span><button type="button" class="chip" data-voice-preset="-100" aria-pressed="false">−100 dB</button><button type="button" class="chip" data-voice-preset="100" aria-pressed="false">+100 dB</button></div>
-            <details class="filter-section"><summary>范围位置 <small data-filter-summary="positions">不限</small></summary>
-              <p class="filter-note">按物种参考范围计算，0% 为下限、100% 为上限。缺少参考范围或越界个体不参与。</p>
-              <div class="measurement-inputs"><span>身高范围位置（%）</span><input type="number" min="0" max="100" step=".1" data-measure-filter="height_position_min" aria-label="最低身高范围位置" placeholder="最低"><span>至</span><input type="number" min="0" max="100" step=".1" data-measure-filter="height_position_max" aria-label="最高身高范围位置" placeholder="最高"></div>
-              <div class="measurement-inputs"><span>体重范围位置（%）</span><input type="number" min="0" max="100" step=".1" data-measure-filter="weight_position_min" aria-label="最低体重范围位置" placeholder="最低"><span>至</span><input type="number" min="0" max="100" step=".1" data-measure-filter="weight_position_max" aria-label="最高体重范围位置" placeholder="最高"></div>
-            </details>
-            <p id="measurement-filter-status" class="filter-note" role="status"></p>
-            <label class="field">
-              <span>天赋阶下限</span>
-              <select id="f-talent"></select>
-            </label>
+            <div class="filter-head"><h2>筛选精灵</h2><div class="button-row"><button id="btn-close-pet-filters" class="ghost-button small">收起筛选</button><span id="pet-filter-actions" data-vue-page></span></div></div>
+            <div id="pet-basic-filters" class="vue-filter-root" data-vue-page></div>
 
           </aside>
 
-          <aside id="pet-detail" class="detail-panel">
-            <div class="empty-hint">点击宠物卡片查看详情</div>
-          </aside>
+          <div id="pet-detail-root" class="vue-filter-root" data-vue-page></div>
         </div>
       </section>
 
@@ -301,39 +247,8 @@
       </section>
 
       <!-- 蛋图鉴 -->
-      <section id="page-egg-dex" class="page">
-        <div class="workspace split">
-          <section class="content-panel">
-            <div class="panel-toolbar">
-              <span id="ed-count" class="count-badge">收录 0 种蛋</span>
-              <label class="inline-field">搜索
-                <input id="ed-search" type="text" placeholder="名字 / 蛋编号">
-              </label>
-              <label class="inline-field">蛋组
-                <select id="ed-group"></select>
-              </label>
-              <label class="inline-field">类型
-                <select id="ed-type"></select>
-              </label>
-              <label class="inline-field">孵化时长
-                <select id="ed-hatch">
-                  <option value="">全部</option>
-                  <option value="8">≤ 8 小时</option>
-                  <option value="12">≤ 12 小时</option>
-                  <option value="16">≤ 16 小时</option>
-                  <option value="20">≤ 20 小时</option>
-                </select>
-              </label>
-            </div>
-            <div class="table-wrap">
-              <div id="ed-grid" class="hb-grid eggdex-grid"></div>
-              <div id="ed-empty" class="empty-hint" hidden>没有符合筛选条件的蛋</div>
-            </div>
-          </section>
-          <aside id="ed-detail" class="detail-panel">
-            <div class="empty-hint">点击蛋卡片查看孵化详情</div>
-          </aside>
-        </div>
+      <section id="page-egg-dex" class="page" data-vue-page>
+        <div class="empty-hint">正在加载蛋图鉴…</div>
       </section>
 
       <!-- 蛋蛋仓库 -->
@@ -597,14 +512,13 @@
   <div id="modal-layer" class="modal-layer" aria-hidden="true"></div>
   <div id="detail-backdrop" class="detail-backdrop" hidden></div>
   <div id="toast-layer" class="toast-layer" role="status" aria-live="polite"></div>
-  <script src="/static/boot.js"></script>
+  <script src="/static/desktop-shell.js"></script>
   <script src="/static/ui.js"></script>
   <script src="/static/appearance.js"></script>
-  <script src="/static/pet-filters.js"></script>
   <script src="/static/icons.js"></script>
-  <script src="/static/backpack-controls.js"></script>
   <script src="/static/pet-presentation.js"></script>
-  <script src="/static/pages/egg-dex.js"></script>
+  <script src="/static/account-requests.js"></script>
+  <script src="/static/account-card.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

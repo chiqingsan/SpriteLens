@@ -10,6 +10,9 @@ from spritelens.domain.static_data import StaticData
 from spritelens.domain.display import TYPE_COLORS
 from spritelens.domain.measurements import range_position, range_text
 from spritelens.web.pet_media import pet_images
+from spritelens.services.egg_repository import EggBoxSnapshot
+from spritelens.services.home_repository import HomeRepoSnapshot
+from spritelens.services.flower_repository import FlowerRepoSnapshot
 
 
 def species_icon_url(base_conf_id: int) -> str:
@@ -31,8 +34,10 @@ def handbook_payload(
     收集状态以「会话快照里出现过该 base_conf_id」为准（与宠物仓库同源）；
     图鉴是只读视图，不做独立持久化——快照本身已由本地库恢复。
     """
+    snapshot = repository.consistent_snapshot()
     if static is None:
         return {
+            "uid": snapshot.uid, "version": snapshot.version, "complete": None,
             "species": [],
             "total": 0,
             "collected": 0,
@@ -44,7 +49,7 @@ def handbook_payload(
 
     # 收集统计：base_conf_id → 拥有只数 / 其中最高等级
     owned: dict[str, dict] = {}
-    for pet in repository.snapshot():
+    for pet in snapshot.pets:
         key = str(pet.base_conf_id)
         if not key or key == "0":
             continue
@@ -102,6 +107,7 @@ def handbook_payload(
         )
     return {
         "species": rows,
+        "uid": snapshot.uid, "version": snapshot.version, "complete": None,
         "total": len(static.species_items()),
         "collected": len(owned),
         "shown": len(rows),
@@ -119,7 +125,8 @@ def male_matrix_payload(pet_repository, static: StaticData | None, gender: str =
     行=性格（含正/负修正说明），列=蛋组，格子=该组合下的宠物摘要列表。
     gender: all / male / female——按公母分库筛选。
     """
-    pets = pet_repository.snapshot() if pet_repository is not None else ()
+    snapshot = pet_repository.consistent_snapshot() if pet_repository is not None else None
+    pets = snapshot.pets if snapshot else ()
     cells: dict[str, list[dict]] = {}
     natures_seen: dict[str, dict] = {}
     groups_seen: dict[str, None] = {}
@@ -159,6 +166,8 @@ def male_matrix_payload(pet_repository, static: StaticData | None, gender: str =
     }
     return {
         "natures": sorted(natures_seen.values(), key=lambda n: n["name"]),
+        "uid": snapshot.uid if snapshot else 0, "version": snapshot.version if snapshot else 0,
+        "complete": None,
         "groups": sorted(groups_seen),
         "cell_order": order,
         "cells": cell_lists,
@@ -172,9 +181,12 @@ def flowers_payload(flower_repo, static: StaticData | None, catalog=None, pet_re
     名字降级链：图鉴物种表 → 蛋目录 → 宠物帧学习表（colorful_conf_id→名字）
     → "#id"。
     """
-    snap = flower_repo.snapshot() if flower_repo is not None else None
+    view = flower_repo.consistent_snapshot() if flower_repo is not None else FlowerRepoSnapshot(None, 0, 0)
+    snap = view.data
+    metadata = {"uid": view.uid, "version": view.version, "complete": None,
+                "source": "observed" if snap is not None else "unknown"}
     if snap is None:
-        return {"available": False, "own": [], "friends": [], "version": 0}
+        return {**metadata, "available": False, "own": [], "friends": []}
 
     def name_of(conf_id: int) -> str:
         species = static.species(conf_id) if static is not None else None
@@ -203,7 +215,7 @@ def flowers_payload(flower_repo, static: StaticData | None, catalog=None, pet_re
         "available": True,
         "own": own,
         "friends": friends,
-        "version": flower_repo.version(),
+        **metadata,
     }
 def colors_payload(pet_repository, catalog, static: StaticData | None) -> dict:
     """炫彩色卡载荷：宠物库按 glass → 卡号聚合，输出底色×混色矩阵。
@@ -212,6 +224,7 @@ def colors_payload(pet_repository, catalog, static: StaticData | None) -> dict:
     与赛季卡单独分组。
     """
     cards = catalog.cards() if catalog is not None else ()
+    snapshot = pet_repository.consistent_snapshot() if pet_repository is not None else None
     # 轴带目录色（mock/降级路径可能没有 color 字段，getattr 防御）
     base_map: dict[str, str | None] = {}
     mix_map: dict[str, str | None] = {}
@@ -222,7 +235,7 @@ def colors_payload(pet_repository, catalog, static: StaticData | None) -> dict:
     seasonal: list[dict] = []
     unknown: list[dict] = []
     total = 0
-    for pet in (pet_repository.snapshot() if pet_repository is not None else ()):
+    for pet in (snapshot.pets if snapshot is not None else ()):
         if not pet.mutation_type & 8 or (not pet.glass_type and not pet.glass_value):
             continue
         if catalog is None:
@@ -249,6 +262,8 @@ def colors_payload(pet_repository, catalog, static: StaticData | None) -> dict:
         matrix.setdefault(f"{card.base_name}|{card.mix_name}", []).append(summary)
     return {
         "base_axis": [{"name": n, "hex": h} for n, h in base_map.items()],
+        "uid": snapshot.uid if snapshot else 0, "version": snapshot.version if snapshot else 0,
+        "complete": None,
         "mix_axis": [{"name": n, "hex": h} for n, h in mix_map.items()],
         "matrix": matrix,
         "seasonal": seasonal,
@@ -258,15 +273,19 @@ def colors_payload(pet_repository, catalog, static: StaticData | None) -> dict:
     }
 def home_payload(home_repo, static: StaticData | None) -> dict:
     """我的家园载荷：居民（联查物种图标）/ 家具 / 产蛋窝 / 增量提示。"""
-    snap = home_repo.snapshot() if home_repo is not None else None
+    view = home_repo.consistent_snapshot() if home_repo is not None else HomeRepoSnapshot(None, 0, 0, 0)
+    snap = view.data
+    metadata = {"uid": view.uid, "version": view.version, "pending_deltas": view.pending_deltas,
+                "complete": None, "source": "stale" if snap and view.pending_deltas else "observed" if snap else "unknown"}
     if snap is None:
         return {"available": False, "residents": [], "furniture": [], "nests": [],
-                "room_level": 0, "pending_deltas": 0, "version": 0}
+                "room_level": 0, **metadata}
     residents = []
     for r in snap.residents:
         species = static.species(r.actor_id & 0xFFFF) if static is not None else None
         residents.append({
-            "actor_id": r.actor_id,
+            # uint64 必须在 JSON 序列化之前转字符串，JS Number 无法区分相邻 ID。
+            "actor_id": str(r.actor_id),
             "name": r.name,
             "gender": r.gender,
             "level": r.level,
@@ -291,22 +310,27 @@ def home_payload(home_repo, static: StaticData | None) -> dict:
         "residents": residents,
         "furniture": furniture,
         "nests": nests,
-        "pending_deltas": home_repo.pending_deltas(),
-        "version": home_repo.version(),
+        **metadata,
     }
 def egg_box_payload(egg_box, catalog) -> dict:
     """蛋蛋仓库载荷：蛋仓快照 + 蛋目录联查（名字/孵化时长/图标）+ 聚合统计。"""
-    entries = egg_box.snapshot() if egg_box is not None else ()
-    slots = egg_box.hatch_slots() if egg_box is not None else set()
+    view = egg_box.consistent_snapshot() if egg_box is not None else EggBoxSnapshot((), frozenset(), 0, 0, frozenset(), "unknown", "unknown")
+    entries, slots = view.entries, view.slots
     rows: list[dict] = []
     hatching_count = 0
+    historical_hatching = 0
     total_quantity = 0
     for egg in entries:
         info = catalog.egg(egg.egg_conf_id) if catalog is not None else None
         total_quantity += egg.quantity or 1
         in_slot = egg.instance_id in slots
-        if egg.hatching or in_slot:
+        hatching = in_slot and view.slots_source == "observed"
+        historical = egg.instance_id in view.historical_ids
+        history_hatch = view.slots_source != "observed" and (in_slot and view.slots_source == "historical" or historical and egg.hatching)
+        if hatching:
             hatching_count += 1
+        if history_hatch:
+            historical_hatching += 1
         rows.append(
             {
                 "instance_id": egg.instance_id,
@@ -325,7 +349,10 @@ def egg_box_payload(egg_box, catalog) -> dict:
                 "hatch_label": info.hatch_label if info is not None else "",
                 "quantity": egg.quantity,
                 "obtained_at": egg.obtained_at,
-                "hatching": egg.hatching or in_slot,
+                "historical": historical,
+                "hatching": hatching,
+                "hatch_known": view.slots_source == "observed",
+                "historical_hatching": history_hatch,
                 "in_slot": in_slot,
                 "hatch_progress": round(egg.hatch_progress, 4),
                 "category": egg.category,
@@ -339,11 +366,15 @@ def egg_box_payload(egg_box, catalog) -> dict:
         "eggs": rows,
         "total": len(entries),
         "total_quantity": total_quantity,
-        "hatching": hatching_count,
+        "hatching": hatching_count if view.slots_source == "observed" else None,
+        "historical_hatching": historical_hatching,
+        "source": view.source,
+        "slots_source": view.slots_source,
+        "complete": None,
         "hatch_slots": len(slots),
-        "version": egg_box.version() if egg_box is not None else 0,
+        "version": view.version,
         # 数据归属（R05）：前端据此核对与概览身份是否一致，拒绝旧账号响应
-        "uid": egg_box.loaded_uid if egg_box is not None else 0,
+        "uid": view.uid,
     }
 def egg_dex_payload(
     catalog,

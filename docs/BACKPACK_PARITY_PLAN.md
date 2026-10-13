@@ -150,6 +150,6 @@
 
 竞品 `webui/app.js`：`petMatches`（525）、`petCard`（约 700）、快捷项（733–758）、`filterPanel`（773）、`detailPanel`（853）、`backpackLayout`（1088）、`renderBackpack`（1107）；目标提醒（161–296）、本地整理规则（880 后，含 V2）。这些都是解包前端行为，不代表游戏规则验证。
 
-本项目：`domain/pet_locations.py`、`domain/pets.py`、`services/pet_repository.py`、`view_models/pet_vm.py`、`web/payloads.py`、`web/static/app.js`、`backpack-controls.js`、`pet-filters.js`、`index.html`。
+本项目：`domain/pet_locations.py`、`domain/pets.py`、`services/pet_repository.py`、`view_models/pet_vm.py`、`web/payloads.py`、`web/static/app.js`、`frontend/src/components/PetShortcuts.vue`、`PetAdvancedFilters.vue`、`PetDetail.vue`、`index.html`。
 
 现有数据：skills.json 共 1511 条，1378 条带描述；真实录制 161 个体/90 个已确认箱位。Schema 已有 PetTeamInfo/PetTeam、PetData.add_time/catch_way/free_medal_conf_ids、PlayerPetMedalInfo 等候选路径；下一步需核验实际载荷与归属。

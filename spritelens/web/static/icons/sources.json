@@ -348,6 +348,78 @@
         "time"
       ],
       "sha256": "971b0b2d3b5b17ae240cd3aac1a09710ab680d8c41900f1a37a0e430994d7fda"
+    },
+    {
+      "name": "eye",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/eye",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/eye.svg",
+      "license": "MIT",
+      "search_tags": [
+        "uid",
+        "show"
+      ],
+      "sha256": "45bdbd35bb18e9997a86dad8db6eb90931d1d53884484baf2c65e34d6f6e4f93"
+    },
+    {
+      "name": "eye-off",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/eye-off",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/eye-off.svg",
+      "license": "MIT",
+      "search_tags": [
+        "uid",
+        "hide"
+      ],
+      "sha256": "7fd56939026b76c23b64597bab2ad0b6aab824eef4e0edd772626126b8b20433"
+    },
+    {
+      "name": "square",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/square",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/square.svg",
+      "license": "MIT",
+      "search_tags": [
+        "stop",
+        "capture"
+      ],
+      "sha256": "03f16281a365e8e68f5d084342c9f7b0c04b02f0ddf79668adb3247f83f662d4"
+    },
+    {
+      "name": "chevron-down",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/chevron-down",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/chevron-down.svg",
+      "license": "MIT",
+      "search_tags": [
+        "account",
+        "expand"
+      ],
+      "sha256": "5a2e5c2a155ce06264a3f7299073ed636142dfd0b324b747387d9cfbf9fb5e3e"
+    },
+    {
+      "name": "gender-male",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/gender-male",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/gender-male.svg",
+      "license": "MIT",
+      "search_tags": [
+        "male",
+        "gender"
+      ],
+      "sha256": "58e541ca0897d0c3201150a69d7ad098d95dcb1e391ac1b843f9b4ec9c8486aa"
+    },
+    {
+      "name": "gender-female",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/gender-female",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/gender-female.svg",
+      "license": "MIT",
+      "search_tags": [
+        "female",
+        "gender"
+      ],
+      "sha256": "991f96057e2479125a87818328e9e87faef513ce62a20fe5835b1546ec028b1c"
     }
   ]
 }

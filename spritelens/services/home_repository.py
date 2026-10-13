@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import threading
+from dataclasses import dataclass
 
 from spritelens.domain.home import HomeSnapshot, extract_home
 from spritelens.domain.identity import extract_identity
@@ -21,6 +22,14 @@ logger = get_logger("home_repository")
 
 OP_HOME_DELTA_A = 0x0413
 OP_HOME_DELTA_B = 0x0414
+
+
+@dataclass(frozen=True)
+class HomeRepoSnapshot:
+    data: HomeSnapshot | None
+    uid: int
+    version: int
+    pending_deltas: int
 
 
 class HomeRepository:
@@ -72,6 +81,10 @@ class HomeRepository:
     def pending_deltas(self) -> int:
         with self._lock:
             return self._delta_count
+
+    def consistent_snapshot(self) -> HomeRepoSnapshot:
+        with self._lock:
+            return HomeRepoSnapshot(self._snapshot, self._account.display_uid, self._version, self._delta_count)
 
     def version(self) -> int:
         with self._lock:

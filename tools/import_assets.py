@@ -142,7 +142,21 @@ def import_type_icons(danshen: Path | None) -> dict:
             (TYPE_ICON_DIR / name).write_bytes(src.read_bytes())
             copied += 1
             print(f"[assets] 系别图标：{name}（{src.stat().st_size / 1024:.1f}KB）")
-    return {"copied": copied}
+    # TypeIcon 的命名编号与协议系别 ID 不同；按已核对的图案映射裁剪。
+    from PIL import Image
+    import re
+    sprite_ids = {0: 2, 1: 4, 2: 5, 3: 3, 4: 11, 5: 9, 6: 14, 7: 12,
+                  8: 8, 9: 15, 10: 16, 11: 20, 12: 13, 13: 17, 14: 19, 15: 10, 16: 18, 17: 6}
+    css = (TYPE_ICON_DIR / "sprites.css").read_text(encoding="utf-8")
+    regions = {int(key): (int(x), int(w), int(h)) for key, x, w, h in re.findall(
+        r"ui_icon_species_(\d+)_png\]\{[^}]*background-position:(-?\d+)px 0;[^}]*width:(\d+)px;height:(\d+)px", css)}
+    # 左上角那一项 CSS 使用 0 0（没有 px）。
+    regions[3] = (0, 56, 57)
+    with Image.open(TYPE_ICON_DIR / "sprite-0.webp") as atlas:
+        for type_id, sprite_id in sprite_ids.items():
+            x, width, height = regions[sprite_id]
+            atlas.crop((-x, 0, -x + width, height)).save(TYPE_ICON_DIR / f"type-{type_id}.png")
+    return {"copied": copied, "derived": len(sprite_ids), "type_to_sprite": sprite_ids}
 
 
 # -- 图鉴元数据 --------------------------------------------------------

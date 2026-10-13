@@ -96,21 +96,30 @@ class SettingsRepository:
         return _clamp_int(value, default, lo=lo, hi=hi)
 
     def window_geometry(self) -> dict | None:
-        """上次窗口几何（width/height/maximized）；未记录过返回 None。"""
+        """上次窗口几何；旧记录未保存坐标时仍使用默认位置。"""
         width = self.get_int("window.width", 0, lo=0, hi=20000)
         height = self.get_int("window.height", 0, lo=0, hi=20000)
         if width <= 0 or height <= 0:
             return None
+        x, y = self.get_value("window.x"), self.get_value("window.y")
+        if type(x) is not int or type(y) is not int:
+            x = y = None
         return {
             "width": width,
             "height": height,
             "maximized": self.get_bool("window.maximized"),
+            "x": x, "y": y,
         }
 
-    def set_window_geometry(self, *, width: int, height: int, maximized: bool) -> None:
-        self.set("window.width", int(width))
-        self.set("window.height", int(height))
-        self.set("window.maximized", bool(maximized))
+    def set_window_geometry(self, *, width: int, height: int, maximized: bool,
+                            x: int | None = None, y: int | None = None) -> None:
+        with self._lock:
+            self._load()
+            self._cache.update({"window.width": int(width), "window.height": int(height),
+                                "window.maximized": bool(maximized)})
+            if x is not None and y is not None:
+                self._cache.update({"window.x": int(x), "window.y": int(y)})
+            self._save_locked()
 
     def set(self, key: str, value: Any) -> None:
         with self._lock:

@@ -246,26 +246,24 @@ class EggStore:
             self._pending_slots[uid] = frozenset(slot for slot in slots if slot > 0)
             self._ensure_worker_locked()
 
-    def load_hatch_slots(self, uid: int) -> set[int]:
-        """读取某账号的孵化槽快照；无记录返回空集合。"""
+    def load_hatch_slots(self, uid: int) -> set[int] | None:
+        """None 为未保存/坏记录；空集合是明确保存的空槽，不能混为一谈。"""
         self.flush()
-        try:
-            rows = self._db.query(
-                "SELECT slots_json FROM egg_hatch_slots WHERE uid = ?", (uid,)
-            )
-        except Exception as exc:  # noqa: BLE001 - 快照读取失败降级为空
-            logger.warning("孵化槽快照读取失败: %s", exc)
-            return set()
+        rows = self._db.query("SELECT slots_json FROM egg_hatch_slots WHERE uid = ?", (uid,))
         if not rows:
-            return set()
+            return None
         try:
             raw = json.loads(rows[0]["slots_json"])
         except (ValueError, TypeError):
-            logger.warning("孵化槽快照损坏，按空处理: uid=%s", uid)
-            return set()
+            logger.warning("孵化槽快照损坏，状态未知: uid=%s", uid)
+            return None
         if not isinstance(raw, list):
-            return set()
-        return {int(item) for item in raw if isinstance(item, int) and item > 0}
+            logger.warning("孵化槽快照格式无效，状态未知: uid=%s", uid)
+            return None
+        if any(type(item) is not int or item <= 0 for item in raw):
+            logger.warning("孵化槽快照条目无效，状态未知: uid=%s", uid)
+            return None
+        return set(raw)
 
     # -- 生命周期 ------------------------------------------------------
     def close(self) -> None:

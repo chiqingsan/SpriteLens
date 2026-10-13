@@ -27,14 +27,16 @@
       fields: Object.assign({}, preferences.fields, changes.fields || {}), shortcuts: changes.shortcuts || preferences.shortcuts || [] };
     apply(draft);
     document.getElementById("appearance-status").textContent = "保存中…";
-    saveQueue = saveQueue.then(function () { return save(draft); }).then(function (value) {
+    var result = saveQueue.then(function () { return save(draft); }).then(function (value) {
       document.getElementById("appearance-status").textContent = "偏好已保存";
       // 后续操作可能已经应用，保存较早响应不能覆盖新选择。
       return value;
-    }).catch(function (error) {
+    });
+    saveQueue = result.catch(function (error) {
       document.getElementById("appearance-status").textContent = "保存失败，当前预览仍可用；请重试";
       notify(error.message, true);
     });
+    return result;
   }
 
   document.querySelectorAll("[data-theme-choice]").forEach(function (button) {
@@ -53,7 +55,7 @@
     imageMode: function () { return preferences.pet_image || "portrait"; },
     initialize: function (value, persist, toast) { save = persist; notify = toast; apply(value); },
     view: function (view) { update({ pet_view: view }); },
-    shortcuts: function (items) { update({ shortcuts: items }); },
+    shortcuts: function (items) { return update({ shortcuts: items }); },
     ranges: function (title, ranges, positions) {
       function esc(text) { var node = document.createElement("span"); node.textContent = text; return node.innerHTML; }
       var content = ["height", "weight"].map(function (field) {

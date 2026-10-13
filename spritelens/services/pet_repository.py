@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from spritelens.domain.identity import PlayerIdentity, extract_identity
 from spritelens.domain.pets import Pet, extract_pets
@@ -90,6 +90,11 @@ class PetRepository:
             for pet in pets:
                 if pet.gid <= 0 or len(self._pets) >= MAX_PETS and pet.gid not in self._pets:
                     continue
+                previous = self._pets.get(pet.gid)
+                if previous:
+                    # 简略更新缺少获得信息时保留已采集字段；0表示未知，不能抹掉日期。
+                    pet = replace(pet, catch_way=pet.catch_way or previous.catch_way,
+                                  add_time=pet.add_time or previous.add_time)
                 self._pets[pet.gid] = pet
             self._version += 1
             uid = self._account.uid
@@ -125,7 +130,7 @@ class PetRepository:
                 backpack=Backpack(dict(self._backpack.boxes), self._backpack.teams, self._backpack.active_team),
                 locations=locations,
                 version=self._version,
-                uid=self._account.uid,
+                uid=self._account.display_uid,
                 identity=self._account.identity,
                 cached_identity=self._cached_identity,
             )
@@ -164,6 +169,9 @@ class PetRepository:
             return 0
         with self._lock:
             existing = set(self._pets)
+            version = self._version
+            if self._account.display_uid and self._account.display_uid != uid:
+                raise ValueError("不能将历史宠物加载到另一账号")
         loaded = self._store.load(uid)
         backpack = self._store.load_backpack(uid)
         account = self._store.load_account(uid)
@@ -171,6 +179,8 @@ class PetRepository:
             return 0
         added = 0
         with self._lock:
+            if self._version != version or self._account.display_uid and self._account.display_uid != uid:
+                raise RuntimeError("恢复期间账号或宠物已变化，历史数据未应用")
             # 记住离线数据的归属：该账号登录时不算「切换」，不清快照
             self._account.note_loaded(uid)
             if self._account.identity is None and account:

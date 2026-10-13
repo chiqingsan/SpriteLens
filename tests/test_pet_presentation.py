@@ -94,8 +94,9 @@ class PetPresentationTest(unittest.TestCase):
         self.assertIsNone(ordinary["color_card"])
         self.assertFalse(ordinary["is_shiny"])
         class Repo:
-            def snapshot(self):
-                return [replace(pet, mutation_type=0), pet]
+            def consistent_snapshot(self):
+                from types import SimpleNamespace
+                return SimpleNamespace(pets=(replace(pet, mutation_type=0), pet), uid=0, version=0)
         matrix = colors_payload(Repo(), catalog, None)
         self.assertEqual(matrix["pet_total"], 1)
         self.assertEqual(next(iter(matrix["matrix"].values()))[0]["color_card"]["particle_id"], 1)

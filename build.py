@@ -205,6 +205,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true", help="只打印命令，不编译")
     args = parser.parse_args(argv)
 
+    from tools.frontend import check
+    failures = check()
+    if failures:
+        raise SystemExit("\n".join(failures))
+
     config = load_config(Path(args.config))
     version = str(config.get("version") or load_project_version())
     check_environment(config)

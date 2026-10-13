@@ -7,10 +7,10 @@
 状态：当前架构说明。新的稳定性与模块化演进以 [ROADMAP](ROADMAP.md) 为准；
 历史技术选型记录仍见 `ARCHITECTURE_DECISION.md`。当前已知缺陷及证据见
 [初审](reviews/PROJECT_REVIEW_2026-10-12.md)、[改动复核](reviews/ARCHITECTURE_FOLLOWUP_2026-10-13.md)
-与 [GLM 交付复核](reviews/GLM_DELIVERY_REVIEW_2026-10-13.md)，
+与 [运行时修复复验](reviews/RUNTIME_REPAIR_VERIFICATION_2026-10-13.md)，
 不要把设计约束解释为所有异常路径已验证。
 
-2026-10-13 已确认前端采用 Vue 3 + TypeScript + Vite，当前生产仍为原生 JS，尚未实施迁移。
+2026-10-13 已落地 Vue 3 + TypeScript + Vite、蛋图鉴与宠物筛选/请求/三视图/箱位切片；其余职责仍为原生 JS，旧壳持唯一 WS。
 工程/状态/发布方向见 [Vue 演进决策](VUE3_MIGRATION.md)，下文前端结构描述当前代码。
 
 ## 分层与依赖方向
@@ -63,10 +63,10 @@ CaptureService 已接管 source 创建、录制 tee、密钥与运行命令；Ca
 |---|---|---|
 | 抓包源、录制器、手动密钥命令 | CaptureService；VM 提供页面命令与偏好 | 运行命令有锁，但录制意愿/持久化仍跨两层分步更新 |
 | 协议会话、密钥接续、管线统计 | MonitorService / SessionTracker | monitor 锁保护管线；checkpoint 仍有同步 IO |
-| 宠物、箱位、身份与域版本 | PetRepository | consistent_snapshot 一次取齐；PetView 用于 /api/pets，bootstrap/概览/WS 尚未统一 |
-| 蛋仓、槽位、家园、花田与域版本 | 各域 repository | 账号判断共用 AccountTracker 规则；不是同一全局原子快照 |
+| 宠物、箱位、身份与域版本 | PetRepository | consistent_snapshot 一次取齐；PetView 覆盖列表/选项/概览/REST/WS，bootstrap 的宠物子载荷共享一次读取 |
+| 蛋仓、槽位、家园、花田与域版本 | 各域 repository | 各域 consistent_snapshot 一次取齐；state 核对归属，失配计数保持未知；不保证跨域全局原子性 |
 | SQLite 连接与最终清理 | AppContext 持有 Database，各 Store 使用连接 | AppContext.close 尝试清理每项；装配失败及外层入口仍有遗漏 |
-| 页状态、请求序号与 DOM 绑定 | 蛋图鉴页面模块；其余主要在 app.js | 蛋图鉴 bind 幂等；其它页面迁移及账号相关失效待落实 |
+| 页状态、请求序号与 DOM 绑定 | Vue 蛋图鉴与完整宠物页；其余主要在 app.js | 宠物请求由 usePets 管理，读取旧壳唯一账号上下文；原生其它页用 account-requests.js，宠物详情/扩展筛选/快捷条件由 Vue 管理 |
 
 读取方不修改所有者私有字段；有界等待与资源实际退出分别判断。
 下面描述的是当前链路，后续任务与验收统一在路线图。
@@ -79,7 +79,7 @@ PacketEvent → MonitorService.add_packet_listener
   → domain.pets.extract_pets（形状搜索 + 字段号取值：六维/技能/外观/物种键）
   → PetRepository（按 gid 合并,版本号递增；带 uid 时分流到 PetStore）
   → PetStore.put（仅并入待写表，零 IO）→ worker 线程批量 upsert → SQLite
-  → PetRepoSnapshot → 请求级 PetView（锁外多维筛选/排序；/api/pets）
+  → PetRepoSnapshot → 请求级 PetView（锁外筛选/排序/选项/统计；列表/概览/REST/WS；bootstrap 共享同一视图）
   → payloads.pets_payload（JSON 契约）→ 前端 app.js 渲染
     （点阵/卡片/表格三视图；系别/性格/六维条/天赋徽章）
   ← domain.static_data 提供物种/性格/技能中文名（base_conf_id 关联）
@@ -122,6 +122,11 @@ UI 的 `drain_events` 与后续帧处理——实测事件日志每条 `flush()`
 载入该账号的历史宠物与蛋仓；无该域缓存时显示空态，不借其它账号补齐。
 未开始采集也能看到上次的数据；历史只补缺失 gid，不覆盖本次会话的新数据，
 并恢复炫彩形态 id→名字的学习表（花田载荷不退化 `#id`）。
+历史恢复在 IO 前后校验账号与版本；期间切号或数据更新则失败，不发布旧数据。
+蛋仓条目与槽位分别标记 observed/historical/unknown，部分条目重观测为 mixed。
+历史槽位不能确认当前在孵；缺失/坏槽记录为未知，明确空槽与未保存区分，数据库读错误向上传播。
+各域 `complete=null` 表示全量完整性未确认；家园有待合并增量时 `source=stale`。
+账号页提交同时校验代次、请求序号、uid 与对应域版本；离页/切号取消，取消无效仍拒绝旧响应。
 
 **迁移历史**：v2 六维/外观列（六维最终值 6 列、身高/体重/声音/变异/系别/
 突破/专精/球种 8 列、物种键 `base_conf_id`，明细存 `attributes_json` /
@@ -250,18 +255,24 @@ schema 为外挂数据文件，游戏版本更新只换文件不改代码。
   → spritelens/app_context.py  装配根（管线/库/VM/自动采集）
 ```
 
-**前端结构**（`web/static/`，零框架零构建）：
+**前端结构**（`frontend/` + `web/static/` 渐进迁移，构建说明见 [前端开发](FRONTEND_DEVELOPMENT.md)）：
 
 ```
 index.html   侧栏（14 页，分组导航）+ 顶栏（角色/状态胶囊/启停）+ 各页面骨架
 app.css      design token 体系（间距/字号/圆角/阴影/表面分层）+ 布局 + 组件样式
 themes.css   三套浅色主题（喵喵/火花/水蓝蓝）的色值覆盖，data-theme 切换
 app.js       导航、REST 调用、WebSocket 消费、尚未迁出的各页状态/渲染
-pages/egg-dex.js   蛋图鉴 state/load/render/bind（显式注入协作函数）
+vue/              专用生成目录（暂存校验后发布，不清空其它静态资源）
+frontend/src/pages/EggDexPage.vue 蛋图鉴页面（独占子树、局部状态、取消与代次校验）
+frontend/src/components/PetBasicFilters.vue 宠物基础筛选（独占根与两个 Teleport 子树；原生脚本不写这些控件）
+frontend/src/petFilterBridge.ts mount/查询/恢复/清理接口；基础与扩展状态分别在 usePetFilters/usePetAdvancedFilters
+frontend/src/composables/usePets.ts 请求/缓存/加载错误/三视图/分页/箱队/选择；不另建 WS 或账号版本权威
+frontend/src/components/PetInventory.vue 及 Cards/Table/Slots/BoxNavigation 子组件，独占列表和导航；petInventoryBridge 连接账号、偏好与应用壳
 appearance.js      主题/显示字段/图片模式偏好（GET/POST /api/ui/preferences）
-pet-presentation.js 头像/色卡/稀有标记/奖牌渲染帮手（三视图共用）
-pet-filters.js     蛋组 any/all、m/kg/dB 绝对范围与范围位置筛选
-backpack-controls.js 命名快捷条件（≤6 组）、性格展开与折叠摘要
+pet-presentation.js 其它原生页资源渲染；Vue 宠物页使用 PetAvatar/PetMarks 模板，不注入旧 HTML
+frontend/src/components/PetAdvancedFilters.vue 蛋组、绝对范围与位置筛选
+frontend/src/components/PetDetailPanel.vue + PetDetail.vue 详情、键盘与焦点
+frontend/src/components/PetShortcuts.vue + PetFilterSummary.vue 快捷条件（≤6 组）与已应用条件标签
 icons.js     本地 SVG sprite 图标装饰（Tabler MIT，零运行时网络）
 pet-media/<id>-<variant>.webp  官方头像/立绘（原图 + 透明边界归一派生图）
 pets/<id>.webp        精灵图（128×128 兜底，缺图回退首字头像）
@@ -295,7 +306,9 @@ type-icons/  系别图标雪碧图（来自 roco-helper 素材）
 阻塞命令经 `asyncio.to_thread` 调用，部分同步快照/载荷仍在事件循环中构造；停止时
 `run_coroutine_threadsafe` 优雅收尾。
 CaptureService 的运行副作用已有命令锁，Store flush 批次已串行化；录制意愿/偏好/立即启停仍未形成完整命令顺序。
-PetView 使用单次仓库快照，但 bootstrap、概览、WS 与蛋仓等仍有多次独立读取。
+PetView 已让列表选项、bootstrap、概览与 WS 的宠物字段使用对应单次快照；
+display_uid 表示已加载/实时数据归属，identity 与 cached_identity 继续区分。
+state 顶层 uid 属于宠物快照；蛋仓/家园/花田的单域及跨域归属一致性仍待 F02。
 不能把线程池调用本身当作线程安全保证，或把局部快照推广成所有接口保证。
 
 ## 单实例控制

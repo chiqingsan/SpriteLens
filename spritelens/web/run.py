@@ -26,8 +26,8 @@ WEBVIEW2_HINT = (
     "请安装 Microsoft Edge WebView2 Runtime 后重试：\n"
     "https://developer.microsoft.com/microsoft-edge/webview2/"
 )
-# 与前端 index.html 启动遮罩同款配色（.startup 渐变起始色）
-SPLASH_BG = "#074f5d"
+# 与 index.html 内联启动遮罩的默认 --bg 保持一致。
+SPLASH_BG = "#f6f6ed"
 
 
 def run_web(*, open_browser: bool = False) -> int:
@@ -145,11 +145,23 @@ def _apply_window_icons(hwnd: int, icon_path: str) -> None:
     if not icon_path or not hwnd:
         return
     user32 = ctypes.WinDLL("user32", use_last_error=True)
+    # Win32 默认返回 int，会截断 64 位句柄；显式声明指针宽度。
+    user32.LoadImageW.argtypes = [
+        wintypes.HINSTANCE, wintypes.LPCWSTR, wintypes.UINT,
+        ctypes.c_int, ctypes.c_int, wintypes.UINT,
+    ]
+    user32.LoadImageW.restype = wintypes.HANDLE
+    user32.SendMessageW.argtypes = [
+        wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM,
+    ]
+    user32.SendMessageW.restype = ctypes.c_ssize_t
     IMAGE_ICON, LR_LOADFROMFILE = 1, 0x10
-    for flag, size in ((0x80, 32), (0x81, 16)):  # WM_SETICON: ICON_BIG / ICON_SMALL
+    WM_SETICON = 0x80
+    for icon_type, size in ((1, 32), (0, 16)):  # ICON_BIG / ICON_SMALL
         handle = user32.LoadImageW(None, icon_path, IMAGE_ICON, size, size, LR_LOADFROMFILE)
-        if handle:
-            user32.SendMessageW(wintypes.HWND(hwnd), wintypes.UINT(flag), wintypes.WPARAM(0), wintypes.LPARAM(handle))
+        if not handle:
+            raise ctypes.WinError(ctypes.get_last_error())
+        user32.SendMessageW(hwnd, WM_SETICON, icon_type, handle)
 
 
 def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> None:
@@ -157,27 +169,51 @@ def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> None:
     import webview
 
     from spritelens.system.window_geometry import initial_window_size
+    from spritelens.web.desktop_shell import WindowControls
+    from spritelens.web.startup_cover import StartupCover
 
     settings = server._context.settings
     saved = settings.window_geometry()
-    if saved:
-        width, height = saved["width"], saved["height"]
-    else:
-        width, height = initial_window_size()
+    width, height = initial_window_size((saved["width"], saved["height"]) if saved else None)
 
     # 唤醒句柄交给 WebView2 的窗口做前台置顶（重复启动时）
     activation_handle = guard.create_activation_event()
 
     window = webview.create_window(
         WINDOW_TITLE,
-        server.url,
+        server.url.replace('/#', '/?desktop=1#'),
         width=width,
         height=height,
+        x=0 if saved and saved["x"] is not None else None,
+        y=0 if saved and saved["y"] is not None else None,
         min_size=(640, 360),
         text_select=True,
-        # WebView2 渲染前的空窗默认白色；用启动页同款深青色，消除白屏观感
+        frameless=True,
+        easy_drag=False,
+        shadow=True,
+        # 与原生遮罩、网页启动面板同底色，交接时不闪白。
         background_color=SPLASH_BG,
     )
+    position = (saved["x"], saved["y"]) if saved and saved["x"] is not None else None
+    controls = WindowControls(window, position)
+    def save_geometry() -> None:
+        try:
+            settings.set_window_geometry(**controls.get_window_geometry(), maximized=False)
+        except Exception as exc:  # noqa: BLE001 - 几何保存失败不阻断退出
+            logger.warning("窗口几何保存失败: %s", exc)
+    window.events.closing += save_geometry
+    window.expose(controls.minimize, controls.toggle_maximize, controls.close,
+                  controls.get_window_state, controls.resize_window)
+    window.events.before_show += controls.install_native_frame
+    window.events.before_show += controls.enable_native_drag
+    startup_cover = StartupCover(window)
+    window.expose(startup_cover.startup_ready, startup_cover.startup_failed)
+    window.events.before_show += startup_cover.install
+    window.events.closing += startup_cover.remove
+    window.events.loaded += startup_cover.keep_on_top
+    window.events.loaded += controls.sync_state
+    window.events.maximized += controls.sync_state
+    window.events.restored += controls.sync_state
 
     if activation_handle:
         stop_flag = threading.Event()
@@ -200,7 +236,7 @@ def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> None:
     try:
         webview.start(
             _late_init,
-            args=(window, _icon_path(), settings),  # GUI 就绪后在后台线程执行
+            args=(window, _icon_path()),  # GUI 就绪后在后台线程执行
             debug=False,
             icon=str(_icon_path()),
         )  # 阻塞至窗口关闭
@@ -209,8 +245,8 @@ def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> None:
             stop_flag.set()
 
 
-def _late_init(window, icon_path: str, settings) -> None:
-    """GUI 就绪后的收尾：窗口图标 + 关闭时保存窗口几何。"""
+def _late_init(window, icon_path: str) -> None:
+    """GUI 就绪后的收尾：窗口图标。"""
     import time
 
     time.sleep(0.8)  # 等 WebView2 窗口真实创建（EnumWindows 找句柄）
@@ -218,24 +254,6 @@ def _late_init(window, icon_path: str, settings) -> None:
         _apply_window_icons(_window_handle(), icon_path)
     except Exception as exc:  # noqa: BLE001 - 图标失败不影响功能
         logger.debug("窗口图标设置失败: %s", exc)
-
-    def _save_geometry() -> None:
-        try:
-            if window.is_maximized:
-                return  # 最大化尺寸不是用户期望的还原尺寸，保留上次窗口化几何
-            settings.set_window_geometry(
-                width=int(window.width),
-                height=int(window.height),
-                maximized=False,
-            )
-        except Exception as exc:  # noqa: BLE001 - 几何保存失败不阻断退出
-            logger.debug("窗口几何保存失败: %s", exc)
-
-    try:
-        window.events.closed += _save_geometry
-    except Exception as exc:  # noqa: BLE001
-        logger.debug("closed 事件注册失败: %s", exc)
-
 
 def _icon_path() -> str:
     """窗口/任务栏图标（resources/app.ico，随包分发；缺失时回落空串）。"""
@@ -295,6 +313,10 @@ def _shutdown(server: "LocalServer | None", context, guard: SingleInstanceGuard)
     for label, action in steps:
         try:
             action()
+        except TimeoutError as exc:
+            failures.append((label, exc))
+            logger.warning("关闭 %s 超时，保留尚在使用的下游资源: %s", label, exc)
+            break
         except Exception as exc:  # noqa: BLE001 - 退出路径尽量多释放
             failures.append((label, exc))
             logger.warning("关闭 %s 失败: %s", label, exc)

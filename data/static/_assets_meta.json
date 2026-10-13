@@ -24,5 +24,12 @@
     "failed": 0,
     "available": 788,
     "total": 1015
+  },
+  "type_icons_derived": {
+    "source": "蛋神助手1.2.0 assets/reference/roco-helper-v3.8.1/TypeIcon",
+    "generator": "tools/import_assets.py:import_type_icons",
+    "count": 18,
+    "sprite_sha256": "ea879e3d04fa8e860b52b82d6fd3af3d6475aab11e824b0089e6e5d10cef3480",
+    "mapping": "type-<id>.png uses data/static/types.json IDs; sprite IDs differ"
   }
 }

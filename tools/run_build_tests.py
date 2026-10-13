@@ -1,10 +1,11 @@
-"""工程门禁（G01）：unittest + JS 语法 + HTML 引用 + 静态资源清单。
+"""工程门禁（G01/V01）：unittest + JS/资源 + Vue 类型、lint、测试与产物。
 
 统一验证入口：`python -B tools/run_build_tests.py`
 - unittest discover（全量 Python 测试）
 - web/static 递归 JS 语法检查（node --check，含 pages/ 子目录）
 - index.html 本地 script/link 引用存在性（新增页面漏登记即失败）
-- smoke 固定资源清单（pages/egg-dex.js 等随包文件必须存在）
+- smoke 固定资源清单（vue/entry.js 等随包文件必须存在）
+- Vue 类型 / ESLint / Vitest 与源指纹、产物哈希检查
 
 JS 语法/引用存在性是工程门禁，不替代浏览器交互验收（视觉/行为另跑）。
 """
@@ -16,12 +17,15 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 STATIC_DIR = PROJECT_ROOT / "spritelens" / "web" / "static"
 
 # 随包必需的前端文件（与 spritelens/main.py 的 smoke 清单一致；两处同步维护）
 REQUIRED_STATIC_FILES = (
     "index.html",
     "boot.js",
+    "desktop-shell.js",
+    "desktop-shell.css",
     "ui.js",
     "app.js",
     "app.css",
@@ -29,11 +33,10 @@ REQUIRED_STATIC_FILES = (
     "themes.css",
     "appearance.js",
     "pet-presentation.js",
-    "pet-filters.js",
-    "backpack-controls.js",
+    "account-requests.js",
     "icons.js",
     "icons/sprite.svg",
-    "pages/egg-dex.js",
+    "vue/entry.js",
     "favicon.png",
 )
 
@@ -41,8 +44,7 @@ REQUIRED_STATIC_FILES = (
 def check_js_syntax() -> list[str]:
     """node --check 递归检查全部静态 JS。
 
-    缺 Node 时报告明确跳过原因（新环境前置条件），不抛 FileNotFoundError；
-    检查本身仍需在声明 Node 前置的环境中执行。
+    缺 Node 时门禁失败，不能把未执行的必需检查报告为通过。
     """
     failures: list[str] = []
     js_files = sorted(STATIC_DIR.rglob("*.js"))
@@ -52,8 +54,7 @@ def check_js_syntax() -> list[str]:
 
     node = shutil.which("node")
     if node is None:
-        print("  [跳过] 未找到 node 可执行文件（JS 语法检查需要 Node.js 前置）")
-        return failures
+        return ["未找到 node 可执行文件：请安装 Node.js 后重新执行完整门禁"]
     for path in js_files:
         proc = subprocess.run(
             [node, "--check", str(path)],
@@ -190,6 +191,23 @@ def main() -> int:
             print(f"  - {item}")
     else:
         print("[gate] 依赖通过")
+
+    print("[gate] Vue 类型 / ESLint / 组件测试 / 产物 ...")
+    import shutil
+    from tools.frontend import check
+
+    npm = shutil.which("npm")
+    if npm is None:
+        print("[gate] 缺 npm：请安装 Node.js 24 LTS / npm 11")
+        failed = True
+    else:
+        for script in ("typecheck", "lint", "test"):
+            result = subprocess.run([npm, "run", script], cwd=PROJECT_ROOT / "frontend")
+            if result.returncode:
+                failed = True
+    for failure in check():
+        print(f"[gate] {failure}")
+        failed = True
 
     if failed:
         print("[gate] 失败")

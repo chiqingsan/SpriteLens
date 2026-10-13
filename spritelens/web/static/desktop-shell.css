@@ -1,0 +1,40 @@
+/* 桌面壳独占窗口顶栏；浏览器模式不占位，沿用现有主题 token。 */
+:root { --window-titlebar: 40px; --window-control: 46px; --window-resize: 6px; }
+.desktop-titlebar {
+  position: fixed; inset: 0 0 auto; height: var(--window-titlebar);
+  display: flex; align-items: stretch; z-index: 1000;
+  background: var(--sidebar-bg); color: var(--ink-soft);
+  border-bottom: 1px solid var(--sidebar-line); user-select: none;
+}
+.window-drag-area {
+  flex: 1; min-width: 0; display: flex; align-items: center;
+  gap: var(--space-3); padding: 0 var(--space-5); app-region: drag;
+}
+.window-drag-area img { width: 24px; height: 24px; border-radius: var(--radius-sm); pointer-events: none; }
+.window-drag-area strong { font-size: var(--fs-sm); pointer-events: none; }
+.window-drag-area span { font-size: var(--fs-3xs); color: var(--muted); pointer-events: none; }
+.window-controls { display: flex; flex: none; app-region: no-drag; }
+.window-button {
+  width: var(--window-control); padding: 0; background: transparent;
+  display: grid; place-items: center; border-radius: 0;
+}
+.window-button:hover { background: var(--sidebar-hover); }
+.window-button:active { transform: none; background: var(--surface-4); }
+.window-button:focus-visible { outline-offset: -4px; }
+.window-button svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1; }
+.window-button-close:hover, .window-button-close:active { background: var(--danger); color: var(--white); }
+.window-restore-icon { display: none; }
+[data-window-maximized="true"] .window-maximize-icon { display: none; }
+[data-window-maximized="true"] .window-restore-icon { display: block; }
+.desktop-window .app-shell { margin-top: var(--window-titlebar); height: calc(100% - var(--window-titlebar)); }
+.window-resize { display: none; position: fixed; z-index: 1001; }
+.desktop-window:not([data-window-maximized="true"]) .window-resize { display: block; }
+.window-resize-left { inset: var(--window-resize) auto var(--window-resize) 0; width: var(--window-resize); cursor: ew-resize; }
+.window-resize-right { inset: var(--window-resize) 0 var(--window-resize) auto; width: var(--window-resize); cursor: ew-resize; }
+.window-resize-top { inset: 0 var(--window-resize) auto; height: var(--window-resize); cursor: ns-resize; }
+.window-resize-bottom { inset: auto var(--window-resize) 0; height: var(--window-resize); cursor: ns-resize; }
+.window-resize-top-left, .window-resize-top-right, .window-resize-bottom-left, .window-resize-bottom-right { width: var(--window-resize); height: var(--window-resize); }
+.window-resize-top-left { top: 0; left: 0; cursor: nwse-resize; }
+.window-resize-top-right { top: 0; right: 0; cursor: nesw-resize; }
+.window-resize-bottom-left { bottom: 0; left: 0; cursor: nesw-resize; }
+.window-resize-bottom-right { bottom: 0; right: 0; cursor: nwse-resize; }

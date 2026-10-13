@@ -11,7 +11,10 @@ import asyncio
 
 from aiohttp import web
 
-from spritelens.web.payloads import type_color_for
+from spritelens.web.payloads import pet_summary_payload
+from spritelens.web.account_state import account_domains_payload
+from spritelens.view_models.pet_vm import PetFilters, PetView
+from spritelens.services.capture_service import RecordingCommandError
 from spritelens.web.server_helpers import _as_bool, _as_int
 
 
@@ -47,7 +50,7 @@ class CaptureRoutesMixin:
             await asyncio.to_thread(self._context.capture_vm.select_iface, name)
         except OSError as exc:
             return web.json_response(
-                {"error": f"网卡已切换，但设置保存失败（重启后可能恢复原值）：{exc}"}, status=500
+                {"error": f"下次采集使用的网卡选择保存失败（重启后可能恢复原值）：{exc}"}, status=500
             )
         return web.json_response(self._capture_payload())
 
@@ -56,7 +59,10 @@ class CaptureRoutesMixin:
         return web.json_response(self._capture_payload())
 
     async def _api_capture_stop(self, request: web.Request) -> web.Response:
-        await asyncio.to_thread(self._context.capture_vm.stop)
+        try:
+            await asyncio.to_thread(self._context.capture_vm.stop)
+        except TimeoutError as exc:
+            return web.json_response({"error": str(exc), "stopped": False}, status=503)
         return web.json_response(self._capture_payload())
 
     async def _api_capture_recording(self, request: web.Request) -> web.Response:
@@ -67,10 +73,16 @@ class CaptureRoutesMixin:
             return web.json_response({"error": str(exc)}, status=400)
         try:
             await asyncio.to_thread(self._context.capture_vm.set_recording_requested, enabled)
-        except OSError as exc:
-            # D03：运行状态已生效但保存失败——返回可读错误，页面据提示重试
+        except RecordingCommandError as exc:
+            message = {
+                "start": "录制器启动失败，未开始录制",
+                "stop": "录制器停止失败，请确认当前录制状态后重试",
+                "save": "录制意愿已生效，但偏好保存失败（重启后可能恢复原值）",
+            }[exc.phase]
             return web.json_response(
-                {"error": f"录制设置已生效，但保存失败（重启后可能恢复原值）：{exc}"}, status=500
+                {"error": f"{message}：{exc}", "error_kind": exc.phase,
+                 "requested": exc.requested, "recording": exc.recording, "saved": False},
+                status=500,
             )
         return web.json_response(self._capture_payload())
 
@@ -152,35 +164,21 @@ class CaptureRoutesMixin:
             },
         }
 
-    def _state_payload(self) -> dict:
+    def _state_payload(self, view: PetView | None = None) -> dict:
         ctx = self._context
+        if view is None:
+            view = ctx.pet_vm.view_with(PetFilters())
+        pets = pet_summary_payload(view, ctx.static_data)
         capture = ctx.capture_vm.snapshot()
-        identity = ctx.pet_repository.identity
-        cached = ctx.pet_repository.cached_identity
-        stats = ctx.pet_vm.stats()
         return {
-            "egg_box_version": ctx.egg_box.version() if ctx.egg_box is not None else 0,
-            "egg_box_total": len(ctx.egg_box.snapshot()) if ctx.egg_box is not None else 0,
-            "home_version": ctx.home_repo.version() if ctx.home_repo is not None else 0,
-            "flower_version": ctx.flower_repo.version() if ctx.flower_repo is not None else 0,
-            "pets_version": ctx.pet_vm.version(),
-            "pets_total": stats.total,
+            **account_domains_payload(pets["uid"], ctx.egg_box, ctx.home_repo, ctx.flower_repo),
+            "uid": pets["uid"],
+            "pets_version": pets["version"],
+            "pets_total": pets["stats"]["total"],
             "events_total": ctx.events_vm.total_events,
-            "identity": (
-                {"uid": identity.uid, "name": identity.name, "level": identity.level}
-                if identity is not None
-                else None
-            ),
-            "cached_identity": {"uid": cached.uid, "name": cached.name, "level": cached.level} if cached else None,
-            "stats": {
-                "total": stats.total,
-                "maxed": stats.maxed,
-                "max_level": stats.max_level,
-                "types": [
-                    {"name": name, "count": count, "color": type_color_for(self._context.static_data, name)}
-                    for name, count in stats.type_counts
-                ],
-            },
+            "identity": pets["identity"],
+            "cached_identity": pets["cached_identity"],
+            "stats": pets["stats"],
             "capture": {
                 "running": capture.running,
                 "recording": capture.recording,

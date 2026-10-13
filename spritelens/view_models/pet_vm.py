@@ -9,10 +9,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+import time
 
 from spritelens.domain.pets import Pet
+from spritelens.domain.identity import PlayerIdentity
 from spritelens.domain.static_data import StaticData
 from spritelens.domain.measurements import range_position
+from spritelens.domain.pet_conditions import MAX_PET_LEVEL, matches_conditions
 from spritelens.services.pet_repository import PetRepository
 
 # 排序键（UI 排序菜单用）
@@ -35,13 +38,22 @@ class PetFilters:
 
     search: str = ""
     level_min: int = 1
-    level_max: int = 100
+    level_max: int = MAX_PET_LEVEL
     natures: frozenset[int] = frozenset()
     type_names: frozenset[str] = frozenset()
     talent_min: int = 0
     gender: int = 0
     egg_groups: frozenset[str] = frozenset()
     egg_mode: str = "any"
+    pool: frozenset[str] = frozenset()
+    pool_mode: str = "and"
+    shiny: bool = False
+    colorful: bool = False
+    medal: int = 0
+    marks: frozenset[str] = frozenset()
+    speciality: int = 0
+    acquisition: int = 0
+    captured_days: int = 0
     height_min: float | None = None
     height_max: float | None = None
     weight_min: float | None = None
@@ -62,11 +74,12 @@ class PetFilters:
             or self.talent_min > 0
             or self.gender
             or self.egg_groups
+            or self.pool or self.shiny or self.colorful or self.medal or self.marks or self.speciality or self.acquisition or self.captured_days
             or any(getattr(self, key) is not None for key in (
                 "height_min", "height_max", "weight_min", "weight_max", "voice_min", "voice_max",
                 "height_position_min", "height_position_max", "weight_position_min", "weight_position_max"))
             or self.level_min > 1
-            or self.level_max < 100
+            or self.level_max < MAX_PET_LEVEL
         )
 
 
@@ -99,8 +112,8 @@ class PetViewModel:
     def set_level_range(self, minimum: int, maximum: int) -> None:
         self._filters = replace(
             self._filters,
-            level_min=max(1, min(minimum, maximum)),
-            level_max=max(minimum, maximum),
+            level_min=max(1, min(MAX_PET_LEVEL, minimum, maximum)),
+            level_max=min(MAX_PET_LEVEL, max(1, minimum, maximum)),
         )
 
     def set_natures(self, natures: frozenset[int]) -> None:
@@ -200,9 +213,10 @@ class PetViewModel:
     def version(self) -> int:
         return self._repository.version
 
-    def stats(self) -> PetStats:
+    def stats(self, pets: tuple[Pet, ...] | None = None) -> PetStats:
         """聚合统计：总量/满级/最高等级/系别分布（按主系别）。"""
-        pets = self._repository.snapshot()
+        if pets is None:
+            pets = self._repository.snapshot()
         if not pets:
             return PetStats()
         counts: dict[str, int] = {}
@@ -216,11 +230,11 @@ class PetViewModel:
             type_counts=ranked,
         )
 
-    def nature_options(self) -> tuple[tuple[int, str], ...]:
-        """出现过的性格（id, 名字），供筛选器多选。"""
-        seen: dict[int, str] = {}
+    def nature_options(self, pets: tuple[Pet, ...] | None = None) -> tuple[tuple[int, str], ...]:
+        """完整性格目录与观测到的未知ID，常用项按当前背包频次排在前面。"""
+        seen: dict[int, str] = {key: info.name for key, info in self._static.nature_items()} if self._static else {}
         counts: dict[int, int] = {}
-        for pet in self._repository.snapshot():
+        for pet in self._repository.snapshot() if pets is None else pets:
             counts[pet.nature] = counts.get(pet.nature, 0) + 1
             if pet.nature in seen:
                 continue
@@ -230,18 +244,19 @@ class PetViewModel:
                 if info is not None:
                     name = info.name
             seen[pet.nature] = name
-        return tuple(sorted(seen.items(), key=lambda kv: (-counts[kv[0]], kv[0])))
+        return tuple(sorted(seen.items(), key=lambda kv: (-counts.get(kv[0], 0), kv[0])))
 
-    def type_options(self) -> tuple[str, ...]:
-        """出现过的系别名（依赖静态表；无静态表返回空）。"""
+    def type_options(self, pets: tuple[Pet, ...] | None = None) -> tuple[str, ...]:
+        """完整系别目录，并保留物种元数据里的已知系别名。"""
         if self._static is None:
             return ()
-        names: set[str] = set()
-        for pet in self._repository.snapshot():
+        names: set[str] = {info.name for _, info in self._static.type_items()}
+        names.update(name for _, species in self._static.species_items() for name in species.type_names)
+        for pet in self._repository.snapshot() if pets is None else pets:
             species = self._static.species(pet.base_conf_id)
             if species is not None:
                 names.update(species.type_names)
-        return tuple(sorted(names))
+        return tuple(sorted(name for name in names if name))
 
     def species_of(self, pet: Pet):
         """宠物的静态物种信息（UI 展示系别/种族值用）；无静态表返回 None。"""
@@ -261,9 +276,25 @@ class PetViewModel:
     def backpack(self):
         return self._repository.backpack()
 
-    def talent_rank_max(self) -> int:
-        pets = self._repository.snapshot()
+    def talent_rank_max(self, pets: tuple[Pet, ...] | None = None) -> int:
+        if pets is None:
+            pets = self._repository.snapshot()
         return max((p.talent_rank for p in pets), default=0)
+
+    def measurement_limits(self, pets: tuple[Pet, ...] | None = None) -> dict[str, dict[str, float]]:
+        """用完整库存快照定量程，筛选结果变化不能缩短滑动条范围。"""
+        if pets is None:
+            pets = self._repository.snapshot()
+        limits = {"height": {"min": 0.0, "max": 1.0}, "weight": {"min": 0.0, "max": 1.0},
+                  "voice": {"min": -100.0, "max": 100.0}}
+        for pet in pets:
+            species = self.species_of(pet)
+            for field, scale in (("height", 100), ("weight", 1000)):
+                reference = getattr(species, field + "_range", (0, 0))[1]
+                limits[field]["max"] = max(limits[field]["max"], getattr(pet, field) / scale, reference / scale)
+            limits["voice"]["min"] = min(limits["voice"]["min"], pet.voice)
+            limits["voice"]["max"] = max(limits["voice"]["max"], pet.voice)
+        return limits
 
     # -- 持久化 --------------------------------------------------------
     def load_persisted(self, uid: int) -> int:
@@ -288,69 +319,63 @@ class PetViewModel:
         if not filters.active:
             return pets
         static = self._static
-
+        captured_since = time.time() - filters.captured_days * 86400
         def matches(pet: Pet) -> bool:
+            species = static.species(pet.base_conf_id) if static else None
             if filters.search:
                 needle = filters.search
-                if not (
-                    needle in pet.name.lower()
-                    or needle in str(pet.gid)
-                    or needle in str(pet.conf_id)
-                    or needle in str(pet.base_conf_id)
-                ):
-                    return False
-            if pet.level < filters.level_min or pet.level > filters.level_max:
-                return False
-            if filters.natures and pet.nature not in filters.natures:
-                return False
-            if filters.talent_min and pet.talent_rank < filters.talent_min:
-                return False
-            if filters.gender and pet.gender != filters.gender:
-                return False
+                texts = [pet.name, str(pet.gid), str(pet.conf_id), str(pet.base_conf_id)]
+                if static:
+                    texts.append(static.nature_name(pet.nature))
+                if species:
+                    texts.extend((species.name, species.display_name, species.handbook_no, *species.egg_groups))
+                    if species.dex_no:
+                        texts.append(str(species.dex_no))
+                if not any(needle in text.lower() for text in texts):
+                    return False  # 搜索在条件池之外，始终约束整个结果集合。
+            checks: list[bool] = []
+            if filters.level_min > 1 or filters.level_max < MAX_PET_LEVEL:
+                checks.append(filters.level_min <= pet.level <= filters.level_max)
+            checks.extend(pet.nature == nature for nature in filters.natures)
+            if filters.talent_min:
+                checks.append(pet.talent_rank >= filters.talent_min)
+            if filters.gender:
+                checks.append(pet.gender == filters.gender)
             for field, scale in (("height", 100), ("weight", 1000), ("voice", 1)):
-                value = getattr(pet, field) / scale
                 low, high = getattr(filters, field + "_min"), getattr(filters, field + "_max")
-                if (low is not None or high is not None) and getattr(pet, field) == 0:
-                    return False  # 当前协议模型的零值表示未取得测量值。
-                if low is not None and value < low or high is not None and value > high:
-                    return False
-            if filters.egg_groups:
-                species = static.species(pet.base_conf_id) if static else None
-                groups = set(species.egg_groups) if species else set()
-                if (filters.egg_mode == "all" and not filters.egg_groups <= groups
-                        or filters.egg_mode != "all" and not groups & filters.egg_groups):
-                    return False
+                if low is not None or high is not None:
+                    value = getattr(pet, field) / scale
+                    checks.append(getattr(pet, field) != 0 and (low is None or value >= low) and (high is None or value <= high))
+            groups = set(species.egg_groups) if species else set()
+            checks.extend(group in groups for group in filters.egg_groups)
             for field in ("height", "weight"):
-                low = getattr(filters, field + "_position_min")
-                high = getattr(filters, field + "_position_max")
-                if low is None and high is None:
-                    continue
-                species = static.species(pet.base_conf_id) if static else None
-                ratio = range_position(getattr(pet, field), getattr(species, field + "_range", (0, 0)))["ratio"]
-                if ratio is None or ratio < 0 or ratio > 1:
-                    return False
-                if low is not None and ratio * 100 < low or high is not None and ratio * 100 > high:
-                    return False
-            if filters.type_names:
-                if static is None:
-                    return True  # 无静态表时该维度不可用，视为通过
-                species = static.species(pet.base_conf_id)
-                if species is None or not (set(species.type_names) & filters.type_names):
-                    return False
-            return True
+                low, high = getattr(filters, field + "_position_min"), getattr(filters, field + "_position_max")
+                if low is not None or high is not None:
+                    ratio = range_position(getattr(pet, field), getattr(species, field + "_range", (0, 0)))["ratio"]
+                    checks.append(ratio is not None and 0 <= ratio <= 1 and (low is None or ratio * 100 >= low) and (high is None or ratio * 100 <= high))
+            if static is not None:
+                types = set(species.type_names) if species else set()
+                checks.extend(name in types for name in filters.type_names)
+            if filters.acquisition:
+                checks.append(pet.catch_way == filters.acquisition)
+            if filters.captured_days:
+                checks.append(pet.add_time > 0 and pet.add_time >= captured_since)
+            return matches_conditions(pet, static, pool=filters.pool, pool_mode=filters.pool_mode,
+                                      shiny=filters.shiny, colorful=filters.colorful, medal=filters.medal,
+                                      marks=filters.marks, speciality=filters.speciality, additional=checks)
 
         return tuple(p for p in pets if matches(p))
 
     def _apply_filters(self, pets: tuple[Pet, ...]) -> tuple[Pet, ...]:
         return self._apply_filters_with(pets, self._filters)
 
-    def egg_group_options(self) -> tuple[str, ...]:
-        groups = set()
-        for pet in self._repository.snapshot():
+    def egg_group_options(self, pets: tuple[Pet, ...] | None = None) -> tuple[str, ...]:
+        groups = {group for _, species in self._static.species_items() for group in species.egg_groups} if self._static else set()
+        for pet in self._repository.snapshot() if pets is None else pets:
             species = self._static.species(pet.base_conf_id) if self._static else None
             if species:
                 groups.update(species.egg_groups)
-        return tuple(sorted(groups))
+        return tuple(sorted(groups - {"未知", "未知组", "未发现", "未发现组", "暂无数据", ""}))
 
     def _apply_sort(self, pets: tuple[Pet, ...]) -> tuple[Pet, ...]:
         return self._apply_sort_with(pets, self._sort_key, self._sort_desc)
@@ -391,6 +416,24 @@ class PetView:
         self._snapshot = vm._repository.consistent_snapshot()
 
     @property
+    def uid(self) -> int:
+        return self._snapshot.uid
+
+    @property
+    def identity(self) -> PlayerIdentity | None:
+        return self._snapshot.identity
+
+    @property
+    def cached_identity(self) -> PlayerIdentity | None:
+        return self._snapshot.cached_identity
+
+    def stats(self) -> PetStats:
+        return self._vm.stats(self._snapshot.pets)
+
+    def cached_accounts(self) -> tuple[tuple[int, str], ...]:
+        return self._vm.cached_accounts()
+
+    @property
     def filters(self) -> PetFilters:
         return self._filters
 
@@ -426,17 +469,20 @@ class PetView:
     def backpack(self):
         return self._snapshot.backpack
 
-    def nature_options(self):
-        return self._vm.nature_options()
+    def nature_options(self) -> tuple[tuple[int, str], ...]:
+        return self._vm.nature_options(self._snapshot.pets)
 
-    def type_options(self):
-        return self._vm.type_options()
+    def type_options(self) -> tuple[str, ...]:
+        return self._vm.type_options(self._snapshot.pets)
 
-    def egg_group_options(self):
-        return self._vm.egg_group_options()
+    def egg_group_options(self) -> tuple[str, ...]:
+        return self._vm.egg_group_options(self._snapshot.pets)
 
     def talent_rank_max(self) -> int:
-        return self._vm.talent_rank_max()
+        return self._vm.talent_rank_max(self._snapshot.pets)
+
+    def measurement_limits(self) -> dict[str, dict[str, float]]:
+        return self._vm.measurement_limits(self._snapshot.pets)
 
 
 __all__ = ["PetFilters", "PetStats", "PetViewModel", "PetView", "SORT_KEYS"]

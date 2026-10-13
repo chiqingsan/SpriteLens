@@ -26,6 +26,16 @@ from spritelens.services.monitor_service import MonitorService
 logger = get_logger("capture_service")
 
 
+class RecordingCommandError(OSError):
+    """录制命令的运行失败与保存失败必须分别告知页面。"""
+
+    def __init__(self, phase: str, requested: bool, recording: bool, cause: OSError) -> None:
+        super().__init__(str(cause))
+        self.phase = phase
+        self.requested = requested
+        self.recording = recording
+
+
 @dataclass(frozen=True)
 class CaptureRuntimeStatus:
     """运行服务的一轮只读状态（快照用，不含安装流程）。"""
@@ -62,6 +72,10 @@ class CaptureService:
         self._source: NpcapCaptureSource | None = None
         self._last_error = ""
         self._recording_wanted = recording_wanted
+        self._state_lock = threading.Lock()  # 只保护意愿，不包含 IO 或线程等待
+        self._stop_lock = threading.Lock()
+        self._stop_thread: threading.Thread | None = None
+        self._stop_errors: list[Exception] = []
         # 录制偏好持久化回调（S01）：由组合根注入，命令锁内调用；
         # 服务本身不依赖 SettingsRepository（保持可独立测试）。
         self._persist_recording = None
@@ -77,7 +91,13 @@ class CaptureService:
         未确认退出时拒绝重启——同实例/同下游回调下两代并存会让旧回调
         污染新会话；已退出的 stale 句柄先清再判。
         """
+        if self._stop_thread is not None:
+            self._last_error = "停止尚未确认完成，请先重试停止采集"
+            return
         with self._command_lock:
+            if self._stop_thread is not None:
+                self._last_error = "停止尚未确认完成，请先重试停止采集"
+                return
             if self._monitor.is_running:
                 return
             previous = self._source
@@ -105,18 +125,52 @@ class CaptureService:
                 return
             self._maybe_start_recording_locked()
 
-    def stop(self) -> None:
-        """停止采集（S03a）：录制器失败仍尝试停 source/协议层。
+    def stop(self, *, timeout: float = 12.0) -> None:
+        """预算覆盖录制器、source 和 monitor；超时保留唯一停止线程。
 
-        旧实现 recorder.stop 抛异常会跳过 monitor.stop，留下运行中的
-        接入层。录制是旁路功能，停源才是停止命令的主目标。
+        停止线程持有命令锁，调用方只限时等待；旧回调或磁盘未退时不
+        启动第二次清理、不允许重启，也不把超时当作可以关闭 DB 的成功。
         """
+        with self._stop_lock:
+            if self._stop_thread is None or not self._stop_thread.is_alive():
+                self._stop_errors = []
+                self._stop_thread = threading.Thread(
+                    target=self._run_stop, args=(self._stop_errors,),
+                    name="spritelens-capture-stop", daemon=True
+                )
+                self._stop_thread.start()
+            thread = self._stop_thread
+            errors = self._stop_errors  # 每次停止结果归属该线程，不被并发重试覆盖
+        thread.join(timeout=timeout)
+        if thread.is_alive():
+            self._last_error = "采集停止超时，资源仍被保留，请稍后重试停止"
+            raise TimeoutError(self._last_error)
+        with self._stop_lock:
+            if self._stop_thread is thread:
+                self._stop_thread = None
+        if errors:
+            self._last_error = str(errors[0])
+            raise errors[0]
+        self._last_error = ""
+
+    def _run_stop(self, errors: list[Exception]) -> None:
+        try:
+            self._stop_locked()
+        except Exception as exc:  # 所有停止结果交给等待方，线程不吞失败
+            errors.append(exc)
+
+    def _stop_locked(self) -> None:
         with self._command_lock:
             try:
                 self._recorder.stop()
             except Exception as exc:  # noqa: BLE001 - 录制失败不阻断停源
                 logger.warning("录制器停止失败（继续停采集）: %s", exc)
             self._monitor.stop()
+            source = self._source
+            if source is not None and (
+                source.is_stale_worker_active() or source.has_unfinished_sniffer()
+            ):
+                raise TimeoutError("采集线程尚未退出，保留资源并等待重试停止")
 
     def set_iface(self, name: str | None) -> None:
         with self._command_lock:
@@ -137,18 +191,27 @@ class CaptureService:
         重启后才会回到旧配置（这是唯一可接受的降级方向）。
         """
         with self._command_lock:
-            self._recording_wanted = enabled
+            with self._state_lock:
+                self._recording_wanted = enabled
             running = self._monitor.is_running
-            if enabled and running and not self._recorder.is_recording:
-                self._start_recording_locked()
-            elif not enabled and self._recorder.is_recording:
-                self._recorder.stop()
-            if self._persist_recording is not None:
-                self._persist_recording(enabled)
+            try:
+                if enabled and running and not self._recorder.is_recording:
+                    self._start_recording_locked()
+                elif not enabled and self._recorder.is_recording:
+                    self._recorder.stop()
+            except OSError as exc:
+                raise RecordingCommandError(
+                    "start" if enabled else "stop", enabled, self._recorder.is_recording, exc
+                ) from exc
+            try:
+                if self._persist_recording is not None:
+                    self._persist_recording(enabled)
+            except OSError as exc:
+                raise RecordingCommandError("save", enabled, self._recorder.is_recording, exc) from exc
 
     def recording_wanted(self) -> bool:
-        """录制意愿（命令锁保护读，供快照/VM 无条件读取）。"""
-        with self._command_lock:
+        """短状态锁读取；HTTP 快照不等待正在执行 IO 的命令。"""
+        with self._state_lock:
             return self._recording_wanted
 
     def apply_manual_key(self, text: str) -> tuple[bool, str]:
@@ -189,7 +252,9 @@ class CaptureService:
 
     def set_recording_wanted(self, wanted: bool) -> None:
         """记录录制意愿（下次 start 时生效）；立即开停走 set_recording。"""
-        self._recording_wanted = wanted
+        with self._command_lock:
+            with self._state_lock:
+                self._recording_wanted = wanted
 
     def _start_recording_locked(self) -> None:
         name = f"capture_{time.strftime('%Y%m%d_%H%M%S')}.jsonl"

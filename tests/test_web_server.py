@@ -567,7 +567,7 @@ class PayloadsUnitTest(unittest.TestCase):
     def test_overview_payload_no_identity(self):
         with tempfile.TemporaryDirectory() as tmp:
             context = _make_context(Path(tmp), pets=(_pet(1, name="A", level=61, first=True),))
-            payload = overview_payload(context.pet_vm, context.pet_repository, None)
+            payload = overview_payload(context.pet_vm.view_with(context.pet_vm.filters), None)
             self.assertIsNone(payload["identity"])
             self.assertEqual(payload["stats"]["total"], 1)
             self.assertNotIn("first_catch", payload["stats"])

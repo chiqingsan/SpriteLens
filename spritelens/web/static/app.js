@@ -1,4 +1,4 @@
-/* 小洛探探 SpriteLens — 前端逻辑（原生 JS，零框架、零构建）
+/* 小洛探探 SpriteLens — 前端壳（原生 JS，页面渐进迁 Vue）
  *
  * 数据来源：本地服务 REST（初始聚合）+ WebSocket（增量推送）。
  * token 经 URL fragment 下发，存 sessionStorage 后从地址栏清除。
@@ -52,6 +52,11 @@
     return parts.length ? ("?" + parts.join("&")) : "";
   }
 
+  var accountRequests = window.SpriteLensAccountRequests.create(api);
+  var petFilters = null;
+  var petInventory = null;
+  window.addEventListener("pagehide", function () { if (petInventory) { petInventory.unmount(); } if (petFilters) { petFilters.unmount(); } });
+
   /* ---------- 小工具 ---------- */
   var $ = function (id) { return document.getElementById(id); };
 
@@ -102,34 +107,30 @@
   /* ---------- 页面状态 ---------- */
   var state = {
     page: "overview",
-    pets: [],
-    petOptions: null,
-    selectedPetGid: null,
     events: [],
     selectedEventIndex: null,
-    filters: { search: "", level_min: 1, level_max: 100, natures: [], types: [], talent_min: 0, gender: 0, sort: "gid", desc: false },
-    petView: "point",
-    petPage: 1,
-    petBox: null,
-    petTeams: false,
-    lastPayload: null,
     hb: { search: "", type: "", mode: "all" },
     hbData: null,
     hbSpecies: [],
     hbSelected: null,
     hbTypeBuilt: false,
     hbLimit: 120,
-    capture: null,
-    petTotal: 0
+    capture: null
   };
 
   /* ---------- 导航 ---------- */
   function switchPage(name) {
-    if (state.page === "pets") {
-      state.petScrollTop = $("pet-grid").closest(".table-wrap").scrollTop;
+    accountRequests.cancel(state.page);
+    if (state.page === "breeder-library") {
+      accountRequests.cancel("breeder-male"); accountRequests.cancel("breeder-female");
     }
+    if (state.page === "pets") {
+      petInventory.pause(); petFilters.pause();
+    }
+    if (state.page === "egg-dex") { eggDex.leave(); }
     window.SpriteLensUI.closeDetail(false, true);
     state.page = name;
+    $("page-title").textContent = document.querySelector('.nav-item[data-page="' + name + '"]').textContent.trim();
     document.querySelectorAll(".page").forEach(function (node) {
       node.classList.toggle("active", node.id === "page-" + name);
     });
@@ -138,7 +139,7 @@
       if (node.dataset.page === name) { node.setAttribute("aria-current", "page"); }
       else { node.removeAttribute("aria-current"); }
     });
-    if (name === "pets") { loadPets(false, true); }
+    if (name === "pets") { petInventory.activate(); petFilters.activate(); loadPets(false, true); }
     if (name === "handbook") { loadHandbook(); }
     if (name === "egg-dex") { eggDex.load(); }
     if (name === "egg-box") { loadEggBox(); }
@@ -227,23 +228,16 @@
   }
 
   function loadOverview() {
-    api("/api/pets").then(function (payload) {
+    accountRequests.request("overview", "/api/pets").then(function (payload) {
+      if (!payload) { return; }
       // 概览统计从 bootstrap 的 overview 已给；单独刷新时用 pets 的 total 兜底
       $("ov-total").textContent = payload.total || 0;
-    }).catch(function () {});
+    }).catch(function (err) { toast("概览加载失败：" + err.message, true); });
   }
 
   /* ---------- 顶栏状态 ---------- */
   function renderRole(identity, cached) {
-    var role = identity || cached;
-    $("role-label").textContent = identity ? "当前角色" : cached ? "上次角色 · 本次未确认" : "当前角色";
-    if (role) {
-      $("role-name").textContent = role.name || "未知角色";
-      $("role-uid").textContent = "UID " + role.uid + (role.level ? " · Lv" + role.level : "");
-    } else {
-      $("role-name").textContent = "等待识别角色";
-      $("role-uid").textContent = "UID —";
-    }
+    window.SpriteLensAccountCard.render(identity, cached);
   }
 
   function setPill(id, text, tone) {
@@ -252,12 +246,35 @@
     node.className = "status-pill " + (tone || "idle");
   }
 
+  function resetAccountViews() {
+    if (state.page !== "egg-dex") { window.SpriteLensUI.closeDetail(false, true); }
+    petInventory.resetAccount(); petFilters.resetAccount(); state._petsVersion = -1;
+    state.hbData = null; state.hbSpecies = []; state.hbSelected = null;
+    eggBoxState.data = { eggs: [], total: 0, hatching: null, source: "unknown" };
+    eggBoxState.selected = null; eggBoxState.version = -1; renderEggBox();
+    homeState.data = { available: false }; homeState.version = -1; renderHome();
+    flowerState.data = { available: false }; flowerState.version = -1; renderFlowers();
+    mmState.data = null; mmState.selected = null;
+    ["hb-grid", "mm-matrix", "bl-male", "bl-female", "cl-matrix", "cl-seasonal", "cl-unknown"].forEach(function (id) {
+      $(id).innerHTML = "";
+    });
+    ["hb-count", "mm-count", "bl-male-count", "bl-female-count", "cl-meta", "cl-seasonal-count", "cl-unknown-count"].forEach(function (id) {
+      $(id).textContent = "等待当前账号数据";
+    });
+    ["hb-detail", "eb-detail", "mm-detail"].forEach(function (id) {
+      $(id).innerHTML = '<div class="empty-hint">请选择当前账号的条目</div>';
+    });
+  }
+
   function renderState(payload) {
+    var observed = accountRequests.observe(payload);
+    if (!observed.accepted) { return; }
+    if (observed.changed) { resetAccountViews(); }
     var capture = payload.capture || {};
     setPill("pill-listen", "采集：" + (capture.running ? "进行中" : "未启动"), capture.running ? "ok" : "idle");
     setPill("pill-key", "密钥：" + (capture.any_key ? "已获取" : "未获取"), capture.any_key ? "ok" : "warn");
     setPill("pill-record", "录制：" + (capture.recording ? "开" : "关"), capture.recording ? "ok" : "idle");
-    setPill("pill-pets", "宠物：" + (payload.pets_total || 0) + " 只", (payload.pets_total || 0) > 0 ? "ok" : "idle");
+    setPill("pill-pets", "精灵：" + (payload.pets_total || 0) + " 只", (payload.pets_total || 0) > 0 ? "ok" : "idle");
 
     var message = "开始采集后登录游戏，自动同步数据";
     if (capture.last_error) { message = "采集异常，请到「采集与设置」查看"; }
@@ -271,11 +288,11 @@
     }
     $("capture-message").textContent = message;
 
-    // 顶栏单按钮切换：运行中 = 危险色"停止采集"，否则主色"开始采集"
+    // 采集按钮保持主色；固定图标与宽度避免状态更新时跳动。
     var toggle = $("btn-toggle");
     if (toggle) {
       var running = !!capture.running;
-      toggle.textContent = running ? "停止采集" : "开始采集";
+      toggle.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="/static/icons/sprite.svg#' + (running ? 'square' : 'player-play') + '"></use></svg>' + (running ? "停止采集" : "开始采集");
       toggle.classList.toggle("stop-button", running);
       toggle.onclick = running ? doStop : doStart;
     }
@@ -316,640 +333,22 @@
     var version = payload.pets_version;
     if (version !== undefined && version !== state._petsVersion) {
       state._petsVersion = version;
-      if (state.page === "pets") { loadPets(false); }
+      var refresh = { pets: loadPets, handbook: loadHandbook, "male-matrix": loadMaleMatrix,
+        "breeder-library": loadBreederLibrary, colors: loadColors };
+      if (refresh[state.page]) { refresh[state.page](false); }
     }
   }
 
   /* ---------- 宠物仓库 ---------- */
   function loadPets(resetPage, restoreWorkspace) {
-    if (resetPage !== false) { state.petPage = 1; }
-    var requestId = (state._petRequest || 0) + 1;
-    state._petRequest = requestId;
-    $("pet-count").textContent = "更新中…";
-    $("pet-grid").setAttribute("aria-busy", "true");
-    var f = state.filters;
-    var params = {
-      search: f.search,
-      level_min: f.level_min,
-      level_max: f.level_max,
-      natures: f.natures.join(","),
-      types: f.types.join(","),
-      talent_min: f.talent_min || "",
-      gender: f.gender || "",
-      sort: f.sort,
-      desc: f.desc ? "1" : ""
-    };
-    Object.assign(params, window.SpriteLensPetFilters.query());
-    return api("/api/pets" + query(params)).then(function (payload) {
-      if (requestId !== state._petRequest) { return; }
-      $("pet-grid").setAttribute("aria-busy", "false");
-      state.pets = payload.pets || [];
-      state.petTotal = payload.total || 0;
-      state.lastPayload = payload;
-      renderPetFilters(payload.options || {});
-      renderPets(payload);
-      if (state.selectedPetGid && !findPet(state.selectedPetGid)) {
-        window.SpriteLensUI.closeDetail(false);
-        state.selectedPetGid = null; setPetDetailOpen(false);
-      }
-      if (state.selectedPetGid) {
-        renderPetDetail(state.selectedPetGid);
-        if (restoreWorkspace && state.page === "pets") {
-          var selected = document.querySelector('#page-pets [data-gid="' + state.selectedPetGid + '"]');
-          window.SpriteLensUI.openDetail("pet-detail", selected);
+    return petInventory.load(resetPage !== false).then(function () {
+      if (restoreWorkspace && state.page === "pets") {
+        petInventory.restoreScroll();
+        if (petInventory.selected()) {
+          petInventory.openDetail();
         }
       }
-      if (restoreWorkspace) { $("pet-grid").closest(".table-wrap").scrollTop = state.petScrollTop || 0; }
-    }).catch(function (err) {
-      if (requestId !== state._petRequest) { return; }
-      $("pet-grid").setAttribute("aria-busy", "false");
-      $("pet-count").textContent = "加载失败";
-      $("pet-empty").hidden = false;
-      $("pet-empty-copy").textContent = "精灵数据加载失败，请重新进入本页重试。";
-      $("btn-empty-reset").hidden = true;
-      toast("宠物数据加载失败：" + err.message, true);
     });
-  }
-
-  function renderPetFilters(options) {
-    if (options.natures && !$("f-natures").dataset.built) {
-      $("f-natures").dataset.built = "1";
-      $("f-natures").innerHTML = options.natures.map(function (item) {
-        return '<button class="chip" data-nature="' + item.id + '">' + esc(item.name) + "</button>";
-      }).join("");
-      $("f-natures").querySelectorAll(".chip").forEach(function (node) {
-        node.addEventListener("click", function () {
-          node.classList.toggle("active");
-          state.filters.natures = Array.prototype.map.call(
-            $("f-natures").querySelectorAll(".chip.active"),
-            function (item) { return Number(item.dataset.nature); }
-          );
-          loadPets();
-        });
-      });
-    }
-    if (options.types && !$("f-types").dataset.built) {
-      $("f-types").dataset.built = "1";
-      $("f-types").innerHTML = options.types.map(function (name) {
-        return '<button class="chip" data-type="' + esc(name) + '">' + esc(name) + "</button>";
-      }).join("");
-      $("f-types").querySelectorAll(".chip").forEach(function (node) {
-        node.addEventListener("click", function () {
-          node.classList.toggle("active");
-          state.filters.types = Array.prototype.map.call(
-            $("f-types").querySelectorAll(".chip.active"),
-            function (item) { return item.dataset.type; }
-          );
-          loadPets();
-        });
-      });
-    }
-    if (options.sorts && !$("f-sort").dataset.built) {
-      $("f-sort").dataset.built = "1";
-      $("f-sort").innerHTML = options.sorts.map(function (item) {
-        return '<option value="' + item.key + '">' + esc(item.label) + "</option>";
-      }).join("");
-    }
-    if (options.talent_max !== undefined && !$("f-talent").dataset.built) {
-      $("f-talent").dataset.built = "1";
-      var max = Math.max(Number(options.talent_max) || 0, 0);
-      var html = '<option value="0">不限</option>';
-      for (var i = 1; i <= max; i++) { html += '<option value="' + i + '">≥ ' + i + ' 阶</option>'; }
-      $("f-talent").innerHTML = html;
-    }
-  }
-
-  var PET_PAGE_SIZE = 60; // 浏览分页，不代表游戏内箱位。
-
-  function renderPets(payload) {
-    var pets = payload.pets || [];
-    var backpack = payload.backpack || { boxes: [] };
-    var boxes = (backpack.boxes || []).filter(function (box) {
-      return box.slots.length !== 30 || box.slots.some(function (slot) { return slot.state !== "empty"; });
-    });
-    var fixed = state.petView === "point";
-    var box = boxes.filter(function (item) { return item.box_id === state.petBox; })[0];
-    if (!box && boxes.length) {
-      box = boxes.filter(function (item) { return item.matched; })[0] || boxes[0];
-      state.petBox = box.box_id;
-    }
-    var focused = $("pet-grid").contains(document.activeElement) ? document.activeElement : null;
-    var focusGid = focused && focused.dataset.gid;
-    var scrollWrap = $("pet-grid").closest(".table-wrap");
-    var scrollTop = scrollWrap.scrollTop, scrollLeft = scrollWrap.scrollLeft;
-    var shown = pets;
-    if (state.petView !== "table" && !fixed) {
-      var pages = Math.max(1, Math.ceil(pets.length / PET_PAGE_SIZE));
-      if (state.petPage > pages) { state.petPage = pages; }
-      var start = (state.petPage - 1) * PET_PAGE_SIZE;
-      shown = pets.slice(start, start + PET_PAGE_SIZE);
-    }
-    $("pet-count").textContent = "命中 " + (payload.shown || 0) + " / " + (payload.total || 0) + " 只";
-    $("pet-empty").hidden = fixed ? (state.petTeams ? !!(backpack.teams || []).length : !!box) : pets.length > 0;
-    $("pet-empty-copy").textContent = fixed ? (state.petTeams ? "尚未采集出战队伍，登录游戏后同步。" : (backpack.boxes || []).length ? "已采集的箱子均为空箱，可切换出战背包查看队伍。" : "尚未采集游戏箱表。登录游戏后同步，可切换属性卡片或对比表格查看已采集精灵。") : payload.total > 0
-      ? "没有符合筛选条件的精灵，可清除筛选后查看全部。"
-      : "暂无精灵数据：开始采集后登录游戏，等待数据同步。";
-    $("btn-empty-reset").hidden = fixed || pets.length > 0 || !payload.total;
-    $("pet-box-navigation").hidden = state.petView !== "point";
-    $("f-sort").disabled = fixed; $("f-desc").disabled = fixed;
-    $("f-sort").closest("label").hidden = fixed;
-    $("f-desc").closest("label").hidden = fixed;
-    $("f-sort").title = fixed ? "游戏箱位固定，排序用于属性卡片和对比表格" : "";
-
-    if (state.petView === "point") {
-      $("pet-grid").hidden = false;
-      $("pet-table").hidden = true;
-      renderBoxNavigation(backpack, box, boxes);
-      var byGid = {};
-      pets.forEach(function (pet) { byGid[pet.gid] = pet; });
-      var slots = state.petTeams ? (backpack.teams || []).reduce(function (all, team) { return all.concat(team.slots); }, []) : box && box.slots;
-      renderPetPoints(slots ? slots.map(function (slot) { return slot.state === "matched" ? byGid[slot.gid] : null; }) : [], slots, state.petTeams);
-      $("pet-pager").hidden = true;
-    } else if (state.petView === "card") {
-      $("pet-grid").hidden = false;
-      $("pet-table").hidden = true;
-      renderPetCards(shown);
-      renderPetPager(pets.length);
-    } else {
-      $("pet-grid").hidden = true;
-      $("pet-table").hidden = false;
-      $("pet-pager").hidden = true;
-      renderPetTable(shown);
-    }
-    scrollWrap.scrollTop = scrollTop; scrollWrap.scrollLeft = scrollLeft;
-    if (focusGid) {
-      var nextFocus = $("pet-grid").querySelector('[data-gid="' + focusGid + '"]');
-      if (nextFocus) { nextFocus.focus({ preventScroll: true }); }
-      else { $("pet-box-navigation").querySelector("button")?.focus({ preventScroll: true }); }
-    }
-    document.dispatchEvent(new CustomEvent("petsrendered", { detail: payload }));
-  }
-
-  function renderBoxNavigation(backpack, box, boxes) {
-    var index = boxes.indexOf(box), from = Math.floor(Math.max(0, index) / 10) * 10;
-    var html = '<div class="box-navigation-row">';
-    html += '<button class="ghost-button small' + (state.petTeams ? ' active' : '') + '" data-box="0" aria-pressed="' + state.petTeams + '">出战背包' + ((backpack.teams || []).length ? ' · ' + backpack.teams.reduce(function (sum, team) { return sum + team.matched; }, 0) : '') + '</button>';
-    if (boxes.length) {
-      if (boxes.length > 10) { html += '<button class="ghost-button small" data-box="' + boxes[Math.max(0, from - 1)].box_id + '"' + (from === 0 ? ' disabled' : '') + '>上一批</button>'; }
-      boxes.slice(from, from + 10).forEach(function (item) {
-        var active = !state.petTeams && item === box;
-        html += '<button class="box-number' + (active ? ' active' : '') + (backpack.filtering && item.matched ? ' box-hit' : '') + '" data-box="' + item.box_id + '" aria-pressed="' + active + '" title="第 ' + item.box_id + ' 箱 · 命中 ' + item.matched + ' 只">' + item.box_id + '<small>' + item.matched + '</small></button>';
-      });
-      if (boxes.length > 10) { html += '<button class="ghost-button small" data-box="' + boxes[Math.min(boxes.length - 1, from + 10)].box_id + '"' + (from + 10 >= boxes.length ? ' disabled' : '') + '>下一批</button>'; }
-      html += '<label class="inline-field">跳转<select id="pet-box-jump" aria-label="跳转游戏箱号">' + boxes.map(function (item) { return '<option value="' + item.box_id + '"' + (item === box ? ' selected' : '') + '>第 ' + item.box_id + ' 箱</option>'; }).join('') + '</select></label>';
-      var hits = boxes.filter(function (item) { return item.matched > 0; });
-      var before = hits.filter(function (item) { return box && item.box_id < box.box_id; }).pop();
-      var after = hits.filter(function (item) { return box && item.box_id > box.box_id; })[0];
-      if (backpack.filtering) { html += '<button class="ghost-button small" data-box="' + (before ? before.box_id : '') + '"' + (!before ? ' disabled' : '') + '>上一命中箱</button><button class="ghost-button small" data-box="' + (after ? after.box_id : '') + '"' + (!after ? ' disabled' : '') + '>下一命中箱</button>'; }
-    }
-    html += '</div>';
-    var description = state.petTeams
-      ? '出战背包 · 3 队 × 6 格' + (backpack.active_team ? ' · 当前出战第 ' + backpack.active_team + ' 队' : '') + ((backpack.teams || []).some(function (team) { return team.historical; }) ? ' · 历史队伍，登录后更新' : '') : box
-      ? '第 ' + box.box_id + ' 箱' + (box.name ? ' · ' + box.name : '') + ' · 命中 ' + box.matched + ' / 已知占用 ' + box.occupied + ' 格 · 6 列 × 5 行' + (box.historical ? ' · 历史箱表，登录后更新' : ' · 本次采集') + (box.unknown ? ' · ' + box.unknown + ' 格未采集' : '')
-      : (backpack.boxes || []).length ? '已采集的箱子均为空箱。' : '没有已采集箱表；不会将未采集的箱子显示为空箱。';
-    $("pet-box-navigation").innerHTML = html + '<div class="box-status-row"><p class="filter-note" role="status">' + esc(description.replace(' · 6 列 × 5 行', '')) + '</p>' + (box || state.petTeams ? '<details class="box-help"><summary>箱位说明</summary><p>空格：空位 · 筛掉：不匹配条件 · 待补：个体资料未到 · 未采集：槽位未知。窄窗口可横向滚动；方向键浏览精灵，Enter打开详情，Esc返回。</p></details>' : '') + '</div>';
-  }
-
-  function selectPetBox(boxId) {
-    state.petTeams = Number(boxId) === 0;
-    if (!state.petTeams) { state.petBox = Number(boxId); }
-    window.SpriteLensUI.closeDetail(false, true);
-    renderPets(state.lastPayload || {});
-    var wrap = $("pet-grid").closest(".table-wrap"); wrap.scrollTop = 0; wrap.scrollLeft = 0;
-    var selected = $("pet-grid").querySelector('[data-gid="' + state.selectedPetGid + '"]');
-    (selected || $("pet-box-navigation").querySelector('[data-box="' + (state.petTeams ? 0 : state.petBox) + '"]'))?.focus({ preventScroll: true });
-  }
-
-  /* 精灵图：有图显示立绘（覆盖在首字之上）；加载失败自动移除，露出首字头像 */
-  /* 点阵视图承载可比较的信息，悬停不放大，避免遮挡相邻宠物。 */
-  function bindPointGrid() {
-    $("pet-box-navigation").addEventListener("click", function (event) {
-      var button = event.target.closest("[data-box]");
-      if (button && !button.disabled) { selectPetBox(button.dataset.box); }
-    });
-    $("pet-box-navigation").addEventListener("change", function (event) { if (event.target.id === "pet-box-jump") { selectPetBox(event.target.value); } });
-    $("pet-detail").addEventListener("click", function (event) {
-      var button = event.target.closest("[data-locate-box], [data-locate-team]");
-      if (!button) { return; }
-      state.petView = "point"; window.SpriteLensAppearance.view("point");
-      $("pet-view").querySelectorAll("button").forEach(function (node) { var active = node.dataset.view === "point"; node.classList.toggle("active", active); node.setAttribute("aria-pressed", String(active)); });
-      selectPetBox(button.hasAttribute("data-locate-team") ? 0 : button.dataset.locateBox);
-    });
-    $("pet-grid").addEventListener("keydown", function (event) {
-      if (!$("pet-grid").classList.contains("game-box-grid")) { return; }
-      var cell = event.target.closest("[data-slot]"), step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -6, ArrowDown: 6 }[event.key];
-      if (!cell || !step) { return; }
-      event.preventDefault();
-      var original = Number(cell.dataset.slot), slot = original + step;
-      while (slot >= 1 && slot <= (state.petTeams ? 18 : 30)) {
-        if (Math.abs(step) === 1 && Math.floor((slot - 1) / 6) !== Math.floor((original - 1) / 6)) { break; }
-        var target = $("pet-grid").querySelector('button[data-slot="' + slot + '"]');
-        if (target) { target.focus(); break; } slot += step;
-      }
-    });
-    $("pet-grid").addEventListener("click", function (event) {
-      var cell = event.target.closest("[data-gid]");
-      if (!cell || state.petView !== "point") { return; }
-      state.selectedPetGid = Number(cell.dataset.gid);
-      setPetDetailOpen(true);
-      renderPetDetail(state.selectedPetGid);
-    });
-  }
-  function renderPetPoints(pets, slots, teams) {
-    $("pet-grid").className = "pet-grid point-grid" + (slots ? " game-box-grid" : "");
-    $("pet-grid").hidden = false;
-    $("pet-table").hidden = true;
-    $("pet-grid").innerHTML = pets.map(function (pet, index) {
-      var heading = teams && index % 6 === 0 ? '<div class="pet-team-heading">第 ' + (Math.floor(index / 6) + 1) + ' 队' + (((state.lastPayload || {}).backpack || {}).active_team === Math.floor(index / 6) + 1 ? ' · 当前出战' : '') + '</div>' : '';
-      if (!pet) {
-        var status = slots[index].state, label = { empty: "空格", filtered: "筛掉", missing: "待补", unknown: "未采集" }[status];
-        return heading + '<div class="pet-box-slot slot-' + status + '" aria-label="第 ' + (Math.floor(index / 6) + 1) + (teams ? ' 队第 ' : ' 行第 ') + (index % 6 + 1) + (teams ? ' 格，' : ' 列，') + label + '"><span>' + label + '</span></div>';
-      }
-      var mark = pet.gender === 2 ? "♀" : (pet.gender === 1 ? "♂" : "—");
-      var genderClass = pet.gender === 2 ? "female" : (pet.gender === 1 ? "male" : "");
-      return heading + '<button type="button" class="point-pet ' + genderClass + (state.selectedPetGid === pet.gid ? " selected" : "")
-        + '" data-slot="' + (index + 1) + '" data-gid="' + pet.gid + '" aria-pressed="' + (state.selectedPetGid === pet.gid) + '" aria-label="' + esc(pet.name) + '，' + esc(pet.nature_name) + (slots ? '，第 ' + (Math.floor(index / 6) + 1) + (teams ? ' 队第 ' : ' 行第 ') + (index % 6 + 1) + (teams ? ' 格' : ' 列') : '') + '">'
-        + '<span class="point-top"><span class="pc-gender ' + genderClass + '" title="' + (pet.gender === 2 ? "雌性" : (pet.gender === 1 ? "雄性" : "未知性别")) + '">' + mark + '</span>'
-        + '<span class="point-markers"><span class="point-rarity-slot">' + window.SpriteLensPetPresentation.rarity(pet) + '</span><span class="point-color-slot">' + window.SpriteLensPetPresentation.colorCard(pet.color_card) + '</span></span>'
-        + '<span class="point-nature" title="' + esc(pet.nature_name) + '">' + esc(pet.nature_name) + '</span></span>'
-        + '<span class="point-portrait-row"><span class="point-groups" data-pet-display="groups">' + [0, 1].map(function (index) { var group = (pet.egg_groups || [])[index]; return '<span class="point-group-slot">' + (group && !/^(未知|未知组|未发现|未发现组|暂无数据)$/.test(group) ? '<span class="point-egg-group" title="' + esc(group) + '">' + esc(group.replace(/组$/, "")) + '</span>' : '') + '</span>'; }).join("") + '</span>'
-        + window.SpriteLensPetPresentation.avatar(pet, "point-avatar")
-        + '<span class="point-medals">' + window.SpriteLensPetPresentation.medal(pet, true) + '</span></span>'
-        + '<span class="point-name" title="' + esc(pet.name) + '">' + esc(pet.name) + '</span>'
-        + '<span class="point-metrics">' + pointMetric(pet, "height", "") + pointMetric(pet, "weight", "") + pointMetric(pet, "voice", "db") + '</span>'
-        + "</button>";
-    }).join("");
-  }
-
-  function pointMetric(pet, field, unit) {
-    var text = pet[field + "_text"], unknown = !text || text === "暂无数据";
-    var value = unknown ? "—" : text, label = "声音", title = unknown ? "暂无数据" : text + " dB";
-    if (field !== "voice") {
-      var position = (pet.range_positions || {})[field];
-      label = (field === "height" ? "身高" : "体重") + " · 物种参考范围位置";
-      value = !position || position.ratio === null ? "—" : position.status !== "within" ? "超界" : (position.ratio === 0 || position.ratio === 1 ? position.ratio * 100 : (position.ratio * 100).toFixed(1)) + "%";
-      title = label + "：" + (value === "—" ? "暂无有效参考范围" : value === "超界" ? "超出参考范围" : value) + " · 实际值 " + (text || "暂无数据");
-    }
-    return '<span data-pet-display="' + field + '" title="' + esc(title) + '"><b>' + esc(value) + '</b>' + (!unit || value === "—" || value === "超界" ? '' : '<small class="metric-unit">' + unit + '</small>') + '</span>';
-  }
-
-  function positionText(pet, field) {
-    var position = (pet.range_positions || {})[field];
-    var text = !position || position.ratio === null ? "暂无范围" : position.status !== "within" ? "超出范围" : (position.ratio * 100).toFixed(1) + "%";
-    return '<small data-pet-display="positions" title="物种参考范围位置">' + text + '</small>';
-  }
-
-  function businessMarks(pet) {
-    return window.SpriteLensPetPresentation.rarity(pet) + window.SpriteLensPetPresentation.colorCard(pet.color_card)
-      + window.SpriteLensPetPresentation.medal(pet);
-  }
-
-  function locationDetail(pet) {
-    var location = pet.location;
-    if (!location) { return '<div class="detail-section"><h3>游戏背包位置</h3><p class="filter-note">暂无箱位或队伍位置，登录游戏后自动同步。</p></div>'; }
-    if (location.team_id) { return '<div class="detail-section"><h3>出战背包位置</h3><p class="info-line">第 ' + location.team_id + ' 队 · 第 ' + location.slot + ' 格</p><p class="filter-note">' + (location.historical ? '历史队伍，登录后更新。' : '本次采集的普通出战队伍。') + '</p><button class="ghost-button small" data-locate-team="' + location.team_id + '">定位到出战背包</button></div>'; }
-    var text = '第 ' + location.box_id + ' 箱 · 第 ' + location.row + ' 行第 ' + location.column + ' 列';
-    var slots = Array.from({ length: 30 }, function (_, index) { return '<span' + (index + 1 === location.slot ? ' class="active"' : '') + '></span>'; }).join('');
-    var box = ((state.lastPayload || {}).backpack || {}).boxes || [];
-    var historical = box.some(function (item) { return item.box_id === location.box_id && item.historical; });
-    return '<div class="detail-section"><h3>游戏背包位置</h3><p class="info-line">' + text + '</p><div class="pet-location-grid" role="img" aria-label="' + text + '">' + slots + '</div><p class="filter-note">' + (historical ? '历史箱位，登录后更新。' : '最近采集的箱位，游戏内移动后自动更新。') + '</p><button class="ghost-button small" data-locate-box="' + location.box_id + '">定位到此箱</button></div>';
-  }
-
-  function petAvatarHtml(pet) {
-    return window.SpriteLensPetPresentation.avatar(pet, "pc-avatar");
-  }
-
-  /* 卡片视图（对标蛋神「点阵背包」）：紧凑卡片承载可比较的关键信息 */
-  function renderPetCards(pets) {
-    $("pet-grid").className = "pet-grid";
-    $("pet-grid").innerHTML = pets.map(function (pet) {
-      var genderClass = pet.gender === 2 ? "female" : (pet.gender === 1 ? "male" : "");
-      var genderMark = pet.gender === 2 ? "♀" : (pet.gender === 1 ? "♂" : "—");
-      var typeBadges = (pet.type_names || []).map(function (name, index) {
-        var color = (pet.type_colors || [])[index] || TYPE_FALLBACK;
-        return '<span class="type-badge" style="' + badgeStyle(color) + '">' + esc(name) + "</span>";
-      }).join("") || '<span class="type-badge" style="' + badgeStyle(TYPE_FALLBACK) + '">未知</span>';
-
-      var stats = (pet.stats || []).map(function (stat) {
-        return '<div class="pc-stat"><small>' + esc(stat.label) + '</small><b>' + stat.value + "</b>"
-          + '<span class="mini-bar"><i style="width:' + (stat.ratio * 100).toFixed(1) + '%"></i>'
-          + (stat.race_ratio ? '<u style="left:' + (stat.race_ratio * 100).toFixed(1) + '%"></u>' : "")
-          + "</span></div>";
-      }).join("");
-
-      var foot = [];
-      if (pet.is_shiny || pet.is_colorful || (pet.medal_marks || []).length) { foot.push(businessMarks(pet)); }
-      if ((pet.egg_groups || []).length) { foot.push('<span class="pc-pct" data-pet-display="groups">' + esc(pet.egg_groups.join(" / ")) + "</span>"); }
-      foot.push('<span class="pc-pct" data-pet-display="height">身高 ' + esc(pet.height_text) + positionText(pet, "height") + "</span>");
-      foot.push('<span class="pc-pct" data-pet-display="weight">体重 ' + esc(pet.weight_text) + positionText(pet, "weight") + "</span>");
-      foot.push('<span class="pc-pct" data-pet-display="voice">声音 ' + esc(pet.voice_text) + (pet.voice_text !== "暂无数据" ? " dB" : "") + "</span>");
-
-      var dexTag = pet.dex_no ? "#" + pet.dex_no : "编号 " + pet.gid;
-      return '<article class="pet-card ' + genderClass + (state.selectedPetGid === pet.gid ? " selected" : "")
-        + '" data-gid="' + pet.gid + '" role="button" tabindex="0" aria-label="查看' + esc(pet.name) + '详情">'
-        + '<div class="pc-top"><span class="pc-gender ' + genderClass + '">' + genderMark + "</span>"
-        + '<span class="pc-nature">' + esc(pet.nature_name) + "</span>"
-        + '<span class="pc-badges">' + typeBadges + "</span></div>"
-        + '<div class="pc-body">' + petAvatarHtml(pet)
-        + '<div class="pc-lines"><span class="pc-name" title="' + esc(pet.name) + '">'
-        + esc(pet.name) + "</span>"
-        + '<span class="pc-sub">' + esc(dexTag)
-        + "</span></div></div>"
-        + '<div class="pc-stats">' + stats + "</div>"
-        + '<div class="pc-foot">' + (foot.join(" ") || '<span class="muted">—</span>')
-        + '<span class="pc-talent" style="' + badgeStyle(pet.talent_color) + '">'
-        + pet.talent_rank + "阶</span></div>"
-        + "</article>";
-    }).join("");
-
-    $("pet-grid").querySelectorAll(".pet-card").forEach(function (card) {
-      card.addEventListener("click", function () {
-        state.selectedPetGid = Number(card.dataset.gid);
-        $("pet-grid").querySelectorAll(".pet-card").forEach(function (node) {
-          node.classList.toggle("selected", node === card);
-        });
-        renderPetDetail(state.selectedPetGid);
-      });
-    });
-  }
-
-  /* 分页条（对标蛋神「第 N/M 箱」）：数据多时按页切，避免一次铺满 DOM */
-  function renderPetPager(totalCount) {
-    var pager = $("pet-pager");
-    if (state.petView === "table" || !totalCount) {
-      pager.hidden = true;
-      pager.innerHTML = "";
-      return;
-    }
-    pager.hidden = false;
-    var pages = Math.ceil(totalCount / PET_PAGE_SIZE);
-    var current = state.petPage;
-    var buttons = [];
-    // 首页/上一页
-    buttons.push('<button data-page="1"' + (current === 1 ? " disabled" : "") + ">首页</button>");
-    buttons.push('<button data-page="' + (current - 1) + '"' + (current === 1 ? " disabled" : "") + ">上一页</button>");
-    // 页码窗口：当前页附近 ±4
-    var from = Math.max(1, current - 4);
-    var to = Math.min(pages, from + 8);
-    from = Math.max(1, to - 8);
-    for (var i = from; i <= to; i++) {
-      buttons.push('<button data-page="' + i + '"' + (i === current ? ' class="active" aria-current="page"' : "") + ">" + i + "</button>");
-    }
-    buttons.push('<button data-page="' + (current + 1) + '"' + (current === pages ? " disabled" : "") + ">下一页</button>");
-    buttons.push('<span class="pager-info">浏览页 ' + current + " / " + pages + " · 每页 " + PET_PAGE_SIZE + " 只</span>");
-    pager.innerHTML = buttons.join("");
-
-    pager.querySelectorAll("button[data-page]").forEach(function (node) {
-      node.addEventListener("click", function () {
-        var page = Number(node.dataset.page);
-        if (!page || page === state.petPage) { return; }
-        state.petPage = page;
-        window.SpriteLensUI.closeDetail(false);
-        renderPets(state.lastPayload || { pets: state.pets, total: state.petTotal });
-        var wrap = $("pet-grid").closest(".table-wrap");
-        if (wrap) { wrap.scrollTop = 0; }
-      });
-    });
-  }
-
-  /* 表格视图（原密集表，保留给需要横向比对的场景） */
-  function renderPetTable(pets) {
-    $("pet-rows").innerHTML = pets.map(function (pet) {
-      var species = pet.species_name && pet.species_name !== pet.name
-        ? '<small>' + esc(pet.species_name) + "</small>" : "<small></small>";
-      var types = (pet.type_names || []).map(function (name, index) {
-        var color = (pet.type_colors || [])[index] || TYPE_FALLBACK;
-        return '<span class="type-badge" style="' + badgeStyle(color) + '">' + esc(name) + "</span>";
-      }).join("") || '<span class="muted">—</span>';
-
-      var natureExtra = "";
-      if (pet.nature_positive) { natureExtra += ' <span class="positive">↑' + esc(pet.nature_positive) + "</span>"; }
-      if (pet.nature_negative) { natureExtra += ' <span class="negative">↓' + esc(pet.nature_negative) + "</span>"; }
-      var nature = '<div class="nature-cell"><strong>' + esc(pet.nature_name) + "</strong>"
-        + '<small>' + natureExtra + "</small></div>";
-
-      var stats = (pet.stats || []).map(function (stat) {
-        return '<div class="mini-stat"><b>' + stat.value + "</b><small>" + esc(stat.label) + "</small>"
-          + '<span class="mini-bar"><i style="width:' + (stat.ratio * 100).toFixed(1) + '%"></i>'
-          + (stat.race_ratio ? '<u style="left:' + (stat.race_ratio * 100).toFixed(1) + '%"></u>' : "")
-          + "</span></div>";
-      }).join("");
-
-      function measurement(field, label, color) {
-        var position = (pet.range_positions || {})[field];
-        var valid = position && position.ratio !== null;
-        var hint = valid ? (position.status === "within" ? "范围位置 " + Math.round(position.ratio * 100) + "%" : "超出参考范围") : "暂无参考范围";
-        return '<div class="body-row" title="' + hint + '"><em>' + label + '</em>'
-          + (valid ? '<span class="body-bar" aria-label="' + hint + '"><i class="' + color + '" style="width:' + (pet[field + "_pct"] * 100).toFixed(1) + '%"></i></span>' : '')
-          + '<span>' + esc(pet[field + "_text"]) + '</span></div>';
-      }
-      var body = '<div class="body-cell">'
-        + measurement("height", "身高", "h")
-        + measurement("weight", "体重", "w")
-        + '<div class="body-row"><em>声音</em><span class="body-bar"><i class="v" style="width:'
-          + (pet.voice_pct * 100).toFixed(1) + '%"></i></span><span>' + esc(pet.voice_text) + (pet.voice_text !== "暂无数据" ? " dB" : "") + "</span></div>"
-        + "</div>";
-
-      var skills = (pet.skills || []).filter(function (item) { return item.equipped; });
-      var skillHtml = skills.length
-        ? '<div class="skill-list">' + skills.map(function (item) {
-            return '<span class="skill-chip">' + esc(item.name) + "</span>";
-          }).join("") + "</div>"
-        : '<span class="muted">—</span>';
-
-      return '<tr data-gid="' + pet.gid + '" role="button" tabindex="0" aria-label="查看' + esc(pet.name) + '详情">'
-        + '<td><div class="pet-cell">' + petAvatarHtml(pet)
-          + "<div><strong>" + esc(pet.name) + "</strong>" + species + "</div></div></td>"
-        + '<td class="' + (pet.type_names && pet.type_names.length ? "" : "col-types") + '">' + types + "</td>"
-        + "<td>" + nature + "</td>"
-        + '<td><div class="mini-stats">' + stats + "</div></td>"
-        + '<td><span class="talent-badge" style="' + badgeStyle(pet.talent_color) + '">'
-          + pet.talent_rank + "阶</span></td>"
-        + '<td class="col-body">' + body + "</td>"
-        + "<td>" + skillHtml + "</td>"
-        + '<td class="col-gid">' + pet.gid + "</td>"
-        + "</tr>";
-    }).join("");
-
-    $("pet-rows").querySelectorAll("tr").forEach(function (row) {
-      row.addEventListener("click", function () {
-        state.selectedPetGid = Number(row.dataset.gid);
-        $("pet-rows").querySelectorAll("tr").forEach(function (item) {
-          item.classList.toggle("active", item === row);
-        });
-        renderPetDetail(state.selectedPetGid);
-      });
-    });
-  }
-
-  function findPet(gid) {
-    for (var i = 0; i < state.pets.length; i++) {
-      if (state.pets[i].gid === gid) { return state.pets[i]; }
-    }
-    return null;
-  }
-
-  /* 详情与筛选复用右侧栏，列表始终保持同一宽度。 */
-  function setPetDetailOpen(open) {
-    var workspace = document.querySelector("#page-pets .workspace.split");
-    if (workspace) { workspace.classList.toggle("has-detail", !!open); }
-  }
-
-  document.addEventListener("detailclosed", function (event) {
-    if (event.detail === "pet-detail") {
-      state.selectedPetGid = null;
-      document.querySelectorAll("#page-pets [data-gid]").forEach(function (node) {
-        node.classList.remove("selected", "active");
-        node.setAttribute("aria-pressed", "false");
-      });
-    }
-    if (event.detail === "event-detail") { state.selectedEventIndex = null; }
-  });
-
-  function renderPetDetail(gid) {
-    var pet = findPet(gid);
-    var panel = $("pet-detail");
-    if (!pet) {
-      panel.innerHTML = '<div class="empty-hint">点击宠物卡片查看详情</div>';
-      setPetDetailOpen(false);
-      return;
-    }
-    setPetDetailOpen(true); // 选中是显式意图：展开详情栏（默认收起给卡片让宽）
-    var peak = 0;
-    (pet.stats || []).forEach(function (stat) { peak = Math.max(peak, stat.value); });
-    var statRows = (pet.stats || []).map(function (stat) {
-      var ratio = peak ? Math.min(1, stat.value / peak) : 0;
-      var raceRatio = peak ? Math.min(1, stat.race / peak) : 0;
-      return "<tr><td>" + esc(stat.label) + "</td>"
-        + '<td class="num">' + stat.value + "</td>"
-        + '<td class="race">' + (stat.race || "—") + "</td>"
-        + '<td class="bar"><span class="detail-bar"><i style="width:' + (ratio * 100).toFixed(1) + '%"></i>'
-        + '<u style="left:' + (raceRatio * 100).toFixed(1) + '%"></u></span></td></tr>';
-    }).join("");
-
-    var natureLine = esc(pet.nature_name);
-    if (pet.nature_positive) { natureLine += ' <span class="positive">↑' + esc(STAT_CN[pet.nature_positive] || pet.nature_positive) + "</span>"; }
-    if (pet.nature_negative) { natureLine += ' <span class="negative">↓' + esc(STAT_CN[pet.nature_negative] || pet.nature_negative) + "</span>"; }
-
-    var types = (pet.type_names || []).map(function (name, index) {
-      var color = (pet.type_colors || [])[index] || TYPE_FALLBACK;
-      return '<span class="type-badge" style="' + badgeStyle(color) + '">' + esc(name) + "</span>";
-    }).join(" ") || '<span class="muted">—</span>';
-
-    var skills = pet.skills || [];
-    var skillHtml = skills.length ? skills.map(function (item) {
-      return '<span class="skill-chip">' + esc(item.name)
-        + (item.equipped ? "" : "·未装备") + "</span>";
-    }).join("") : '<span class="muted">无技能数据</span>';
-
-    panel.innerHTML =
-      '<div class="detail-hero">' + petAvatarHtml(pet) + '<div><div class="detail-title"><h2>' + esc(pet.name) + "</h2>"
-      + '<span class="muted">Lv' + pet.level + "</span></div>"
-      + '<div class="detail-sub">编号 ' + pet.gid + " · 图鉴 " + (pet.base_conf_id || "—")
-      + "</div></div></div>"
-      + '<div class="point-tags">' + businessMarks(pet) + '</div>'
-      + (pet.worn_medal_id ? '<p class="info-line muted">佩戴奖牌：' + esc(pet.worn_medal_name) + '</p>' : '')
-      + locationDetail(pet)
-
-      + '<div class="detail-section"><h3>系别 / 性格</h3>'
-      + '<div class="info-line">' + types + "</div>"
-      + '<div class="info-line"><b>' + natureLine + "</b></div></div>"
-      + '<div class="info-line muted">蛋组：' + esc((pet.egg_groups || []).join(" / ") || "暂无数据") + '</div>'
-
-      + '<div class="detail-section"><h3>六维对照</h3>'
-      + '<table class="stat-table"><tbody>' + statRows + "</tbody></table>"
-      + '<div class="info-line muted">数值 / 种族值（竖线为种族值参考）· 总和 '
-      + (pet.stat_sum || 0) + (pet.species_stat_sum ? " / 种族 " + pet.species_stat_sum : "")
-      + "</div></div>"
-
-      + '<div class="detail-section"><h3>个体实际值 · 体型 / 声音</h3>'
-      + '<div class="meta-grid">'
-      + '<div class="meta-cell"><span>身高</span><b>' + esc(pet.height_text) + "</b></div>"
-      + '<div class="meta-cell"><span>体重</span><b>' + esc(pet.weight_text) + "</b></div>"
-      + '<div class="meta-cell"><span>声音</span><b>' + esc(pet.voice_text) + (pet.voice_text !== "暂无数据" ? " dB" : "") + "</b></div>"
-      + '<div class="meta-cell"><span>天赋阶</span><b>' + pet.talent_rank + " 阶</b></div>"
-      + "</div></div>"
-
-      + window.SpriteLensAppearance.ranges("物种参考范围", pet.reference_ranges, pet.range_positions)
-      + window.SpriteLensAppearance.ranges("蛋基础范围", pet.egg_ranges)
-      + '<div class="detail-section"><h3>技能</h3><div class="skill-list">' + skillHtml + "</div></div>";
-  }
-
-  /* ---------- 筛选交互 ---------- */
-  function bindPetFilters() {
-    var timer = null;
-    // 视图切换：点阵背包（默认）/ 属性卡片 / 对比表格。
-    $("pet-view").querySelectorAll("button").forEach(function (node) {
-      node.addEventListener("click", function () {
-        window.SpriteLensUI.closeDetail(false);
-        state.petView = node.dataset.view;
-        window.SpriteLensAppearance.view(state.petView);
-        state.petPage = 1;
-        $("pet-view").querySelectorAll("button").forEach(function (item) {
-          item.classList.toggle("active", item === node);
-          item.setAttribute("aria-pressed", String(item === node));
-        });
-        renderPets(state.lastPayload || { pets: state.pets, total: state.petTotal, shown: state.pets.length });
-      });
-    });
-    $("f-search").addEventListener("input", function (event) {
-      state.filters.search = event.target.value.trim();
-      clearTimeout(timer);
-      timer = setTimeout(loadPets, 220);
-    });
-    $("f-level-min").addEventListener("input", function () {
-      var min = Number($("f-level-min").value);
-      var max = Number($("f-level-max").value);
-      if (min > max) { $("f-level-max").value = String(min); max = min; }
-      state.filters.level_min = min;
-      state.filters.level_max = max;
-      $("f-level-label").textContent = min + " – " + max;
-      clearTimeout(timer);
-      timer = setTimeout(loadPets, 180);
-    });
-    $("f-level-max").addEventListener("input", function () {
-      var min = Number($("f-level-min").value);
-      var max = Number($("f-level-max").value);
-      if (max < min) { $("f-level-min").value = String(max); min = max; }
-      state.filters.level_min = min;
-      state.filters.level_max = max;
-      $("f-level-label").textContent = min + " – " + max;
-      clearTimeout(timer);
-      timer = setTimeout(loadPets, 180);
-    });
-    $("f-talent").addEventListener("change", function () {
-      state.filters.talent_min = Number($("f-talent").value) || 0;
-      loadPets();
-    });
-    $("f-gender").addEventListener("change", function () {
-      state.filters.gender = Number(this.value) || 0;
-      loadPets();
-    });
-    $("f-sort").addEventListener("change", function () {
-      state.filters.sort = $("f-sort").value;
-      loadPets();
-    });
-    $("f-desc").addEventListener("change", function () {
-      state.filters.desc = $("f-desc").checked;
-      loadPets();
-    });
-    $("btn-reset-filters").addEventListener("click", function () {
-      clearTimeout(timer);
-      state.filters = { search: "", level_min: 1, level_max: 100, natures: [], types: [], talent_min: 0, gender: 0, sort: "gid", desc: false };
-      $("f-search").value = "";
-      $("f-level-min").value = "1";
-      $("f-level-max").value = "100";
-      $("f-level-label").textContent = "1 – 100";
-      $("f-talent").value = "0";
-      $("f-gender").value = "0";
-      $("f-sort").value = "gid";
-      $("f-desc").checked = false;
-      $("f-natures").querySelectorAll(".chip").forEach(function (node) { node.classList.remove("active"); });
-      $("f-types").querySelectorAll(".chip").forEach(function (node) { node.classList.remove("active"); });
-      loadPets();
-    });
-    $("btn-empty-reset").addEventListener("click", function () { $("btn-reset-filters").click(); });
-
   }
 
   /* ---------- 精灵图鉴 ---------- */
@@ -963,7 +362,8 @@
       collected: state.hb.mode === "collected" ? "1" : "",
       uncollected: state.hb.mode === "uncollected" ? "1" : ""
     };
-    return api("/api/handbook" + query(params)).then(function (payload) {
+    return accountRequests.request("handbook", "/api/handbook" + query(params)).then(function (payload) {
+      if (!payload) { return; }
       state.hbData = payload;
       state.hbSpecies = payload.species || [];
       renderHandbook(payload);
@@ -1192,7 +592,7 @@
     var toggle = $("btn-toggle");
     if (toggle) {
       var running = !!payload.running;
-      toggle.textContent = running ? "停止采集" : "开始采集";
+      toggle.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="/static/icons/sprite.svg#' + (running ? 'square' : 'player-play') + '"></use></svg>' + (running ? "停止采集" : "开始采集");
       toggle.classList.toggle("stop-button", running);
       toggle.classList.remove("toggle-busy");
       toggle.disabled = false;
@@ -1381,8 +781,30 @@
     socket.onerror = function () { try { socket.close(); } catch (e) {} };
   }
 
-  /* ---------- 蛋图鉴（页面模块 pages/egg-dex.js，协作函数在此注入） ---------- */
-  var eggDex = window.SpriteLensEggDex.create({ api: api, query: query, $: $, esc: esc, toast: toast });
+  /* 临时迁移桥：壳只传根节点/token 和挂载生命周期，页面状态归 Vue。F04 删除。 */
+  var eggDex = (function () {
+    var generation = 0;
+    var dispose = null;
+    return {
+      leave: function () {
+        generation++;
+        if (dispose) { dispose(); dispose = null; }
+      },
+      load: function () {
+        var current = ++generation;
+        var root = $("page-egg-dex");
+        root.textContent = "正在加载蛋图鉴…";
+        return import("/static/vue/entry.js").then(function (page) {
+          if (current !== generation) { return; }
+          dispose = page.mount(root, TOKEN);
+        }).catch(function (err) {
+          if (current !== generation) { return; }
+          root.textContent = "蛋图鉴启动失败，请切页重试：" + err.message;
+          toast("蛋图鉴启动失败：" + err.message, true);
+        });
+      }
+    };
+  })();
 
   /* ---------- 待实现页占位 ---------- */
   function renderFeaturePlaceholders() {
@@ -1399,7 +821,8 @@
   var eggBoxState = { search: "", mode: "all", data: null, selected: null, version: -1 };
 
   function loadEggBox() {
-    api("/api/egg-box").then(function (payload) {
+    return accountRequests.request("egg-box", "/api/egg-box").then(function (payload) {
+      if (!payload) { return; }
       eggBoxState.data = payload;
       eggBoxState.version = payload.version || 0;
       renderEggBox();
@@ -1421,13 +844,13 @@
     var payload = eggBoxState.data;
     if (!payload) { return; }
     var shown = eggBoxFilter(payload.eggs);
-    $("eb-count").textContent = "共 " + payload.total + " 枚";
-    $("eb-hatching").textContent = "在孵 " + (payload.hatching || 0);
+    $("eb-count").textContent = payload.source === "unknown" ? "蛋仓状态未知" : (payload.source === "historical" ? "历史缓存 " : payload.source === "mixed" ? "观察与历史 " : "已观察 ") + payload.total + " 枚（完整性未确认）";
+    $("eb-hatching").textContent = payload.hatching === null ? "当前孵化状态未知" + (payload.historical_hatching ? " · 历史在孵 " + payload.historical_hatching : "") : "已观察在孵 " + payload.hatching;
     $("eb-grid").innerHTML = shown.map(function (egg) {
       var progress = Math.round((egg.hatch_progress || 0) * 100);
       var bar = egg.hatching
         ? '<div class="egg-progress"><i style="width:' + progress + '%"></i><b>' + progress + "%</b></div>"
-        : '<span class="hb-badge none">未孵化</span>';
+        : '<span class="hb-badge none">' + (egg.hatch_known ? "未孵化" : egg.historical_hatching ? "历史在孵 · 当前未知" : "孵化状态未知") + "</span>";
       var qty = egg.quantity > 1 ? '<span class="egg-qty">×' + egg.quantity + "</span>" : "";
       var img = egg.icon_url
         ? '<img src="' + esc(egg.icon_url) + '" alt="" loading="lazy" '
@@ -1445,6 +868,7 @@
         + "</article>";
     }).join("");
     $("eb-empty").hidden = shown.length > 0;
+    $("eb-empty").textContent = payload.total ? "没有符合筛选条件的蛋" : payload.source === "unknown" ? "尚未观察到蛋仓数据，请进入游戏打开蛋仓" : "当前观察/缓存中没有蛋，不能据此确认游戏蛋仓为空";
     if (eggBoxState.selected !== null) { renderEggBoxDetail(eggBoxState.selected); }
   }
 
@@ -1466,14 +890,14 @@
     panel.innerHTML =
       '<div class="detail-title"><h2>' + esc(egg.egg_name) + "</h2>"
       + '<span class="muted">#' + esc(egg.instance_id) + "</span></div>"
-      + '<div class="detail-sub">' + esc(egg.species_name || "未知物种")
+      + '<div class="detail-sub">' + (egg.historical ? "历史条目 · " : "当前观察条目 · ") + esc(egg.species_name || "未知物种")
       + (egg.egg_type_name ? " · " + esc(egg.egg_type_name) : "")
       + (egg.quantity > 1 ? " · 数量 ×" + egg.quantity : "") + "</div>"
       + '<div class="detail-section"><h3>孵化状态</h3>'
       + (egg.hatching
         ? '<div class="egg-progress large"><i style="width:' + progress + '%"></i><b>' + progress + "%</b></div>"
           + '<div class="info-line muted">孵化时长参考 ' + esc(egg.hatch_label || "—") + hatchedMinutes + "</div>"
-        : '<div class="info-line">未开始孵化 · 参考时长 ' + esc(egg.hatch_label || "—") + "</div>")
+        : '<div class="info-line">' + (egg.hatch_known ? "未开始孵化" : egg.historical_hatching ? "历史记录为在孵，当前状态未知" : "当前孵化状态未知") + " · 参考时长 " + esc(egg.hatch_label || "—") + "</div>")
       + "</div>"
       + '<div class="detail-section"><h3>个体实际值</h3><dl class="detail-rows">'
       + '<div><dt>获得时间</dt><dd>' + (egg.obtained_at ? new Date(egg.obtained_at * 1000).toLocaleString() : "未知") + "</dd></div>"
@@ -1512,7 +936,8 @@
   var mmState = { gender: "all", data: null, selected: null };
 
   function loadMaleMatrix() {
-    api("/api/male-matrix" + query({ gender: mmState.gender })).then(function (payload) {
+    return accountRequests.request("male-matrix", "/api/male-matrix" + query({ gender: mmState.gender })).then(function (payload) {
+      if (!payload) { return; }
       mmState.data = payload;
       renderMaleMatrix();
     }).catch(function (err) { toast("矩阵加载失败：" + err.message, true); });
@@ -1565,7 +990,7 @@
     var rows = pets.map(function (pet) {
       return '<div class="mm-row"><img src="' + esc(pet.icon_url) + '" alt="" loading="lazy" onerror="this.remove()">'
         + '<b>' + esc(pet.name) + '</b><span class="muted">Lv' + pet.level + '</span>'
-        + '<span class="' + (pet.gender === 2 ? "female" : "male") + '-mark">' + (pet.gender === 2 ? "♀" : "♂") + "</span></div>";
+        + '<span class="' + (pet.gender === 2 ? "female" : "male") + '-mark">' + '<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/static/icons/sprite.svg#gender-' + (pet.gender === 2 ? 'female' : 'male') + '"></use></svg>' + "</span></div>";
     }).join("");
     panel.innerHTML =
       '<div class="detail-title"><h2>' + esc(parts[0]) + " × " + esc(parts[1]) + "</h2></div>"
@@ -1587,18 +1012,14 @@
       var chip = event.target.closest("[data-mm]");
       if (!chip) { return; }
       switchPage("pets");
-      state.filters.search = String(chip.dataset.mm);
-      var searchBox = $("f-search");
-      if (searchBox) { searchBox.value = String(chip.dataset.mm); }
+      petFilters.search(String(chip.dataset.mm));
       loadPets();
     });
     document.getElementById("page-breeder-library").addEventListener("click", function (event) {
       var chip = event.target.closest("[data-mm]");
       if (!chip) { return; }
       switchPage("pets");
-      state.filters.search = String(chip.dataset.mm);
-      var searchBox = $("f-search");
-      if (searchBox) { searchBox.value = String(chip.dataset.mm); }
+      petFilters.search(String(chip.dataset.mm));
       loadPets();
     });
     $("mm-matrix").addEventListener("click", function (event) {
@@ -1606,9 +1027,7 @@
       if (chip) {
         // 跳到精灵背包并按 gid 搜索（详情可查）
         switchPage("pets");
-        state.filters.search = String(chip.dataset.mm);
-        var searchBox = $("f-search");
-        if (searchBox) { searchBox.value = String(chip.dataset.mm); }
+        petFilters.search(String(chip.dataset.mm));
         loadPets();
         return;
       }
@@ -1624,7 +1043,8 @@
   var homeState = { data: null, version: -1 };
 
   function loadHome() {
-    api("/api/home").then(function (payload) {
+    return accountRequests.request("home", "/api/home").then(function (payload) {
+      if (!payload) { return; }
       homeState.data = payload;
       homeState.version = payload.version || 0;
       renderHome();
@@ -1637,6 +1057,7 @@
     $("home-deltas").hidden = !(payload.pending_deltas > 0);
     if (!payload.available) {
       $("home-meta").textContent = "等待家园快照（进入家园后自动更新）";
+      $("home-resident-count").textContent = "—"; $("home-nest-count").textContent = "—";
       $("home-residents").innerHTML = "";
       $("home-residents-empty").hidden = false;
       $("home-nests").innerHTML = "";
@@ -1644,12 +1065,12 @@
       $("home-furniture-line").textContent = "—";
       return;
     }
-    $("home-meta").textContent = "房间等级 " + payload.room_level + " · 快照 #" + payload.version;
+    $("home-meta").textContent = "房间等级 " + payload.room_level + " · 观察快照 #" + payload.version + "（完整性未确认）";
     var residents = payload.residents || [];
     $("home-resident-count").textContent = residents.length + " 只";
     $("home-residents").innerHTML = residents.map(function (r) {
-      var gender = r.gender === 2 ? '<span class="female-mark">♀</span>'
-        : (r.gender === 1 ? '<span class="male-mark">♂</span>' : "");
+      var gender = r.gender === 2 ? '<span class="female-mark"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/static/icons/sprite.svg#gender-female"></use></svg></span>'
+        : (r.gender === 1 ? '<span class="male-mark"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/static/icons/sprite.svg#gender-male"></use></svg></span>' : "");
       var img = r.icon_url
         ? '<img src="' + esc(r.icon_url) + '" alt="" loading="lazy" onerror="this.remove()">'
         : "";
@@ -1675,9 +1096,10 @@
   /* ---------- 种公母库（性别分组的配种宠物库） ---------- */
   function loadBreederLibrary() {
     Promise.all([
-      api("/api/male-matrix" + query({ gender: "male" })),
-      api("/api/male-matrix" + query({ gender: "female" }))
+      accountRequests.request("breeder-male", "/api/male-matrix" + query({ gender: "male" })),
+      accountRequests.request("breeder-female", "/api/male-matrix" + query({ gender: "female" }))
     ]).then(function (results) {
+      if (!results[0] || !results[1] || results[0].uid !== results[1].uid) { return; }
       renderBreederSection("bl-male", "bl-male-count", results[0]);
       renderBreederSection("bl-female", "bl-female-count", results[1]);
     }).catch(function (err) { toast("种公母库加载失败：" + err.message, true); });
@@ -1715,7 +1137,8 @@
   var flowerState = { data: null, version: -1 };
 
   function loadFlowers() {
-    api("/api/flowers").then(function (payload) {
+    return accountRequests.request("flowers", "/api/flowers").then(function (payload) {
+      if (!payload) { return; }
       flowerState.data = payload;
       flowerState.version = payload.version || 0;
       renderFlowers();
@@ -1739,13 +1162,14 @@
     if (!payload) { return; }
     if (!payload.available) {
       $("fl-meta").textContent = "等待花田快照（登录或打开花田界面后更新）";
+      $("fl-friend-count").textContent = "—";
       $("fl-own").innerHTML = "";
       $("fl-friends").innerHTML = "";
       $("fl-own-empty").hidden = false;
       $("fl-friends-empty").hidden = false;
       return;
     }
-    $("fl-meta").textContent = "快照 #" + payload.version + " · 我的花 " + (payload.own || []).length + " 朵";
+    $("fl-meta").textContent = "观察快照 #" + payload.version + " · 我的花 " + (payload.own || []).length + " 朵（完整性未确认）";
     $("fl-own").innerHTML = (payload.own || []).map(flowerCard).join("");
     $("fl-own-empty").hidden = (payload.own || []).length > 0;
     $("fl-friends").innerHTML = (payload.friends || []).map(flowerCard).join("");
@@ -1755,13 +1179,15 @@
 
   /* ---------- 炫彩色卡 ---------- */
   function loadColors() {
-    api("/api/colors").then(renderColors).catch(function (err) {
+    accountRequests.request("colors", "/api/colors").then(function (payload) {
+      if (payload) { renderColors(payload); }
+    }).catch(function (err) {
       toast("色卡加载失败：" + err.message, true);
     });
   }
 
   function petChip(pet, withLevel) {
-    var mark = pet.gender === 2 ? "♀" : "♂";
+    var mark = '<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/static/icons/sprite.svg#gender-' + (pet.gender === 2 ? "female" : "male") + '"></use></svg>';
     return '<span class="mm-pet" data-mm="' + pet.gid + '"><img src="' + esc(pet.icon_url)
       + '" alt="" loading="lazy" onerror="this.remove()">' + mark + esc(pet.name)
       + (withLevel === false ? "" : '<small>Lv' + pet.level + "</small>") + "</span>" + window.SpriteLensPetPresentation.colorCard(pet.color_card);
@@ -1812,15 +1238,13 @@
   }
 
   var lastImageMode = "portrait";
+  document.addEventListener("preferenceschanged", function (event) { if (petFilters) { petFilters.setShortcuts(event.detail.shortcuts); } });
   document.addEventListener("preferenceschanged", function (event) {
     var mode = event.detail.pet_image || "portrait";
     if (mode === lastImageMode) { return; }
     lastImageMode = mode;
-    if (!state.lastPayload) { return; }
-    var scroll = $("pet-grid").parentElement, top = scroll.scrollTop, left = scroll.scrollLeft;
-    renderPets(state.lastPayload);
-    if (state.selectedPetGid) { renderPetDetail(state.selectedPetGid); }
-    scroll.scrollTop = top; scroll.scrollLeft = left;
+    if (!petInventory) { return; }
+    petInventory.refreshPresentation();
   });
 
   /* ---------- 启动（15s 超时 + 自动重试 2 次，与自恢复链协同） ---------- */
@@ -1829,47 +1253,44 @@
   function bootAttempt(remaining) {
     var controller = ("AbortController" in window) ? new AbortController() : null;
     var timer = controller ? setTimeout(function () { controller.abort(); }, 15000) : null;
-    api("/api/bootstrap", { signal: controller ? controller.signal : undefined }).then(function (payload) {
+    api("/api/bootstrap", { signal: controller ? controller.signal : undefined }).then(async function (payload) {
+      if (!petFilters) {
+        var vue = await import("/static/vue/entry.js");
+        petFilters = vue.mountPetFilters($("pet-basic-filters"), loadPets, function () { petInventory.invalidate(); }, {
+          busy: function () { return petInventory.isBusy(); },
+          persist: window.SpriteLensAppearance.shortcuts, notify: toast
+        });
+      }
+      if (!petInventory) {
+        var inventoryVue = await import("/static/vue/entry.js");
+        petInventory = inventoryVue.mountPetInventory($("pet-list-root"), TOKEN, {
+          account: accountRequests.petContext,
+          query: petFilters.query,
+          imageMode: window.SpriteLensAppearance.imageMode,
+          fixed: petFilters.setFixed,
+          failed: function (message) { toast("宠物数据加载失败：" + message, true); },
+          view: function (view) { window.SpriteLensAppearance.view(view); },
+          reset: function () { $("btn-reset-filters").click(); },
+          committed: petFilters.sync
+        });
+      }
+      petFilters.updateOptions(payload.pets.options);
+      petFilters.setShortcuts(payload.ui_preferences.shortcuts);
+      accountRequests.observe(payload.state);
+      petInventory.seed(payload.pets);
       if (timer) { clearTimeout(timer); }
       window.SpriteLensAppearance.initialize(payload.ui_preferences, function (changes) {
         return api("/api/ui/preferences", { method: "POST", body: changes });
       }, toast);
-      window.SpriteLensPetFilters.initialize(loadPets);
-      window.SpriteLensBackpackControls.initialize(function (value) {
-        state.filters.search = value.search || ""; state.filters.level_min = value.level_min || 1; state.filters.level_max = value.level_max || 100;
-        state.filters.natures = (value.natures || []).slice(); state.filters.types = (value.types || []).slice();
-        state.filters.talent_min = value.talent_min || 0; state.filters.gender = value.gender || 0;
-        $("f-search").value = state.filters.search; $("f-level-min").value = state.filters.level_min; $("f-level-max").value = state.filters.level_max;
-        $("f-level-label").textContent = state.filters.level_min + " – " + state.filters.level_max;
-        $("f-talent").value = state.filters.talent_min; $("f-gender").value = state.filters.gender;
-        $("f-natures").querySelectorAll(".chip").forEach(function (node) { var active = state.filters.natures.indexOf(Number(node.dataset.nature)) >= 0; node.classList.toggle("active", active); node.setAttribute("aria-pressed", String(active)); });
-        $("f-types").querySelectorAll(".chip").forEach(function (node) { var active = state.filters.types.indexOf(node.dataset.type) >= 0; node.classList.toggle("active", active); node.setAttribute("aria-pressed", String(active)); });
-        window.SpriteLensPetFilters.restore(value); loadPets();
-      }, toast);
-      state.petView = payload.ui_preferences.pet_view;
-      $("pet-view").querySelectorAll("button").forEach(function (node) {
-        node.classList.toggle("active", node.dataset.view === state.petView);
-        node.setAttribute("aria-pressed", String(node.dataset.view === state.petView));
-      });
-      $("startup").hidden = true;
-      $("app").hidden = false;
+      petInventory.setView(payload.ui_preferences.pet_view);
       if (payload.app && payload.app.version) {
         var versionNode = $("app-version");
         if (versionNode) { versionNode.textContent = "v" + payload.app.version + " · 纯本地运行"; }
       }
       renderOverview(payload.overview || {});
-      state.petOptions = (payload.pets || {}).options || null;
-      state.pets = (payload.pets || {}).pets || [];
-      state.petTotal = (payload.pets || {}).total || 0;
-      state.lastPayload = payload.pets || {};
-      renderPetFilters(state.petOptions || {});
-      renderPets(payload.pets || {});
       renderCapture(payload.capture || {});
       renderState(payload.state || {});
       renderFeaturePlaceholders();
-      eggDex.bind();
-      bindPetFilters();
-      bindPointGrid();
       bindHandbookFilters();
       bindEggBoxActions();
       bindMaleMatrixActions();
@@ -1877,6 +1298,7 @@
       loadIfaces();
       connectPush();
       if (window.__spritelensBoot) { window.__spritelensBoot.ready(); }
+      else { $("startup").hidden = true; $("app").hidden = false; }
     }).catch(function (err) {
       if (timer) { clearTimeout(timer); }
       if (remaining > 0) {

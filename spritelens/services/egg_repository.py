@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import threading
+from dataclasses import dataclass
 
 from spritelens.domain.egg_box import EggBoxEntry, extract_eggs, extract_hatch_slots
 from spritelens.domain.identity import extract_identity
@@ -21,6 +22,17 @@ from spritelens.events import PacketEvent
 logger = get_logger("egg_repository")
 
 MAX_EGGS = 5000  # 安全上限（蛋仓实测几百枚量级）
+
+
+@dataclass(frozen=True)
+class EggBoxSnapshot:
+    entries: tuple[EggBoxEntry, ...]
+    slots: frozenset[int]
+    uid: int
+    version: int
+    historical_ids: frozenset[int]
+    source: str
+    slots_source: str
 
 
 class EggBoxRepository:
@@ -34,6 +46,9 @@ class EggBoxRepository:
         self._account = AccountTracker()
         self._version = 0
         self._loaded_uid = 0  # 离线恢复的蛋仓归属（R05：载荷据此标记身份）
+        self._historical_ids: set[int] = set()
+        self._source = "unknown"
+        self._slots_source = "unknown"
 
     def handle_packet(self, event: PacketEvent) -> None:
         # 身份跟踪无条件进行：账号切换要把内存蛋仓/孵化槽一起作废，
@@ -46,12 +61,16 @@ class EggBoxRepository:
                     logger.info("账号切换 → 清空蛋仓快照（uid %s）", identity.uid)
                     self._eggs.clear()
                     self._hatch_slots.clear()
+                    self._historical_ids.clear()
+                    self._source = "unknown"
+                    self._slots_source = "unknown"
                     self._version += 1
 
         slots = extract_hatch_slots(event)
         if slots is not None:
             with self._lock:
                 self._hatch_slots = set(slots)
+                self._slots_source = "observed"
                 self._version += 1
                 uid = self._account.uid
                 eggs = list(self._eggs.values())
@@ -71,6 +90,8 @@ class EggBoxRepository:
                 if egg.instance_id <= 0 or len(self._eggs) >= MAX_EGGS and egg.instance_id not in self._eggs:
                     continue
                 self._eggs[egg.instance_id] = egg
+                self._historical_ids.discard(egg.instance_id)
+            self._source = "mixed" if self._historical_ids else "observed"
             self._version += 1
             uid = self._account.uid
         if self._store is not None and uid > 0:
@@ -92,13 +113,22 @@ class EggBoxRepository:
         """
         if self._store is None or uid <= 0:
             return 0
+        with self._lock:
+            if self._account.uid and self._account.uid != uid:
+                raise ValueError("不能将历史蛋仓加载到另一实时账号")
+            version = self._version
         eggs = self._store.load(uid)
         # 槽位快照一并恢复（R06）：标记为历史状态——恢复后的槽位来自
         # 上次会话的观察，不能推断当前仍在孵
         slots = self._store.load_hatch_slots(uid)
         with self._lock:
+            if self._version != version or self._account.uid and self._account.uid != uid:
+                raise RuntimeError("恢复期间账号或蛋仓已变化，历史数据未应用")
             self._eggs = {egg.instance_id: egg for egg in eggs}
-            self._hatch_slots = slots
+            self._hatch_slots = set(slots or ())
+            self._historical_ids = set(self._eggs)
+            self._source = "historical"
+            self._slots_source = "historical" if slots is not None else "unknown"
             self._loaded_uid = uid
             self._account.note_loaded(uid)
             self._version += 1
@@ -116,6 +146,14 @@ class EggBoxRepository:
         with self._lock:
             return tuple(sorted(self._eggs.values(), key=lambda e: (e.obtained_at, e.instance_id)))
 
+    def consistent_snapshot(self) -> EggBoxSnapshot:
+        with self._lock:
+            return EggBoxSnapshot(
+                tuple(sorted(self._eggs.values(), key=lambda e: (e.obtained_at, e.instance_id))),
+                frozenset(self._hatch_slots), self._account.display_uid, self._version,
+                frozenset(self._historical_ids), self._source, self._slots_source,
+            )
+
     def version(self) -> int:
         with self._lock:
             return self._version
@@ -128,7 +166,10 @@ class EggBoxRepository:
         with self._lock:
             self._eggs.clear()
             self._hatch_slots.clear()
+            self._historical_ids.clear()
+            self._source = "unknown"
+            self._slots_source = "unknown"
             self._version += 1
 
 
-__all__ = ["EggBoxRepository", "MAX_EGGS"]
+__all__ = ["EggBoxRepository", "EggBoxSnapshot", "MAX_EGGS"]

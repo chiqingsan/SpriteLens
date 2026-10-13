@@ -23,9 +23,10 @@
     });
     Object.keys(controls).forEach(function (id) {
       var button = document.getElementById(id);
-      if (button && !button.querySelector(".ui-icon")) { button.insertAdjacentHTML("afterbegin", icon(controls[id])); }
+      if (button && !button.closest("[data-vue-page]") && !button.querySelector(".ui-icon")) { button.insertAdjacentHTML("afterbegin", icon(controls[id])); }
     });
     document.querySelectorAll(".detail-close, .detail-navigation button, [data-view], .empty-hint, .feature-placeholder, .filter-tag").forEach(function (node) {
+      if (node.closest("[data-vue-page]")) { return; }
       if (node.querySelector(".ui-icon")) { return; }
       var name = "search";
       if (node.classList.contains("filter-tag")) {

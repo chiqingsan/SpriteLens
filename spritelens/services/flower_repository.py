@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import threading
+from dataclasses import dataclass
 
 from spritelens.domain.flowers import FlowerSnapshot, extract_flowers
 from spritelens.domain.identity import extract_identity
@@ -15,6 +16,13 @@ from spritelens.services.account_tracker import AccountTracker
 from spritelens.events import PacketEvent
 
 logger = get_logger("flower_repository")
+
+
+@dataclass(frozen=True)
+class FlowerRepoSnapshot:
+    data: FlowerSnapshot | None
+    uid: int
+    version: int
 
 
 class FlowerRepository:
@@ -54,6 +62,10 @@ class FlowerRepository:
     def version(self) -> int:
         with self._lock:
             return self._version
+
+    def consistent_snapshot(self) -> FlowerRepoSnapshot:
+        with self._lock:
+            return FlowerRepoSnapshot(self._snapshot, self._account.display_uid, self._version)
 
 
 __all__ = ["FlowerRepository"]

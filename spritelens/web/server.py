@@ -101,6 +101,7 @@ class LocalServer(CaptureRoutesMixin):
         self._push_task: asyncio.Task | None = None
         self._last_state_json: str | None = None
         self._stopped = False
+        self._stop_future = None
 
     # -- 生命周期 ------------------------------------------------------
     @property
@@ -145,7 +146,8 @@ class LocalServer(CaptureRoutesMixin):
             raise TimeoutError(f"本地服务启动超时（{timeout}s）")
         if self._start_error is not None:
             self._thread.join(timeout=5.0)
-            self._thread = None
+            if not self._thread.is_alive():
+                self._thread = None
             raise self._start_error
         logger.info("本地服务已启动: http://%s:%d", self._host, self._bound_port or 0)
 
@@ -169,26 +171,40 @@ class LocalServer(CaptureRoutesMixin):
         self._runner = None
 
     def stop(self, *, timeout: float = 5.0) -> None:
-        """停服务、关事件循环；幂等（重复 stop 安全，不触碰已关闭循环）。"""
+        """线程拥有清理；等待超时保留句柄与同一停止任务，允许重试。"""
         thread = self._thread
         if thread is None:
             return
         self._stopped = True
         loop = self._loop
         if loop is not None and not loop.is_closed():
-            try:
-                future = asyncio.run_coroutine_threadsafe(self._shutdown(), loop)
-                future.result(timeout=timeout)
-            except Exception as exc:  # noqa: BLE001 - 停止失败不阻断退出
-                logger.warning("本地服务停止异常: %s", exc)
-            try:
-                loop.call_soon_threadsafe(loop.stop)
-            except RuntimeError:
-                pass  # 循环已关闭
+            if self._stop_future is None:
+                shutdown = self._stop_async()
+                try:
+                    self._stop_future = asyncio.run_coroutine_threadsafe(shutdown, loop)
+                except RuntimeError:
+                    shutdown.close()  # 与启动失败收尾的 loop.close 竞态
+                    if not loop.is_closed():
+                        raise
         thread.join(timeout=timeout)
+        if thread.is_alive():
+            raise TimeoutError("本地服务停止超时，保留线程和资源，等待重试")
+        if self._stop_future is not None and self._stop_future.done():
+            try:
+                self._stop_future.result()
+            except Exception as exc:
+                logger.warning("本地服务停止异常: %s", exc)
         self._thread = None
         self._loop = None
         self._runner = None
+        self._stop_future = None
+
+    async def _stop_async(self) -> None:
+        try:
+            await self._shutdown()
+        finally:
+            # 留出当前协程完成与 future 传递结果的一拍，不截断 runner.cleanup。
+            asyncio.get_running_loop().call_soon(asyncio.get_running_loop().stop)
 
     def _run_loop(self) -> None:
         if self._stopped:  # 超时发生在 loop 创建前：不进入启动
@@ -225,7 +241,7 @@ class LocalServer(CaptureRoutesMixin):
         finally:
             # 兜底（D06）：正常 stop 已清理过则 no-op；取消/异常路径确保
             # runner 不随本地变量残留（socket 随 loop 关闭前回收）
-            self._cleanup_partial_runner(loop)
+            self._finish_start_abort(loop)
             loop.close()
 
     def _finish_start_abort(self, loop: asyncio.AbstractEventLoop) -> None:
@@ -253,15 +269,18 @@ class LocalServer(CaptureRoutesMixin):
                 except Exception:  # noqa: BLE001 - 收尾失败不阻断关闭
                     pass
         self._cleanup_partial_runner(loop)
+        # Windows Proactor 的 socket/transport close 通过下一轮回调完成。
+        if not loop.is_closed():
+            loop.run_until_complete(asyncio.sleep(0))
 
     def _cleanup_partial_runner(self, loop: asyncio.AbstractEventLoop) -> None:
         """清理启动中途留下的 runner/site（取消或异常路径）。"""
         runner = self._runner
-        self._runner = None
         if runner is None or loop.is_closed() or loop.is_running():
             return
         try:
             loop.run_until_complete(runner.cleanup())
+            self._runner = None
         except Exception as exc:  # noqa: BLE001 - 清理失败不阻断退出
             logger.debug("半成品 runner 清理异常: %s", exc)
 
@@ -334,9 +353,10 @@ class LocalServer(CaptureRoutesMixin):
                 pass
         self._sockets.clear()
         runner = self._runner
-        self._runner = None  # 置空：_run_loop 的兜底清理对正常 stop 变 no-op
         if runner is not None:
             await runner.cleanup()
+            self._runner = None  # cleanup 完成前由 loop 唯一持有
+        await asyncio.sleep(0)
         logger.info("本地服务已停止")
 
     # -- 鉴权 ----------------------------------------------------------
@@ -357,6 +377,10 @@ class LocalServer(CaptureRoutesMixin):
 
     # -- 静态页 --------------------------------------------------------
     async def _index(self, request: web.Request) -> web.Response:
+        from spritelens.web.frontend_assets import check_frontend_assets
+        failures = check_frontend_assets(self._static_dir / "vue")
+        if failures:
+            return web.Response(status=500, text="\n".join(failures))
         path = self._static_dir / "index.html"
         if not path.is_file():
             return web.Response(status=500, text="前端资源缺失：static/index.html")
@@ -384,16 +408,18 @@ class LocalServer(CaptureRoutesMixin):
     # -- 数据 API ------------------------------------------------------
     async def _api_bootstrap(self, request: web.Request) -> web.Response:
         ctx = self._context
+        from spritelens.view_models.pet_vm import PetFilters
+        view = ctx.pet_vm.view_with(PetFilters())
         payload = {
             "app": {
                 "name": "SpriteLens",
                 "display_name": "小洛探探",
                 "version": _app_version(),
             },
-            "overview": overview_payload(ctx.pet_vm, ctx.pet_repository, ctx.static_data),
-            "pets": pets_payload(ctx.pet_vm, ctx.static_data, ctx.color_catalog, ctx.egg_catalog),
+            "overview": overview_payload(view, ctx.static_data),
+            "pets": pets_payload(view, ctx.static_data, ctx.color_catalog, ctx.egg_catalog),
             "capture": self._capture_payload(),
-            "state": self._state_payload(),
+            "state": self._state_payload(view),
             "ui_preferences": UIPreferencesViewModel(ctx.settings).snapshot(),
         }
         return web.json_response(payload)
@@ -424,16 +450,22 @@ class LocalServer(CaptureRoutesMixin):
         """HTTP query → 不可变筛选 + 一次性视图（无共享状态写入）。"""
         from spritelens.view_models.pet_vm import PetFilters
 
+        from spritelens.web.pet_queries import pet_ui_query
+        try:
+            ui_conditions = pet_ui_query(query)
+        except ValueError as exc:
+            raise web.HTTPBadRequest(text=str(exc)) from exc
         filters = PetFilters(
             search=(query.get("search") or "").strip().lower(),
-            level_min=max(1, min(_as_int(query.get("level_min"), 1), _as_int(query.get("level_max"), 100))),
-            level_max=max(_as_int(query.get("level_min"), 1), _as_int(query.get("level_max"), 100)),
+            level_min=max(1, min(60, _as_int(query.get("level_min"), 1), _as_int(query.get("level_max"), 60))),
+            level_max=min(60, max(1, _as_int(query.get("level_min"), 1), _as_int(query.get("level_max"), 60))),
             natures=frozenset(_id_set(query.get("natures"))),
             type_names=frozenset(_name_set(query.get("types"))),
             talent_min=max(0, _as_int(query.get("talent_min"), 0)),
             gender=(lambda g: g if g in (1, 2) else 0)(_as_int(query.get("gender"), 0)),
             egg_groups=frozenset(_name_set(query.get("egg_groups"))),
             egg_mode="all" if query.get("egg_mode") == "all" else "any",
+            **ui_conditions,
         )
         vm = self._context.pet_vm
         measurement = vm.measurement_query(**{key: query.get(key) for key in (

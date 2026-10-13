@@ -1,0 +1,7 @@
+{
+  "source": "蛋神助手电脑版 v1.2.0 / PYZ.pyz_extracted/desktop_catalog.pyc / SPECIALITIES",
+  "source_sha256": "383d78375e372d3acdf3b63b36367a78c8aeb4f232765eea3a23c37cb34e6e46",
+  "extracted_at": "2026-10-13",
+  "count": 13,
+  "mapping": "speciality_id → specialities.json key；只提取名称常量，不使用 petFeatures.json 的战斗特征映射"
+}

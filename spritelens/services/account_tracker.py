@@ -32,6 +32,11 @@ class AccountTracker:
         """当前账号 uid；尚未识别身份时为 0。"""
         return self._identity.uid if self._identity is not None else 0
 
+    @property
+    def display_uid(self) -> int:
+        """内存数据归属；离线加载不代表实时身份，写路径仍使用 uid。"""
+        return self.uid or self._loaded_uid or 0
+
     def note_loaded(self, uid: int) -> None:
         """记录离线载入的内存数据属于哪个账号（该账号登录不算切换）。"""
         if uid > 0:

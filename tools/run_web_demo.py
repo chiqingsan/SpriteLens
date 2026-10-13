@@ -16,6 +16,7 @@ import json
 import random
 import sys
 import tempfile
+import time
 import webbrowser
 from pathlib import Path
 
@@ -54,6 +55,7 @@ _SAMPLE = (
 
 def _demo_flowers() -> FlowerRepository:
     repo = FlowerRepository()
+    repo._account.observe(PlayerIdentity(101384922, "话绵雨", 60))
     repo._snapshot = FlowerSnapshot(
         own=tuple(
             FlowerRecord(slot_id=20128 + i, slot_index=i, pet_conf_id=conf,
@@ -73,6 +75,7 @@ def _demo_flowers() -> FlowerRepository:
 
 def _demo_home() -> HomeRepository:
     repo = HomeRepository()
+    repo._account.observe(PlayerIdentity(101384922, "话绵雨", 60))
     repo._snapshot = HomeSnapshot(
         room_level=10,
         residents=(
@@ -117,6 +120,7 @@ def build_demo_context(tmp: Path, count: int) -> AppContext:
                              base_value=rng.randint(120, 220), effort_add=rng.randint(0, 30))
                 for _ in _ATTR_SLOTS
             ),
+            catch_way=(i % 6) + 1, add_time=int(time.time()) - i * 86400,
             height=rng.randint(70, 200), weight=rng.randint(20000, 100000),
             voice=rng.randint(-100, 100), mutation_type=9 if i % 4 == 0 else (8 if i % 4 == 1 else 0),
             glass_type=2 if i % 7 == 0 else 1,
@@ -149,11 +153,14 @@ def build_demo_context(tmp: Path, count: int) -> AppContext:
 
     # 合成蛋仓（联查蛋目录：confId 取 eggs.json 的真实条目）
     egg_box = EggBoxRepository()
+    egg_box._account.observe(PlayerIdentity(101384922, "话绵雨", 60))
     catalog = EggCatalog(static_dir())
     conf_ids = [info.egg_conf_id for info in catalog.entries()][:8]
     import time as _time
     for i, conf_id in enumerate(conf_ids):
         hatching = i % 3 == 0
+        if hatching:
+            egg_box._hatch_slots.add(9000 + i)
         hatch_total = 43200 if i % 2 else 28800
         egg_box._eggs[9000 + i] = EggBoxEntry(
             instance_id=9000 + i, egg_conf_id=conf_id, pet_conf_id=0, quantity=(i % 3) + 1,
@@ -165,6 +172,8 @@ def build_demo_context(tmp: Path, count: int) -> AppContext:
             category=6, special_egg_conf_id=0, appearance_type=0, extension_type=0,
         )
     egg_box._version += 1
+    egg_box._source = "observed"
+    egg_box._slots_source = "observed"
 
     settings = SettingsRepository(tmp / "config.json")
     capture_vm = CaptureViewModel(

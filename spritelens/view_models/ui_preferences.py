@@ -10,13 +10,14 @@ VIEWS = frozenset({"point", "card", "table"})
 IMAGE_MODES = frozenset({"portrait", "artwork"})
 FIELDS = ("groups", "height", "weight", "voice", "positions")
 SHORTCUT_KEYS = frozenset({"search", "level_min", "level_max", "natures", "types", "talent_min", "gender", "egg_groups", "egg_mode",
+    "pool", "pool_mode", "shiny", "colorful", "medal", "marks", "speciality", "acquisition", "captured_days",
     "height_min", "height_max", "weight_min", "weight_max", "voice_min", "voice_max",
     "height_position_min", "height_position_max", "weight_position_min", "weight_position_max"})
 
 
 def validate_shortcuts(raw: object) -> list:
-    if not isinstance(raw, list) or len(raw) > 6:
-        raise ValueError("最多保存六组快捷条件")
+    if not isinstance(raw, list) or len(raw) > 256:
+        raise ValueError("最多保存256组快捷条件")
     result = []
     for item in raw:
         if not isinstance(item, dict) or set(item) != {"name", "filters"}:
@@ -27,7 +28,17 @@ def validate_shortcuts(raw: object) -> list:
         if not isinstance(filters, dict) or set(filters) - SHORTCUT_KEYS:
             raise ValueError("快捷条件字段无效")
         for key, value in filters.items():
-            if key in ("natures", "types", "egg_groups"):
+            if key in ("shiny", "colorful"):
+                valid = type(value) is bool
+            elif key == "pool_mode":
+                valid = value in ("and", "or")
+            elif key in ("pool", "marks"):
+                from spritelens.domain.pet_conditions import MARK_NAMES, POOL_KEYS
+                allowed = POOL_KEYS if key == "pool" else MARK_NAMES
+                valid = isinstance(value, list) and all(isinstance(item, str) and item in allowed for item in value)
+            elif key in ("medal", "speciality", "acquisition", "captured_days"):
+                valid = type(value) is int and value >= 0 and (key != "captured_days" or value in (0, 1, 3, 7))
+            elif key in ("natures", "types", "egg_groups"):
                 expected = int if key == "natures" else str
                 valid = isinstance(value, list) and len(value) <= 50 and all(type(v) is expected and (v >= 0 if expected is int else 0 < len(v) <= 40) for v in value)
             elif key in ("search", "egg_mode"):

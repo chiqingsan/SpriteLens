@@ -85,7 +85,7 @@ class PreferencesTest(unittest.TestCase):
                 self.vm.update({"shortcuts": [{"name": "bad", "filters": filters}]})
         self.assertEqual(self.vm.snapshot()["shortcuts"], [valid])
         with self.assertRaises(ValueError):
-            self.vm.update({"shortcuts": [valid] * 7})
+            self.vm.update({"shortcuts": [valid] * 257})
 
 
 class MeasurementsTest(unittest.TestCase):
@@ -165,9 +165,12 @@ class UpgradeAPITest(unittest.TestCase):
             replace(_pet(3, name="C", level=60, base_conf=3001), height=90, weight=8000, voice=0),
         ))
         (root / "species.json").write_text(json.dumps({
-            "3001": {"name": "A", "egg_groups": ["植物", "精灵"], "height_range": [53, 75], "weight_range": [3620, 4600]},
+            "3001": {"name": "A", "display_name": "物种甲", "dex_no": 9876, "egg_groups": ["植物", "精灵"], "height_range": [53, 75], "weight_range": [3620, 4600]},
             "3002": {"name": "B", "egg_groups": ["精灵"]},
         }), encoding="utf-8")
+        (root / "natures.json").write_text(json.dumps({"1": {"name": "合成性格"}, "99": {"name": "未持有性格"}}), encoding="utf-8")
+        (root / "types.json").write_text(json.dumps({"1": {"name": "未持有系别"}}), encoding="utf-8")
+        (root / "medals.json").write_text(json.dumps({"1001": "未佩戴奖牌"}), encoding="utf-8")
         cls.ctx.static_data = StaticData(root)
         cls.ctx.pet_vm = PetViewModel(cls.ctx.pet_repository, cls.ctx.static_data)
         cls.ctx.egg_catalog = EggCatalog(ROOT / "data/static")
@@ -186,13 +189,35 @@ class UpgradeAPITest(unittest.TestCase):
         self.assertEqual(status, 200)
         return payload
 
+    def test_search_species_dex_and_egg_group_with_other_conditions(self):
+        for search in ("物种甲", "9876", "植物"):
+            self.assertEqual([pet["gid"] for pet in self.get_pets(search=search)["pets"]], [1, 3])
+        self.assertEqual([pet["gid"] for pet in self.get_pets(search="植物", voice_max=-10)["pets"]], [1])
+
+    def test_filter_options_include_catalog_choices_not_owned_yet(self):
+        options = self.get_pets()["options"]
+        self.assertIn({"id": 99, "name": "未持有性格"}, options["natures"])
+        self.assertIn("未持有系别", options["types"])
+        self.assertIn({"id": 1001, "name": "未佩戴奖牌"}, options["medals"])
+
+    def test_slider_limits_use_full_inventory_even_after_filtering(self):
+        limits = self.get_pets()["options"]["measurement_limits"]
+        self.assertEqual(limits, {"height": {"min": 0, "max": 1}, "weight": {"min": 0, "max": 8}, "voice": {"min": -100, "max": 100}})
+        self.assertEqual(self.get_pets(search="A")["options"]["measurement_limits"], limits)
+
     def test_any_all_and_combined_range_reset(self):
-        self.assertEqual(self.get_pets(egg_groups="植物,精灵", egg_mode="any")["shown"], 3)
-        self.assertEqual(self.get_pets(egg_groups="植物,精灵", egg_mode="all")["shown"], 2)
+        self.assertEqual(self.get_pets(egg_groups="植物,精灵", pool_mode="or")["shown"], 3)
+        self.assertEqual(self.get_pets(egg_groups="植物,精灵", pool_mode="and")["shown"], 2)
         payload = self.get_pets(egg_groups="植物", height_min=.6, height_max=.7, weight_max=5, voice_max=-10, first_catch=1)
         self.assertEqual([x["gid"] for x in payload["pets"]], [1])
         self.assertEqual(self.get_pets()["shown"], 3)
         self.assertFalse(self.ctx.pet_vm.filters.active)
+
+    def test_pool_mode_applies_to_each_detail_condition(self):
+        self.assertEqual(self.get_pets(level_min=60, voice_min=20, pool_mode="and")["shown"], 0)
+        self.assertEqual(self.get_pets(level_min=60, voice_min=20, pool_mode="or")["shown"], 3)
+        self.assertEqual(self.get_pets(search="a", level_min=60, voice_min=20, pool_mode="or")["shown"], 2)
+        self.assertEqual(self.get_pets(voice_min=20, pool_mode="or")["shown"], 1)
 
     def test_egg_search_uses_display_name_when_name_key_is_missing(self):
         result = egg_dex_payload(self.ctx.egg_catalog, search="云梦豚")

@@ -13,19 +13,10 @@ from __future__ import annotations
 import unittest
 
 import spritelens.paths as paths
-from spritelens.web.server import STATIC_DIR
 
 
 class PackagedAssetsTest(unittest.TestCase):
     """随包分发的资源必须真实存在（打包漏带/被 gitignore 误伤都会红灯）。"""
-
-    def test_frontend_static_dir_exists(self):
-        self.assertTrue(STATIC_DIR.is_dir(), f"前端静态目录缺失: {STATIC_DIR}")
-
-    def test_frontend_entry_files_exist(self):
-        for name in ("index.html", "boot.js", "ui.js", "app.js", "app.css", "ui.css", "themes.css", "appearance.js", "pet-presentation.js", "pet-filters.js", "backpack-controls.js", "icons.js", "icons/sprite.svg"):
-            with self.subTest(file=name):
-                self.assertTrue((STATIC_DIR / name).is_file(), f"前端文件缺失: {name}")
 
     def test_static_tables_exist(self):
         static_dir = paths.static_dir()

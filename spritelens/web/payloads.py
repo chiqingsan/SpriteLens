@@ -7,12 +7,12 @@ from __future__ import annotations
 
 from spritelens.domain.pets import Pet
 from spritelens.domain.static_data import StaticData
-from spritelens.services.pet_repository import PetRepository
-from spritelens.view_models.pet_vm import SORT_KEYS, PetViewModel
+from spritelens.view_models.pet_vm import SORT_KEYS, PetView, PetViewModel
 from spritelens.domain.display import STAT_LABELS, TALENT_RANK_COLORS, TYPE_COLORS
 from spritelens.domain.measurements import range_position, range_text
 from spritelens.web.pet_media import pet_images
 from spritelens.domain.pet_marks import pet_marks
+from spritelens.domain.pet_conditions import ACQUISITION_NAMES
 
 
 def _stat_bars(pet: Pet, peak: int) -> tuple[dict, ...]:
@@ -99,6 +99,7 @@ def pet_row(
         **pet_images(pet.base_conf_id, bool(pet.mutation_type & 1)),
         "color_card": color_catalog.effect_for(pet.glass_type, pet.glass_value) if color_catalog and pet.mutation_type & 8 else None,
         "worn_medal_id": pet.worn_medal_id,
+        "catch_way": pet.catch_way, "add_time": pet.add_time,
         "medal_marks": pet_marks(pet, weight_range),
         "worn_medal_name": static.medal_name(pet.worn_medal_id) if static and pet.worn_medal_id else (f"奖牌 #{pet.worn_medal_id}" if pet.worn_medal_id else ""),
         "height_text": f"{pet.height / 100:.2f} m" if pet.height else "暂无数据",
@@ -137,12 +138,15 @@ def _glass_colors(pet: Pet, catalog) -> list[str] | None:
 
 
 def pets_payload(
-    vm: PetViewModel,
+    vm: PetViewModel | PetView,
     static: StaticData | None,
     color_catalog=None,
     egg_catalog=None,
 ) -> dict:
     """宠物列表页载荷：行数据 + 可选值与当前筛选状态（一次给全）。"""
+    if isinstance(vm, PetViewModel):
+        sort_key, sort_desc = vm.sort_state
+        vm = vm.view_with(vm.filters, sort_key, descending=sort_desc)
     pets = vm.filtered_pets()
     height_max = max((p.height for p in pets), default=0)
     weight_max = max((p.weight for p in pets), default=0)
@@ -175,6 +179,7 @@ def pets_payload(
             "unlocated_shown": sum(gid not in located_gids for gid in matched),
             "filtering": filters.active,
         },
+        "uid": vm.uid,
         "version": vm.version(),
         "filters": {
             "search": filters.search,
@@ -186,6 +191,10 @@ def pets_payload(
             "gender": filters.gender,
             "egg_groups": sorted(filters.egg_groups),
             "egg_mode": filters.egg_mode,
+            "pool": sorted(filters.pool), "pool_mode": filters.pool_mode,
+            "shiny": filters.shiny, "colorful": filters.colorful,
+            "medal": filters.medal, "marks": sorted(filters.marks), "speciality": filters.speciality,
+            "acquisition": filters.acquisition, "captured_days": filters.captured_days,
             **{key: getattr(filters, key) for key in ("height_min", "height_max", "weight_min", "weight_max", "voice_min", "voice_max",
                 "height_position_min", "height_position_max", "weight_position_min", "weight_position_max")},
         },
@@ -193,20 +202,32 @@ def pets_payload(
         "options": {
             "natures": [{"id": i, "name": n} for i, n in vm.nature_options()],
             "types": list(vm.type_options()),
+            "type_icons": {info.name: f"/static/type-icons/type-{key}.png" for key, info in static.type_items()} if static else {},
             "egg_groups": list(vm.egg_group_options()),
             "sorts": [{"key": k, "label": label} for k, label in SORT_KEYS],
             "talent_max": vm.talent_rank_max(),
+            "measurement_limits": vm.measurement_limits(),
+            "medals": [{"id": key, "name": static.medal_name(key) if static else f"奖牌 #{key}"}
+                       for key in sorted(({key for key, _ in static.medal_items()} if static else set())
+                                         | {pet.worn_medal_id for pet in vm.all_pets() if pet.worn_medal_id})],
+            "specialities": [{"id": key, "name": static.speciality_name(key) if static else f"特性 #{key}"}
+                            for key in sorted(({key for key, _ in static.speciality_items()} if static else set())
+                                              | {pet.speciality_id for pet in vm.all_pets() if pet.speciality_id})],
             "stat_labels": [label for _, label in STAT_LABELS],
+            "acquisitions": [{"id": key, "name": ACQUISITION_NAMES.get(key, f"方式 #{key}")}
+                             for key in sorted(set(ACQUISITION_NAMES) | {pet.catch_way for pet in vm.all_pets() if pet.catch_way})],
         },
     }
 
 
-def overview_payload(vm: PetViewModel, repository: PetRepository, static: StaticData | None) -> dict:
-    """概览载荷：账号身份 + 聚合统计 + 静态表状态。"""
+def pet_summary_payload(vm: PetView, static: StaticData | None) -> dict:
+    """同一宠物快照的归属、身份与统计，供概览和 WS/REST state 共用。"""
     stats = vm.stats()
-    identity = repository.identity
-    cached = repository.cached_identity
+    identity = vm.identity
+    cached = vm.cached_identity
     return {
+        "uid": vm.uid,
+        "version": vm.version(),
         "identity": (
             {"uid": identity.uid, "name": identity.name, "level": identity.level}
             if identity is not None
@@ -222,6 +243,13 @@ def overview_payload(vm: PetViewModel, repository: PetRepository, static: Static
                 for name, count in stats.type_counts
             ],
         },
+    }
+
+
+def overview_payload(vm: PetView, static: StaticData | None) -> dict:
+    """概览载荷：快照内身份/统计 + 独立静态表状态与历史账号列表。"""
+    return {
+        **pet_summary_payload(vm, static),
         "static_ready": bool(static is not None and static.available),
         "accounts": [{"uid": uid, "name": name} for uid, name in vm.cached_accounts()],
     }

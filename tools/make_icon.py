@@ -1,4 +1,4 @@
-"""生成应用图标 resources/app.ico（品牌 teal + 放大镜语义，对应 SpriteLens）。
+"""从确认的好奇版头像 PNG 生成应用图标 resources/app.ico。
 
 图标为多尺寸 .ico（16/24/32/48/64/128/256），供窗口标题栏、任务栏与
 浏览器标签页复用。运行一次即可，产物入库；改设计后重跑覆盖。
@@ -14,28 +14,16 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "resources" / "app.ico"
-SOURCE = ROOT / "resources" / "icon_source.jpg"
+SOURCE = ROOT / "resources" / "icon_source.png"
 FAVICON = ROOT / "spritelens" / "web" / "static" / "favicon.png"
 
 SIZES = (16, 24, 32, 48, 64, 128, 256)
 
 
 def _load_canvas() -> Image.Image:
-    """加载源图：白底转透明（容差渐变保边缘平滑）、裁剪内容区、方形化居中。"""
-    src = Image.open(SOURCE).convert("RGBA")
-    px = src.load()
-    w, h = src.size
-    for y in range(h):
-        for x in range(w):
-            r, g, b, _ = px[x, y]
-            whiteness = min(r, g, b)
-            if whiteness >= 245 and max(r, g, b) - whiteness <= 12:
-                px[x, y] = (r, g, b, 0)
-    src = src.crop(src.getbbox())
-    side = max(src.size)
-    canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-    canvas.paste(src, ((side - src.width) // 2, (side - src.height) // 2), src)
-    return canvas
+    """保留已确认方形 PNG 的背景与高光，不再按颜色抠除白色。"""
+    with Image.open(SOURCE) as source:
+        return source.convert("RGBA")
 
 
 def main() -> int:

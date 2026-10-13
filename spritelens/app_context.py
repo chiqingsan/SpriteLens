@@ -77,7 +77,6 @@ class AppContext:
         """
         if self._closed:
             return
-        self._closed = True
         failures: list[tuple[str, BaseException]] = []
 
         def _try(label: str, action) -> None:
@@ -87,7 +86,15 @@ class AppContext:
                 failures.append((label, exc))
                 logger.warning("关闭 %s 失败: %s", label, exc)
 
-        _try("采集", self.capture_vm.stop)
+        try:
+            self.capture_vm.stop()
+        except TimeoutError:
+            # 旧回调仍可能访问日志/Store/DB；保持可重试，不关闭其下游。
+            logger.warning("采集未确认停止，延后关闭存储资源")
+            raise
+        except Exception as exc:
+            failures.append(("采集", exc))
+        self._closed = True
         if self.event_log is not None:
             _try("事件日志", self.event_log.close)
         if self.pet_store is not None:
@@ -122,6 +129,9 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
         for cleanup in reversed(created):
             try:
                 cleanup()
+            except TimeoutError:
+                logger.warning("装配回滚仍有活跃采集，保留下游资源")
+                break
             except Exception as exc:  # noqa: BLE001 - 回滚失败不阻断其余清理
                 logger.warning("装配回滚清理失败: %s", exc)
         raise

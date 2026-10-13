@@ -5,6 +5,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 from spritelens.domain.egg_box import EggBoxEntry, extract_eggs, extract_hatch_slots
 from spritelens.domain.eggs import EggCatalog
@@ -472,10 +473,8 @@ class MaleMatrixPayloadTests(unittest.TestCase):
 
     def test_matrix_cells(self) -> None:
         class Repo:
-            def snapshot(self):
-                return [
-                    self._p1, self._p2, self._p3,
-                ]
+            def consistent_snapshot(self):
+                return SimpleNamespace(pets=(self._p1, self._p2, self._p3), uid=0, version=0)
         repo = Repo()
         repo._p1 = self._pet(1, "喵喵A", 1, 1, 3001)   # 动物组/拟人组
         repo._p2 = self._pet(2, "喵喵B", 1, 2, 3001)   # 同性格雌性
@@ -502,8 +501,8 @@ class MaleMatrixPayloadTests(unittest.TestCase):
 
     def test_gender_filter(self) -> None:
         class Repo:
-            def snapshot(self):
-                return [self._p1, self._p2]
+            def consistent_snapshot(self):
+                return SimpleNamespace(pets=(self._p1, self._p2), uid=0, version=0)
         repo = Repo()
         repo._p1 = self._pet(1, "A", 1, 1, 3001)
         repo._p2 = self._pet(2, "B", 1, 2, 3001)
@@ -564,8 +563,8 @@ class ColorCardTests(unittest.TestCase):
         from spritelens.web.payloads import colors_payload
 
         class Repo:
-            def snapshot(self):
-                return [self._p]
+            def consistent_snapshot(self):
+                return SimpleNamespace(pets=(self._p,), uid=0, version=0)
         repo = Repo()
         repo._p = self._pet(1, "菊花梨", 1, 1)  # glass 1×1048605 → 卡 29
 

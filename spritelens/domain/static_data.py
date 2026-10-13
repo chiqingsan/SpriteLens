@@ -112,9 +112,13 @@ class StaticData:
     def medal_name(self, medal_id: int) -> str:
         return str(self._medals.get(str(medal_id)) or f"奖牌 #{medal_id}")
 
+    def speciality_name(self, speciality_id: int) -> str:
+        return str(self._specialities.get(str(speciality_id)) or f"特性 #{speciality_id}")
+
     def __init__(self, directory: Path | None) -> None:
         self.directory = directory
         self._medals = _load_table(directory, "medals.json") if directory and (directory / "medals.json").is_file() else {}
+        self._specialities = _load_table(directory, "specialities.json") if directory and (directory / "specialities.json").is_file() else {}
         self._species: dict[str, SpeciesInfo] = {}
         self._natures: dict[int, NatureInfo] = {}
         self._types: dict[int, TypeInfo] = {}
@@ -243,6 +247,21 @@ class StaticData:
 
     def nature(self, nature_id: int) -> NatureInfo | None:
         return self._natures.get(nature_id)
+
+    def nature_items(self) -> tuple[tuple[int, NatureInfo], ...]:
+        """完整已加载性格目录，不受当前背包出现频次限制。"""
+        return tuple(sorted(self._natures.items()))
+
+    def type_items(self) -> tuple[tuple[int, TypeInfo], ...]:
+        return tuple(sorted(self._types.items()))
+
+    def medal_items(self) -> tuple[tuple[int, str], ...]:
+        return tuple(sorted((int(key), name) for key, name in self._medals.items()
+                            if key.isdecimal() and isinstance(name, str)))
+
+    def speciality_items(self) -> tuple[tuple[int, str], ...]:
+        return tuple(sorted((int(key), name) for key, name in self._specialities.items()
+                            if key.isdecimal() and isinstance(name, str)))
 
     def nature_name(self, nature_id: int, fallback: str = "") -> str:
         info = self._natures.get(nature_id)

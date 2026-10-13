@@ -13,13 +13,24 @@
 6. `CODEBASE_MAP.md` — 文件级代码地图
 7. `PROTOCOL_NOTES.md` — 排障自查清单、未解事项、版本适配指引
 8. `UI_GUIDE.md` — 前端视觉与组件规范（改 UI 前必读：token 速查/组件清单/反面清单）
-9. [VUE3_MIGRATION.md](VUE3_MIGRATION.md) — 已确认的 Vue 3 技术方向、配套工程、接口/状态与逐页迁移边界（待实施）
+9. [VUE3_MIGRATION.md](VUE3_MIGRATION.md) — 已确认的 Vue 3 技术方向、配套工程、接口/状态与逐页迁移边界（工程与蛋图鉴已落地）
+
+- [FRONTEND_DEVELOPMENT.md](FRONTEND_DEVELOPMENT.md) — 前端安装/构建/验收、生成文件与临时桥所有权
+- [reviews/VUE_EGG_DEX_VERIFICATION_2026-10-13.md](reviews/VUE_EGG_DEX_VERIFICATION_2026-10-13.md) — F00/V01/V02 实施范围与本机验证，WebView2/exe 待验收
+- [reviews/PET_SNAPSHOT_VERIFICATION_2026-10-13.md](reviews/PET_SNAPSHOT_VERIFICATION_2026-10-13.md) — F01 宠物响应/选项/身份同源、bootstrap 单次快照与离线归属
+- [reviews/ACCOUNT_DOMAIN_VERIFICATION_2026-10-13.md](reviews/ACCOUNT_DOMAIN_VERIFICATION_2026-10-13.md) — F02 三域单次快照、跨域归属、历史恢复与原生账号页旧请求失效
+- [reviews/VUE_PET_FILTERS_VERIFICATION_2026-10-13.md](reviews/VUE_PET_FILTERS_VERIFICATION_2026-10-13.md) — F03 基础筛选切片、单一状态/DOM 所有者、快捷恢复与防抖旧请求失效
+- [reviews/F03_ACCEPTANCE_2026-10-13.md](reviews/F03_ACCEPTANCE_2026-10-13.md) — 完整宠物页交付范围、自动化证据与统一人工验收清单
+- [reviews/VUE_PET_INVENTORY_VERIFICATION_2026-10-13.md](reviews/VUE_PET_INVENTORY_VERIFICATION_2026-10-13.md) — F03 请求/三视图/分页/箱队迁移、账号失效、槽位语义与原生详情定位桥
+- [reviews/ASSET_SIZE_AUDIT_2026-10-13.md](reviews/ASSET_SIZE_AUDIT_2026-10-13.md) — 素材体积/完全重复/运行引用与压缩副本实测；正式资源尚未修改
 
 方向与决策（按需查阅）：
 
 - [reviews/PROJECT_REVIEW_2026-10-12.md](reviews/PROJECT_REVIEW_2026-10-12.md) — `114be08` 全项目初审快照；当前修复状态见路线图
 - [reviews/ARCHITECTURE_FOLLOWUP_2026-10-13.md](reviews/ARCHITECTURE_FOLLOWUP_2026-10-13.md) — `240b94c` 改动复核：录制回归、生命周期/HTTP 缺口与完成范围校正
 - [reviews/GLM_DELIVERY_REVIEW_2026-10-13.md](reviews/GLM_DELIVERY_REVIEW_2026-10-13.md) — `a106044` 交付复核：启动阻断、并发/停止/HTTP 返修证据与门禁边界
+- [reviews/GLM_RECHECK_2026-10-13.md](reviews/GLM_RECHECK_2026-10-13.md) — `477bd75` 返修二次复核：启动已恢复，剩余 HTTP 阻塞、停止确认/所有权与失败分类
+- [reviews/RUNTIME_REPAIR_VERIFICATION_2026-10-13.md](reviews/RUNTIME_REPAIR_VERIFICATION_2026-10-13.md) — E01–E06 实施复验：状态读取、停止重试/下游保护、错误分类与工程门禁
 
 - `ARCHITECTURE_DECISION.md` — 架构决策：目标形态（pywebview + 本地服务 + Web UI）、
   Tauri 评估、阶段划分与量化判据

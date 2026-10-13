@@ -2,6 +2,11 @@
 __pycache__/
 *.py[cod]
 .venv/
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+spritelens/web/static/vue/
 .pytest_cache/
 
 # 运行时产物：日志 / 录制帧 / 密钥均含本地敏感信息

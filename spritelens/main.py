@@ -109,7 +109,11 @@ def _smoke_check_assets() -> int:
         else:
             failures.append(f"{label}缺失: {path}")
 
-    for name in ("index.html", "boot.js", "ui.js", "app.js", "app.css", "ui.css", "themes.css", "appearance.js", "pet-presentation.js", "pet-filters.js", "backpack-controls.js", "icons.js", "icons/sprite.svg", "pages/egg-dex.js"):
+    from spritelens.web.frontend_assets import check_frontend_assets
+    failures.extend(check_frontend_assets(STATIC_DIR / "vue"))
+    if not (STATIC_DIR / "account-requests.js").is_file():
+        failures.append("前端文件缺失: account-requests.js")
+    for name in ("index.html", "boot.js", "desktop-shell.js", "desktop-shell.css", "ui.js", "app.js", "app.css", "ui.css", "themes.css", "appearance.js", "pet-presentation.js", "icons.js", "icons/sprite.svg", "vue/entry.js"):
         if not (STATIC_DIR / name).is_file():
             failures.append(f"前端文件缺失: {STATIC_DIR / name}")
 

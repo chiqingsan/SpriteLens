@@ -4,7 +4,7 @@
 
 界面形态：**只有 Web 一套**（pywebview 窗口 + 本地服务 + 原生 JS 前端）；
 历史 PyQt 原生界面已于 2026-10 退役，`requirements.txt` 不再含 PyQt6。
-Vue 3 + TypeScript + Vite 已确认采用，工程尚未创建；下表描述当前文件，规划见 `VUE3_MIGRATION.md`。
+Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEND_DEVELOPMENT.md`，后续迁页见 `VUE3_MIGRATION.md`。
 
 ## 根目录
 
@@ -32,9 +32,15 @@ Vue 3 + TypeScript + Vite 已确认采用，工程尚未创建；下表描述当
 | `tools/run_web_demo.py` | 带合成数据的界面实例（浏览器打开，视觉验收用） |
 | `tools/make_icon.py` | 生成 `resources/app.ico` 多尺寸图标与 favicon（PIL，产物入库） |
 | `resources/app.ico` | 应用图标（窗口/任务栏用，打包时随包分发） |
+| `resources/icon_source.png` | 已确认的好奇版头像源图，供 `tools/make_icon.py` 派生 ICO 与 favicon |
+| `spritelens/web/desktop_shell.py` | 自绘标题栏 JS 桥、WebView2原生拖动区域、保留系统动画的窗口消息回调、原生状态、最大化工作区与边缘缩放 |
+| `spritelens/web/startup_cover.py` | 桌面启动唯一可见面板：静态图标与文案，首屏就绪才揭开；失败/20 秒超时原地重试，closing 释放资源 |
+| `frontend/browser/startup.spec.ts` | 初始数据/模块等待、原生桥早晚就绪与失败通知、浏览器样式失败重试及减少动画验收 |
+| `spritelens/web/static/desktop-shell.js` / `desktop-shell.css` | 桌面顶栏、窗口操作与缩放边缘；浏览器模式隐藏 |
+| `frontend/browser/desktopShell.spec.ts` | 顶栏交互、原生状态同步、浏览器隐藏与启动失败时关闭验收 |
 | `data/schemas/` | 外挂 schema：`opcodes.json` + `messages/*.json`（字段级合并） |
-| `data/static/` | 静态映射：`species/natures/types/skills/type_chart/eggs/medals/flower_levels/color_cards.json` + 各 `_meta.json` |
-| `spritelens/web/static/` | 前端资源：`index.html`（分组导航骨架）/ `boot.js`（启动自恢复链）/ `app.css`（布局与组件 token）/ `themes.css`（三套主题色值）/ `app.js`（数据渲染）/ `ui.css` / `ui.js`（详情抽屉、键盘与焦点）/ `appearance.js`（主题与显示偏好）/ `pet-presentation.js`（头像/色卡/标记渲染）/ `pet-filters.js`（蛋组与范围筛选）/ `backpack-controls.js`（快捷条件）/ `icons.js` + `icons/`（本地 SVG sprite）/ `favicon.png` / `pet-media/`（官方头像立绘，含 `-fit` 派生）/ `pets/`（兜底立绘）/ `type-icons/` `egg-icons/` `medal-icons/` `medals/` `rarity/` `color-cards/` |
+| `data/static/` | 静态映射：`species/natures/types/skills/type_chart/eggs/medals/specialities/flower_levels/color_cards.json` + 各 `_meta.json`；特性来源见 `_specialities_meta.json` |
+| `spritelens/web/static/` | 前端资源：`index.html`（分组导航骨架）/ `boot.js`（启动自恢复链）/ `app.css`（布局与组件 token）/ `themes.css`（三套主题色值）/ `app.js`（数据渲染）/ `ui.css` / `ui.js`（详情抽屉、键盘与焦点）/ `appearance.js`（主题与显示偏好）/ `pet-presentation.js`（头像/色卡/标记渲染）/ `icons.js` + `icons/`（本地 SVG sprite）/ `favicon.png` / `pet-media/`（官方头像立绘，含 `-fit` 派生）/ `pets/`（兜底立绘）/ `type-icons/` `egg-icons/` `medal-icons/` `medals/` `rarity/` `color-cards/` |
 | `data/recordings/` | 运行时录制产物（gitignore；本地回放样例不在版本库） |
 
 ## 维护与审查文档
@@ -47,6 +53,8 @@ Vue 3 + TypeScript + Vite 已确认采用，工程尚未创建；下表描述当
 | `docs/reviews/PROJECT_REVIEW_2026-10-12.md` | 基于114be08的审查快照、复现证据与资源/文档风险；不代表已修复 |
 | `docs/reviews/ARCHITECTURE_FOLLOWUP_2026-10-13.md` | 基于240b94c的改动复核、确定性复现与完成范围校正 |
 | `docs/reviews/GLM_DELIVERY_REVIEW_2026-10-13.md` | 基于a106044的交付复核、启动/并发/生命周期/HTTP 返修证据与门禁边界 |
+| `docs/reviews/GLM_RECHECK_2026-10-13.md` | 基于477bd75的返修复核、已修范围及事件循环/停止/失败语义剩余证据 |
+| `docs/reviews/RUNTIME_REPAIR_VERIFICATION_2026-10-13.md` | E01–E06 的本轮实现、受控回归与真实装配复验边界 |
 
 路线图中的新模块路径是规划，尚未加入下面的当前源码地图。
 
@@ -95,16 +103,16 @@ Vue 3 + TypeScript + Vite 已确认采用，工程尚未创建；下表描述当
 | `services/monitor_service.py` | 采集管线编排：字节流 → 帧 → 解密 → 解码 → PacketEvent；会话释放/空闲回收/硬上限 |
 | `services/capture_service.py` | 采集运行服务：接入层创建与生命周期、录制 tee、手动密钥、副作用命令串行化（阶段1.3 自 capture_vm 抽出） |
 | `services/session_tracker.py` | 会话表（LRU，支持 drop）与全局统计 |
-| `services/account_tracker.py` | 账号切换判定（uid 变化才清快照；同 uid 重复帧/离线加载登录不算切换） |
+| `services/account_tracker.py` | 账号切换判定；display_uid 是已加载/实时归属，写路径 uid 不变（同 uid 重复帧/离线加载登录不算切换） |
 | `services/pet_repository.py` | 宠物聚合、身份/切号、彩名学习与入库；consistent_snapshot 单次取齐宠物/箱位/位置/uid/version |
-| `services/egg_repository.py` | 蛋仓聚合（instance_id 去重 + 版本号 + 切号清空 + 入库出口） |
+| `services/egg_repository.py` | 蛋仓聚合；EggBoxSnapshot 一次取齐条目/槽/uid/version/历史来源，恢复 IO 竞争拒绝提交 |
 | `services/home_repository.py` | 家园聚合（快照覆盖 + 切号清空 + 增量帧版本提示） |
 | `services/flower_repository.py` | 花田聚合（快照覆盖 + 切号清空 + 版本号） |
 | `services/event_logger.py` | PacketEvent JSONL 异步落盘（有界队列 + worker 批量写，按天分片，复盘用） |
 | `recording/recorder.py` | StreamChunk jsonl 录制/读回 |
 | `recording/replay.py` | ReplaySource + CLI 回放摘要输出 |
 | `logs/local_logger.py` | 双文件 RotatingFileHandler + 崩溃兜底 `install_excepthook`（crash.log） |
-| `view_models/pet_vm.py` | 宠物 VM + 请求级 PetView；后者持一致快照在锁外筛选/排序，不改共享条件 |
+| `view_models/pet_vm.py` | 宠物 VM + 请求级 PetView；后者持一致快照在锁外筛选/排序/选项/统计，身份与 uid/version 同源 |
 | `view_models/ui_preferences.py` | UI 偏好 VM：主题/视图/显示字段/快捷条件白名单校验与快照 |
 | `view_models/capture_vm.py` | 采集页 VM（Npcap 安装状态机、自动采集开关、偏好持久化、快照组装；运行命令委托 capture_service） |
 | `view_models/events_vm.py` | 协议流页 VM（行视图/详情缓存） |
@@ -115,8 +123,25 @@ Vue 3 + TypeScript + Vite 已确认采用，工程尚未创建；下表描述当
 | `web/run.py` | 界面入口：pywebview 窗口（系统 WebView2）+ 单实例唤醒 + 降级提示 |
 | `web/payloads.py` | 宠物域载荷（宠物行/列表页/概览/箱位）+ 目录域兼容重导出（无 UI 依赖） |
 | `web/payloads_catalog.py` | 目录域载荷：图鉴/种公矩阵/花田/色卡/家园/蛋仓/蛋图鉴（阶段1.4 自 payloads.py 拆出） |
+| `web/account_state.py`、`web/static/account-requests.js` | F02：state 跨域归属核对与原生账号页请求取消/代次/序号/uid/域版本校验 |
 | `web/pet_media.py` | 物种 ID → 官方头像/立绘 URL 映射（pet_media.json，缺图回退 pets/ 兜底） |
-| `web/static/pages/egg-dex.js` | 蛋图鉴页模块：该页 state/load/render/bind（阶段1.6 自 app.js 抽出；协作函数显式注入，bind 幂等 + 请求序号防旧覆新） |
+| `frontend/src/pages/EggDexPage.vue`、`components/`、`composables/useEggDex.ts` | 蛋图鉴展示、详情与请求生命周期；局部状态、卸载/取消与代次失效 |
+| `frontend/src/components/PetBasicFilters.vue`、`composables/usePetFilters.ts`、`types/petFilters.ts` | F03 第一刀：基础筛选的唯一状态/DOM 所有者、防抖与 options 运行校验；相关 Vitest 同目录 |
+| `frontend/src/petFilterBridge.ts`、`frontend/browser/petFilters.spec.ts` | 原生页查询/恢复/清理/请求失效桥；真实 HTTP 筛选、快捷恢复、焦点、离页与防抖旧响应验证 |
+| `frontend/src/components/PetFiltersPanel.vue`、`PetAdvancedFilters.vue`、`PetShortcuts.vue` | 完整筛选、顶部AND/OR匹配与快捷追加；扩展状态在 usePetAdvancedFilters，条件运行契约在 types/petConditions.ts |
+| `frontend/src/components/DualRangeSlider.vue` | 等级、体型、声音与百分比共用双头滑动条；仅持有拖动量程，筛选状态仍在对应composable |
+| `frontend/src/components/PetDetail.vue`、`PetDetailPanel.vue`、`frontend/browser/petComplete.spec.ts` | 完整详情、定位、键盘/焦点与窄屏交互；完整页浏览器回归 |
+| `frontend/src/composables/usePets.ts`、`types/pets.ts`、`petInventoryBridge.ts` | F03 第二刀：请求与账号票据/DTO、快照/三视图/分页/箱队/选择；账号/偏好与应用壳桥 |
+| `frontend/src/components/PetInventory.vue`、`PetCards.vue`、`PetTable.vue`、`PetSlots.vue`、`PetBoxNavigation.vue` | 三视图、加载/错误重试、真实箱位/队伍、分页、键盘/焦点；Vue 独占节点 |
+| `frontend/src/components/PetAvatar.vue`、`PetMarks.vue`、`petDisplay.ts` | 安全模板展示本地头像/立绘、色卡/粒子、稀有/奖牌及 UI 格式；不复制 Python 业务规则 |
+| `frontend/src/petTestData.ts`、`composables/usePets.test.ts`、`components/PetInventory.test.ts`、`frontend/browser/petInventory.spec.ts` | 合成数据、异步/账号/DTO/槽位回归与大列表/多箱/详情定位浏览器验收 |
+| `frontend/src/api/client.ts`、`types/eggDex.ts` | 同源 token/取消/错误归一与页面 DTO 运行校验 |
+| `frontend/src/main.ts`、工程配置/锁文件、`browser/` | memory Router/Pinia 装配、strict TS/Vite/Vitest/ESLint 与 Playwright 合成验收 |
+| `tools/frontend.py`、`web/frontend_assets.py` | 暂存构建/专用目录发布、源指纹及运行产物清单/哈希校验 |
+| `tests/test_frontend_contract.py` | JSON→JS ID 精度与构建负例 |
+| `tests/test_desktop_startup.py` | 原生拖动设置、启动固定槽位、带桌面标识的重试URL与销毁后交接 |
+| `tests/test_pet_snapshot_contract.py` | F01：读取后切号，列表/选项/概览/REST/WS 与 bootstrap 的单响应同源、离线归属 |
+| `tests/test_account_domain_contract.py`、`tests/test_account_requests.py`、`tests/account_requests_cases.js`、`frontend/browser/accountDomains.spec.ts` | F02：切号交错、历史语义、恢复竞争与错误；浏览器旧响应/缓存清理与历史孵化显示 |
 
 ## tests/（unittest 平铺）
 
@@ -139,10 +164,12 @@ Vue 3 + TypeScript + Vite 已确认采用，工程尚未创建；下表描述当
 | `test_egg_box.py` | 蛋仓：形状搜索提取/拒收、聚合去重、SQLite roundtrip、写-behind 落盘、跨账号隔离、载荷联查、种公矩阵 |
 | `test_home.py` | 家园：居民/家具/窝提取、聚合与增量计数、载荷、花种提取与载荷 |
 | `test_desktop_shell.py` | 窗口几何 fit_window（DPI/工作区 clamp）、WebView2 env 覆盖检测 |
+| `test_app_icons.py` | 窗口大小图标消息、64 位句柄与图标加载失败回归 |
 | `test_nic_rank.py` | 活跃网卡排序（前置/保持原序/宽松匹配） |
 | `test_single_instance.py` | 单实例互斥锁唯一性、唤醒事件投递与消费、close 幂等 |
 | `test_persistence.py` | 身份识别（NPC 不误取）、写库/重开/加载、跨账号隔离、迁移事务/回滚/半迁移自修复、外观字段往返、彩名恢复、损坏恢复 |
 | `test_view_models.py` | VM 状态与命令（Capture/Events + 自动采集开关） |
+| `test_runtime_repair.py` | E01–E06：慢保存 HTTP/WS、停止所有权/下游保护、嗅探器退出、错误分类与缺工具门禁 |
 | `test_pet_locations.py` | 箱位：登录映射、空箱/部分箱、槽位匹配状态、队伍归属与槽序、切号/重启、历史与实时去重 |
 | `test_pet_presentation.py` | 头像 `-fit` 派生、尺寸/声音标记边界、旧偏好迁移、类型色卡解码 |
 | `test_session_resume.py` | 会话接续：服务端帧确认、流/密钥/序号不匹配、新握手与关闭失效、损坏缓存 |
@@ -162,7 +189,6 @@ Vue 3 + TypeScript + Vite 已确认采用，工程尚未创建；下表描述当
 | `domain/measurements.py` | cm/g参考范围转m/kg、范围位置与越界状态 |
 | `view_models/ui_preferences.py` | 主题/视图/显示字段白名单、非法配置降级与严格保存 |
 | `web/static/themes.css` / `appearance.js` | 三套浅色主题、即时切换、显示选项与保存反馈 |
-| `web/static/pet-filters.js` | 蛋组any/all和m/kg/dB绝对范围，接原有筛选与重置 |
 | `web/static/icons.js` / `icons/` | 本地Tabler SVG与sprite，29枚图标和MIT来源清单 |
 | `tools/sync_catalog_resources.py` | 保留有效值的ID合并、官方镜像校验、可重复资源导入与报告 |
 | `tools/sync_ui_icons.py` | 固定官方Git版本的少量SVG导入，无运行时网络依赖 |
@@ -178,7 +204,6 @@ Vue 3 + TypeScript + Vite 已确认采用，工程尚未创建；下表描述当
 | 文件 | 责任 |
 |---|---|
 | `domain/pet_locations.py` | Backpack/PetBox：完整30格箱表、普通3×6队伍、移动增量；区分零空格与未采集，排除客户端请求和特殊队伍，兼容旧位置快照 |
-| `web/static/backpack-controls.js` | 命名快捷条件、性格更多和折叠摘要，共用原有查询 |
 | `repositories/pet_store.py` | 当前佩戴奖牌与按账号Backpack v2快照异步落盘/恢复，沿用pet_locations表 |
 | `tests/test_pet_locations.py` | 登录协议映射、真实空箱/部分箱、固定槽匹配状态、普通队伍归属/槽序、切号/重启及历史与实时位置去重、登录后WebSocket推送回归 |
 | `tests/test_session_resume.py` | 原会话重启接续、服务端帧确认、流/密钥/序号不匹配、新握手/关闭失效及损坏缓存回归 |
@@ -188,3 +213,19 @@ Vue 3 + TypeScript + Vite 已确认采用，工程尚未创建；下表描述当
 偏好增加 `fields.positions` 与最多六组 `shortcuts` 定义；查询增加
 `height_position_min/max`、`weight_position_min/max`，排序增加身高/体重/声音。
 宠物载荷兼容增加 `location`、`worn_medal_id/name` 与 `is_colorful`。
+
+### F03-U1 定稿界面落点
+
+| 文件 | 职责 |
+|---|---|
+| `spritelens/domain/pet_conditions.py` | 全局AND/OR、异色炫彩/奖牌/参考快捷标记筛选，复用既有物种参考与卡片规则 |
+| `spritelens/web/pet_queries.py` | 新增筛选参数的 HTTP 输入边界；无共享状态写入 |
+| `spritelens/web/static/account-card.js` | 现有账号快照的卡片展示与窗口内 UID 隐藏；不参与账号归属或持久化 |
+| `spritelens/web/static/backpack-layout.css` | 定稿应用壳/宠物页布局、工具条与响应式几何，复用主题 tokens |
+| `tests/test_pet_ui_conditions.py` | 全局 AND/OR、真实奖牌与参考标记区别、非法查询拒绝 |
+| `frontend/browser/petLayout.spec.ts` | UID可见性、首用状态、双按钮筛选、详情共享宽度与窄窗账号弹出 |
+| `frontend/src/components/PetShortcutSettings.vue` | 原生dialog快捷设置：分组勾选具体选项、草稿、保存和关闭；沿用现有快捷偏好边界 |
+| `frontend/browser/petFilterPolish.spec.ts` | 图标资源、慢请求保留计数、快捷设置勾选/应用/取消、获取方式与日期、范围边界摘要 |
+| `tests/test_pet_acquisition.py` | PetData获得字段、简略更新保留已知信息、v8→v9库迁移、未知日期与全局AND/OR |
+
+新增本地 Tabler eye/eye-off/square/chevron-down 图标列入 `icons/sources.json` 与 `tools/sync_ui_icons.py`，沿用固定来源提交和MIT许可。

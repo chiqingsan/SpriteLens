@@ -87,6 +87,8 @@ class NpcapCaptureSource:
         # 停止超时的嗅探器句柄（D05）：scapy stop 默认无上限 join，卡住时
         # 不能把句柄当已退出丢掉；由 has_unfinished_sniffer 暴露诊断
         self._stale_sniffers: list[object] = []
+        self._sniffer_stop_threads: dict[int, threading.Thread] = {}
+        self._sniffer_stop_errors: dict[int, bool] = {}
         self._worker_join_timeout = _WORKER_JOIN_TIMEOUT
         self._sniffer_stop_budget = _SNIFFER_STOP_BUDGET
         self.dropped_chunks = 0
@@ -191,6 +193,10 @@ class NpcapCaptureSource:
         self._sniffer = None
         if sniffer is not None:
             self._stop_sniffer_bounded(sniffer)
+        for stale in list(self._stale_sniffers):
+            helper = self._sniffer_stop_threads.get(id(stale))
+            if stale is not sniffer and (helper is None or not helper.is_alive()):
+                self._stop_sniffer_bounded(stale)
         self._signal_worker_stop()
         # 停止后不再有 FIN/RST 事件，流表与重组缓冲在这里统一释放
         with self._flow_lock:
@@ -248,27 +254,41 @@ class NpcapCaptureSource:
             except Exception as exc:  # noqa: BLE001 - 停止失败不影响退出
                 error.append(exc)
             finally:
+                self._sniffer_stop_errors[id(sniffer)] = bool(error)
                 done.set()
 
         thread = threading.Thread(target=_runner, name="spritelens-sniffer-stop", daemon=True)
+        self._sniffer_stop_threads[id(sniffer)] = thread
+        if sniffer not in self._stale_sniffers:
+            self._stale_sniffers.append(sniffer)
         thread.start()
+        deadline = time.monotonic() + self._sniffer_stop_budget
         if not done.wait(timeout=self._sniffer_stop_budget):
             logger.warning(
                 "sniffer.stop 超出预算 %.1fs 未返回，句柄转 stale 留诊断", self._sniffer_stop_budget
             )
-            self._stale_sniffers.append(sniffer)
             return False
+        thread.join(timeout=max(0.0, deadline - time.monotonic()))
         if error:
             logger.warning("sniffer 停止异常: %s", error[0])
-        return True
+        return not self.has_unfinished_sniffer()
 
     def has_unfinished_sniffer(self) -> bool:
-        """是否有停止未确认的嗅探器句柄（判断当前用 running 状态收窄）。"""
-        active = [
-            sniffer
-            for sniffer in self._stale_sniffers
-            if getattr(sniffer, "running", False)
-        ]
+        """退出须同时确认 stop helper 与嗅探线程，running=False 不够。"""
+        active = []
+        for sniffer in self._stale_sniffers:
+            helper = self._sniffer_stop_threads.get(id(sniffer))
+            sniff_thread = getattr(sniffer, "thread", None)
+            if (
+                (helper is not None and helper.is_alive())
+                or (sniff_thread is not None and sniff_thread.is_alive())
+                or getattr(sniffer, "running", False)
+                or (sniff_thread is None and self._sniffer_stop_errors.get(id(sniffer), False))
+            ):
+                active.append(sniffer)
+            else:
+                self._sniffer_stop_threads.pop(id(sniffer), None)
+                self._sniffer_stop_errors.pop(id(sniffer), None)
         self._stale_sniffers = active
         return bool(active)
 

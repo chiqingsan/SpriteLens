@@ -82,7 +82,8 @@ web（aiohttp/pywebview）；protocol 不反向依赖 services/capture；线程�
 
 ## 前端约定（Vue 3 演进，现有 web/static 渐进迁移）
 
-Vue 3 + TypeScript strict + Vite 是已确认方向，当前生产页面仍为原生 JS。
+Vue 3 + TypeScript strict + Vite 已落地，蛋图鉴已迁移，其余生产页面仍为原生 JS。
+源码/demo/打包先 npm ci + tools/frontend.py build；命令与生成文件所有权见 [前端开发](FRONTEND_DEVELOPMENT.md)。
 工程、导航/状态、测试和发布边界见 [VUE3_MIGRATION](VUE3_MIGRATION.md)；按路线图逐页迁移，
 不要再把“零框架零构建”作为新增功能约束，也不要同时扩大原生实现和 Vue 实现。
 
@@ -140,8 +141,10 @@ Store 并发批次顺序、坏库备份失败保护与坏行隔离已有修复�
   打包后仍写 `%LOCALAPPDATA%`，绝不写进安装目录（Program Files 无写权限）
 - 包内自带的静态前端（`web/static/`）用 `Path(__file__).parent / "static"` 定位，
   打包器会把整个包目录搬走，这是唯一允许不经过 `project_root()` 的场景
-- **图标**：改设计后跑 `python tools/make_icon.py` 重新生成，
-  产物（`resources/app.ico`、`web/static/favicon.png`）随仓库提交
+- **图标**：源图为 `resources/icon_source.png`（好奇版头像，保留背景、大椭圆高光与眼底绿色亮面）。
+  改设计后跑 `python tools/make_icon.py`，生成 16/24/32/48/64/128/256px 的
+  `resources/app.ico` 与 `spritelens/web/static/favicon.png`，源图与产物随仓库提交。
+  窗口标题栏、任务栏、Alt-Tab、桌面快捷方式与 exe 共用 ICO；浏览器标签页与页面品牌标识共用 PNG。
 - **打包**：`build.bat` / `python build.py`（配置在 `build_config.toml`）。
   **不要排除 scapy 的任何子模块**——scapy 内部动态 import 多，静态排除会
   在打包产物里才暴露为运行时失败（实测排除 `as_resolvers` 让网卡枚举直接挂）
@@ -193,21 +196,34 @@ domain→services 豁免已移除；当前测试已检查根级 events 的源层
 - 旧 JavaScript 纯规则/请求时序可用 Node 测试；Vue 工程用 vue-tsc、Vitest/Vue Test Utils 与关键 Playwright 用例。
   语法/类型与资源检查不能替代浏览器交互；Chromium 验收不能代替 WebView2 发布实机验收
 
+### 测试取舍
+
+验证不等于新增测试。按本次行为变化和失败风险选择最少、有效的检查，不要求每个文件、组件、函数或分支都有测试。
+
+- 文案、样式、图标、布局及简单展示调整：差异检查与必要的页面目视验收即可，不新增自动化用例。
+- 内部重命名、局部整理或直接委托：优先复用已有相关测试，不写复述实现、检查私有字段或固定 DOM 结构的用例。
+- 新业务规则、对外契约变化、真实缺陷修复：现有测试未覆盖时，补能区分正确与错误行为的最小回归用例。
+- 账号/快照一致性、协议、持久化、线程与资源生命周期：针对本次涉及的失败或并发路径保留自动化验证，不枚举无关假设场景。
+- 同一行为优先在最合适的一层验证；只有跨层连接本身存在风险时才补集成或浏览器用例，不重复铺满各层。
+
 ### 测试分级（按改动范围选命令）
 
 | 改动范围 | 需要跑 |
 | --- | --- |
 | 文档 / 注释 | diff 与引用检查即可 |
-| 单一 domain / repository / view_model | 对应测试文件 + `compileall` |
+| 单一 domain / repository / view_model | 相关已有测试；按上述取舍决定是否新增用例 |
 | 协议层（frames/crypto/records/wire/schema） | `tools/run_build_tests.py`（协议是全链路地基） |
-| Web 前端 / 路由 / 组合根 | `run_build_tests.py` + `python -m spritelens --smoke-test` + 浏览器过一遍 |
-| Vue / TS / 前端构建（工程落地后） | 相关组件/规则测试 + 类型/ESLint 检查 + Vite 构建/引用检查；交互改动跑关键 Playwright；接口/入口变更加 Python/源码 smoke |
-| 持久化 schema / 打包入口 / 发布前 | 上面全部 |
+| 文案 / 样式 / 图标 / 简单展示 | diff、必要的资源引用检查与页面目视验收；Vue 源变化后构建 |
+| Web 路由 / 接口 | 相关请求/契约测试；涉及启动入口时加源码 smoke |
+| 组合根装配 | 完整门禁 + 源码 smoke；界面启动受影响时加 GUI 验收 |
+| Vue / TS 行为或前端构建 | 类型/ESLint + 构建/引用检查；选相关已有测试。新增复杂交互或跨组件时序按风险补关键浏览器用例，不要求每次跑全套 Playwright |
+| 持久化 schema / 打包入口 / 发布前 | 完整门禁；启动与打包加 smoke，发布加相关 GUI/实机验收 |
 | 资源导入 / 映射 | 对应工具与资源测试、JSON/图片/引用校验、覆盖/冲突差异；涉发布再做exe验收 |
 
 发布前统一用 `python tools/run_build_tests.py`（完整 unittest、递归 JS、HTML 引用、静态清单与依赖检查）。
 现有 JS 检查依赖 PATH 中可执行的 Node；安装 requirements-dev.txt 不会安装 Node。
-生命周期测试必须覆盖真实成功装配与受控失败/超时/重启，不能只断言异常类型或诊断句柄。
+缺 Node 的完整门禁必须失败，不能把跳过记成检查通过。
+生命周期行为发生变化时，验证受影响的成功装配、失败、超时或重启路径；不能只断言异常类型或诊断句柄。
 
 环境缺测试工具或依赖时，要在最终说明里明确写清楚"跳过什么、为什么"。
 
@@ -249,7 +265,7 @@ domain→services 豁免已移除；当前测试已检查根级 events 的源层
 范围：涉及模块、状态所有者、依赖方向、对外契约
 实现边界：最小改动；不扩大大文件职责/架构豁免；兼容与迁移条件
 失败分支：启动、运行、停止、写失败、并发/切号（按实际相关性列出）
-验收：先失败后通过的用例、相关测试、smoke/JS/交互或资源检查
+验收：按风险选择已有测试、必要回归用例或人工/静态检查；缺陷回归应能复现原问题
 交付：改动摘要、验证结果、未验证项、遗留编号、回退条件
 ```
 
@@ -260,6 +276,8 @@ domain→services 豁免已移除；当前测试已检查根级 events 的源层
   快照状态锁保持短小，序列化/渲染在锁外；不得把“锁内零 IO”误用于所有类型的锁。
 - **资源生命周期**：创建即登记释放，成功装配后转交唯一所有者；失败回滚、正常退出与重复关闭分别测试。
   超时返回不代表 worker 已退；没有清理证据不能丢掉句柄或宣告数据保存成功。
+  采集停止默认等待预算 12s，HTTP 服务停止 5s；超时保留唯一清理线程/任务并允许重试。
+  旧采集回调或 HTTP 服务尚未确认退出时，下游日志/Store/DB 延后关闭，不能以逐项容错为由关闭仍在使用的资源。
 - **数据读契约**：返回同域的 uid/version/业务数据快照，静态配置独立；跨域检查归属，保留历史、不完整与未知。
   frozen 外壳不保护内层 dict，读取方不得修改；不靠多次带锁 getter 拼响应。
 - **页面与请求**：页面自持状态、加载与绑定；导航/推送只分发。绑定幂等，账号相关请求能失效，旧响应不能覆盖新账号。
