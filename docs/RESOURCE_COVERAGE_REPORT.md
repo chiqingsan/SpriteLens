@@ -24,6 +24,7 @@
 - 蛋：`assets/catalog/eggData.json`，495个形态条目去重为224种蛋；去重前提取477个baseId别名，进化形态可查对应蛋。
 - 图片：`assets/official-resources/manifest.json`，资源版本 `2026-09-19`，优先官方内容本地镜像；验证源sha256后精灵转换128px WebP，蛋保留PNG。
 - 网络补图只允许manifest明示的 `https://game.gtimg.cn/` 官方CDN；客户端提取镜像缺失但仅提供第三方转发地址时保留占位。
+- 运行时新精灵补图由 `web/pet_media.py` 与 `web/pet_media_cache.py` 按需处理：页面请求到未映射ID时尝试官方 `icon.png` / `image.png`，成功后转为256/512 WebP并写入 `data_root()/pet-media-cache`，同时记录源/产物SHA-256。已有随包素材优先；离线、404或校验失败继续使用首字占位。运行时只请求实际展示的ID，不扫描或批量探测CDN。
 - 原始高度cm、重量g；UI统一换算m、kg。声音为有符号dB；参考范围与个体实际值分开展示。蛋基础范围与成年物种范围不同，不能互换。
 - 不整表覆盖，不以名字猜ID，不按父形态自动套图。不导入3D、交易、云服务或其他当前功能不使用的资源。
 
@@ -45,7 +46,7 @@
 .venv/Scripts/python.exe tools/sync_catalog_resources.py '解包目录' --download
 ```
 
-不带`--download`仅用本地镜像；第二次运行不会增加重复物种、蛋或别名，保留新增ID/资源导入历史，缺口重新核对。工具要求开发环境的Pillow；运行应用不依赖该导入工具或网络。
+不带`--download`仅用本地镜像；第二次运行不会增加重复物种、蛋或别名，保留新增ID/资源导入历史，缺口重新核对。工具要求开发环境的Pillow；运行应用不依赖该导入工具或网络，缺图时在线请求失败也会继续显示占位。
 
 机器报告：`data/static/resource_sync_report.json`（source_hashes、版本、新增ID、冲突、缺字段、缺图、图片来源与覆盖率）。原始source哈希：
 

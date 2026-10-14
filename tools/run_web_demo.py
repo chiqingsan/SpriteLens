@@ -50,6 +50,7 @@ _SAMPLE = (
     ("迪莫", 3004, 60), ("火神", 3006, 60), ("水灵", 3005, 55), ("彩蝶鲨", 3117, 48),
     ("燃薪虫", 3437, 42), ("小独角兽", 3062, 35), ("菊花梨", 3227, 28), ("恶魔叮", 3010, 22),
     ("皇家狮鹫", 3469, 58), ("治愈兔", 3081, 44), ("机械方方", 3200, 39), ("乖乖鹄", 3344, 31),
+    ("护主犬", 3070, 1),
 )
 
 
@@ -112,20 +113,24 @@ def build_demo_context(tmp: Path, count: int) -> AppContext:
         name, base_conf, level = names[i]
         repository._pets[1000 + i] = Pet(
             gid=1000 + i, conf_id=2000000 + i, name=name, level=level, exp=1000 * i,
-            nature=rng.randint(1, 25), gender=rng.randint(1, 2), blood_id=(i % 5) + 1,
+            nature=next(key for key, info in static.nature_items() if info.name == '胆小') if i == 12 else rng.randint(1, 25),
+            gender=1 if i == 12 else rng.randint(1, 2), blood_id=(i % 5) + 1,
             talent_rank=rng.randint(1, 5), is_first_catch=rng.random() < 0.35,
             base_conf_id=base_conf,
-            attributes=tuple(
+            attributes=tuple(PetAttribute(total_race=static.species(3070).stats[key], base_value=value - bonus, talent_add=bonus)
+                             for (_, key), value, bonus in zip(_ATTR_SLOTS, (49, 57, 26, 53, 44, 61), (9, 0, 0, 7, 0, 8))) if i == 12 else tuple(
                 PetAttribute(total_race=rng.randint(70, 130), talent=rng.choice([0, 24, 48]),
                              base_value=rng.randint(120, 220), effort_add=rng.randint(0, 30))
                 for _ in _ATTR_SLOTS
             ),
             catch_way=(i % 6) + 1, add_time=int(time.time()) - i * 86400,
-            height=rng.randint(70, 200), weight=rng.randint(20000, 100000),
-            voice=rng.randint(-100, 100), mutation_type=9 if i % 4 == 0 else (8 if i % 4 == 1 else 0),
+            awarded_medal_ids=(1001, 1002, 1004, 1005, 1006, 1010, 1025, 1026, 1028, 1030) if i == 0 else (1001, 1010) if i == 12 else () if i == 2 else None,
+            height=88 if i == 12 else round(sum(static.species(base_conf).height_range) / 2) if i == 0 else rng.randint(70, 200),
+            weight=16931 if i == 12 else round(sum(static.species(base_conf).weight_range) / 2) if i == 0 else rng.randint(20000, 100000),
+            voice=-96 if i == 12 else rng.randint(-100, 100), mutation_type=8 if i == 12 else 9 if i % 4 == 0 else (8 if i % 4 == 1 else 0),
             glass_type=2 if i % 7 == 0 else 1,
             glass_value=(1 if i % 7 == 0 else rng.choice((7, 29, 1048605, 1048597, 2097156))),
-            classis=i % 18, breakthrough_lv=level // 10, speciality_id=100 + i,
+            classis=i % 18, breakthrough_lv=level // 10, speciality_id=401 if i == 12 else 100 + i,
             ball_id=(i % 5) + 1,
             skills=tuple(
                 PetSkill(skill_id=sid, conf_idx=10 + k, is_learned=True, is_equipped=k < 2, pos=k)

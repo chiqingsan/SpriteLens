@@ -48,8 +48,8 @@ INSERT INTO pets (
     attr_hp, attr_atk, attr_spa, attr_def, attr_spd, attr_spe,
     height, weight, voice, mutation_type, classis, breakthrough_lv,
     speciality_id, ball_id, attributes_json, skills_json, base_conf_id,
-    colorful_conf_id, glass_type, glass_value, worn_medal_id, is_trial_pet, is_mirror_pet, catch_way, add_time
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    colorful_conf_id, glass_type, glass_value, worn_medal_id, is_trial_pet, is_mirror_pet, catch_way, add_time, awarded_medals_json
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(uid, gid) DO UPDATE SET
     conf_id        = excluded.conf_id,
     name           = excluded.name,
@@ -85,6 +85,7 @@ ON CONFLICT(uid, gid) DO UPDATE SET
     is_mirror_pet  = excluded.is_mirror_pet,
     catch_way      = excluded.catch_way,
     add_time       = excluded.add_time,
+    awarded_medals_json = excluded.awarded_medals_json,
     updated_at     = excluded.updated_at
 """
 
@@ -93,7 +94,7 @@ SELECT gid, conf_id, name, level, exp, nature, gender, blood_id, talent_rank, is
        attr_hp, attr_atk, attr_spa, attr_def, attr_spd, attr_spe,
        height, weight, voice, mutation_type, classis, breakthrough_lv,
        speciality_id, ball_id, attributes_json, skills_json, base_conf_id,
-       colorful_conf_id, glass_type, glass_value, worn_medal_id, is_trial_pet, is_mirror_pet, catch_way, add_time
+       colorful_conf_id, glass_type, glass_value, worn_medal_id, is_trial_pet, is_mirror_pet, catch_way, add_time, awarded_medals_json
 FROM pets WHERE uid = ? ORDER BY gid
 """
 
@@ -300,6 +301,7 @@ class PetStore:
                             pet.colorful_conf_id, pet.glass_type, pet.glass_value, pet.worn_medal_id,
                             int(pet.is_trial_pet),
                             int(pet.is_mirror_pet), pet.catch_way, pet.add_time,
+                            json.dumps(pet.awarded_medal_ids) if pet.awarded_medal_ids is not None else None,
                         )
                         for (uid, _gid), pet in pets.items()
                     ],
@@ -346,6 +348,9 @@ class PetStore:
 
     @staticmethod
     def _pet_from_row(row) -> Pet:
+        medals = json.loads(row["awarded_medals_json"]) if row["awarded_medals_json"] is not None else None
+        if medals is not None and (not isinstance(medals, list) or any(type(value) is not int or value <= 0 for value in medals)):
+            raise ValueError("奖牌集合必须是正整数列表")
         return Pet(
             gid=int(row["gid"]),
             conf_id=int(row["conf_id"]),
@@ -372,6 +377,7 @@ class PetStore:
             glass_type=int(row["glass_type"]),
             glass_value=int(row["glass_value"]),
             worn_medal_id=int(row["worn_medal_id"]),
+            awarded_medal_ids=tuple(medals) if medals is not None else None,
             is_trial_pet=bool(row["is_trial_pet"]),
             is_mirror_pet=bool(row["is_mirror_pet"]),
             skills=_skills_from_json(str(row["skills_json"] or "")),

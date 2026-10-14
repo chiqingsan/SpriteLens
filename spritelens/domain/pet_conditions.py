@@ -16,7 +16,8 @@ ACQUISITION_NAMES = {1: "捕捉", 2: "互访捕捉", 3: "孵化", 4: "花种", 5
 
 def matches_conditions(pet: Pet, static: StaticData | None, *, pool: frozenset[str],
                        pool_mode: str, shiny: bool, colorful: bool, medal: int,
-                       marks: frozenset[str], speciality: int, additional: Iterable[bool] = ()) -> bool:
+                       marks: frozenset[str], speciality: int, medals: frozenset[int] = frozenset(),
+                       additional: Iterable[bool] = ()) -> bool:
     species = static.species(pet.base_conf_id) if static else None
     names = {item["name"] for item in pet_marks(pet, species.weight_range if species else (0, 0))}
     checks = list(additional)
@@ -26,6 +27,7 @@ def matches_conditions(pet: Pet, static: StaticData | None, *, pool: frozenset[s
         checks.append(bool(pet.mutation_type & 8))
     if medal:
         checks.append(pet.worn_medal_id == medal)
+    checks.extend(pet.worn_medal_id == item for item in medals)
     if speciality:
         checks.append(pet.speciality_id == speciality)
     checks.extend(name in names for name in marks)

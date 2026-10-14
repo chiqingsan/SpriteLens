@@ -5,3 +5,4 @@ pycryptodome>=3.19
 # Web 界面（唯一界面：pywebview 走系统 WebView2，额外体积≈0；aiohttp 本地服务）
 aiohttp>=3.9
 pywebview>=5.0
+Pillow>=10.0

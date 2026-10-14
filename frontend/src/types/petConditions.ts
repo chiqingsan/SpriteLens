@@ -9,8 +9,10 @@ export function emptyRanges(): PetRanges {
 }
 export type PetConditions = Omit<PetFilters, 'sort' | 'desc'> & AdvancedFilters & PetRanges
 export interface PetShortcut { name: string; filters: Partial<PetConditions> }
+export const markMedals: Record<number, string> = { 1001: '大块头', 1002: '小不点', 1026: '婉转声', 1025: '粗嗓门' }
+export const defaultPetShortcuts: PetShortcut[] = ['大块头', '小不点', '婉转声', '粗嗓门'].map(name => ({ name, filters: { marks: [name] } }))
 const removedKeys = ['talent_min', 'height_min', 'height_max', 'weight_min', 'weight_max']
-const keys = ['search', 'level_min', 'level_max', 'natures', 'types', ...removedKeys, 'gender', 'egg_groups', 'egg_mode', 'pool', 'pool_mode', 'shiny', 'colorful', 'medal', 'marks', 'speciality', 'acquisition', 'captured_days', ...Object.keys(emptyRanges())]
+const keys = ['search', 'level_min', 'level_max', 'natures', 'types', 'medals', ...removedKeys, 'gender', 'egg_groups', 'egg_mode', 'pool', 'pool_mode', 'shiny', 'colorful', 'medal', 'marks', 'speciality', 'acquisition', 'captured_days', ...Object.keys(emptyRanges())]
 function conditions(value: unknown): value is Partial<PetConditions> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   return Object.entries(value).every(([key, item]) => {
@@ -19,7 +21,7 @@ function conditions(value: unknown): value is Partial<PetConditions> {
     if (key === 'pool_mode') return item === 'and' || item === 'or'
     if (key === 'pool' || key === 'marks') return Array.isArray(item) && item.every(value => typeof value === 'string' && (key === 'pool' ? ['medal', 'male', 'shiny', 'max_height', 'max_weight'] : ['大块头', '小不点', '婉转声', '粗嗓门']).includes(value))
     if (key === 'medal' || key === 'speciality' || key === 'acquisition' || key === 'captured_days') return typeof item === 'number' && Number.isSafeInteger(item) && item >= 0 && (key !== 'captured_days' || [0, 1, 3, 7].includes(item))
-    if (['natures', 'types', 'egg_groups'].includes(key)) return Array.isArray(item) && item.every(element => key === 'natures' ? Number.isSafeInteger(element) && element >= 0 : typeof element === 'string')
+    if (['natures', 'medals', 'types', 'egg_groups'].includes(key)) return Array.isArray(item) && item.every(element => key === 'natures' || key === 'medals' ? Number.isSafeInteger(element) && element >= (key === 'medals' ? 1 : 0) : typeof element === 'string')
     if (key === 'search') return typeof item === 'string'
     if (key === 'egg_mode') return item === 'any' || item === 'all'
     if (['level_min', 'level_max', 'talent_min', 'gender'].includes(key)) return typeof item === 'number' && Number.isSafeInteger(item) && item >= 0
@@ -36,6 +38,12 @@ export function parsePetShortcuts(value: unknown): PetShortcut[] {
   if (!Array.isArray(value) || value.length > 256) throw new Error('快捷条件格式不正确')
   return value.map(item => {
     if (!item || typeof item !== 'object' || typeof item.name !== 'string' || !item.name.trim() || item.name.length > 40) throw new Error('快捷条件名称无效')
-    return { name: item.name, filters: parsePetConditions(item.filters) }
-  })
+    let filters = parsePetConditions(item.filters)
+    if (filters.medal) {
+      const preset = markMedals[filters.medal]
+      filters = { ...filters, ...(preset ? { marks: [...new Set([...(filters.marks || []), preset])] } : { medals: [...new Set([...(filters.medals || []), filters.medal])] }) }
+      delete filters.medal
+    }
+    return { name: item.name.replace(/^(奖牌|系别|性格|蛋组|特性|获取方式|获取|捕获)\s*[·：:]\s*/, ''), filters }
+  }).filter((item, index, items) => items.findIndex(value => JSON.stringify(value.filters) === JSON.stringify(item.filters)) === index)
 }

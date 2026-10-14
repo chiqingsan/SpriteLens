@@ -20,7 +20,7 @@
 │ web/ (前端层)  run.py(pywebview 窗口)  server.py(HTTP)  │
 │                payloads.py(JSON 契约)                   │
 │ web/static/    index.html / boot.js / app.css / app.js  │
-│ web/static/    pets/*.webp · type-icons/（图片资源）    │
+│ web/static/    pet-media/*.webp · type-icons/（图片资源）│
 ├─────────────────────────────────────────────────────────┤
 │ view_models(纯 PY)  app_context.py (装配根)             │
 ├─────────────────────────────────────────────────────────┤
@@ -271,13 +271,19 @@ frontend/src/components/PetInventory.vue 及 Cards/Table/Slots/BoxNavigation 子
 appearance.js      主题/显示字段/图片模式偏好（GET/POST /api/ui/preferences）
 pet-presentation.js 其它原生页资源渲染；Vue 宠物页使用 PetAvatar/PetMarks 模板，不注入旧 HTML
 frontend/src/components/PetAdvancedFilters.vue 蛋组、绝对范围与位置筛选
-frontend/src/components/PetDetailPanel.vue + PetDetail.vue 详情、键盘与焦点
+frontend/src/components/PetDetailPanel.vue + PetDetail.vue 360px共享详情栏/窄窗抽屉、键盘与焦点
+PetDetailHero/Stats/Medals/Evolution + PetMeasurementRow 详情各区展示；pet-detail.css限定背包样式
+web/pet_details.py 同次宠物快照的详情展示契约；domain/pet_medals.py提取登录获得集合
 frontend/src/components/PetShortcuts.vue + PetFilterSummary.vue 快捷条件（≤6 组）与已应用条件标签
 icons.js     本地 SVG sprite 图标装饰（Tabler MIT，零运行时网络）
-pet-media/<id>-<variant>.webp  官方头像/立绘（原图 + 透明边界归一派生图）
-pets/<id>.webp        精灵图（128×128 兜底，缺图回退首字头像）
+pet-media/<id>-<variant>-<use>.webp  内置精灵图；缺图时本地服务按需请求官方CDN并写入用户数据缓存，失败回退首字占位
 type-icons/  系别图标雪碧图（来自 roco-helper 素材）
 ```
+
+精灵图片运行期按本地优先：先读随包资源，再读用户缓存；两者都缺时，本地服务只访问
+`game.gtimg.cn/images/rocom/rocodata/jingling/{id}/` 固定图像路径，校验 PNG 后转为项目 WebP
+规格并记录来源/产物哈希。缓存位于 `data_root()/pet-media-cache`，不写入安装目录；404 与网络失败
+分别短暂抑制重试，避免缺图造成连续请求。缓存仅覆盖实际显示到的精灵，不扫描 CDN 全目录。
 
 **三主题**：颜色变量在 `themes.css` 按 `:root[data-theme]` 覆盖，布局变量仍在
 `app.css`；`appearance.js` 只切根属性与显示类，不重建数据。偏好经

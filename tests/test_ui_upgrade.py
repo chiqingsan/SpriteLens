@@ -26,6 +26,14 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class PreferencesTest(unittest.TestCase):
+    def test_legacy_presets_migrate_once_and_empty_shortcuts_survive_restart(self):
+        custom = {"name": "雌性", "filters": {"gender": 2}}
+        self.repo.set("ui.preferences", {"shortcuts": [custom]})
+        self.assertEqual([item["name"] for item in self.vm.snapshot()["shortcuts"]],
+                         ["大块头", "小不点", "婉转声", "粗嗓门", "雌性"])
+        self.vm.update({"shortcuts": []})
+        self.assertEqual(UIPreferencesViewModel(SettingsRepository(self.path)).snapshot()["shortcuts"], [])
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -78,7 +86,7 @@ class PreferencesTest(unittest.TestCase):
     def test_invalid_shortcut_does_not_replace_saved_definitions(self):
         valid = {"name": "雌性", "filters": {"gender": 2}}
         self.vm.update({"shortcuts": [valid]})
-        for filters in ({"sort": "gid"}, {"gender": True}, {"natures": [True]},
+        for filters in ({"sort": "gid"}, {"gender": True}, {"natures": [True]}, {"medals": [0]}, {"medals": [True]},
                         {"voice_min": float("nan")}, {"height_position_max": 101},
                         {"height_min": -1}, {"egg_groups": ["植物", {}]}):
             with self.subTest(filters=filters), self.assertRaises(ValueError):

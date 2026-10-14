@@ -6,9 +6,13 @@ export function testPet(gid = 1): Pet {
     type_names: ['火'], type_colors: ['#ff4400'], egg_groups: ['动物组'], stats: [],
     height_text: '1.00 m', weight_text: '2.00 kg', voice_text: '+10', height_pct: .5, weight_pct: 0, voice_pct: .1,
     range_positions: { height: { ratio: .5, status: 'within' }, weight: { ratio: null, status: 'missing' } },
-    skills: [], portrait_url: '/static/pets/1.webp', artwork_url: '', icon_url: '', is_shiny: false,
+    skills: [], portrait_url: '/static/pet-media/3001-normal-portrait.webp', artwork_url: '', icon_url: '', is_shiny: false,
     is_colorful: false, color_card: null, medal_marks: [], base_conf_id: 3004, stat_sum: 0, species_stat_sum: 0,
-    worn_medal_id: 0, catch_way: 0, add_time: 0, worn_medal_name: '', location: null, reference_ranges: { height: '暂无数据', weight: '暂无数据' }, egg_ranges: { height: '暂无数据', weight: '暂无数据' } }
+    worn_medal_id: 0, catch_way: 0, add_time: 0, worn_medal_name: '', location: null, reference_ranges: { height: '暂无数据', weight: '暂无数据' }, egg_ranges: { height: '暂无数据', weight: '暂无数据' },
+    detail: { speciality_name: '特性未知', acquisition_name: '未采集', types: [],
+      measurements: { height: { value: 1, limits: [.5, 1.5], ratio: .5, status: 'within' },
+        weight: { value: 2, limits: null, ratio: null, status: 'unknown' }, voice: { value: 10, limits: [-100, 100], ratio: .55, status: 'within' } },
+      egg_limits: { height: null, weight: null }, evolution: { nodes: [], edges: [] }, awarded_medals: null } }
 }
 export function testPets(count = 1): Pets {
   return { uid: 101, version: 10, total: count, shown: count,

@@ -11,6 +11,7 @@ from spritelens.view_models.pet_vm import SORT_KEYS, PetView, PetViewModel
 from spritelens.domain.display import STAT_LABELS, TALENT_RANK_COLORS, TYPE_COLORS
 from spritelens.domain.measurements import range_position, range_text
 from spritelens.web.pet_media import pet_images
+from spritelens.web.pet_details import detail_payload
 from spritelens.domain.pet_marks import pet_marks
 from spritelens.domain.pet_conditions import ACQUISITION_NAMES
 
@@ -25,6 +26,8 @@ def _stat_bars(pet: Pet, peak: int) -> tuple[dict, ...]:
                 "label": label,
                 "value": attr.final_value,
                 "race": attr.total_race,
+                "talent_add": attr.talent_add,
+                "effort_add": attr.effort_add,
                 "ratio": round(min(1.0, attr.final_value / peak), 4) if peak else 0.0,
                 "race_ratio": round(min(1.0, attr.total_race / peak), 4) if peak else 0.0,
             }
@@ -38,8 +41,8 @@ def _talent_color(rank: int) -> str:
 
 
 def species_icon_url(base_conf_id: int) -> str:
-    """精灵图 URL（Web 静态资源）；无图时前端回退首字头像。"""
-    return f"/static/pets/{base_conf_id}.webp"
+    """精灵头像 URL；缺图时前端回退首字头像。"""
+    return pet_images(base_conf_id)["portrait_url"]
 
 
 def pet_row(
@@ -99,6 +102,7 @@ def pet_row(
         **pet_images(pet.base_conf_id, bool(pet.mutation_type & 1)),
         "color_card": color_catalog.effect_for(pet.glass_type, pet.glass_value) if color_catalog and pet.mutation_type & 8 else None,
         "worn_medal_id": pet.worn_medal_id,
+        "detail": detail_payload(pet, static, egg_catalog),
         "catch_way": pet.catch_way, "add_time": pet.add_time,
         "medal_marks": pet_marks(pet, weight_range),
         "worn_medal_name": static.medal_name(pet.worn_medal_id) if static and pet.worn_medal_id else (f"奖牌 #{pet.worn_medal_id}" if pet.worn_medal_id else ""),
@@ -193,7 +197,7 @@ def pets_payload(
             "egg_mode": filters.egg_mode,
             "pool": sorted(filters.pool), "pool_mode": filters.pool_mode,
             "shiny": filters.shiny, "colorful": filters.colorful,
-            "medal": filters.medal, "marks": sorted(filters.marks), "speciality": filters.speciality,
+            "medal": filters.medal, "medals": sorted(filters.medals), "marks": sorted(filters.marks), "speciality": filters.speciality,
             "acquisition": filters.acquisition, "captured_days": filters.captured_days,
             **{key: getattr(filters, key) for key in ("height_min", "height_max", "weight_min", "weight_max", "voice_min", "voice_max",
                 "height_position_min", "height_position_max", "weight_position_min", "weight_position_max")},

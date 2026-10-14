@@ -15,39 +15,6 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def fit_portrait(image: Image.Image) -> Image.Image:
-    """按透明边界统一头像占比，不裁切非透明内容。"""
-    image = image.convert("RGBA")
-    bounds = image.getchannel("A").getbbox()
-    if bounds:
-        image = image.crop(bounds)
-    scale = 232 / max(image.size)
-    image = image.resize((max(1, round(image.width * scale)), max(1, round(image.height * scale))), Image.Resampling.LANCZOS)
-    canvas = Image.new("RGBA", (256, 256))
-    canvas.paste(image, ((256 - image.width) // 2, (256 - image.height) // 2))
-    return canvas
-
-
-def sync_portraits(web: Path, index: dict) -> list[dict]:
-    """保留原始头像，派生统一留白版本；重复导入从原始文件生成。"""
-    resources = []
-    for variants in index.values():
-        for entry in variants.values():
-            url = entry.get("portrait")
-            if not url:
-                continue
-            original = web / url.removeprefix("/static/").replace("-portrait-fit.webp", "-portrait.webp")
-            target = original.with_name(original.stem + "-fit.webp")
-            with Image.open(original) as image:
-                fit_portrait(image).save(target, "WEBP", lossless=True)
-            entry["portrait"] = "/static/pet-media/" + target.name
-            resources.append({"key": "portrait-fit/" + original.name,
-                              "sourceLocal": "/static/pet-media/" + original.name,
-                              "sha256": hashlib.sha256(original.read_bytes()).hexdigest(),
-                              "local": entry["portrait"], "transform": "alpha bounds crop + 232px content on 256px canvas"})
-    return resources
-
-
 def sync_rarity(web: Path) -> list[dict]:
     """统一稀有标记透明留白，保留原图及比例。"""
     resources = []
@@ -75,7 +42,7 @@ def sync_rarity(web: Path) -> list[dict]:
 
 def sync_medals(source: Path, web: Path) -> list[dict]:
     """导入四种普通奖章，裁掉透明边距以统一显示尺寸。"""
-    target = web / "medals"
+    target = web / "medal-icons"
     target.mkdir(parents=True, exist_ok=True)
     resources = []
     for medal_id, name in ((1001, "大块头"), (1002, "小不点"), (1025, "粗嗓门"), (1026, "婉转声")):
@@ -88,12 +55,12 @@ def sync_medals(source: Path, web: Path) -> list[dict]:
             image.thumbnail((128, 128))
             normalized = Image.new("RGBA", (128, 128))
             normalized.paste(image, ((128 - image.width) // 2, (128 - image.height) // 2))
-            normalized.save(target / f"{medal_id}.png")
-        resources.append({"key": f"medals/{medal_id}.png", "name": name,
+            normalized.save(target / f"mark-{medal_id}.png")
+        resources.append({"key": f"medal-icons/mark-{medal_id}.png", "name": name,
                           "sha256": hashlib.sha256(origin.read_bytes()).hexdigest(),
-                          "local": f"/static/medals/{medal_id}.png",
+                          "local": f"/static/medal-icons/mark-{medal_id}.png",
                           "transform": "alpha bounds crop + centered 128px canvas"})
-    (target / "sources.json").write_text(json.dumps({"source": source.name, "resources": resources}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (target / "mark-sources.json").write_text(json.dumps({"source": source.name, "resources": resources}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return resources
 
 
@@ -177,7 +144,6 @@ def sync(source: Path, root: Path = ROOT) -> dict:
                             "local": "/static/" + target.name + "/" + name})
     sources.extend(sync_rarity(web))
     sources.extend(sync_medals(source, web))
-    sources.extend(sync_portraits(web, index))
     report = {"source": source.name, "manifest_version": manifest.get("resourceVersion"),
               "species_total": len(species), "portrait_species": len(index), "missing_mirrors": missing,
               "without_portrait": sorted(set(species) - set(index), key=int), "resources": sources}

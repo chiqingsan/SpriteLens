@@ -39,6 +39,17 @@ class PetUIConditionsTest(unittest.TestCase):
         self.assertTrue(self.matches(replace(self.pet, worn_medal_id=1001), medal=1001))
         self.assertFalse(self.matches(medal=1001))
 
+    def test_multiple_medals_obey_global_mode_and_query_keeps_all_ids(self) -> None:
+        pet = replace(self.pet, worn_medal_id=1010)
+        choices = frozenset({1010, 1006})
+        self.assertFalse(self.matches(pet, medals=choices))
+        self.assertTrue(self.matches(pet, medals=choices, pool_mode="or"))
+        self.assertTrue(self.matches(pet, medals=frozenset({1010}), marks=frozenset({"大块头", "婉转声"})))
+        self.assertEqual(pet_ui_query({"medals": "1010,1006,1010"})["medals"], choices)
+        for value in ("-1", "0", "bad"):
+            with self.assertRaises(ValueError):
+                pet_ui_query({"medals": value})
+
     def test_invalid_external_queries_fail_and_defaults_are_unrestricted(self) -> None:
         for query in ({"pool": "unknown"}, {"pool_mode": "xor"}, {"shiny": "yes"}, {"medal": "-1"}, {"marks": "unknown"}):
             with self.assertRaises(ValueError):

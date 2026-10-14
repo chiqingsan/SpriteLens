@@ -14,6 +14,7 @@ from spritelens.repositories.egg_store import EggStore
 from spritelens.services.egg_repository import EggBoxRepository
 from spritelens.events import PacketEvent
 from spritelens.web.payloads import egg_box_payload, male_matrix_payload
+from spritelens.web.pet_media import pet_images
 
 
 def _field(no: int, raw: object, children: list[dict] | None = None) -> dict:
@@ -452,7 +453,7 @@ class EggBoxPayloadTests(unittest.TestCase):
             row = payload["eggs"][0]
             self.assertEqual(row["egg_name"], "喵喵蛋")
             self.assertEqual(row["icon_url"], "/static/egg-icons/107001.png")
-            self.assertEqual(row["fallback_icon_url"], "/static/pets/3001.webp")
+            self.assertEqual(row["fallback_icon_url"], pet_images(3001)["portrait_url"])
             self.assertEqual(payload["total_quantity"], 1)
 
     def test_payload_empty_when_no_repo(self) -> None:

@@ -77,8 +77,11 @@ html, body {
   color: var(--ink);
   font-family: "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
   font-size: var(--fs-md);
+  user-select: none;
 }
 
+/* 普通界面避免误选；输入内容仍可选中、复制和编辑。 */
+input, textarea { user-select: text; }
 button, input, select { font: inherit; color: inherit; }
 button { border: 0; cursor: pointer; }
 
@@ -248,7 +251,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .page:not(.active) { display: none !important; }
 .page .workspace.split { display: grid; grid-template-columns: 236px minmax(0, 1fr) 316px; gap: var(--space-4); align-items: start; }
 /* 背包右侧筛选与详情共用一列，查看详情不改变网格宽度。 */
-#page-pets .workspace.split { grid-template-columns: minmax(0, 1fr) 300px; }
+#page-pets .workspace.split { grid-template-columns: minmax(0, 1fr) var(--pet-side-width); }
 #page-pets .content-panel { grid-column: 1; grid-row: 1; }
 #page-pets .filter-rail, #page-pets .detail-panel { grid-column: 2; grid-row: 1; }
 #page-pets .workspace.split.has-detail .filter-rail { display: none; }

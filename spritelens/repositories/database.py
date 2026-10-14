@@ -156,6 +156,7 @@ _MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
         "ALTER TABLE pets ADD COLUMN catch_way INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE pets ADD COLUMN add_time INTEGER NOT NULL DEFAULT 0",
     )),
+    (10, ("ALTER TABLE pets ADD COLUMN awarded_medals_json TEXT DEFAULT NULL",)),
 )
 
 

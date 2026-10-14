@@ -1,16 +1,19 @@
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { initialMeasurementLimits, parsePetFilterOptions, type PetFilters, type PetFilterOptions } from '../types/petFilters'
+
+import { markMedals } from '../types/petConditions'
 
 function defaults(): PetFilters {
   return { search: '', level_min: 1, level_max: 60, natures: [], types: [],
     gender: 0, sort: 'dex_no', desc: false,
-    pool: [], pool_mode: 'and', shiny: false, colorful: false, medal: 0, marks: [], speciality: 0, acquisition: 0, captured_days: 0 }
+    pool: [], pool_mode: 'and', shiny: false, colorful: false, medal: 0, medals: [], marks: [], speciality: 0, acquisition: 0, captured_days: 0 }
 }
 
 // 迁移期间唯一持有基础筛选状态；旧页只通过查询/命令接口使用，不保存副本。
 export function usePetFilters(reload: () => void, invalidate: () => void) {
   const filters = reactive(defaults())
   const options = ref<PetFilterOptions>({ natures: [], types: [], sorts: [], talent_max: 0, measurement_limits: initialMeasurementLimits })
+  const selectedMedals = computed(() => [...filters.medals, ...Object.entries(markMedals).filter(([, name]) => filters.marks.includes(name)).map(([id]) => Number(id))])
   const fixed = ref(false)
   let active = false
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -40,6 +43,12 @@ export function usePetFilters(reload: () => void, invalidate: () => void) {
     filters.types = filters.types.includes(name) ? filters.types.filter(value => value !== name) : [...filters.types, name]
     changed()
   }
+  function medal(id: number) {
+    const mark = markMedals[id]
+    if (mark) filters.marks = filters.marks.includes(mark) ? filters.marks.filter(value => value !== mark) : [...filters.marks, mark]
+    else filters.medals = filters.medals.includes(id) ? filters.medals.filter(value => value !== id) : [...filters.medals, id]
+    changed()
+  }
   function restore(value: Partial<PetFilters>) {
     cancel()
     // 快捷条件还含蛋组/体型等原生切片的字段，不能把它们复制进 Vue 状态。
@@ -47,7 +56,7 @@ export function usePetFilters(reload: () => void, invalidate: () => void) {
       level_max: Math.min(value.level_max ?? 60, 60), natures: [...(value.natures || [])], types: [...(value.types || [])],
       gender: value.gender ?? 0, sort: value.sort ?? 'dex_no', desc: value.desc ?? false,
       pool: [...(value.pool || [])], pool_mode: value.pool_mode ?? 'and', shiny: value.shiny ?? false,
-      colorful: value.colorful ?? false, medal: value.medal ?? 0, marks: [...(value.marks || [])], speciality: value.speciality ?? 0, acquisition: value.acquisition ?? 0, captured_days: value.captured_days ?? 0 })
+      colorful: value.colorful ?? false, medal: value.medal ?? 0, medals: [...(value.medals || [])], marks: [...(value.marks || [])], speciality: value.speciality ?? 0, acquisition: value.acquisition ?? 0, captured_days: value.captured_days ?? 0 })
   }
   function patch(value: Partial<PetFilters>, notify = true) {
     cancel(); Object.assign(filters, value)
@@ -56,15 +65,15 @@ export function usePetFilters(reload: () => void, invalidate: () => void) {
   function resetAccount() {
     cancel(); filters.natures = []; filters.types = []
     options.value = { ...options.value, natures: [], types: [], talent_max: 0, measurement_limits: initialMeasurementLimits }
-    filters.medal = 0; filters.speciality = 0; options.value.medals = []; options.value.specialities = []
+    filters.medal = 0; filters.medals = []; filters.speciality = 0; options.value.medals = []; options.value.specialities = []
   }
   function toggleMaxed() {
     const enabled = filters.level_min === 60 && filters.level_max === 60
     filters.level_min = enabled ? 1 : 60; filters.level_max = 60; changed()
   }
-  return { filters, options, fixed, search, level, nature, type, changed, toggleMaxed,
+  return { filters, options, fixed, selectedMedals, search, level, nature, type, medal, changed, toggleMaxed,
     query: () => ({ ...filters, search: filters.search.trim(), natures: filters.natures.join(','),
-      types: filters.types.join(','), desc: filters.desc ? '1' : '', pool: filters.pool.join(','), marks: filters.marks.join(','),
+      types: filters.types.join(','), medals: filters.medals.join(','), desc: filters.desc ? '1' : '', pool: filters.pool.join(','), marks: filters.marks.join(','),
       shiny: filters.shiny ? '1' : '0', colorful: filters.colorful ? '1' : '0' }),
     restore, patch, reset: () => restore(defaults()), resetAccount,
     updateOptions: (value: unknown) => {

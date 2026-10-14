@@ -47,6 +47,7 @@ class PetFilters:
     shiny: bool = False
     colorful: bool = False
     medal: int = 0
+    medals: frozenset[int] = frozenset()
     marks: frozenset[str] = frozenset()
     speciality: int = 0
     acquisition: int = 0
@@ -71,7 +72,7 @@ class PetFilters:
             or self.talent_min > 0
             or self.gender
             or self.egg_groups
-            or self.pool or self.shiny or self.colorful or self.medal or self.marks or self.speciality or self.acquisition or self.captured_days
+            or self.pool or self.shiny or self.colorful or self.medal or self.medals or self.marks or self.speciality or self.acquisition or self.captured_days
             or any(getattr(self, key) is not None for key in (
                 "height_min", "height_max", "weight_min", "weight_max", "voice_min", "voice_max",
                 "height_position_min", "height_position_max", "weight_position_min", "weight_position_max"))
@@ -359,7 +360,7 @@ class PetViewModel:
                 checks.append(pet.add_time > 0 and pet.add_time >= captured_since)
             return matches_conditions(pet, static, pool=filters.pool, pool_mode=filters.pool_mode,
                                       shiny=filters.shiny, colorful=filters.colorful, medal=filters.medal,
-                                      marks=filters.marks, speciality=filters.speciality, additional=checks)
+                                      marks=filters.marks, medals=filters.medals, speciality=filters.speciality, additional=checks)
 
         return tuple(p for p in pets if matches(p))
 

@@ -35,6 +35,12 @@
 
 ## 未解事项（已知存在、暂不影响主功能）
 
+### 精灵获得奖牌集合（2026-10-14）
+
+登录ZoneLoginRsp.CliPetMedalInfo.collection按PetMedalRecord→buckets→detail_list读取奖牌配置ID与obtain_pet_gid；wear_pet_gid仅表示佩戴者，不改变获得归属。两批本机录制核验见[详情记录](reviews/PET_DETAIL_VERIFICATION_2026-10-14.md)，包含多奖牌个体和获得者/佩戴者不同的记录。PetRepository保存每个体的已确认集合，SQLite v10区分NULL未知与[]已确认空集合。
+
+PetMedal增量尚无真实样本，收到时失效涉及集合等待登录重采；不猜op删除/转移语义。PetData.free_medal_conf_ids等候选字段未在本轮录制出现，不作为完整集合。体型与声音阈值只能作参考标记。
+
 ### 获取方式与日期（2026-10-14 接入）
 
 PetData字段67=`catch_way`，字段32=`add_time`（Unix秒）。蛋神1.2.0的

@@ -121,6 +121,7 @@ class Pet:
     glass_type: int = 0  # glass 外观参数（色卡底色维度；0=帧中无）
     glass_value: int = 0  # glass 混色维度
     worn_medal_id: int = 0  # 服务端佩戴奖牌，不从体型阈值推算
+    awarded_medal_ids: tuple[int, ...] | None = None  # None=集合未采集；空元组=已确认没有
     skills: tuple[PetSkill, ...] = ()
     is_trial_pet: bool = False  # 服务端试用个体，不属于自己的精灵库存
     is_mirror_pet: bool = False  # 好友队伍镜像，不属于自己的精灵库存

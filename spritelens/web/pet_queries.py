@@ -12,6 +12,10 @@ def pet_ui_query(query: Mapping[str, str]) -> dict:
     if pool - POOL_KEYS or marks - set(MARK_NAMES) or mode not in ("and", "or"):
         raise ValueError("条件池或快捷条件无效")
     result = {"pool": pool, "pool_mode": mode, "marks": marks}
+    medals = list(filter(None, query.get("medals", "").split(",")))
+    if any(not value.isdecimal() or int(value) <= 0 for value in medals):
+        raise ValueError("奖牌条件无效")
+    result["medals"] = frozenset(map(int, medals))
     for key in ("shiny", "colorful"):
         value = query.get(key, "0")
         if value not in ("0", "1"):

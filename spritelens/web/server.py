@@ -21,6 +21,7 @@ import asyncio
 import json
 import secrets
 import threading
+import webbrowser
 from dataclasses import replace
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from aiohttp import WSMsgType, web
 
 from spritelens.app_context import AppContext
 from spritelens.logs import get_logger
+from spritelens.paths import data_root
 from spritelens.view_models.ui_preferences import UIPreferencesViewModel
 from spritelens.web.payloads import (
     overview_payload,
@@ -43,6 +45,7 @@ from spritelens.web.payloads_catalog import (
     home_payload,
     male_matrix_payload,
 )
+from spritelens.web.pet_media_cache import PetMediaCache
 from spritelens.web.routes_capture import CaptureRoutesMixin
 
 logger = get_logger("web")
@@ -100,6 +103,7 @@ class LocalServer(CaptureRoutesMixin):
         self._sockets: set[web.WebSocketResponse] = set()
         self._push_task: asyncio.Task | None = None
         self._last_state_json: str | None = None
+        self._pet_media_cache: PetMediaCache | None = None
         self._stopped = False
         self._stop_future = None
 
@@ -285,16 +289,19 @@ class LocalServer(CaptureRoutesMixin):
             logger.debug("半成品 runner 清理异常: %s", exc)
 
     async def _start_async(self) -> None:
+        self._pet_media_cache = PetMediaCache(self._static_dir, data_root() / "pet-media-cache")
         app = web.Application(
             middlewares=[self._auth_middleware, self._no_cache_middleware],
             client_max_size=8 * 1024 * 1024,
         )
         app.router.add_get("/", self._index)
         app.router.add_get("/favicon.ico", self._favicon)
+        app.router.add_get("/static/pet-media/{asset}", self._pet_media_asset)
         app.router.add_static("/static", self._static_dir, name="static")
         app.router.add_get("/api/bootstrap", self._api_bootstrap)
         app.router.add_get("/api/ui/preferences", self._api_ui_preferences)
         app.router.add_post("/api/ui/preferences", self._api_save_ui_preferences)
+        app.router.add_post("/api/ui/open-browser", self._api_open_browser)
         app.router.add_get("/api/pets", self._api_pets)
         app.router.add_get("/api/handbook", self._api_handbook)
         app.router.add_get("/api/eggs", self._api_eggs)
@@ -393,6 +400,15 @@ class LocalServer(CaptureRoutesMixin):
             return web.Response(status=204)
         return web.FileResponse(icon, headers={"Cache-Control": "no-cache"})
 
+    async def _pet_media_asset(self, request: web.Request) -> web.Response:
+        """先读安装包/用户缓存，缺图时按需下载官方 CDN 素材。"""
+        if self._pet_media_cache is None:
+            raise RuntimeError("精灵图片缓存尚未初始化")
+        path = await self._pet_media_cache.resolve(request.match_info["asset"])
+        if path is None:
+            return web.Response(status=404)
+        return web.FileResponse(path)
+
     @web.middleware
     async def _no_cache_middleware(self, request: web.Request, handler):
         """本地单机应用：静态资源禁用缓存。
@@ -426,6 +442,19 @@ class LocalServer(CaptureRoutesMixin):
 
     async def _api_ui_preferences(self, request: web.Request) -> web.Response:
         return web.json_response(UIPreferencesViewModel(self._context.settings).snapshot())
+
+    async def _api_open_browser(self, request: web.Request) -> web.Response:
+        # 使用服务自身的入口，携带 fragment token；不接受客户端指定任意 URL。
+        try:
+            opened = await asyncio.to_thread(webbrowser.open, self.url, new=2)
+        except (OSError, webbrowser.Error):
+            logger.exception("打开系统浏览器失败")
+            opened = False
+        if not opened:
+            return web.json_response(
+                {"error": "无法打开默认浏览器，请检查系统默认浏览器设置后重试"}, status=503
+            )
+        return web.json_response({"ok": True})
 
     async def _api_save_ui_preferences(self, request: web.Request) -> web.Response:
         try:
