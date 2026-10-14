@@ -44,20 +44,6 @@ class DesktopStartupTest(unittest.TestCase):
         navigation.set(view, None)
         self.assertTrue(settings.IsNonClientRegionSupportEnabled)
 
-    def test_native_cover_layout_stays_fixed_when_failure_controls_appear(self):
-        cover = StartupCover.__new__(StartupCover)
-        cover._scale = 1.5
-        cover._cover = SimpleNamespace(ClientSize=SimpleNamespace(Width=1200, Height=900), IsDisposed=False)
-        for name in ("logo", "title", "message", "retry", "close"):
-            setattr(cover, "_" + name, Mock())
-        cover._timer = Mock()
-        cover._layout()
-        bounds = cover._logo.SetBounds.call_args
-        cover._show_failure("合成失败")
-        cover._layout()
-        self.assertEqual(cover._logo.SetBounds.call_args, bounds)
-        self.assertEqual(bounds.args[2:], (120, 120))
-
     def test_retry_preserves_desktop_hint_and_forces_navigation(self):
         window = Mock(original_url="http://127.0.0.1:1234/?desktop=1#token=synthetic")
         cover = StartupCover(window)

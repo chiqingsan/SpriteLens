@@ -20,19 +20,18 @@ cd ..
 在 demo 输出的本地 URL 打开页面。开发仍从 aiohttp 同源加载，不开第二个服务器、不改变鉴权/CORS。
 修改源码后重新运行 `tools/frontend.py build` 并刷新浏览器。
 
+构建已包含 vue-tsc 类型检查，日常不单独重复执行。交互行为变化时，按需选相关轻量回归：
+
 ```powershell
-.venv/Scripts/python.exe -B tools/frontend.py check
-.venv/Scripts/python.exe -B tools/run_build_tests.py
 cd frontend
-npx playwright install chromium
-npm run test:browser
+npm test -- src/composables/usePets.test.ts
 ```
 
-上述命令是检查入口，不要求日常改动全部执行。按 [开发指南的测试取舍](DEVELOPMENT_GUIDE.md#测试取舍) 选择验证；文案/样式/简单展示不强制新增测试或跑全套浏览器回归。
-统一门禁含 Python、JS/资源、vue-tsc、ESLint、Vitest、源指纹与产物哈希。
-Playwright 独立运行，使用临时用户目录与合成数据、阻断外网；通过 stdin 让 demo 正常关闭。
-截图和 trace 只在忽略的 `frontend/test-results/`，不作为提交样本。
-Chromium 验证不能代替 WebView2 和 exe 发布验收。
+仅保留请求失效、账号/DTO 契约、筛选状态联动、卸载清理与保存失败回归。
+已取消统一门禁、ESLint 和 Playwright；布局用必要目视检查，不维护固定 DOM/像素值断言。
+前端测试与合成数据不参与生产源码指纹，修改测试不会要求重建运行页面；生产类型检查也不包含测试文件。
+构建与打包仍检查运行产物；`tools/frontend.py check` 用于需要单独检查现有产物的场景，不在刚成功构建后重复运行。
+具体取舍见 [开发指南](DEVELOPMENT_GUIDE.md#测试取舍)；实际 WebView2/exe 验收留在受影响的启动改动或发布时进行。
 
 ## 生成文件所有权与失败语义
 

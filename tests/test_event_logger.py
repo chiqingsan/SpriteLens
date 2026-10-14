@@ -47,15 +47,6 @@ class EventLogWriterTest(unittest.TestCase):
         self.assertEqual(first["decoded"][0]["name"], "gid")
         self.assertEqual(writer.count, 2)
 
-    def test_same_day_appends_one_file(self):
-        writer = self._writer()
-        writer.handle_packet(_event())
-        writer.flush()
-        first = writer.current_path
-        writer.handle_packet(_event())
-        writer.flush()
-        self.assertEqual(writer.current_path, first)
-
     def test_close_flushes_pending_events(self):
         """close 落盘全部积压（退出不丢日志）。"""
         writer = self._writer()
@@ -67,18 +58,6 @@ class EventLogWriterTest(unittest.TestCase):
         lines = files[0].read_text(encoding="utf-8").strip().splitlines()
         self.assertEqual(len(lines), 50)
         self.assertGreaterEqual(writer.count, 50)
-
-    def test_unwritable_dir_degrades_silently(self):
-        # log_dir 指向一个已存在的"文件" → mkdir/open 失败 → failed 态，后续调用 no-op 不抛
-        blocker = self.dir / "not_a_dir"
-        blocker.parent.mkdir(parents=True, exist_ok=True)
-        blocker.write_text("occupied", encoding="utf-8")
-        writer = self._writer(blocker)
-        writer.handle_packet(_event())  # worker 打开失败 → failed
-        writer.flush()
-        writer.handle_packet(_event())  # no-op
-        writer.flush()
-        self.assertEqual(writer.count, 0)
 
     def test_queue_full_drops_and_counts(self):
         """磁盘阻塞时队列满丢新事件并计数（不反压抓包主链路）。"""

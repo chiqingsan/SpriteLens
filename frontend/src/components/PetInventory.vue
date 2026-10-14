@@ -13,7 +13,6 @@ const emit = defineEmits<{ select: [gid: number, element: HTMLElement]; close: [
 const wrap = ref<HTMLElement | null>(null)
 let scrollTop = 0, scrollLeft = 0
 const detailOpen = ref(false), trigger = ref<HTMLElement | null>(null)
-const visibleGids = computed(() => view.value === 'point' ? model.slots.value.filter(slot => slot.state === 'matched').map(slot => slot.gid!) : (view.value === 'card' ? model.cards.value : pets.value).map(pet => pet.gid))
 let focusedGid: string | undefined
 onBeforeUpdate(() => { focusedGid = wrap.value?.contains(document.activeElement) ? (document.activeElement as HTMLElement).dataset.gid : undefined })
 onUpdated(() => { if (focusedGid) wrap.value?.querySelector<HTMLElement>(`[data-gid="${focusedGid}"]`)?.focus({ preventScroll: true }) })
@@ -56,5 +55,5 @@ defineExpose({ setBox, closeDetail, openDetail: () => { if (selected.value !== n
       <div class="button-row"><button v-if="error" id="btn-pets-retry" class="ghost-button small" @click="model.load(false)"><UiIcon name="refresh"></UiIcon>重试</button><button id="btn-empty-reset" class="ghost-button small" :hidden="!!error || view === 'point' || !!pets.length || !data?.total" @click="emit('reset')"><UiIcon name="filter-off"></UiIcon>清除筛选</button></div>
     </div>
   </div>
-  <PetDetailPanel :model="model" :open="detailOpen" :enabled="model.visible.value" :trigger="trigger" :visible-gids="visibleGids" :image-mode="imageMode()" @close="closeDetail()" @select="select" @locate="locate"></PetDetailPanel>
+  <PetDetailPanel :model="model" :open="detailOpen" :enabled="model.visible.value" :trigger="trigger" :image-mode="imageMode()" @close="closeDetail()" @locate="locate"></PetDetailPanel>
 </template>

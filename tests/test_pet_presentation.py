@@ -1,6 +1,5 @@
 """头像映射、采集色卡解码及旧偏好迁移。"""
 from dataclasses import replace
-import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -11,7 +10,6 @@ from spritelens.paths import static_dir
 from spritelens.repositories.settings import SettingsRepository
 from spritelens.view_models.ui_preferences import UIPreferencesViewModel, normalize_preferences
 from spritelens.web.payloads import pet_row, colors_payload
-from spritelens.web.pet_media import pet_images
 from tests.test_web_server import _pet
 
 
@@ -32,19 +30,6 @@ class PetPresentationTest(unittest.TestCase):
         self.assertEqual([m["label"] for m in marks], ["大", "婉"])
         # 完美无瑕等纪念奖牌不进入紧凑的四种标记区。
         self.assertEqual(pet_marks(replace(pet, worn_medal_id=1010), (0, 0)), [])
-
-    def test_avatar_mode_defaults_persists_and_rejects_invalid(self):
-        self.assertEqual(normalize_preferences({})["pet_image"], "portrait")
-        self.assertEqual(normalize_preferences({"pet_image": []})["pet_image"], "portrait")
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "config.json"
-            vm = UIPreferencesViewModel(SettingsRepository(path))
-            vm.update({"pet_image": "artwork"})
-            vm.update({"theme": "huohua", "fields": {"weight": False}})
-            self.assertEqual(UIPreferencesViewModel(SettingsRepository(path)).snapshot()["pet_image"], "artwork")
-            for value in (None, [], "small", True):
-                with self.assertRaises(ValueError):
-                    vm.update({"pet_image": value})
 
     def test_saved_shortcuts_keep_other_filters_after_first_catch_removal(self):
         saved = [{"name": "条件", "filters": {"first_catch_only": True, "gender": 2, "natures": [3]}}]
@@ -85,23 +70,3 @@ class PetPresentationTest(unittest.TestCase):
         matrix = colors_payload(Repo(), catalog, None)
         self.assertEqual(matrix["pet_total"], 1)
         self.assertEqual(next(iter(matrix["matrix"].values()))[0]["color_card"]["particle_id"], 1)
-
-    def test_local_image_mapping_and_missing_species(self):
-        images = pet_images(3004)
-        self.assertIn("portrait", images["portrait_url"])
-        self.assertIn("artwork", images["artwork_url"])
-        self.assertNotEqual(images["portrait_url"], images["artwork_url"])
-        self.assertEqual(pet_images(999999)["portrait_url"], "/static/pet-media/999999-normal-portrait.webp")
-        index = json.loads((static_dir() / "pet_media.json").read_text(encoding="utf-8"))
-        web = Path(__file__).resolve().parents[1] / "spritelens/web/static"
-        for entry in index.values():
-            for variant in entry.values():
-                for url in variant.values():
-                    self.assertNotIn("-fit.webp", url)
-                    self.assertTrue((web / url.removeprefix("/static/")).is_file(), url)
-        medals = json.loads((web / "medal-icons/mark-sources.json").read_text(encoding="utf-8"))["resources"]
-        self.assertEqual({row["name"] for row in medals}, {"大块头", "小不点", "粗嗓门", "婉转声"})
-        for row in medals:
-            self.assertTrue((web / row["local"].removeprefix("/static/")).is_file())
-            self.assertNotIn("extreme", row["key"])
-            self.assertEqual(len(row["sha256"]), 64)

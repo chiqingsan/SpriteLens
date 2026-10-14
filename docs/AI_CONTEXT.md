@@ -2,6 +2,10 @@
 
 状态：当前入口文档。读者：AI 助手与新开发者。用途：快速定位项目、边界和必读资料。
 
+2026-10-15 已精简测试与开发约束：统一门禁、ESLint、Playwright 与结构/展示类冗余测试已删除。
+日常仅验证本次行为，Vue 构建已含类型检查；必要回归与发布检查按 [开发指南](DEVELOPMENT_GUIDE.md#测试) 选择。
+下文测试数量与门禁结果是历史交付证据，不代表当前执行要求。
+
 SpriteLens（小洛探探）是 Windows 本地游戏数据观测工具。当前技术栈为 Python 3.12、Npcap/scapy、aiohttp、pywebview/WebView2、SQLite 和原生 JS。采集为被动旁听，运行数据在用户数据目录；静态数据和页面资源随包分发。
 
 前端已落地 Vue 3 + TypeScript + Vite、蛋图鉴与宠物完整页面；其余职责仍为原生 JS，后端与桌面壳保留。

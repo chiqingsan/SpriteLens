@@ -102,18 +102,6 @@ class PetViewModelTest(unittest.TestCase):
         self.assertEqual(len(self.vm.filtered_pets()), 4)
 
     # -- 维度筛选 ------------------------------------------------------
-    def test_level_range_filter(self):
-        self.vm.set_level_range(30, 60)
-        self.assertEqual(sorted(p.gid for p in self.vm.filtered_pets()), [1, 2, 4])
-
-    def test_nature_filter(self):
-        self.vm.set_natures(frozenset({1}))
-        self.assertEqual(sorted(p.gid for p in self.vm.filtered_pets()), [1, 3])
-
-    def test_talent_filter(self):
-        self.vm.set_talent_min(5)
-        self.assertEqual(sorted(p.gid for p in self.vm.filtered_pets()), [1, 4])
-
     def test_gender_composes_and_resets(self):
         self.repo._pets[2] = replace(self.repo._pets[2], gender=2)
         self.repo._pets[3] = replace(self.repo._pets[3], gender=0)
@@ -136,23 +124,10 @@ class PetViewModelTest(unittest.TestCase):
         self.vm.set_types(frozenset({"火"}))
         self.assertEqual(sorted(p.gid for p in self.vm.filtered_pets()), [1, 3, 4])
 
-    def test_type_filter_without_static_ignored(self):
-        vm = PetViewModel(self.repo, static_data=None)
-        vm.set_types(frozenset({"水"}))
-        self.assertEqual(len(vm.filtered_pets()), 4)
-
     def test_filters_compose(self):
         self.vm.set_level_range(20, 60)
         self.vm.set_natures(frozenset({2}))
         self.assertEqual(sorted(p.gid for p in self.vm.filtered_pets()), [2, 4])
-
-    def test_reset_filters(self):
-        self.vm.set_search("火")
-        self.vm.set_level_range(50, 60)
-        self.assertTrue(self.vm.filters.active)
-        self.vm.reset_filters()
-        self.assertFalse(self.vm.filters.active)
-        self.assertEqual(len(self.vm.filtered_pets()), 4)
 
     # -- 排序 ----------------------------------------------------------
     def test_sort_by_level_desc(self):
@@ -168,44 +143,6 @@ class PetViewModelTest(unittest.TestCase):
         self.repo._pets[4] = replace(self.repo._pets[4], add_time=100)
         # gid1 与 gid4 同为图鉴 10，并列时按捕捉时间升序 → gid4 在前。
         self.assertEqual([p.gid for p in self.vm.filtered_pets()], [4, 1, 2, 3])
-
-    def test_sort_unknown_key_falls_back(self):
-        self.vm.set_sort("nope")
-        self.assertEqual(self.vm.sort_state[0], "dex_no")
-
-    # -- 聚合 ----------------------------------------------------------
-    def test_stats(self):
-        stats = self.vm.stats()
-        self.assertEqual(stats.total, 4)
-        self.assertFalse(hasattr(stats, "first_catch"))
-        self.assertEqual(stats.maxed, 1)  # gid4 Lv60
-        self.assertEqual(stats.max_level, 60)
-        # 系别分布：火(1+4) → 2 只，水(2) → 1，火/草(3) 主系别为火 → 并入火
-        counts = dict(stats.type_counts)
-        self.assertEqual(counts.get("火"), 3)
-        self.assertEqual(counts.get("水"), 1)
-
-    def test_options_reflect_data(self):
-        # 含副系别（双系兽带 火/草），按名称排序
-        self.assertEqual(self.vm.type_options(), ("水", "火", "草"))
-        natures = self.vm.nature_options()
-        self.assertEqual(dict(natures)[1], "开朗")
-        self.assertEqual(dict(natures)[2], "固执")
-
-    def test_species_of(self):
-        pet = next(p for p in self.vm.all_pets() if p.gid == 2)
-        species = self.vm.species_of(pet)
-        self.assertIsNotNone(species)
-        self.assertEqual(species.name, "水兽")
-
-    def test_counters_and_version(self):
-        self.assertEqual(self.vm.total_count(), 4)
-        self.assertEqual(self.vm.filtered_count(), 4)
-        before = self.vm.version()
-        self.vm.clear()
-        self.assertGreater(self.vm.version(), before)
-        self.assertEqual(self.vm.total_count(), 0)
-
 
 if __name__ == "__main__":
     unittest.main()

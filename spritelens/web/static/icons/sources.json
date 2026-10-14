@@ -420,6 +420,32 @@
         "gender"
       ],
       "sha256": "991f96057e2479125a87818328e9e87faef513ce62a20fe5835b1546ec028b1c"
+    },
+    {
+      "name": "arrow-up",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/arrow-up",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/arrow-up.svg",
+      "license": "MIT",
+      "search_tags": [
+        "nature-positive",
+        "increase",
+        "up"
+      ],
+      "sha256": "c0a58436629c59996826b7980b0cbdfff51bfa289eefb2cceee494a964c5105e"
+    },
+    {
+      "name": "arrow-down",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/arrow-down",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/arrow-down.svg",
+      "license": "MIT",
+      "search_tags": [
+        "nature-negative",
+        "decrease",
+        "down"
+      ],
+      "sha256": "34efc2d5737ffa3f29f8056e6d861ea8218d8f40858539a959a9482811f6bd05"
     }
   ]
 }

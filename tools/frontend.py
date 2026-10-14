@@ -18,8 +18,10 @@ STATIC = ROOT / "spritelens/web/static"
 
 
 def source_hash() -> str:
-    files = sorted((FRONTEND / "src").rglob("*")) + [FRONTEND / name for name in
-        ("package.json", "package-lock.json", "tsconfig.json", "vite.config.ts", "eslint.config.js",
+    # 测试和合成数据不进入运行产物，修改它们不应强迫重建页面。
+    files = sorted(path for path in (FRONTEND / "src").rglob("*")
+                   if not path.name.endswith(".test.ts") and path.name not in {"testData.ts", "petTestData.ts"}) + [FRONTEND / name for name in
+        ("package.json", "package-lock.json", "tsconfig.json", "vite.config.ts",
          ".node-version", ".npmrc")] + [ROOT / "tools/frontend.py"]
     digest = hashlib.sha256()
     for path in files:

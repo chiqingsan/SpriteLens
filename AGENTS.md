@@ -14,7 +14,7 @@
 - 后端沿用 Python + aiohttp + pywebview；前端已确认演进为 Vue 3 + TypeScript + Vite，当前仍有原生 JS。实施前读 `docs/VUE3_MIGRATION.md`，按页面渐进迁移。
 - `web/static/app.js`、`web/server.py`、`web/payloads_catalog.py` 是复杂度关注区；新增页面先确定模块归属，不继续吸收整页职责。
 - 账号、快照、线程、持久化、协议和资源导入修改必须写明失败分支及验证。运行数据、密钥、录制和本机临时路径不得作为可提交测试样本。
-- Python 使用 unittest，完整入口为 `.venv\Scripts\python.exe -B tools\run_build_tests.py`；按开发指南选择相关测试、源码 smoke、JS/资源与GUI验收。
+- 日常只验证本次改变的行为；文案/样式用 diff 与必要目视检查，Python 按模块运行 unittest，Vue 改动构建即可。仅数据正确性、协议、账号/请求时序、保存失败和资源生命周期保留必要回归；不恢复统一门禁、ESLint 或整套浏览器测试，不因修改某层自动跑全套。
 - 文档使用 UTF-8/LF，新增文档同步索引并说明状态、读者和维护边界。
 
 ## 架构与实现交接

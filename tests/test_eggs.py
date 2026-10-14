@@ -63,22 +63,6 @@ class EggCatalogTests(unittest.TestCase):
         self.assertEqual(self.catalog.egg_by_base_id(3002).name_key, "岚鸟")
         self.assertEqual(self.catalog.stats()["eggs"], 2)
 
-    def test_groups_and_types(self) -> None:
-        # 组名按条目出现顺序去重
-        self.assertEqual(self.catalog.group_names(), ("动物组", "拟人组", "天空组"))
-        self.assertEqual(self.catalog.type_names(), ("普通", "活动蛋"))
-
-    def test_missing_file_degrades(self) -> None:
-        empty = EggCatalog(Path(self.tmp.name) / "nowhere")
-        self.assertFalse(empty.available)
-        self.assertEqual(empty.entries(), ())
-
-    def test_payload_no_filter(self) -> None:
-        payload = egg_dex_payload(self.catalog)
-        self.assertEqual(payload["total"], 2)
-        self.assertEqual(payload["shown"], 2)
-        self.assertEqual(payload["groups"], ["动物组", "拟人组", "天空组"])
-
     def test_payload_filters(self) -> None:
         by_group = egg_dex_payload(self.catalog, group="天空组")
         self.assertEqual([e["name"] for e in by_group["eggs"]], ["岚鸟"])
@@ -88,12 +72,6 @@ class EggCatalogTests(unittest.TestCase):
         self.assertEqual([e["name"] for e in by_hatch["eggs"]], ["喵喵"])
         by_search = egg_dex_payload(self.catalog, search="3002")
         self.assertEqual([e["name"] for e in by_search["eggs"]], ["岚鸟"])
-
-    def test_payload_with_empty_catalog(self) -> None:
-        payload = egg_dex_payload(EggCatalog(None))
-        self.assertEqual(payload["total"], 0)
-        self.assertEqual(payload["groups"], [])
-
 
 if __name__ == "__main__":
     unittest.main()

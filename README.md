@@ -192,10 +192,14 @@ API 与 WebSocket 均校验。数据只在本机流动，不对外发送。
 ## 测试
 
 ```powershell
-python tools\run_build_tests.py
+# 日常只跑本次涉及的模块，例如持久化
+.venv\Scripts\python.exe -B -m unittest tests.test_persistence -q
+# 发布前或跨多个核心域改动时，按需要检查保留的回归
+.venv\Scripts\python.exe -B -m unittest discover -s tests -q
 ```
 
 协议层测试使用合成帧生成器（`tests/_synth.py`），全链路不依赖游戏客户端。
+已取消统一门禁、ESLint 和 Playwright；验证范围见 [开发指南](docs/DEVELOPMENT_GUIDE.md#测试)。
 
 ## 打包（Nuitka）
 

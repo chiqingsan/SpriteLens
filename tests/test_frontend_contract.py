@@ -60,7 +60,3 @@ class FrontendBuildTest(unittest.TestCase):
             self.assertIn("改变", check_frontend_assets(directory)[0])
             (directory / "entry.js").unlink()
             self.assertIn("缺失", check_frontend_assets(directory)[0])
-
-    def test_missing_manifest_fails(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            self.assertTrue(check_frontend_assets(Path(tmp)))

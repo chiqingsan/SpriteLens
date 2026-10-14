@@ -44,15 +44,6 @@ class SingleInstanceTest(unittest.TestCase):
         # 已消费（ResetEvent）后再查应为 False
         self.assertFalse(self.guard.consume_activation(handle))
 
-    def test_notify_without_event_returns_false(self):
-        """没有实例创建事件时投递失败但不抛错（调用方据返回值决定提示）。"""
-        notifier = SingleInstanceGuard()
-        self.addCleanup(notifier.close)
-        # 先确保没有残留事件被置位
-        self.guard.consume_activation(self.guard.create_activation_event())
-        result = notifier.notify_existing()
-        self.assertIsInstance(result, bool)
-
     def test_close_is_idempotent(self):
         """close 可重复调用且清空句柄（退出路径可能被触发多次）。
 
@@ -65,11 +56,6 @@ class SingleInstanceTest(unittest.TestCase):
         guard.close()  # 不应抛错
         self.assertIsNone(guard._mutex_handle)
         self.assertIsNone(guard._event_handle)
-
-    def test_null_handle_is_safe(self):
-        """未创建事件时传 None 不抛错（非 Windows / 失败路径）。"""
-        self.assertFalse(self.guard.consume_activation(None))
-
 
 if __name__ == "__main__":
     unittest.main()

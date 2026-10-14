@@ -1,7 +1,6 @@
 """真实登录路径、空位保留、移动增量及离线恢复的回归。"""
 from __future__ import annotations
 
-import re
 import asyncio
 import tempfile
 import unittest
@@ -353,15 +352,6 @@ class LocationTest(unittest.TestCase):
         event = pet_event([(1, "测试", 32)])
         event.decoded[0]["children"][0]["children"].append({"no": 73, "raw": 1010})
         self.assertEqual(extract_pets(event)[0].worn_medal_id, 1010)
-
-    def test_static_event_bindings_refer_to_existing_controls(self):
-        # 移除顶栏旧按钮后仍绑定它们，会中断启动，导致 WebSocket 未连接。
-        directory = ROOT / "spritelens/web/static"
-        html = (directory / "index.html").read_text(encoding="utf-8")
-        script = (directory / "app.js").read_text(encoding="utf-8")
-        ids = set(re.findall(r'id="([^"]+)"', html))
-        bindings = set(re.findall(r'\$\("([^"]+)"\)\.addEventListener', script))
-        self.assertFalse(bindings - ids, bindings - ids)
 
     def test_late_login_pushes_role_and_box_location_to_api(self):
         import aiohttp

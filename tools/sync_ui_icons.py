@@ -27,7 +27,10 @@ ICONS = {
     "eye": ["uid", "show"], "eye-off": ["uid", "hide"],
     "square": ["stop", "capture"], "chevron-down": ["account", "expand"],
     "gender-male": ["male", "gender"], "gender-female": ["female", "gender"],
+    "arrow-up": ["nature-positive", "increase", "up"],
+    "arrow-down": ["nature-negative", "decrease", "down"],
 }
+STROKE_WIDTH_OVERRIDES = {"arrow-up": "2.5", "arrow-down": "2.5"}
 
 
 def fetch(url: str) -> bytes:
@@ -47,10 +50,11 @@ def main() -> None:
         data = fetch(url)
         svg = ET.fromstring(data)
         assert svg.get("viewBox") == "0 0 24 24" and svg.get("stroke-width") == "2"
-        text = data.decode("utf-8")
+        stroke_width = STROKE_WIDTH_OVERRIDES.get(name, "2")
+        text = data.decode("utf-8").replace('stroke-width="2"', f'stroke-width="{stroke_width}"', 1)
         (dest / f"{name}.svg").write_text(text, encoding="utf-8")
         body = text[text.index(">", text.index("<svg")) + 1:text.rindex("</svg>")]
-        symbols.append(f'<symbol id="{name}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{body}</symbol>')
+        symbols.append(f'<symbol id="{name}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{stroke_width}" stroke-linecap="round" stroke-linejoin="round">{body}</symbol>')
         metadata.append({"name": name, "source": "Tabler Icons", "url": f"https://tabler.io/icons/icon/{name}",
                          "svg_url": url, "license": "MIT", "search_tags": tags, "sha256": hashlib.sha256(data).hexdigest()})
     (dest / "sprite.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg">' + "\n".join(symbols) + '</svg>\n', encoding="utf-8")

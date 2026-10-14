@@ -4,11 +4,10 @@ import type { Pet, PetBox } from '../types/pets'
 import PetDetailHero from './PetDetailHero.vue'
 import PetDetailStats from './PetDetailStats.vue'
 import PetMeasurementRow from './PetMeasurementRow.vue'
-import PetDetailMedals from './PetDetailMedals.vue'
 import PetDetailEvolution from './PetDetailEvolution.vue'
 const { pet, boxes } = defineProps<{ pet: Pet; boxes: PetBox[] }>()
-const emit = defineEmits<{ locate: [id: number] }>()
 const egg = ref(false)
+const measurementFields = computed(() => egg.value ? ['height', 'weight'] as const : ['height', 'weight', 'voice'] as const)
 const place = computed(() => pet.location)
 const historical = computed(() => { const value = place.value; return value && ('team_id' in value ? value.historical : boxes.find(box => box.box_id === value.box_id)?.historical) })
 const location = computed(() => !place.value ? '位置未采集' : 'team_id' in place.value ? '第 ' + place.value.team_id + ' 队 · 第 ' + place.value.slot + ' 格' : '第 ' + place.value.box_id + ' 箱 · 第 ' + place.value.row + ' 行第 ' + place.value.column + ' 列')
@@ -26,13 +25,13 @@ const acquired = computed(() => pet.add_time ? new Date(pet.add_time * 1000).toL
         <div class="pet-location-grid"><span v-for="slot in ('team_id' in place ? 6 : 30)" :key="slot" :class="{ active: slot === place.slot }"></span></div>
       </div>
       <p v-else class="filter-note">登录游戏后同步真实位置。</p>
-      <div class="detail-position-footer"><small>{{ historical ? '历史位置，待登录更新' : '最近采集的位置' }}</small><button v-if="place" class="ghost-button small" :data-locate-team="'team_id' in place ? place.team_id : undefined" :data-locate-box="'box_id' in place ? place.box_id : undefined" @click="emit('locate', 'team_id' in place ? 0 : place.box_id)">{{ 'team_id' in place ? '定位到出战背包' : '定位到此箱' }}</button></div>
+      <div v-if="place && !historical" class="detail-position-footer"><small>最近采集的位置</small></div>
     </section>
   </div>
   <section class="detail-measurements">
     <header><h3>体型与声音</h3><div class="segmented"><button :class="{ active: !egg }" :aria-pressed="!egg" @click="egg = false">精灵范围</button><button :class="{ active: egg }" :aria-pressed="egg" @click="egg = true">精灵蛋范围</button></div></header>
-    <PetMeasurementRow v-for="field in (['height', 'weight', 'voice'] as const)" :key="field" :field="field" :measurement="pet.detail.measurements[field]" :reference-only="egg && field !== 'voice'" :limits="egg && field !== 'voice' ? pet.detail.egg_limits[field] : pet.detail.measurements[field].limits" />
+    <PetMeasurementRow v-for="field in measurementFields" :key="field" :field="field" :measurement="pet.detail.measurements[field]" :reference-only="egg" :limits="egg && field !== 'voice' ? pet.detail.egg_limits[field] : pet.detail.measurements[field].limits" />
   </section>
-  <PetDetailMedals :pet="pet" /><PetDetailEvolution :pet="pet" />
+  <PetDetailEvolution :pet="pet" />
   <footer class="detail-acquisition"><span>获取方式 <b>{{ pet.detail.acquisition_name }}</b></span><span>获得时间 <b>{{ acquired }}</b></span></footer>
 </template>

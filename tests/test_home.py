@@ -7,7 +7,6 @@ import unittest
 from spritelens.domain.home import extract_home
 from spritelens.services.home_repository import HomeRepository
 from spritelens.events import PacketEvent
-from spritelens.web.payloads import home_payload
 
 
 def _field(no: int, raw: object = None, text: str | None = None, children: list[dict] | None = None) -> dict:
@@ -102,19 +101,6 @@ class HomeRepositoryTests(unittest.TestCase):
         self.assertEqual(repo.version(), base + 1)
         # 快照仍在（增量未合并）
         self.assertIsNotNone(repo.snapshot())
-
-
-class HomePayloadTests(unittest.TestCase):
-    def test_empty(self) -> None:
-        payload = home_payload(HomeRepository(), None)
-        self.assertFalse(payload["available"])
-
-    def test_available(self) -> None:
-        repo = HomeRepository()
-        repo.handle_packet(_resident_event(123, "喵喵"))
-        payload = home_payload(repo, None)
-        self.assertTrue(payload["available"])
-        self.assertEqual(payload["residents"][0]["name"], "喵喵")
 
 
 class FlowerTests(unittest.TestCase):

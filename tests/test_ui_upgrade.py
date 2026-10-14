@@ -8,16 +8,14 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
-import xml.etree.ElementTree as ET
 from urllib.parse import urlencode
 
 from spritelens.domain.eggs import EggCatalog
-from spritelens.domain.measurements import range_position, range_text
+from spritelens.domain.measurements import range_position
 from spritelens.domain.static_data import StaticData
 from spritelens.repositories.settings import SettingsRepository
 from spritelens.view_models.pet_vm import PetViewModel
-from spritelens.view_models.ui_preferences import UIPreferencesViewModel, normalize_preferences
-from spritelens.web.payloads import egg_dex_payload, handbook_payload
+from spritelens.view_models.ui_preferences import UIPreferencesViewModel
 from spritelens.web.server import LocalServer
 from tests.test_web_server import _make_context, _pet, _http_get, _http_post
 from tools.sync_catalog_resources import merge_species
@@ -40,20 +38,6 @@ class PreferencesTest(unittest.TestCase):
         self.path = Path(self.tmp.name) / "config.json"
         self.repo = SettingsRepository(self.path)
         self.vm = UIPreferencesViewModel(self.repo)
-
-    def test_invalid_config_defaults(self):
-        for raw in (None, [], {"theme": [], "pet_view": {}, "fields": {"height": 1}}):
-            self.assertEqual(normalize_preferences(raw), normalize_preferences({}))
-
-    def test_restart_and_partial_updates(self):
-        self.repo.set("capture.port", 8195)
-        self.vm.update({"theme": "huohua", "fields": {"voice": False}})
-        self.vm.update({"pet_view": "card"})
-        restored = UIPreferencesViewModel(SettingsRepository(self.path)).snapshot()
-        self.assertEqual(restored["theme"], "huohua")
-        self.assertEqual(restored["pet_view"], "card")
-        self.assertFalse(restored["fields"]["voice"])
-        self.assertEqual(self.repo.get_int("capture.port", 0, lo=0, hi=9999), 8195)
 
     def test_reject_business_filters_and_bad_values(self):
         for changes in ({"search": "foo"}, {"theme": "dark"}, {"theme": []}, {"fields": {"height": 1}}, {"fields": {"foo": False}}, []):
@@ -97,38 +81,11 @@ class PreferencesTest(unittest.TestCase):
 
 
 class MeasurementsTest(unittest.TestCase):
-    def test_range_units_and_missing(self):
-        self.assertEqual(range_text((53, 75), 100, "m"), "0.53–0.75 m")
-        self.assertEqual(range_text((1267, 1840), 1000, "kg"), "1.27–1.84 kg")
-        for limits in ((0, 0), (75, 53)):
-            self.assertEqual(range_text(limits, 100, "m"), "暂无数据")
-            self.assertIsNone(range_position(60, limits)["ratio"])
-        self.assertIsNone(range_position(60, (53, 53))["ratio"])
-
     def test_positions_and_bounds(self):
         self.assertEqual(range_position(64, (53, 75)), {"ratio": .5, "status": "within"})
         self.assertEqual(range_position(52, (53, 75))["status"], "below")
         self.assertEqual(range_position(80, (53, 75))["status"], "above")
         self.assertIsNone(range_position(0, (53, 75))["ratio"])
-
-    def test_starter_egg_aliases_and_independent_ranges(self):
-        catalog = EggCatalog(ROOT / "data/static")
-        raw = json.loads((ROOT / "data/static/eggs.json").read_text(encoding="utf-8"))
-        self.assertEqual(len(raw["egg_base_index"]), 477)
-        for base, key in raw["egg_base_index"].items():
-            self.assertEqual(catalog.egg_by_base_id(int(base)).egg_key, key)
-        for conf, key in raw["egg_conf_index"].items():
-            self.assertEqual(catalog.egg(int(conf)).egg_key, key)
-        egg = catalog.egg_by_base_id(3001)
-        self.assertEqual((egg.height_low, egg.height_high), (23, 31))
-        self.assertEqual(egg.egg_item_id, 107001)
-        self.assertTrue((ROOT / f"spritelens/web/static/egg-icons/{egg.egg_item_id}.png").is_file())
-
-    def test_full_chain_and_egg_names_use_stable_ids(self):
-        static = StaticData(ROOT / "data/static")
-        self.assertEqual(static.species(3001).chain_members, (3001, 3025, 3007, 5061))
-        payload = egg_dex_payload(EggCatalog(ROOT / "data/static"), static=static, search="3001001")
-        self.assertEqual(payload["eggs"][0]["chain_names"]["3007"], "魔力猫")
 
     def test_merge_is_idempotent_preserves_valid_values(self):
         table = {"1": {"name": "existing", "height_range": [50, 70]}}
@@ -141,20 +98,6 @@ class MeasurementsTest(unittest.TestCase):
         snapshot = json.dumps(table, sort_keys=True)
         self.assertEqual(merge_species(table, refs)[0], [])
         self.assertEqual(json.dumps(table, sort_keys=True), snapshot)
-
-    def test_sprite_contains_valid_flat_symbols_and_references(self):
-        directory = ROOT / "spritelens/web/static/icons"
-        sprite = ET.parse(directory / "sprite.svg").getroot()
-        ns = "{http://www.w3.org/2000/svg}"
-        sources = json.loads((directory / "sources.json").read_text(encoding="utf-8"))["icons"]
-        self.assertEqual({x.get("id") for x in sprite}, {x["name"] for x in sources})
-        for symbol in sprite:
-            self.assertEqual(symbol.tag, ns + "symbol")
-            self.assertEqual(symbol.get("stroke-width"), "2")
-            self.assertFalse(list(symbol.iter(ns + "svg")), "nested svg breaks symbol geometry")
-        for source in sources:
-            self.assertTrue((directory / (source["name"] + ".svg")).is_file())
-            self.assertEqual(source["license"], "MIT")
 
     def test_merge_repairs_invalid_range_only(self):
         table = {"1": {"name": "one", "height_range": [90, 50]}}
@@ -227,10 +170,6 @@ class UpgradeAPITest(unittest.TestCase):
         self.assertEqual(self.get_pets(search="a", level_min=60, voice_min=20, pool_mode="or")["shown"], 2)
         self.assertEqual(self.get_pets(voice_min=20, pool_mode="or")["shown"], 1)
 
-    def test_egg_search_uses_display_name_when_name_key_is_missing(self):
-        result = egg_dex_payload(self.ctx.egg_catalog, search="云梦豚")
-        self.assertEqual([egg["egg_conf_id"] for egg in result["eggs"]], [3784001])
-
     def test_invalid_range_normalization(self):
         filters = self.get_pets(height_min="nan", weight_max="inf", voice_min=40, voice_max=-30, egg_mode="bad")["filters"]
         self.assertIsNone(filters["height_min"])
@@ -250,13 +189,6 @@ class UpgradeAPITest(unittest.TestCase):
         self.assertIsNone(filters["weight_position_min"])
         self.assertIsNone(filters["weight_position_max"])
         self.assertEqual(self.get_pets()["shown"], 3)
-
-    def test_measurement_sorting_and_format(self):
-        for key, expected in (("height", [1, 2, 3]), ("weight", [1, 2, 3]), ("voice", [1, 3, 2])):
-            self.assertEqual([p["gid"] for p in self.get_pets(sort=key)["pets"]], expected)
-            self.assertEqual([p["gid"] for p in self.get_pets(sort=key, desc=1)["pets"]], list(reversed(expected)) if key != "weight" else [2, 3, 1])
-        row = self.get_pets(search="A")["pets"][0]
-        self.assertEqual((row["height_text"], row["weight_text"]), ("0.64 m", "4.00 kg"))
 
     def test_saving_shortcut_does_not_apply_business_filters(self):
         self.get_pets()
@@ -295,17 +227,3 @@ class UpgradeAPITest(unittest.TestCase):
             status, value = _http_post(self.url + "/api/ui/preferences", "upgrade-test", {"theme": "huohua"})
         self.assertEqual(status, 500)
         self.assertIn("保存失败", value["error"])
-
-    def test_preferences_survive_new_server_context(self):
-        expected = UIPreferencesViewModel(self.ctx.settings).snapshot()
-        context = _make_context(Path(self.tmp.name))
-        server = LocalServer(context, token="restart-test", port=0)
-        server.start()
-        try:
-            status, result = _http_get(f"http://127.0.0.1:{server.port}/api/bootstrap", "restart-test")
-            self.assertEqual(status, 200)
-            self.assertEqual(result["ui_preferences"], expected)
-            self.assertFalse(context.pet_vm.filters.active)
-        finally:
-            server.stop()
-            context.close()

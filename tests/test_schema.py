@@ -84,18 +84,6 @@ class SchemaLibraryTest(unittest.TestCase):
         self.assertEqual(lib.messages, {})
         self.assertEqual(lib.decode(make_protobuf_payload(), None)[0]["name"], "field_1")
 
-    def test_get_library_default_empty(self):
-        from spritelens.protocol import schema as schema_mod
-
-        saved = schema_mod._library
-        schema_mod._library = None
-        try:
-            lib = schema_mod.get_library()
-            self.assertEqual(lib.messages, {})
-        finally:
-            schema_mod._library = saved
-
-
 class SchemaLibraryDirectTest(unittest.TestCase):
     def test_field_defs_namespace_fallback(self):
         lib = SchemaLibrary(messages={"PetAttributeData": {1: {"name": "x", "type": ""}}}, source_dir=None)

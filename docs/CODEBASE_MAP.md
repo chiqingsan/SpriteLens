@@ -1,6 +1,6 @@
 # 代码地图
 
-文件级速查；新增文件须同步本表。测试数基线：见 `tools/run_build_tests.py` 输出。
+文件级速查；新增文件须同步本表。必要回归与开发/发布验证范围见 [开发指南](DEVELOPMENT_GUIDE.md#测试)。
 
 界面形态：**只有 Web 一套**（pywebview 窗口 + 本地服务 + 原生 JS 前端）；
 历史 PyQt 原生界面已于 2026-10 退役，`requirements.txt` 不再含 PyQt6。
@@ -19,7 +19,6 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `requirements-build.txt` | 打包依赖（nuitka / ordered-set / zstandard），运行程序不需要 |
 | `tools/create_shortcut.bat` + `ps1` | 创建桌面快捷方式（幂等，ps1 用 $PSScriptRoot 自定位） |
 | `requirements.txt` | scapy / pycryptodome / aiohttp / pywebview（无 UI 框架之外的额外依赖） |
-| `tools/run_build_tests.py` | 统一门禁：unittest、递归 JS、HTML 引用、静态清单与依赖 |
 | `tools/import_schema.py` | 导入外部 schema 全集到 data/schemas（本地目录或 GitHub） |
 | `tools/import_static_data.py` | 导入基础静态表（物种/性格/系别/技能）到 data/static |
 | `tools/import_assets.py` | 导入图鉴元数据 + 精灵图 + 系别图标 + 系别克制表 |
@@ -35,9 +34,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `resources/icon_source.png` | 已确认的好奇版头像源图，供 `tools/make_icon.py` 派生 ICO 与 favicon |
 | `spritelens/web/desktop_shell.py` | 自绘标题栏 JS 桥、WebView2原生拖动区域、保留系统动画的窗口消息回调、原生状态、最大化工作区与边缘缩放 |
 | `spritelens/web/startup_cover.py` | 桌面启动唯一可见面板：静态图标与文案，首屏就绪才揭开；失败/20 秒超时原地重试，closing 释放资源 |
-| `frontend/browser/startup.spec.ts` | 初始数据/模块等待、原生桥早晚就绪与失败通知、浏览器样式失败重试及减少动画验收 |
 | `spritelens/web/static/desktop-shell.js` / `desktop-shell.css` | 桌面顶栏、窗口操作与缩放边缘；浏览器模式隐藏 |
-| `frontend/browser/desktopShell.spec.ts` | 顶栏交互、原生状态同步、浏览器隐藏与启动失败时关闭验收 |
 | `data/schemas/` | 外挂 schema：`opcodes.json` + `messages/*.json`（字段级合并） |
 | `data/static/` | 静态映射：`species/natures/types/skills/type_chart/eggs/medals/specialities/flower_levels/color_cards.json` + 各 `_meta.json`；特性来源见 `_specialities_meta.json` |
 | `spritelens/web/static/` | 前端资源：`index.html`（分组导航骨架）/ `boot.js`（启动自恢复链）/ `app.css`（布局与组件 token）/ `themes.css`（三套主题色值）/ `app.js`（数据渲染）/ `ui.css` / `ui.js`（详情抽屉、键盘与焦点）/ `appearance.js`（主题与显示偏好）/ `pet-presentation.js`（头像/色卡/标记渲染）/ `icons.js` + `icons/`（本地 SVG sprite）/ `favicon.png` / `pet-media/`（官方原始头像与全身图）/ `type-icons/` `egg-icons/` `medal-icons/`（奖牌及标记图标）/ `rarity/` `color-cards/` |
@@ -128,21 +125,21 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `web/pet_media_cache.py` | 精灵图本地优先；缺失时按需校验、转码、缓存官方 CDN 图片并记录哈希 |
 | `frontend/src/pages/EggDexPage.vue`、`components/`、`composables/useEggDex.ts` | 蛋图鉴展示、详情与请求生命周期；局部状态、卸载/取消与代次失效 |
 | `frontend/src/components/PetBasicFilters.vue`、`composables/usePetFilters.ts`、`types/petFilters.ts` | F03 第一刀：基础筛选的唯一状态/DOM 所有者、防抖与 options 运行校验；相关 Vitest 同目录 |
-| `frontend/src/petFilterBridge.ts`、`frontend/browser/petFilters.spec.ts` | 原生页查询/恢复/清理/请求失效桥；真实 HTTP 筛选、快捷恢复、焦点、离页与防抖旧响应验证 |
+| `frontend/src/petFilterBridge.ts` | 原生页查询/恢复/清理/请求失效桥；卸载与重新挂载由相关轻量回归验证 |
 | `frontend/src/components/PetFiltersPanel.vue`、`PetAdvancedFilters.vue`、`PetShortcuts.vue` | 完整筛选、顶部AND/OR匹配与快捷追加；扩展状态在 usePetAdvancedFilters，条件运行契约在 types/petConditions.ts |
 | `frontend/src/components/DualRangeSlider.vue` | 等级、体型、声音与百分比共用双头滑动条；仅持有拖动量程，筛选状态仍在对应composable |
-| `frontend/src/components/PetDetail.vue`、`PetDetailPanel.vue`、`frontend/browser/petComplete.spec.ts` | 完整详情、定位、键盘/焦点与窄屏交互；完整页浏览器回归 |
+| `frontend/src/components/PetDetail.vue`、`PetDetailPanel.vue` | 完整详情、定位、键盘/焦点与窄屏交互；布局按需目视验收 |
 | `frontend/src/composables/usePets.ts`、`types/pets.ts`、`petInventoryBridge.ts` | F03 第二刀：请求与账号票据/DTO、快照/三视图/分页/箱队/选择；账号/偏好与应用壳桥 |
 | `frontend/src/components/PetInventory.vue`、`PetCards.vue`、`PetTable.vue`、`PetSlots.vue`、`PetBoxNavigation.vue` | 三视图、加载/错误重试、真实箱位/队伍、分页、键盘/焦点；Vue 独占节点 |
 | `frontend/src/components/PetAvatar.vue`、`PetMarks.vue`、`petDisplay.ts` | 安全模板展示本地头像/立绘、色卡/粒子、稀有/奖牌及 UI 格式；不复制 Python 业务规则 |
-| `frontend/src/petTestData.ts`、`composables/usePets.test.ts`、`components/PetInventory.test.ts`、`frontend/browser/petInventory.spec.ts` | 合成数据、异步/账号/DTO/槽位回归与大列表/多箱/详情定位浏览器验收 |
+| `frontend/src/petTestData.ts`、`composables/usePets.test.ts` | 合成数据、异步/账号/DTO/槽位回归 |
 | `frontend/src/api/client.ts`、`types/eggDex.ts` | 同源 token/取消/错误归一与页面 DTO 运行校验 |
-| `frontend/src/main.ts`、工程配置/锁文件、`browser/` | memory Router/Pinia 装配、strict TS/Vite/Vitest/ESLint 与 Playwright 合成验收 |
+| `frontend/src/main.ts`、工程配置/锁文件 | memory Router/Pinia 装配、strict TS/Vite 与必要 Vitest 回归；无 ESLint/Playwright |
 | `tools/frontend.py`、`web/frontend_assets.py` | 暂存构建/专用目录发布、源指纹及运行产物清单/哈希校验 |
 | `tests/test_frontend_contract.py` | JSON→JS ID 精度与构建负例 |
-| `tests/test_desktop_startup.py` | 原生拖动设置、启动固定槽位、带桌面标识的重试URL与销毁后交接 |
+| `tests/test_desktop_startup.py` | 原生拖动设置、正常窗口边界保存、带桌面标识的重试 URL 与销毁后交接 |
 | `tests/test_pet_snapshot_contract.py` | F01：读取后切号，列表/选项/概览/REST/WS 与 bootstrap 的单响应同源、离线归属 |
-| `tests/test_account_domain_contract.py`、`tests/test_account_requests.py`、`tests/account_requests_cases.js`、`frontend/browser/accountDomains.spec.ts` | F02：切号交错、历史语义、恢复竞争与错误；浏览器旧响应/缓存清理与历史孵化显示 |
+| `tests/test_account_domain_contract.py`、`tests/test_account_requests.py`、`tests/account_requests_cases.js` | F02：切号交错、历史语义、恢复竞争与原生页请求失效 |
 
 ## tests/（unittest 平铺）
 
@@ -159,30 +156,27 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `test_npcap_source.py` | 抓包线程逻辑（分类/入队/队列满丢弃/worker 投递/关闭事件保序/流淘汰） |
 | `test_recording.py` | 录制 roundtrip、坏行跳过、回放一致性 |
 | `test_pets.py` | 形状提取、仓库合并、schema→管线→聚合端到端、v2 扩展字段 |
-| `test_pet_vm.py` | 宠物 VM：多维筛选、排序、聚合统计 |
-| `test_static_data.py` | 静态表加载/索引/降级；base_conf_id 与 conf_id 的区分回归 |
-| `test_eggs.py` | 蛋目录：加载/索引/降级、载荷筛选（蛋组/类型/孵化时长/搜索） |
+| `test_pet_vm.py` | 宠物 VM：搜索/多维筛选组合与排序 |
+| `test_static_data.py` | base_conf_id 与 conf_id 的区分、坏表不影响其它数据 |
+| `test_eggs.py` | 蛋目录关联索引与蛋组/类型/孵化时长/搜索筛选 |
 | `test_egg_box.py` | 蛋仓：形状搜索提取/拒收、聚合去重、SQLite roundtrip、写-behind 落盘、跨账号隔离、载荷联查、种公矩阵 |
-| `test_home.py` | 家园：居民/家具/窝提取、聚合与增量计数、载荷、花种提取与载荷 |
-| `test_desktop_shell.py` | 窗口几何 fit_window（DPI/工作区 clamp）、WebView2 env 覆盖检测 |
+| `test_home.py` | 家园：居民/家具/窝提取、聚合与增量计数；花种提取与载荷 |
+| `test_desktop_shell.py` | DPI/工作区适配、保存的宽高比例与多屏位置恢复 |
 | `test_app_icons.py` | 窗口大小图标消息、64 位句柄与图标加载失败回归 |
-| `test_nic_rank.py` | 活跃网卡排序（前置/保持原序/宽松匹配） |
 | `test_single_instance.py` | 单实例互斥锁唯一性、唤醒事件投递与消费、close 幂等 |
 | `test_persistence.py` | 身份识别（NPC 不误取）、写库/重开/加载、跨账号隔离、迁移事务/回滚/半迁移自修复、外观字段往返、彩名恢复、损坏恢复 |
-| `test_view_models.py` | VM 状态与命令（Capture/Events + 自动采集开关） |
-| `test_runtime_repair.py` | E01–E06：慢保存 HTTP/WS、停止所有权/下游保护、嗅探器退出、错误分类与缺工具门禁 |
+| `test_view_models.py` | 手动密钥、采集/录制命令串行化、配置/录制失败与自动采集开关 |
+| `test_runtime_repair.py` | 慢保存 HTTP/WS、停止所有权/下游保护、嗅探器退出与错误分类 |
 | `test_pet_locations.py` | 箱位：登录映射、空箱/部分箱、槽位匹配状态、队伍归属与槽序、切号/重启、历史与实时去重 |
-| `test_pet_presentation.py` | 头像 `-fit` 派生、尺寸/声音标记边界、旧偏好迁移、类型色卡解码 |
+| `test_pet_presentation.py` | 尺寸/声音标记边界、旧快捷偏好迁移与色卡解码 |
 | `test_session_resume.py` | 会话接续：服务端帧确认、流/密钥/序号不匹配、新握手与关闭失效、损坏缓存 |
-| `test_ui_upgrade.py` | UI 升级：偏好鉴权/重启/并发/失败、范围与组合筛选、别名合并、sprite 完整性 |
-| `test_architecture.py` | 架构边界：业务层无 Web 依赖、无反向分层、protocol 纯函数约束 |
-| `test_crash_log.py` | 崩溃日志：主线程/后台线程异常落盘、Ctrl+C 不记录、写入失败静默 |
+| `test_ui_upgrade.py` | 偏好鉴权/并发/写失败、快捷迁移/校验、范围/组合筛选与资源合并 |
+| `test_crash_log.py` | pythonw 主线程/后台线程崩溃落盘 |
 | `test_paths.py` | 打包态资源定位：源码/frozen/_MEIPASS 三分支、数据目录不受打包影响 |
-| `test_smoke_assets.py` | 随包资源齐备（前端静态目录/静态表/schema），防打包漏带 |
-| `test_web_server.py` | 本地服务：token 鉴权（REST/WS）、随机端口、宠物/图鉴/采集 API、载荷构造 |
+| `test_web_server.py` | REST/WS 鉴权、启动回收、请求串扰、采集输入/写失败与图鉴筛选 |
 | `test_browser_open.py` | 设置页浏览器调试入口：鉴权、当前服务 URL 与浏览器打开失败 |
-| `test_environment.py` | Npcap 检测与安装引导状态机 |
-| `test_event_logger.py` | 事件日志异步落盘与分片、队列满丢弃、关闭超时不跨线程关文件 |
+| `test_environment.py` | 启动 quick 探测不调用慢 RSC 检查、Npcap 版本数字排序 |
+| `test_event_logger.py` | 异步落盘、关闭 flush、过载计数与关闭超时所有权 |
 
 ## 三主题与资源补齐（2026-10-12）
 
@@ -194,7 +188,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `web/static/icons.js` / `icons/` | 本地Tabler SVG与sprite，29枚图标和MIT来源清单 |
 | `tools/sync_catalog_resources.py` | 保留有效值的ID合并、官方镜像校验、可重复资源导入与报告 |
 | `tools/sync_ui_icons.py` | 固定官方Git版本的少量SVG导入，无运行时网络依赖 |
-| `tests/test_ui_upgrade.py` | 偏好鉴权/重启/并发/失败、范围/组合筛选、别名、合并和sprite完整性 |
+| `tests/test_ui_upgrade.py` | 偏好鉴权/并发/失败、快捷与筛选规则及资源合并回归 |
 | `docs/RESOURCE_COVERAGE_REPORT.md` | 1060物种、646组范围、224蛋、477别名；缺图/缺字段/冲突 |
 | `docs/BREEDING_PLANNER_SPEC.md` / `COLLECTION_LINES_SPEC.md` | 下一轮配窝与产线开发规格，明确已验证规则与未知假设 |
 
@@ -225,9 +219,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `spritelens/web/static/account-card.js` | 现有账号快照的卡片展示与窗口内 UID 隐藏；不参与账号归属或持久化 |
 | `spritelens/web/static/backpack-layout.css` | 定稿应用壳/宠物页布局、工具条与响应式几何，复用主题 tokens |
 | `tests/test_pet_ui_conditions.py` | 全局 AND/OR、真实奖牌与参考标记区别、非法查询拒绝 |
-| `frontend/browser/petLayout.spec.ts` | UID可见性、首用状态、双按钮筛选、详情共享宽度与窄窗账号弹出 |
 | `frontend/src/components/PetShortcutSettings.vue` | 原生dialog快捷设置：分组勾选具体选项、草稿、保存和关闭；沿用现有快捷偏好边界 |
-| `frontend/browser/petFilterPolish.spec.ts` | 图标资源、慢请求保留计数、快捷设置勾选/应用/取消、获取方式与日期、范围边界摘要 |
 | `tests/test_pet_acquisition.py` | PetData获得字段、简略更新保留已知信息、v8→v9库迁移、未知日期与全局AND/OR |
 
 新增本地 Tabler eye/eye-off/square/chevron-down 图标列入 `icons/sources.json` 与 `tools/sync_ui_icons.py`，沿用固定来源提交和MIT许可。
@@ -237,7 +229,8 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | 文件 | 职责 |
 |---|---|
 | `frontend/src/components/PetDetailPanel.vue`、`PetDetail.vue` | 与筛选共用360px右栏、窄窗抽屉、焦点/连续浏览、正文滚动与低优先级获取信息 |
-| `PetDetailHero.vue`、`PetDetailStats.vue`、`PetMeasurementRow.vue` | 立绘透明边界占比/像素限幅、两行身份、六维与已含加成、精灵/精灵蛋数值范围 |
+| `PetDetailHero.vue`、`PetArtwork.vue` | 详情身份叠加；独立立绘展示与同URL复用，原图按整张立绘卡片宽度70%等比居中 |
+| `PetDetailStats.vue`、`PetMeasurementRow.vue` | 六维与已含加成、精灵/精灵蛋数值范围 |
 | `PetDetailMedals.vue`、`PetDetailEvolution.vue`、`pet-detail.css` | 横向获得奖牌、真实头像分支进化、限定背包的主题与响应式样式 |
 | `spritelens/domain/pet_medals.py` | 登录集合按获得精灵归属；未核验增量失效相关集合 |
 | `spritelens/web/pet_details.py` | 既有宠物与静态资料生成详情DTO，不另读仓库 |

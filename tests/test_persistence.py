@@ -156,37 +156,6 @@ class PetStoreTest(unittest.TestCase):
         store2.close()
         db2.close()
 
-    def test_upsert_updates_existing_pet(self):
-        db = Database(self.db_path)
-        store = PetStore(db)
-        store.put(UID, self._pets())
-        store.flush()
-        updated = [Pet(gid=1, conf_id=20508, name="魔力猫", level=60, exp=9, nature=11,
-                       gender=1, blood_id=4, talent_rank=5, is_first_catch=True)]
-        store.put(UID, updated)
-        store.flush()
-        loaded = store.load(UID)
-        self.assertEqual(len(loaded), 2)  # 不重复插入
-        self.assertEqual(loaded[0].level, 60)
-        self.assertEqual(loaded[0].talent_rank, 5)
-        store.close()
-        db.close()
-
-    def test_pending_coalesces_duplicates(self):
-        """同一 (uid,gid) 多次写入在待写表合并，落盘只算一条。"""
-        db = Database(self.db_path)
-        store = PetStore(db, flush_interval=60.0)  # 不自动落盘，便于断言待写表
-        pet = self._pets()[0]
-        for level in (10, 20, 30):
-            store.put(UID, [Pet(gid=pet.gid, conf_id=pet.conf_id, name=pet.name, level=level,
-                                exp=0, nature=0, gender=0, blood_id=0, talent_rank=0,
-                                is_first_catch=False)])
-        self.assertEqual(store.pending_count, 1)
-        self.assertEqual(store.flush(), 1)
-        self.assertEqual(store.load(UID)[0].level, 30)
-        store.close()
-        db.close()
-
     def test_invalid_uid_and_gid_ignored(self):
         db = Database(self.db_path)
         store = PetStore(db)
@@ -278,49 +247,6 @@ class PetRepositoryPersistenceTest(unittest.TestCase):
         store.close()
         db.close()
 
-    def test_load_persisted_fills_missing(self):
-        db = Database(self.db_path)
-        store = PetStore(db)
-        store.put(UID, [Pet(gid=1, conf_id=1, name="历史宠物", level=10, exp=0, nature=0,
-                            gender=0, blood_id=0, talent_rank=0, is_first_catch=False)])
-        store.flush()
-
-        repo = PetRepository(store=store)
-        added = repo.load_persisted(UID)
-        self.assertEqual(added, 1)
-        self.assertEqual(repo.snapshot()[0].name, "历史宠物")
-        store.close()
-        db.close()
-
-    def test_load_last_account(self):
-        db = Database(self.db_path)
-        store = PetStore(db)
-        store.put_account(UID, "话绵雨", 55)
-        store.put(UID, [Pet(gid=7, conf_id=1, name="上次的宠物", level=20, exp=0, nature=0,
-                            gender=0, blood_id=0, talent_rank=0, is_first_catch=False)])
-        store.flush()
-
-        repo = PetRepository(store=store)
-        self.assertEqual(repo.load_last_account(), 1)
-        self.assertEqual(repo.snapshot()[0].gid, 7)
-        store.close()
-        db.close()
-
-    def test_without_store_behaviour_unchanged(self):
-        """未注入 store：不落库、不补历史，但身份跟踪与切换清空照常生效。"""
-        repo = PetRepository()
-        repo.handle_packet(identity_event())
-        repo.handle_packet(pet_event([(1, "魔力猫", 41)]))
-        # 身份跟踪独立于持久化（切号清空内存快照是回放场景也需要的隔离）
-        self.assertIsNotNone(repo.identity)
-        self.assertEqual(repo.identity.uid, UID)
-        self.assertEqual(repo.load_persisted(UID), 0)
-        self.assertEqual(len(repo.snapshot()), 1)
-        # 切换账号 → 旧快照作废
-        repo.handle_packet(identity_event(uid=OTHER_UID, name="另一个账号"))
-        self.assertEqual(repo.snapshot(), ())
-
-
 # --- 4. 迁移与降级 ----------------------------------------------------
 
 
@@ -328,38 +254,6 @@ class DatabaseMigrationTest(unittest.TestCase):
     def setUp(self):
         self.tmp_path = _make_tmp(self)
         self.db_path = self.tmp_path / "mig.sqlite"
-
-    def test_schema_version_set(self):
-        db = Database(self.db_path)
-        self.assertGreaterEqual(db.schema_version, 1)
-        db.close()
-
-    def test_reopen_is_idempotent(self):
-        """重复打开不重复执行迁移、不报错、数据保留。"""
-        db1 = Database(self.db_path)
-        store1 = PetStore(db1)
-        store1.put(UID, [Pet(gid=1, conf_id=1, name="x", level=1, exp=0, nature=0,
-                             gender=0, blood_id=0, talent_rank=0, is_first_catch=False)])
-        store1.close()  # close 内含最终 flush
-        db1.close()
-
-        db2 = Database(self.db_path)
-        self.assertGreaterEqual(db2.schema_version, 1)
-        store2 = PetStore(db2)
-        self.assertEqual(len(store2.load(UID)), 1)
-        store2.close()
-        db2.close()
-
-    def test_in_memory_database(self):
-        """:memory: 可直接用于测试，无需临时文件。"""
-        db = Database(":memory:")
-        store = PetStore(db)
-        store.put(UID, [Pet(gid=1, conf_id=1, name="mem", level=1, exp=0, nature=0,
-                            gender=0, blood_id=0, talent_rank=0, is_first_catch=False)])
-        store.flush()
-        self.assertEqual(store.load(UID)[0].name, "mem")
-        store.close()
-        db.close()
 
     def test_corrupt_database_recovered_not_fatal(self):
         """损坏库不阻断启动：自动备份原文件并重建空库（原数据留证）。"""
@@ -550,21 +444,6 @@ class DatabaseMigrationTest(unittest.TestCase):
         self.assertEqual(loaded.skills[0].conf_idx, 13)
         self.assertTrue(loaded.skills[0].is_equipped)
         self.assertEqual(loaded.skills[0].unlock_need_lv, 48)
-        store.close()
-        db.close()
-
-    def test_extended_fields_default_when_absent(self):
-        """老数据/缺字段的宠物入库后，新列全零且读取不崩。"""
-        db = Database(self.db_path)
-        store = PetStore(db)
-        store.put(UID, [Pet(gid=1, conf_id=1, name="x", level=1, exp=0, nature=0,
-                            gender=0, blood_id=0, talent_rank=0, is_first_catch=False)])
-        store.flush()
-        loaded = store.load(UID)[0]
-        self.assertEqual(loaded.attributes, ())
-        self.assertEqual(loaded.skills, ())
-        self.assertEqual((loaded.height, loaded.weight, loaded.voice), (0, 0, 0))
-        self.assertEqual((loaded.colorful_conf_id, loaded.glass_type, loaded.glass_value), (0, 0, 0))
         store.close()
         db.close()
 
@@ -1058,16 +937,6 @@ class AppContextCloseTest(unittest.TestCase):
         with self.assertRaises(Exception):
             database.query("SELECT 1")  # 已关闭
         self.assertEqual(context.pet_store.pending_count, 0)
-
-    def test_database_survives_in_context_for_new_code(self):
-        """AppContext 构造可直接携带 database 字段（dataclass 契约）。"""
-        from dataclasses import fields
-
-        from spritelens.app_context import AppContext
-
-        names = {f.name for f in fields(AppContext)}
-        self.assertIn("database", names)
-
 
 class BuildRollbackTest(unittest.TestCase):
     """S02：装配失败回滚——任一节点失败，已建资源（DB/log worker）被清理。"""

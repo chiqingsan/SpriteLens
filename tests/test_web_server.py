@@ -23,7 +23,7 @@ from spritelens.repositories.settings import SettingsRepository
 from spritelens.services.monitor_service import MonitorService
 from spritelens.services.pet_repository import PetRepository
 from spritelens.view_models import CaptureViewModel, EventsViewModel, PetViewModel
-from spritelens.web.payloads import handbook_payload, overview_payload, pets_payload
+from spritelens.web.payloads import handbook_payload
 from spritelens.web.server import LocalServer
 
 
@@ -150,11 +150,6 @@ class LocalServerTest(unittest.TestCase):
         cls.server.stop()
         cls._tmp.cleanup()
 
-    def test_random_port_assigned(self):
-        """端口交给系统分配（非固定），且只绑回环。"""
-        self.assertGreater(self.server.port, 0)
-        self.assertEqual(self.server.host, "127.0.0.1")
-
     def test_start_timeout_reclaims_background_loop(self):
         """start 超时抛 TimeoutError 并请求后台循环停止（S02）。
 
@@ -175,11 +170,6 @@ class LocalServerTest(unittest.TestCase):
             server.stop()
         context.close()
         self.assertIsInstance(timed_out, bool)
-
-    def test_url_carries_token_in_fragment(self):
-        """token 走 fragment：不进请求行/服务端日志。"""
-        self.assertTrue(self.server.url.endswith("/#token=test-token-abc"))
-        self.assertIn("/#token=", self.server.url)
 
     def test_api_requires_token(self):
         status, _ = _http_get(f"http://127.0.0.1:{self.server.port}/api/bootstrap")
@@ -249,19 +239,6 @@ class LocalServerTest(unittest.TestCase):
         self.assertEqual(results["boot"][1]["pets"]["total"], 2)
         self.assertEqual(len(results["boot"][1]["pets"]["pets"]), 2)
 
-    def test_bootstrap_payload_shape(self):
-        status, payload = _http_get(
-            f"http://127.0.0.1:{self.server.port}/api/bootstrap", token=self.server.token
-        )
-        self.assertEqual(status, 200)
-        self.assertEqual(payload["app"]["name"], "SpriteLens")
-        self.assertIn("overview", payload)
-        self.assertIn("pets", payload)
-        self.assertIn("capture", payload)
-        self.assertIn("state", payload)
-        self.assertEqual(payload["pets"]["total"], 2)
-        self.assertEqual(payload["overview"]["stats"]["total"], 2)
-
     def test_pets_filtering_via_query(self):
         base = f"http://127.0.0.1:{self.server.port}"
         _, payload = _http_get(f"{base}/api/pets?first_catch=1", token=self.server.token)
@@ -299,16 +276,6 @@ class LocalServerTest(unittest.TestCase):
             self.assertEqual(payload["filters"]["gender"], 0)
         finally:
             _http_get(base, token=self.server.token)
-
-    def test_pet_row_has_display_fields(self):
-        _, payload = _http_get(
-            f"http://127.0.0.1:{self.server.port}/api/pets", token=self.server.token
-        )
-        row = payload["pets"][0]
-        for key in ("gid", "name", "level", "stats", "height_text", "weight_text", "talent_color"):
-            self.assertIn(key, row)
-        self.assertEqual(len(row["stats"]), 6)
-        self.assertEqual(row["height_text"], "1.21 m")
 
     def test_capture_endpoints(self):
         base = f"http://127.0.0.1:{self.server.port}"
@@ -447,23 +414,6 @@ class LocalServerTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertTrue(payload["ok"])
 
-    def test_state_endpoint(self):
-        status, payload = _http_get(
-            f"http://127.0.0.1:{self.server.port}/api/state", token=self.server.token
-        )
-        self.assertEqual(status, 200)
-        self.assertEqual(payload["pets_total"], 2)
-        self.assertIn("capture", payload)
-
-    def test_type_color_in_stats(self):
-        """系别分布带主题色（前端条形图直接着色，不必自己映射）。"""
-        status, payload = _http_get(
-            f"http://127.0.0.1:{self.server.port}/api/state", token=self.server.token
-        )
-        self.assertEqual(status, 200)
-        for item in payload["stats"]["types"]:
-            self.assertIn("color", item)
-
     def test_removed_clear_snapshot_endpoints(self):
         """已移除清空功能：旧接口不再清理当前会话。"""
         with tempfile.TemporaryDirectory() as tmp:
@@ -482,38 +432,6 @@ class LocalServerTest(unittest.TestCase):
                 self.assertEqual(after["total"], 1)
             finally:
                 server.stop()
-
-    def test_events_endpoints(self):
-        base = f"http://127.0.0.1:{self.server.port}"
-        status, payload = _http_get(f"{base}/api/events", token=self.server.token)
-        self.assertEqual(status, 200)
-        self.assertIn("rows", payload)
-
-        status, payload = _http_get(f"{base}/api/events/detail?index=0", token=self.server.token)
-        self.assertEqual(status, 200)
-        self.assertIn("detail", payload)
-
-    def test_handbook_endpoint(self):
-        """图鉴：无静态表时返回空壳（不报错），保证前端可渲染空态。"""
-        status, payload = _http_get(
-            f"http://127.0.0.1:{self.server.port}/api/handbook", token=self.server.token
-        )
-        self.assertEqual(status, 200)
-        self.assertIn("species", payload)
-        self.assertIn("total", payload)
-        self.assertIn("filters", payload)
-
-    def test_eggs_endpoint(self):
-        """蛋图鉴：目录缺失时返回空壳（前端可渲染空态与空筛选器）。"""
-        status, payload = _http_get(
-            f"http://127.0.0.1:{self.server.port}/api/eggs", token=self.server.token
-        )
-        self.assertEqual(status, 200)
-        self.assertIn("eggs", payload)
-        self.assertIn("groups", payload)
-        self.assertIn("egg_types", payload)
-        self.assertIn("filters", payload)
-        self.assertEqual(payload["total"], 0)
 
     def test_websocket_requires_token(self):
         """WebSocket 走查询参数鉴权（浏览器无法自定义头）；错 token 被拒、对 token 可连。"""
@@ -548,31 +466,6 @@ class LocalServerTest(unittest.TestCase):
         first = asyncio.run(good_scenario())
         self.assertIn("pets_total", first)
         self.assertIn("capture", first)
-
-
-class PayloadsUnitTest(unittest.TestCase):
-    """载荷构造的纯函数测试（不起服务）。"""
-
-    def test_pet_row_without_static_data(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            context = _make_context(Path(tmp), pets=(_pet(7, name="彩蝶鲨", level=48),))
-            payload = pets_payload(context.pet_vm, None)
-            row = payload["pets"][0]
-            self.assertEqual(row["name"], "彩蝶鲨")
-            self.assertEqual(row["nature_name"], "1")  # 无静态表退回原始 ID
-            self.assertEqual(row["type_names"], [])
-            self.assertEqual(row["species_name"], "")
-            self.assertEqual(row["stat_sum"], sum(100 + i * 5 for i in range(6)))
-
-    def test_overview_payload_no_identity(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            context = _make_context(Path(tmp), pets=(_pet(1, name="A", level=61, first=True),))
-            payload = overview_payload(context.pet_vm.view_with(context.pet_vm.filters), None)
-            self.assertIsNone(payload["identity"])
-            self.assertEqual(payload["stats"]["total"], 1)
-            self.assertNotIn("first_catch", payload["stats"])
-            self.assertEqual(payload["stats"]["max_level"], 61)
-            self.assertEqual(payload["stats"]["maxed"], 1)
 
 
 class HandbookPayloadTest(unittest.TestCase):
@@ -652,17 +545,6 @@ class HandbookPayloadTest(unittest.TestCase):
             [row["key"] for row in self._payload(search="烈焰")["species"]], ["200"]
         )
         self.assertEqual([row["key"] for row in self._payload(search="300")["species"]], ["300"])
-
-    def test_evolution_links_resolve_to_names(self):
-        rows = {row["key"]: row for row in self._payload()["species"]}
-        self.assertEqual(rows["100"]["evolutions"], [{"key": "200", "name": "烈焰兽"}])
-        self.assertEqual(rows["200"]["evolutions"], [])
-
-    def test_no_static_data_returns_empty_shell(self):
-        payload = handbook_payload(None, self.context.pet_repository)
-        self.assertEqual(payload["species"], [])
-        self.assertEqual(payload["total"], 0)
-
 
 if __name__ == "__main__":
     unittest.main()

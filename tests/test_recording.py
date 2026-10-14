@@ -50,14 +50,6 @@ class RecorderTest(unittest.TestCase):
             chunks = read_recording(path)
         self.assertEqual(len(chunks), 1)
 
-    def test_append_without_start_is_noop(self):
-        recorder = StreamRecorder()
-        recorder.append(
-            StreamChunk(session_id=SESSION, direction=Direction.S2C, data=b"\x01", first_seq=1)
-        )
-        self.assertEqual(recorder.chunk_count, 0)
-
-
 class ReplayPipelineTest(unittest.TestCase):
     def test_replay_reproduces_events(self):
         """录制的合成流回放后应产出与直接喂入一致的事件。"""

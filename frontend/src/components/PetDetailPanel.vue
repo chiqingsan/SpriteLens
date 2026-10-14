@@ -2,11 +2,11 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { PetsModel } from '../composables/usePets'
 import PetDetail from './PetDetail.vue'
-import UiIcon from './UiIcon.vue'
 import './pet-detail.css'
-const props = defineProps<{ model: PetsModel; open: boolean; enabled: boolean; trigger: HTMLElement | null; visibleGids: number[]; imageMode: string }>()
-const emit = defineEmits<{ close: [restore?: boolean]; select: [gid: number, element: HTMLElement | null]; locate: [id: number] }>()
+const props = defineProps<{ model: PetsModel; open: boolean; enabled: boolean; trigger: HTMLElement | null; imageMode: string }>()
+const emit = defineEmits<{ close: [restore?: boolean]; locate: [id: number] }>()
 const pet = computed(() => props.model.selected.value === null ? null : props.model.find(props.model.selected.value))
+const place = computed(() => pet.value?.location ?? null)
 const showing = computed(() => props.open && props.enabled && !!pet.value)
 const panel = ref<HTMLElement>(), closeButton = ref<HTMLButtonElement>(), body = ref<HTMLElement>()
 const narrow = window.matchMedia('(max-width: 960px)'), modal = ref(narrow.matches)
@@ -25,11 +25,7 @@ async function close(restore = true) {
   emit('close', restore); await nextTick(); sync()
   if (restore) (props.trigger?.isConnected ? props.trigger : document.querySelector<HTMLElement>('#pet-view button.active'))?.focus({ preventScroll: true })
 }
-const index = computed(() => props.visibleGids.indexOf(props.model.selected.value!))
-function navigate(step: number) {
-  const gid = props.visibleGids[index.value + step]
-  if (gid !== undefined) emit('select', gid, document.querySelector<HTMLElement>(`#page-pets [data-gid="${gid}"]`))
-}
+function locate() { if (place.value) emit('locate', 'team_id' in place.value ? 0 : place.value.box_id) }
 function keydown(event: KeyboardEvent) {
   if (!showing.value) return
   if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); void close() }
@@ -49,7 +45,7 @@ onUnmounted(() => { inert.forEach(node => { node.inert = false }); workspace().c
 <template>
   <Teleport to="#pet-detail-root">
 <div v-if="showing && modal" class="detail-backdrop" data-vue-page @click="close()"></div><aside v-if="showing && pet" id="pet-detail" ref="panel" class="detail-panel detail-open" data-vue-page :role="modal ? 'dialog' : 'region'" :aria-modal="modal || undefined" :aria-label="pet.name + '详情'">
-    <header class="pet-detail-toolbar"><h2>精灵详情</h2><div><button ref="closeButton" type="button" class="ghost-button small" aria-label="关闭详情" @click="close()">关闭</button><button class="ghost-button small" aria-label="上一只" :disabled="index <= 0" @click="navigate(-1)"><UiIcon name="chevron-left" /></button><button class="ghost-button small" aria-label="下一只" :disabled="index < 0 || index >= visibleGids.length - 1" @click="navigate(1)"><UiIcon name="chevron-right" /></button></div></header>
+    <header class="pet-detail-toolbar"><h2>精灵详情</h2><div><button v-if="place" type="button" class="ghost-button small" :aria-label="'team_id' in place ? '定位到出战背包' : '定位到此箱'" :data-locate-team="'team_id' in place ? place.team_id : undefined" :data-locate-box="'box_id' in place ? place.box_id : undefined" @click="locate">{{ 'team_id' in place ? '定位到出战背包' : '定位到此箱' }}</button><button ref="closeButton" type="button" class="ghost-button small" aria-label="关闭详情" @click="close()">关闭</button></div></header>
     <div ref="body" class="pet-detail-body"><PetDetail :pet="pet" :boxes="model.data.value!.backpack.boxes" @locate="emit('locate', $event)" /></div>
   </aside>
 </Teleport>

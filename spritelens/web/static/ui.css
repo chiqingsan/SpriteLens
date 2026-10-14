@@ -218,14 +218,14 @@ button:not(.nav-item):has(> .ui-icon) { display: inline-flex; align-items: cente
 .point-pet { position: relative; border: 1px solid var(--line); border-radius: var(--radius-md); justify-items: center; }
 .point-pet:hover { border-color: var(--teal); }
 .point-avatar { display: grid; place-items: center; position: relative; font-weight: 800; }
-.point-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.point-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: center; transform-origin: center; transform: scale(1.2); }
 #page-pets .table-wrap { container-type: inline-size; container-name: backpack; }
 .point-grid .point-pet { display: grid; grid-template-rows: 26px var(--pet-portrait) 22px 24px; height: var(--pet-height); min-width: 0; align-content: start; align-items: center; gap: 4px; padding: 6px; overflow: hidden; text-align: center; }
 .point-top { position: relative; display: flex; align-items: center; justify-content: space-between; line-height: 26px; width: 100%; color: var(--ink-soft); }
 .point-top .pc-gender { font-size: 15px; }
 .point-nature { position: relative; flex: none; min-width: 0; max-width: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 500; text-align: center; line-height: 18px; height: 26px; padding: 3px 7px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--line) 55%, transparent); background: color-mix(in srgb, var(--panel) 45%, transparent); }
 .point-portrait-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) 28px; gap: 2px; align-items: start; justify-items: center; width: 100%; height: var(--pet-portrait); }
-.point-pet .point-avatar { width: 100%; max-width: 80px; height: var(--pet-portrait); border-radius: 0; background: transparent; font-size: 28px; overflow: hidden; }
+.point-pet .point-avatar { width: 100%; max-width: 80px; height: var(--pet-portrait); border-radius: 0; background: transparent; font-size: 28px; overflow: visible; }
 .point-markers { position: absolute; left: 50%; transform: translateX(-50%); display: grid; grid-template-columns: 16px 20px; align-items: center; gap: 4px; height: 22px; }
 .point-rarity-slot, .point-color-slot { display: flex; align-items: center; justify-content: center; min-width: 0; height: 22px; }
 .point-medals, .point-groups { display: grid; align-content: start; width: 28px; min-width: 0; }
@@ -249,7 +249,7 @@ button:not(.nav-item):has(> .ui-icon) { display: inline-flex; align-items: cente
 .pet-color-card { display: inline-block; position: relative; width: 38px; height: 24px; flex: none; border-radius: 6px; overflow: hidden; vertical-align: middle; background: var(--surface-3); }
 .pet-color-card svg, .pet-color-card img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; }
 .point-pet .pet-color-card { width: 20px; height: 15px; border-radius: 4px; }
-.point-pet .point-name { font-size: var(--pet-name); font-weight: 700; line-height: 22px; width: 100%; max-width: 100%; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.point-pet .point-name { font-size: calc(var(--pet-name) - 1px); font-weight: 700; line-height: 22px; width: 100%; max-width: 100%; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .point-pet .point-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; gap: 0; padding-top: 5px; border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent); align-self: start; }
 .point-pet .point-metrics > span { display: flex; align-items: baseline; justify-content: center; gap: 0; min-width: 0; white-space: nowrap; }
 .point-pet .point-metrics > span + span { border-left: 1px solid color-mix(in srgb, var(--line) 55%, transparent); }

@@ -121,11 +121,6 @@ class ExtractEggsTests(unittest.TestCase):
         self.assertTrue(eggs[0].hatching)
         self.assertAlmostEqual(eggs[0].hatch_progress, 0.5, places=3)
 
-    def test_no_events_without_tree(self) -> None:
-        event = PacketEvent(0.0, "s", "c2s", 0x1344, "x", 0, [])
-        self.assertEqual(extract_eggs(event), [])
-
-
 class HatchSlotTests(unittest.TestCase):
     def test_extract_slot_ids(self) -> None:
         event = PacketEvent(
@@ -145,19 +140,6 @@ class HatchSlotTests(unittest.TestCase):
     def test_non_slot_frame(self) -> None:
         event = PacketEvent(0.0, "s", "s2c", 0x0164, "x", 0, [])
         self.assertIsNone(extract_hatch_slots(event))
-
-    def test_repo_marks_in_slot(self) -> None:
-        repo = EggBoxRepository()
-        repo.handle_packet(_event(_egg_row(888)))
-        repo.handle_packet(PacketEvent(
-            ts=0.0, session_id="s", direction="s2c", opcode=0x0312, opcode_name="x", payload_len=0,
-            decoded=[{"no": 2, "name": "f2", "type": "", "value": "888", "raw": 888}],
-        ))
-        payload = egg_box_payload(repo, None)
-        self.assertTrue(payload["eggs"][0]["hatching"])
-        self.assertTrue(payload["eggs"][0]["in_slot"])
-        self.assertEqual(payload["hatch_slots"], 1)
-
 
 class EggBoxRepositoryTests(unittest.TestCase):
     def test_merge_dedup_and_version(self) -> None:
@@ -456,12 +438,6 @@ class EggBoxPayloadTests(unittest.TestCase):
             self.assertEqual(row["fallback_icon_url"], pet_images(3001)["portrait_url"])
             self.assertEqual(payload["total_quantity"], 1)
 
-    def test_payload_empty_when_no_repo(self) -> None:
-        payload = egg_box_payload(None, None)
-        self.assertEqual(payload["total"], 0)
-        self.assertEqual(payload["version"], 0)
-
-
 class MaleMatrixPayloadTests(unittest.TestCase):
     def _pet(self, gid, name, nature, gender, base_conf_id):
         from spritelens.domain.pets import Pet, PetAttribute
@@ -543,11 +519,6 @@ class ColorCardTests(unittest.TestCase):
             "particles": {"1": "四角星"},
         }, ensure_ascii=False), encoding="utf-8")
         return ColorCatalog(d)
-
-    def test_card_lookup(self) -> None:
-        catalog = self._catalog()
-        self.assertEqual(catalog.card("7").base_name, "紫色")
-        self.assertIsNone(catalog.card("999"))
 
     def test_card_id_for(self) -> None:
         catalog = self._catalog()

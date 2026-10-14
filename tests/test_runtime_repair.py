@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
-import io
 import json
-import subprocess
 import tempfile
 import threading
 import unittest
@@ -20,7 +17,6 @@ from spritelens.recording.recorder import StreamRecorder
 from spritelens.web.server import LocalServer
 from tests.test_server_lifecycle import _port_serving
 from tests.test_web_server import _http_post, _make_context
-from tools import run_build_tests as gate
 
 
 class RuntimeRepairTest(unittest.TestCase):
@@ -276,15 +272,3 @@ class RuntimeRepairTest(unittest.TestCase):
         self.assertEqual(data["error_kind"], "save")
         self.assertFalse(data["recording"])
         self.assertIn("保存失败", data["error"])
-
-    def test_missing_node_fails_complete_gate(self):
-        output = io.StringIO()
-        with mock.patch("shutil.which", return_value=None), \
-             mock.patch.object(gate.subprocess, "run", return_value=subprocess.CompletedProcess(
-                 [], 0, "Ran 390 tests\nOK\n", ""
-             )), contextlib.redirect_stdout(output):
-            result = gate.main()
-        self.assertEqual(result, 1)
-        self.assertNotIn("JS 语法通过", output.getvalue())
-        self.assertIn("未找到 node", output.getvalue())
-        self.assertTrue(output.getvalue().rstrip().endswith("[gate] 失败"))

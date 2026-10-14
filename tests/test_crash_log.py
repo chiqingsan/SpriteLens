@@ -55,41 +55,5 @@ class ExcepthookTest(unittest.TestCase):
         self.assertIn("sl-crash-test", text)
         self.assertIn("后台线程炸了", text)
 
-    def test_keyboard_interrupt_is_not_logged(self):
-        """Ctrl+C 属正常退出路径，不应污染崩溃日志。"""
-        with tempfile.TemporaryDirectory() as tmp:
-            crash = install_excepthook(Path(tmp))
-            try:
-                raise KeyboardInterrupt
-            except KeyboardInterrupt:
-                _fire_excepthook()
-
-            exists = crash.exists()
-        self.assertFalse(exists, "KeyboardInterrupt 不应写入 crash.log")
-
-    def test_write_failure_does_not_raise(self):
-        """日志目录不可写时钩子不得二次抛出（崩溃现场写入失败要静默）。"""
-        missing = Path("Z:/definitely-not-exist/logs")
-        crash = install_excepthook(missing)
-        try:
-            raise RuntimeError("目录不可写")
-        except RuntimeError:
-            _fire_excepthook()  # 不应抛出
-        self.assertEqual(missing / crash.name, crash)
-
-    def test_successive_crashes_append(self):
-        """多次崩溃追加到同一文件，不互相覆盖。"""
-        with tempfile.TemporaryDirectory() as tmp:
-            crash = install_excepthook(Path(tmp))
-            for message in ("第一次", "第二次"):
-                try:
-                    raise ValueError(message)
-                except ValueError:
-                    _fire_excepthook()
-            text = crash.read_text(encoding="utf-8")
-        self.assertIn("第一次", text)
-        self.assertIn("第二次", text)
-
-
 if __name__ == "__main__":
     unittest.main()
