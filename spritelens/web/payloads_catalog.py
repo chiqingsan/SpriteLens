@@ -16,8 +16,8 @@ from spritelens.services.flower_repository import FlowerRepoSnapshot
 
 
 def species_icon_url(base_conf_id: int) -> str:
-    """精灵图 URL（Web 静态资源）；无图时前端回退首字头像。"""
-    return f"/static/pets/{base_conf_id}.webp"
+    """精灵头像 URL；缺图时前端回退首字头像。"""
+    return pet_images(base_conf_id)["portrait_url"]
 
 
 def handbook_payload(

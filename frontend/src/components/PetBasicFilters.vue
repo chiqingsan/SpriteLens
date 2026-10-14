@@ -3,7 +3,7 @@ import type { PetFilterModel } from '../composables/usePetFilters'
 import DualRangeSlider from './DualRangeSlider.vue'
 
 const { model } = defineProps<{ model: PetFilterModel }>()
-const { filters, options, fixed } = model
+const { filters, options, fixed, selectedMedals } = model
 function value(event: Event) { return (event.target as HTMLInputElement).value }
 </script>
 
@@ -34,9 +34,9 @@ function value(event: Event) { return (event.target as HTMLInputElement).value }
   </div>
 </section>
   <details class="filter-section" style="order: 2">
-<summary>奖牌<small>{{ filters.medal ? options.medals?.find(item => item.id === filters.medal)?.name : '不限' }}</small></summary>
-    <div class="chip-group medal-choices"><button v-for="item in options.medals" :key="item.id" class="chip" :class="{ active: filters.medal === item.id }" :aria-pressed="filters.medal === item.id" @click="model.patch({ medal: filters.medal === item.id ? 0 : item.id })"><img v-if="item.id" :src="`/static/medal-icons/${item.id}.png`" alt="" @error="($event.target as HTMLImageElement).hidden = true"><span>{{ item.name }}</span></button></div>
-    <button v-if="filters.medal || filters.pool.includes('medal')" class="text-button filter-clear" @click="model.patch({ medal: 0, pool: filters.pool.filter(item => item !== 'medal') })">清除奖牌</button>
+<summary>奖牌<small>{{ selectedMedals.map(id => options.medals?.find(item => item.id === id)?.name || id).join('、') || '不限' }}</small></summary>
+    <div class="chip-group medal-choices"><button v-for="item in options.medals" :key="item.id" class="chip" :class="{ active: selectedMedals.includes(item.id) }" :aria-pressed="selectedMedals.includes(item.id)" @click="model.medal(item.id)"><img v-if="item.id" :src="`/static/medal-icons/${item.id}.png`" alt="" @error="($event.target as HTMLImageElement).hidden = true"><span>{{ item.name }}</span></button></div>
+    <button v-if="selectedMedals.length || filters.pool.includes('medal')" class="text-button filter-clear" @click="model.patch({ medal: 0, medals: [], marks: [], pool: filters.pool.filter(item => item !== 'medal') })">清除奖牌</button>
   </details>
   <details class="filter-section" style="order: 3">
 <summary>等级<small id="f-level-label">{{ filters.level_min }} – {{ filters.level_max }}</small></summary>

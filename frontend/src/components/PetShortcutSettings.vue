@@ -1,25 +1,25 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import type { PetShortcut } from '../types/petConditions'
+import { defaultPetShortcuts, type PetShortcut } from '../types/petConditions'
 import type { PetFilterOptions } from '../types/petFilters'
 import UiIcon from './UiIcon.vue'
 const props = defineProps<{ items: PetShortcut[]; options: PetFilterOptions; groups: string[]; saving: boolean; error: string }>()
-const emit = defineEmits<{ save: [items: PetShortcut[]]; close: []; pin: [items: PetShortcut[]] }>()
+const emit = defineEmits<{ save: [items: PetShortcut[]]; close: [] }>()
 const dialog = ref<HTMLDialogElement>()
 const draft = ref(props.items.slice())
 const key = (item: PetShortcut) => JSON.stringify(item.filters)
 const catalog = computed(() => {
   const named = (title: string, field: 'medal' | 'speciality' | 'acquisition', values: { id: number; name: string }[] = []) => ({ title,
-    items: values.map(item => ({ name: `${title} · ${item.name}`, filters: { [field]: item.id } })) })
+    items: values.map(item => ({ name: item.name, filters: field === 'medal' ? defaultPetShortcuts.find(value => value.name === item.name)?.filters || { medals: [item.id] } : { [field]: item.id } })) })
   const groups: { title: string; items: PetShortcut[] }[] = [
     named('奖牌', 'medal', props.options.medals),
     { title: '异色与炫彩', items: [{ name: '异色', filters: { shiny: true } }, { name: '炫彩', filters: { colorful: true } }] },
     { title: '性别', items: [{ name: '雄性', filters: { gender: 1 } }, { name: '雌性', filters: { gender: 2 } }] },
-    { title: '系别', items: props.options.types.map(name => ({ name: '系别 · ' + name, filters: { types: [name] } })) },
-    { title: '蛋组', items: props.groups.map(name => ({ name: '蛋组 · ' + name, filters: { egg_groups: [name] } })) },
-    { title: '性格', items: props.options.natures.map(item => ({ name: '性格 · ' + item.name, filters: { natures: [item.id] } })) },
+    { title: '系别', items: props.options.types.map(name => ({ name, filters: { types: [name] } })) },
+    { title: '蛋组', items: props.groups.map(name => ({ name, filters: { egg_groups: [name] } })) },
+    { title: '性格', items: props.options.natures.map(item => ({ name: item.name, filters: { natures: [item.id] } })) },
     named('特性', 'speciality', props.options.specialities), named('获取方式', 'acquisition', props.options.acquisitions),
-    { title: '捕获日期', items: [1, 3, 7].map(days => ({ name: `捕获 · 近${days}天`, filters: { captured_days: days } })) },
+    { title: '捕获日期', items: [1, 3, 7].map(days => ({ name: `近${days}天`, filters: { captured_days: days } })) },
   ]
   const keys = new Set(groups.flatMap(group => group.items.map(key)))
   const others = props.items.filter(item => !keys.has(key(item)))
@@ -43,10 +43,9 @@ onMounted(() => dialog.value!.showModal())
           <label v-for="item in group.items" :key="key(item)"><input type="checkbox" :checked="draft.some(value => key(value) === key(item))" :disabled="saving" @change="toggle(item)"><span>{{ item.name }}</span></label>
           </div>
         </section>
-        <slot></slot>
         <p v-if="error" role="alert" class="filter-note">保存失败：{{ error }}；可重试。</p>
       </div>
-      <footer><button id="btn-pin-filters" type="button" class="ghost-button" :disabled="saving" @click="emit('pin', draft)">添加当前范围或组合</button><button type="button" class="primary-button" :disabled="saving" @click="emit('save', draft)">{{ saving ? '保存中…' : '保存设置' }}</button></footer>
+      <footer><button type="button" class="primary-button" :disabled="saving" @click="emit('save', draft)">{{ saving ? '保存中…' : '保存设置' }}</button></footer>
     </dialog>
   </Teleport>
 </template>

@@ -21,6 +21,7 @@
 - [reviews/ACCOUNT_DOMAIN_VERIFICATION_2026-10-13.md](reviews/ACCOUNT_DOMAIN_VERIFICATION_2026-10-13.md) — F02 三域单次快照、跨域归属、历史恢复与原生账号页旧请求失效
 - [reviews/VUE_PET_FILTERS_VERIFICATION_2026-10-13.md](reviews/VUE_PET_FILTERS_VERIFICATION_2026-10-13.md) — F03 基础筛选切片、单一状态/DOM 所有者、快捷恢复与防抖旧请求失效
 - [reviews/F03_ACCEPTANCE_2026-10-13.md](reviews/F03_ACCEPTANCE_2026-10-13.md) — 完整宠物页交付范围、自动化证据与统一人工验收清单
+- [reviews/PET_DETAIL_VERIFICATION_2026-10-14.md](reviews/PET_DETAIL_VERIFICATION_2026-10-14.md) — F03-U3精灵详情、共享区域与立绘占比/低清限幅、登录奖牌归属核验与增量限制
 - [reviews/VUE_PET_INVENTORY_VERIFICATION_2026-10-13.md](reviews/VUE_PET_INVENTORY_VERIFICATION_2026-10-13.md) — F03 请求/三视图/分页/箱队迁移、账号失效、槽位语义与原生详情定位桥
 - [reviews/ASSET_SIZE_AUDIT_2026-10-13.md](reviews/ASSET_SIZE_AUDIT_2026-10-13.md) — 素材体积/完全重复/运行引用与压缩副本实测；正式资源尚未修改
 

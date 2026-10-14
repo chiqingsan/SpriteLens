@@ -1,10 +1,11 @@
-/* 主题与显示字段保持 DOM；图片模式由背包使用现有载荷重新绘制。 */
+/* 外观与浏览器调试设置；图片模式由背包使用现有载荷重新绘制。 */
 (function () {
   "use strict";
   var preferences = { theme: "miaomiao", pet_view: "point", pet_image: "portrait", fields: { groups: true, height: true, weight: true, voice: true, positions: false }, shortcuts: [] };
   var saveQueue = Promise.resolve();
   var save = null;
   var notify = null;
+  var openBrowser = null;
 
   function apply(value) {
     preferences = value;
@@ -51,9 +52,21 @@
 
   document.getElementById("pet-image-mode").addEventListener("change", function () { update({ pet_image: this.value }); });
 
+  document.getElementById("btn-open-browser").addEventListener("click", async function () {
+    this.disabled = true;
+    try {
+      await openBrowser();
+      notify("已请求打开默认浏览器，可按 F12 检查布局");
+    } catch (error) {
+      notify("打开浏览器失败：" + error.message, true);
+    } finally {
+      this.disabled = false;
+    }
+  });
+
   window.SpriteLensAppearance = {
     imageMode: function () { return preferences.pet_image || "portrait"; },
-    initialize: function (value, persist, toast) { save = persist; notify = toast; apply(value); },
+    initialize: function (value, persist, toast, open) { save = persist; notify = toast; openBrowser = open; apply(value); },
     view: function (view) { update({ pet_view: view }); },
     shortcuts: function (items) { return update({ shortcuts: items }); },
     ranges: function (title, ranges, positions) {

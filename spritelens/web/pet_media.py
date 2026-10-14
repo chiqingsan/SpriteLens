@@ -17,5 +17,8 @@ def pet_images(base_id: int, shiny: bool = False) -> dict:
     entry = _index().get(str(base_id), {})
     normal = entry.get("normal", {})
     selected = entry.get("shiny", {}) if shiny else normal
-    return {"portrait_url": selected.get("portrait") or normal.get("portrait") or "",
-            "artwork_url": selected.get("artwork") or normal.get("artwork") or f"/static/pets/{base_id}.webp"}
+    variant = "shiny" if shiny else "normal"
+    return {"portrait_url": selected.get("portrait") or normal.get("portrait") or
+            (f"/static/pet-media/{base_id}-{variant}-portrait.webp" if base_id > 0 else ""),
+            "artwork_url": selected.get("artwork") or normal.get("artwork") or
+            (f"/static/pet-media/{base_id}-{variant}-artwork.webp" if base_id > 0 else "")}

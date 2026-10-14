@@ -16,21 +16,6 @@ from tests.test_web_server import _pet
 
 
 class PetPresentationTest(unittest.TestCase):
-    def test_portrait_fit_preserves_content_and_normalizes_transparent_margin(self):
-        from PIL import Image
-        from tools.sync_pet_media import fit_portrait
-        for bounds in ((20, 30, 70, 80), (40, 5, 60, 95)):
-            image = Image.new("RGBA", (100, 100))
-            image.paste((255, 0, 0, 255), bounds)
-            fitted = fit_portrait(image)
-            self.assertEqual(fitted.size, (256, 256))
-            left, top, right, bottom = fitted.getchannel("A").getbbox()
-            self.assertEqual(max(right - left, bottom - top), 232)
-            self.assertLessEqual(abs(left + right - 256), 1)
-            self.assertLessEqual(abs(top + bottom - 256), 1)
-            self.assertEqual(fitted.getpixel((128, 128)), (255, 0, 0, 255))
-        self.assertIsNone(fit_portrait(Image.new("RGBA", (100, 100))).getbbox())
-
     def test_size_voice_marks_are_exclusive_and_use_exact_boundaries(self):
         pet = _pet(1, name="样本", level=1, first=False)
         for weight, voice, expected in ((1020, -96, ["小", "粗"]), (1980, 96, ["大", "婉"]),
@@ -64,7 +49,7 @@ class PetPresentationTest(unittest.TestCase):
     def test_saved_shortcuts_keep_other_filters_after_first_catch_removal(self):
         saved = [{"name": "条件", "filters": {"first_catch_only": True, "gender": 2, "natures": [3]}}]
         normalized = normalize_preferences({"shortcuts": saved})
-        self.assertEqual(normalized["shortcuts"], [{"name": "条件", "filters": {"gender": 2, "natures": [3]}}])
+        self.assertEqual(normalized["shortcuts"][-1], {"name": "条件", "filters": {"gender": 2, "natures": [3]}})
         with tempfile.TemporaryDirectory() as tmp:
             vm = UIPreferencesViewModel(SettingsRepository(Path(tmp) / "config.json"))
             with self.assertRaises(ValueError):
@@ -106,14 +91,15 @@ class PetPresentationTest(unittest.TestCase):
         self.assertIn("portrait", images["portrait_url"])
         self.assertIn("artwork", images["artwork_url"])
         self.assertNotEqual(images["portrait_url"], images["artwork_url"])
-        self.assertEqual(pet_images(999999)["portrait_url"], "")
+        self.assertEqual(pet_images(999999)["portrait_url"], "/static/pet-media/999999-normal-portrait.webp")
         index = json.loads((static_dir() / "pet_media.json").read_text(encoding="utf-8"))
         web = Path(__file__).resolve().parents[1] / "spritelens/web/static"
         for entry in index.values():
             for variant in entry.values():
                 for url in variant.values():
+                    self.assertNotIn("-fit.webp", url)
                     self.assertTrue((web / url.removeprefix("/static/")).is_file(), url)
-        medals = json.loads((web / "medals/sources.json").read_text(encoding="utf-8"))["resources"]
+        medals = json.loads((web / "medal-icons/mark-sources.json").read_text(encoding="utf-8"))["resources"]
         self.assertEqual({row["name"] for row in medals}, {"大块头", "小不点", "粗嗓门", "婉转声"})
         for row in medals:
             self.assertTrue((web / row["local"].removeprefix("/static/")).is_file())

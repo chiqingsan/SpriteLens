@@ -29,7 +29,7 @@ test('特性名称目录无搜索框，名称按原始 ID 提交并可取消', a
   await expect(page.locator('#pet-count')).toContainText('命中 40 / 40')
 })
 
-for (const width of [1440, 640]) {
+for (const width of [1440, 1280, 960, 640, 390]) {
   test(`详情内容、导航、焦点与主题 ${width}px`, async ({ page }) => {
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
@@ -40,31 +40,56 @@ for (const width of [1440, 640]) {
     await expect(page.locator('#pet-count')).toContainText('命中 40 / 40')
     await page.locator('#pet-view [data-view="card"]').click()
     const card = page.locator('#pet-grid .pet-card').first()
+    const gridBefore = await page.locator('#pet-grid').boundingBox()
     await card.focus(); await card.press('Enter')
     const detail = page.locator('#pet-detail')
     await expect(detail).toBeVisible()
     await expect(detail).toHaveAttribute('role', width <= 960 ? 'dialog' : 'region')
-    await expect(detail).toContainText('六维对照')
-    await expect(detail).toContainText('物种参考范围')
-    await expect(detail).toContainText('蛋基础范围')
+    await expect(detail).toContainText('当前六维属性')
+    await expect(detail).toContainText('精灵范围')
+    await expect(detail).toContainText('精灵蛋范围')
+    await expect(detail.locator('.skill-list, .detail-sub')).toHaveCount(0)
+    await expect.poll(() => detail.locator('.detail-artwork').evaluate(node => getComputedStyle(node).visibility)).toBe('visible')
+    const radar = await detail.locator('.detail-radar').evaluate(node => ({
+      width: node.getBoundingClientRect().width,
+      font: Number.parseFloat(getComputedStyle(node.querySelector('text')!).fontSize),
+    }))
+    expect(radar.font * radar.width / 220).toBeGreaterThanOrEqual(11)
+    if (width > 960) expect(await page.locator('#pet-grid').boundingBox()).toEqual(gridBefore)
     await expect(detail.getByRole('button', { name: '关闭详情', exact: true })).toBeFocused()
     if (width <= 960) {
       expect(await page.locator('#page-pets .content-panel').evaluate(node => (node as HTMLElement).inert)).toBe(true)
       await page.keyboard.press('Shift+Tab')
-      await expect(detail.locator('[data-locate-team], [data-locate-box]')).toBeFocused()
+      await expect(detail.locator('.detail-medal-icon').last()).toBeFocused()
       await page.keyboard.press('Tab')
       await expect(detail.getByRole('button', { name: '关闭详情', exact: true })).toBeFocused()
     }
-    const first = await detail.locator('.detail-sub').textContent()
+    const first = await detail.locator('.detail-art-name').textContent()
     await detail.getByRole('button', { name: '下一只', exact: true }).click()
-    await expect(detail.locator('.detail-sub')).not.toHaveText(first!)
+    await expect(detail.locator('.detail-art-name')).not.toHaveText(first!)
     await detail.getByRole('button', { name: '上一只', exact: true }).click()
-    await expect(detail.locator('.detail-sub')).toHaveText(first!)
+    await expect(detail.locator('.detail-art-name')).toHaveText(first!)
+    await expect.poll(() => detail.locator('.detail-artwork').evaluate(node => getComputedStyle(node).visibility)).toBe('visible')
+    const sound = await detail.locator('.measure-voice').textContent()
+    await detail.getByRole('button', { name: '精灵蛋范围', exact: true }).click()
+    await expect(detail.locator('.measure-height')).not.toContainText('%')
+    await expect(detail.locator('.measure-voice')).toHaveText(sound!)
+    await detail.getByRole('button', { name: '精灵范围', exact: true }).click()
+    await detail.locator('.detail-medal-scroll').scrollIntoViewIfNeeded()
+    const scroll = detail.locator('.detail-medal-scroll')
+    expect(await scroll.evaluate(node => node.scrollWidth > node.clientWidth)).toBe(true)
+    await scroll.focus(); await page.keyboard.press('ArrowRight')
+    await expect.poll(() => scroll.evaluate(node => node.scrollLeft)).toBeGreaterThan(0)
+    await detail.locator('.pet-detail-body').evaluate(node => { node.scrollTop = 0 })
     for (const theme of ['miaomiao', 'huohua', 'shuilanlan']) {
       await page.evaluate(value => { document.documentElement.dataset.theme = value }, theme)
       await page.screenshot({ path: `test-results/pet-complete-detail-${width}-${theme}.png` })
+      await detail.locator('.pet-detail-body').evaluate(node => { node.scrollTop = node.scrollHeight })
+      await detail.screenshot({ path: `test-results/pet-complete-detail-lower-${width}-${theme}.png` })
+      await detail.locator('.pet-detail-body').evaluate(node => { node.scrollTop = 0 })
       const rect = await detail.boundingBox()
       expect(rect && rect.x >= 0 && rect.x + rect.width <= width + 1).toBeTruthy()
+      expect(Math.round(rect!.width)).toBe(Math.min(360, width))
     }
     await page.keyboard.press('Escape')
     await expect(detail).toHaveCount(0)
@@ -74,7 +99,106 @@ for (const width of [1440, 640]) {
   })
 }
 
-test('双头范围拖动、交叉联动、百分比查询、组合条件与保存失败重试', async ({ page }) => {
+test('详情真实头像进化、同个体刷新保留阅读与过滤关闭', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1600 })
+  await page.goto(process.env.SPRITELENS_DEMO_URL!)
+  await page.locator('[data-page="pets"]').click()
+  await page.locator('#pet-view [data-view="card"]').click()
+  const card = page.locator('#pet-grid .pet-card').filter({ hasText: '护主犬' }).first()
+  await card.click()
+  const detail = page.locator('#pet-detail')
+  await expect(detail.locator('.detail-art-name')).toContainText('护主犬')
+  await expect(detail.locator('.evolution-avatar img')).toHaveCount(2)
+  expect(await detail.locator('.evolution-avatar img').evaluateAll(nodes => nodes.every(node => (node as HTMLImageElement).src.includes('portrait')))).toBe(true)
+  await detail.screenshot({ path: 'test-results/pet-detail-approved-layout.png' })
+  await page.route('**/api/pets?**', async route => {
+    const response = await route.fetch(), payload = await response.json()
+    const pet = payload.pets.find((item: { gid: number }) => item.gid === 1012)
+    if (pet) {
+      pet.name = '长昵称长昵称长昵称长昵称长昵称'
+      pet.artwork_url = '/static/missing-detail-artwork.webp'; pet.portrait_url = '/static/missing-detail-portrait.webp'
+    }
+    await route.fulfill({ response, json: payload })
+  })
+  await page.setViewportSize({ width: 1440, height: 900 })
+  const body = detail.locator('.pet-detail-body')
+  await body.evaluate(node => { node.scrollTop = 300 })
+  const scroll = await body.evaluate(node => node.scrollTop)
+  const response = page.waitForResponse(result => new URL(result.url()).pathname === '/api/pets')
+  await page.locator('#f-search').fill('护主犬')
+  await response; await expect(page.locator('#pet-count')).toContainText('命中 3 / 40')
+  await expect(detail).toBeVisible()
+  await expect(detail.locator('.detail-art-placeholder')).toBeVisible()
+  await expect(detail.locator('.detail-art-name h2')).toHaveAttribute('title', '长昵称长昵称长昵称长昵称长昵称')
+  expect(await body.evaluate(node => node.scrollTop)).toBe(scroll)
+  await page.locator('#f-search').fill('无匹配精灵')
+  await expect(detail).toHaveCount(0)
+})
+
+test('立绘透明留白归一、低清像素限制与顶部信息', async ({ browser }) => {
+  const context = await browser.newContext({ deviceScaleFactor: 2, viewport: { width: 1440, height: 1000 } })
+  const page = await context.newPage()
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  // 合成图的角色边界已知，覆盖留白差异；不引入运行数据样本。
+  const square = (size: number, margin: number) => 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><rect x="${margin}" y="${margin}" width="${size - margin * 2}" height="${size - margin * 2}" fill="#66aabb"/></svg>`)
+  let artwork = square(900, 300), portrait = square(256, 0)
+  await page.route('**/api/pets?**', async route => {
+    const response = await route.fetch(), payload = await response.json()
+    for (const pet of payload.pets.slice(0, 2)) {
+      Object.assign(pet, { name: '大耳帽兜', dex_no: 142, level: 42, artwork_url: artwork, portrait_url: portrait, nature_name: '专注' })
+      pet.detail.speciality_name = '慈悲为怀'
+      pet.detail.types = [{ name: '冰', icon_url: '/static/type-icons/type-5.png' }, { name: '萌', icon_url: '/static/type-icons/type-10.png' }]
+      pet.egg_groups = ['妖精组', '拟人组']
+    }
+    await route.fulfill({ response, json: payload })
+  })
+  try {
+    const sizes: number[] = []
+    for (const sample of [square(900, 300), square(900, 150), square(128, 0), '/static/missing-audit-artwork.webp']) {
+      artwork = sample
+      await page.goto(process.env.SPRITELENS_DEMO_URL!)
+      await page.locator('[data-page="pets"]').click()
+      await page.locator('#pet-view [data-view="card"]').click()
+      await page.locator('#pet-grid .pet-card').first().click()
+      const detail = page.locator('#pet-detail'), image = detail.locator('.detail-artwork')
+      await expect.poll(() => image.evaluate(node => getComputedStyle(node).visibility)).toBe('visible')
+      const width = await image.evaluate(node => node.getBoundingClientRect().width)
+      sizes.push(width * (sample === square(900, 300) ? 1 / 3 : sample === square(900, 150) ? 2 / 3 : 1))
+      expect(await detail.locator('.detail-art-name h2').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true)
+      expect(await detail.locator('.detail-art-traits').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true)
+      await expect(detail.locator('.detail-art-identity')).toContainText('No.142')
+      if (sample === square(128, 0)) expect(width).toBeLessThanOrEqual(64)
+      if (sample.startsWith('/static/missing')) await expect(image).toHaveAttribute('src', portrait)
+      await detail.getByRole('button', { name: '下一只', exact: true }).click()
+      await expect.poll(() => image.evaluate(node => getComputedStyle(node).visibility)).toBe('visible')
+    }
+    expect(sizes[0]).toBeCloseTo(sizes[1]!, 1)
+    expect(sizes[2]).toBeCloseTo(64, 1)
+    expect(sizes[3]).toBeCloseTo(128, 1)
+    artwork = '/static/pet-media/3121-shiny-artwork.webp'
+    await page.goto(process.env.SPRITELENS_DEMO_URL!)
+    await page.locator('[data-page="pets"]').click()
+    await page.locator('#pet-view [data-view="card"]').click()
+    await page.locator('#pet-grid .pet-card').first().click()
+    await expect.poll(() => page.locator('.detail-artwork').evaluate(node => getComputedStyle(node).visibility)).toBe('visible')
+    await page.locator('.pet-detail-art').screenshot({ path: 'test-results/pet-detail-hood-360.png' })
+    await page.screenshot({ path: 'test-results/pet-detail-normalized-360.png' })
+    await page.setViewportSize({ width: 320, height: 1000 })
+    expect(await page.locator('.detail-stats-position').evaluate(node => getComputedStyle(node).gridTemplateColumns.split(' ').length)).toBe(1)
+    expect(await page.locator('.pet-detail-body').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true)
+    artwork = '/static/missing-audit-artwork.webp'
+    portrait = '/static/missing-audit-portrait.webp'
+    await page.reload()
+    await page.locator('[data-page="pets"]').click()
+    await page.locator('#pet-view [data-view="card"]').click()
+    await page.locator('#pet-grid .pet-card').first().click()
+    await expect(page.locator('.detail-art-placeholder')).toBeVisible()
+    expect(errors).toEqual([])
+  } finally { await context.close() }
+})
+
+test('双头范围拖动、交叉联动、百分比查询、快捷重置与保存失败重试', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   await page.setViewportSize({ width: 1440, height: 1200 })
@@ -143,25 +267,20 @@ test('双头范围拖动、交叉联动、百分比查询、组合条件与保�
   await expect(page.locator('#f-level-label')).toHaveText('60 – 60')
   await expect(page.locator('#pet-grid')).toHaveAttribute('aria-busy', 'false')
   await page.locator('.shortcut-section .text-button').first().click()
-  await page.locator('#btn-pin-filters').click()
-  await expect(page.locator('#shortcut-editor')).toBeVisible()
-  await page.locator('#shortcut-name').fill('统一验收快捷条件')
+  const dialog = page.getByRole('dialog', { name: '快捷条件设置' })
+  await dialog.getByLabel('雌性', { exact: true }).check()
   await page.route('**/api/ui/preferences', route => route.request().method() === 'POST'
     ? route.fulfill({ status: 500, json: { error: '合成保存失败' } }) : route.continue())
-  await page.locator('#shortcut-editor button[type="submit"]').click()
+  await dialog.getByRole('button', { name: '保存设置', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('合成保存失败')
-  await expect(page.locator('#shortcut-editor')).toBeVisible()
+  await expect(dialog.getByLabel('雌性', { exact: true })).toBeChecked()
   await page.unroute('**/api/ui/preferences')
-  await page.locator('#shortcut-editor button[type="submit"]').click()
-  await expect(page.locator('#shortcut-editor')).toBeHidden()
-  await expect(page.locator('#saved-shortcuts .chip').filter({ hasText: '统一验收快捷条件' })).toHaveCount(1)
-  await page.locator('#btn-reset-filters').click()
-  await page.locator('#saved-shortcuts .chip').filter({ hasText: '统一验收快捷条件' }).click()
+  await dialog.getByRole('button', { name: '保存设置', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(page.locator('#saved-shortcuts').getByRole('button', { name: '雌性', exact: true })).toHaveCount(1)
+  await page.locator('.shortcut-section .text-button').last().click()
+  await expect(page.locator('#saved-shortcuts .chip')).toHaveCount(4)
   await expect(page.locator('#f-level-label')).toHaveText('60 – 60')
-  await page.locator('.shortcut-section .text-button').first().click()
-  await page.locator('#quick-settings-dialog').getByLabel('统一验收快捷条件', { exact: true }).uncheck()
-  await page.locator('#quick-settings-dialog').getByRole('button', { name: '保存设置', exact: true }).click()
-  await expect(page.locator('#saved-shortcuts .chip').filter({ hasText: '统一验收快捷条件' })).toHaveCount(0)
   await page.locator('#btn-reset-filters').click()
   await page.locator('details').filter({ has: page.locator('#f-egg-groups') }).locator('summary').click()
   await page.locator('#f-egg-groups .chip').first().click()

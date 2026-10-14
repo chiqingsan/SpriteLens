@@ -38,7 +38,7 @@ Chromium 验证不能代替 WebView2 和 exe 发布验收。
 
 `frontend/src/`、配置、测试、package-lock 是源文件；`node_modules/`、`dist/` 与
 `spritelens/web/static/vue/` 是忽略的生成文件。新 checkout 通过 npm ci + build 重建，不提交 bundle。
-工程没有 public 媒体副本；继续引用 `/static/pets/`、`egg-icons/`、`icons/sprite.svg`。
+工程没有 public 媒体副本；继续引用 `/static/pet-media/`、`egg-icons/`、`icons/sprite.svg`。
 
 构建只清空 `frontend/dist`，通过 [Vite manifest](https://vite.dev/guide/backend-integration.html)
 列出入口、chunk、CSS、媒体引用，再写源指纹与逐文件 SHA256 清单。

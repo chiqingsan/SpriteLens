@@ -2,7 +2,7 @@ export interface PetFilters {
   search: string; level_min: number; level_max: number; natures: number[]; types: string[]
   gender: number; sort: string; desc: boolean
   pool: string[]; pool_mode: 'and' | 'or'; shiny: boolean; colorful: boolean
-  medal: number; marks: string[]; speciality: number; acquisition: number; captured_days: number
+  medal: number; medals: number[]; marks: string[]; speciality: number; acquisition: number; captured_days: number
 }
 export interface PetFilterOptions {
   natures: { id: number; name: string }[]; types: string[]

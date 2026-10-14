@@ -40,7 +40,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `frontend/browser/desktopShell.spec.ts` | 顶栏交互、原生状态同步、浏览器隐藏与启动失败时关闭验收 |
 | `data/schemas/` | 外挂 schema：`opcodes.json` + `messages/*.json`（字段级合并） |
 | `data/static/` | 静态映射：`species/natures/types/skills/type_chart/eggs/medals/specialities/flower_levels/color_cards.json` + 各 `_meta.json`；特性来源见 `_specialities_meta.json` |
-| `spritelens/web/static/` | 前端资源：`index.html`（分组导航骨架）/ `boot.js`（启动自恢复链）/ `app.css`（布局与组件 token）/ `themes.css`（三套主题色值）/ `app.js`（数据渲染）/ `ui.css` / `ui.js`（详情抽屉、键盘与焦点）/ `appearance.js`（主题与显示偏好）/ `pet-presentation.js`（头像/色卡/标记渲染）/ `icons.js` + `icons/`（本地 SVG sprite）/ `favicon.png` / `pet-media/`（官方头像立绘，含 `-fit` 派生）/ `pets/`（兜底立绘）/ `type-icons/` `egg-icons/` `medal-icons/` `medals/` `rarity/` `color-cards/` |
+| `spritelens/web/static/` | 前端资源：`index.html`（分组导航骨架）/ `boot.js`（启动自恢复链）/ `app.css`（布局与组件 token）/ `themes.css`（三套主题色值）/ `app.js`（数据渲染）/ `ui.css` / `ui.js`（详情抽屉、键盘与焦点）/ `appearance.js`（主题与显示偏好）/ `pet-presentation.js`（头像/色卡/标记渲染）/ `icons.js` + `icons/`（本地 SVG sprite）/ `favicon.png` / `pet-media/`（官方原始头像与全身图）/ `type-icons/` `egg-icons/` `medal-icons/`（奖牌及标记图标）/ `rarity/` `color-cards/` |
 | `data/recordings/` | 运行时录制产物（gitignore；本地回放样例不在版本库） |
 
 ## 维护与审查文档
@@ -124,7 +124,8 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `web/payloads.py` | 宠物域载荷（宠物行/列表页/概览/箱位）+ 目录域兼容重导出（无 UI 依赖） |
 | `web/payloads_catalog.py` | 目录域载荷：图鉴/种公矩阵/花田/色卡/家园/蛋仓/蛋图鉴（阶段1.4 自 payloads.py 拆出） |
 | `web/account_state.py`、`web/static/account-requests.js` | F02：state 跨域归属核对与原生账号页请求取消/代次/序号/uid/域版本校验 |
-| `web/pet_media.py` | 物种 ID → 官方头像/立绘 URL 映射（pet_media.json，缺图回退 pets/ 兜底） |
+| `web/pet_media.py` | 物种 ID → 本地头像/立绘 URL（pet_media.json；缺图映射到同源图片路由） |
+| `web/pet_media_cache.py` | 精灵图本地优先；缺失时按需校验、转码、缓存官方 CDN 图片并记录哈希 |
 | `frontend/src/pages/EggDexPage.vue`、`components/`、`composables/useEggDex.ts` | 蛋图鉴展示、详情与请求生命周期；局部状态、卸载/取消与代次失效 |
 | `frontend/src/components/PetBasicFilters.vue`、`composables/usePetFilters.ts`、`types/petFilters.ts` | F03 第一刀：基础筛选的唯一状态/DOM 所有者、防抖与 options 运行校验；相关 Vitest 同目录 |
 | `frontend/src/petFilterBridge.ts`、`frontend/browser/petFilters.spec.ts` | 原生页查询/恢复/清理/请求失效桥；真实 HTTP 筛选、快捷恢复、焦点、离页与防抖旧响应验证 |
@@ -179,6 +180,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `test_paths.py` | 打包态资源定位：源码/frozen/_MEIPASS 三分支、数据目录不受打包影响 |
 | `test_smoke_assets.py` | 随包资源齐备（前端静态目录/静态表/schema），防打包漏带 |
 | `test_web_server.py` | 本地服务：token 鉴权（REST/WS）、随机端口、宠物/图鉴/采集 API、载荷构造 |
+| `test_browser_open.py` | 设置页浏览器调试入口：鉴权、当前服务 URL 与浏览器打开失败 |
 | `test_environment.py` | Npcap 检测与安装引导状态机 |
 | `test_event_logger.py` | 事件日志异步落盘与分片、队列满丢弃、关闭超时不跨线程关文件 |
 
@@ -229,3 +231,14 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `tests/test_pet_acquisition.py` | PetData获得字段、简略更新保留已知信息、v8→v9库迁移、未知日期与全局AND/OR |
 
 新增本地 Tabler eye/eye-off/square/chevron-down 图标列入 `icons/sources.json` 与 `tools/sync_ui_icons.py`，沿用固定来源提交和MIT许可。
+
+### F03-U3 精灵详情
+
+| 文件 | 职责 |
+|---|---|
+| `frontend/src/components/PetDetailPanel.vue`、`PetDetail.vue` | 与筛选共用360px右栏、窄窗抽屉、焦点/连续浏览、正文滚动与低优先级获取信息 |
+| `PetDetailHero.vue`、`PetDetailStats.vue`、`PetMeasurementRow.vue` | 立绘透明边界占比/像素限幅、两行身份、六维与已含加成、精灵/精灵蛋数值范围 |
+| `PetDetailMedals.vue`、`PetDetailEvolution.vue`、`pet-detail.css` | 横向获得奖牌、真实头像分支进化、限定背包的主题与响应式样式 |
+| `spritelens/domain/pet_medals.py` | 登录集合按获得精灵归属；未核验增量失效相关集合 |
+| `spritelens/web/pet_details.py` | 既有宠物与静态资料生成详情DTO，不另读仓库 |
+| `tests/test_pet_detail.py` | 获得/佩戴归属、未知/空集合、合并落库、v9→v10迁移与详情契约 |

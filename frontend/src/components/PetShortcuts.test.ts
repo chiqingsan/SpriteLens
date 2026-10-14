@@ -3,27 +3,27 @@ import { expect, it, vi } from 'vitest'
 import PetShortcuts from './PetShortcuts.vue'
 import { usePetFilters } from '../composables/usePetFilters'
 import { usePetAdvancedFilters } from '../composables/usePetAdvancedFilters'
-import { emptyRanges, parsePetConditions } from '../types/petConditions'
-it('保存失败保留编辑并可重试，乐观预览不会使重试重复追加', async () => {
-  const basic = usePetFilters(vi.fn(), vi.fn()), advanced = usePetAdvancedFilters(vi.fn(), vi.fn())
+import { defaultPetShortcuts, parsePetConditions, parsePetShortcuts } from '../types/petConditions'
+it('快捷保存失败保留勾选并可重试，重置只恢复默认快捷项', async () => {
+  const basic = usePetFilters(vi.fn(), vi.fn()), advanced = usePetAdvancedFilters(vi.fn(), vi.fn()), reload = vi.fn()
   Object.defineProperty(HTMLDialogElement.prototype, 'showModal', { configurable: true, value() { this.open = true } })
-  basic.restore({ level_min: 60 })
-  const applied = { search: '', level_min: 60, level_max: 60, gender: 0, natures: [], types: [], pool: [], pool_mode: 'and' as const, shiny: false, colorful: false, medal: 0, marks: [], speciality: 0, acquisition: 0, captured_days: 0, egg_groups: [], egg_mode: 'any' as const, ...emptyRanges() }
-  const persist = vi.fn().mockRejectedValueOnce(new Error('合成保存失败')).mockResolvedValueOnce(undefined)
-  const wrapper = mount(PetShortcuts, { props: { basic, advanced, applied, items: [], busy: () => false, persist, reload: vi.fn(), notify: vi.fn() }, global: { stubs: { teleport: true } } })
+  basic.restore({ level_min: 60, gender: 1 })
+  basic.options.value.medals = [{ id: 1001, name: '大块头' }]
+  const persist = vi.fn().mockRejectedValueOnce(new Error('合成保存失败')).mockResolvedValue(undefined)
+  const wrapper = mount(PetShortcuts, { props: { basic, advanced, applied: {}, items: defaultPetShortcuts, busy: () => false, persist, reload, notify: vi.fn() }, global: { stubs: { teleport: true } } })
   try {
     await wrapper.get('.quick-filter-head .text-button').trigger('click')
+    expect((wrapper.findAll('label').find(item => item.text() === '大块头')!.get('input').element as HTMLInputElement).checked).toBe(true)
     await wrapper.findAll('label').find(item => item.text() === '雌性')!.get('input').setValue(true)
-    await wrapper.get('#btn-pin-filters').trigger('click')
-    await wrapper.get('#shortcut-name').setValue('待保存条件')
-    await wrapper.get('form').trigger('submit'); await flushPromises()
+    await wrapper.get('footer button').trigger('click'); await flushPromises()
     expect(wrapper.get('[role="alert"]').text()).toContain('合成保存失败')
-    expect(wrapper.get('form').attributes('hidden')).toBeUndefined()
-    await wrapper.setProps({ items: [{ name: '待保存条件', filters: applied }] })
-    await wrapper.get('form').trigger('submit'); await flushPromises()
-    expect(persist.mock.calls[1]![0]).toHaveLength(2)
-    expect(persist.mock.calls[1]![0][0].filters).toEqual({ gender: 2 })
-    expect(wrapper.find('form').exists()).toBe(false)
+    await wrapper.get('footer button').trigger('click'); await flushPromises()
+    expect(persist.mock.calls[1]![0]).toEqual([...defaultPetShortcuts, { name: '雌性', filters: { gender: 2 } }])
+    expect(wrapper.find('dialog').exists()).toBe(false)
+    await wrapper.findAll('.quick-filter-head .text-button')[1]!.trigger('click'); await flushPromises()
+    expect(persist.mock.calls[2]![0]).toEqual(defaultPetShortcuts)
+    expect(basic.filters).toMatchObject({ level_min: 60, gender: 1 })
+    expect(reload).not.toHaveBeenCalled()
   } finally { wrapper.unmount(); document.body.innerHTML = '' }
 })
 
@@ -48,6 +48,8 @@ it('自定义快捷条件追加且保留当前池模式，不清除已选条件'
 })
 
 it('旧快捷和查询响应不恢复不可见的实际体型范围或满值预设', () => {
+  expect(parsePetShortcuts([defaultPetShortcuts[0], { name: '奖牌 · 大块头', filters: { medal: 1001 } },
+    { name: '系别 · 火', filters: { types: ['火'] } }])).toEqual([defaultPetShortcuts[0], { name: '火', filters: { types: ['火'] } }])
   const filters = parsePetConditions({ height_min: 1, height_max: 2, weight_min: 3, weight_max: 4,
     voice_min: -20, height_position_min: 25, pool: ['medal', 'max_height', 'max_weight'] })
   expect(filters).toEqual({ voice_min: -20, height_position_min: 25, pool: ['medal'] })

@@ -53,7 +53,7 @@ button:not(.nav-item):has(> .ui-icon) { display: inline-flex; align-items: cente
 .detail-close { display: block; margin: 0 0 var(--space-5) auto; }
 .detail-panel.detail-closed { display: none !important; }
 .page .workspace.split.detail-collapsed { grid-template-columns: minmax(0, 1fr) !important; }
-#page-pets .workspace.split.detail-collapsed { grid-template-columns: minmax(0, 1fr) 300px !important; }
+#page-pets .workspace.split.detail-collapsed { grid-template-columns: minmax(0, 1fr) var(--pet-side-width) !important; }
 .detail-backdrop { position: fixed; inset: 0; background: var(--overlay); z-index: 110; }
 .drawer-open .page.active { overflow: hidden; }
 #btn-pet-filters, #btn-close-pet-filters { display: none; }

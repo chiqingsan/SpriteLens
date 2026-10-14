@@ -16,6 +16,7 @@ from dataclasses import dataclass, replace
 
 from spritelens.domain.identity import PlayerIdentity, extract_identity
 from spritelens.domain.pets import Pet, extract_pets
+from spritelens.domain.pet_medals import extract_medals
 from spritelens.domain.pet_locations import Backpack, PetBox, PetLocation, update_backpack
 from spritelens.repositories.pet_store import PetStore
 from spritelens.services.account_tracker import AccountTracker
@@ -50,6 +51,7 @@ class PetRepository:
         self._store = store
         self._account = AccountTracker()
         self._cached_identity: PlayerIdentity | None = None
+        self._medals: dict[int, tuple[int, ...] | None] | None = None
 
     def handle_packet(self, event: PacketEvent) -> None:
         """PacketEvent 监听回调：先认身份，再提取宠物并合并（新的覆盖旧的）。"""
@@ -70,22 +72,48 @@ class PetRepository:
                     self._pets.clear()
                     self._locations.clear()
                     self._backpack = Backpack()
+                    self._medals = None
                     self._version += 1
             if self._store is not None:
                 self._store.put_account(identity.uid, identity.name, identity.level)
 
+        medal_update = extract_medals(event)
+        changed_medals: list[Pet] = []
         with self._lock:
+            if medal_update is not None:
+                if medal_update.collection is not None:
+                    self._medals = dict(medal_update.collection)
+                if 0 in medal_update.invalidated:
+                    self._medals = None
+                elif self._medals is not None:
+                    for gid in medal_update.invalidated:
+                        self._medals[gid] = None
+                for gid, pet in self._pets.items():
+                    if self._medals is not None:
+                        ids = self._medals.get(gid, ())
+                    elif 0 in medal_update.invalidated or gid in medal_update.invalidated:
+                        ids = None
+                    else:
+                        continue
+                    if ids != pet.awarded_medal_ids:
+                        pet = replace(pet, awarded_medal_ids=ids)
+                        self._pets[gid] = pet
+                        changed_medals.append(pet)
+                self._version += 1
             backpack = update_backpack(event, self._backpack)
             if backpack is not None:
                 self._backpack = backpack
                 self._locations = backpack.locations()
                 self._version += 1
             uid = self._account.uid
+        if changed_medals and self._store is not None and uid > 0:
+            self._store.put(uid, changed_medals)
         if backpack is not None and self._store is not None and uid > 0:
             self._store.put_backpack(uid, backpack)
         pets = extract_pets(event, include_non_owned=True)
         if not pets:
             return
+        merged: list[Pet] = []
         with self._lock:
             for pet in pets:
                 if pet.gid <= 0 or len(self._pets) >= MAX_PETS and pet.gid not in self._pets:
@@ -94,12 +122,16 @@ class PetRepository:
                 if previous:
                     # 简略更新缺少获得信息时保留已采集字段；0表示未知，不能抹掉日期。
                     pet = replace(pet, catch_way=pet.catch_way or previous.catch_way,
-                                  add_time=pet.add_time or previous.add_time)
+                                  add_time=pet.add_time or previous.add_time,
+                                  awarded_medal_ids=previous.awarded_medal_ids)
+                if self._medals is not None:
+                    pet = replace(pet, awarded_medal_ids=self._medals.get(pet.gid, ()))
                 self._pets[pet.gid] = pet
+                merged.append(pet)
             self._version += 1
             uid = self._account.uid
         if self._store is not None and uid > 0:
-            self._store.put(uid, pets)
+            self._store.put(uid, merged)
 
     def colorful_name(self, conf_id: int) -> str | None:
         """炫彩形态 id → 宠物名（协议学习表；未见过返回 None）。"""
@@ -227,6 +259,7 @@ class PetRepository:
             self._pets.clear()
             self._locations.clear()
             self._backpack = Backpack()
+            self._medals = None
             self._version += 1
 
 

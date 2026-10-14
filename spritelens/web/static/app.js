@@ -1281,7 +1281,7 @@
       if (timer) { clearTimeout(timer); }
       window.SpriteLensAppearance.initialize(payload.ui_preferences, function (changes) {
         return api("/api/ui/preferences", { method: "POST", body: changes });
-      }, toast);
+      }, toast, function () { return api("/api/ui/open-browser", { method: "POST" }); });
       petInventory.setView(payload.ui_preferences.pet_view);
       if (payload.app && payload.app.version) {
         var versionNode = $("app-version");

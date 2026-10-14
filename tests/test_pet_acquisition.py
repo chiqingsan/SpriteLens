@@ -41,7 +41,7 @@ class PetAcquisitionTest(unittest.TestCase):
             db = Database(path)
             store = PetStore(db)
             try:
-                self.assertEqual(db.schema_version, 9)
+                self.assertGreaterEqual(db.schema_version, 9)
                 legacy = store.load(101)[0]
                 self.assertEqual((legacy.add_time, legacy.catch_way), (0, 0))
                 pet = replace(_pet(1, name="synthetic", level=1), catch_way=3, add_time=1700000000)

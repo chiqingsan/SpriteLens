@@ -4,8 +4,8 @@
   function esc(value) { var node = document.createElement("span"); node.textContent = value == null ? "" : value; return node.innerHTML; }
   function avatar(pet, klass) {
     var artwork = window.SpriteLensAppearance.imageMode() === "artwork";
-    // 头像缺失保留首字，不把全身图冒充头像。立绘可回退已有本地小图。
-    var url = artwork ? pet.artwork_url || pet.icon_url : pet.portrait_url;
+    // 缺少对应尺寸素材时保留首字，不拿头像冒充全身立绘。
+    var url = artwork ? pet.artwork_url : pet.portrait_url;
     return '<span class="' + klass + ' pet-image' + (artwork ? ' is-artwork' : '') + '"><span aria-hidden="true">'
       + esc((pet.name || "?").slice(0, 1)) + '</span>' + (url ? '<img src="' + esc(url) + '" alt="" loading="lazy" onerror="this.remove()">' : '') + '</span>';
   }
@@ -39,7 +39,7 @@
       if (!mark) { return ''; }
       var id = { "大": 1001, "小": 1002, "粗": 1025, "婉": 1026 }[mark.label];
       return '<span class="pet-medal' + (id ? ' has-icon' : '') + '" title="' + esc(mark.name + (mark.source === "reference" ? " · 体型/声音参考标记" : " · 当前佩戴")) + '"><span>' + esc(mark.label) + '</span>'
-        + (id ? '<img src="/static/medals/' + id + '.png" alt="' + esc(mark.name) + '" onerror="this.parentNode.classList.remove(\'has-icon\');this.remove()">' : '') + '</span>';
+        + (id ? '<img src="/static/medal-icons/mark-' + id + '.png" alt="' + esc(mark.name) + '" onerror="this.parentNode.classList.remove(\'has-icon\');this.remove()">' : '') + '</span>';
     }
     return slots ? ["大小", "粗婉"].map(function (group) {
       return '<span class="point-medal-slot">' + tag(marks.find(function (mark) { return group.indexOf(mark.label) !== -1; })) + '</span>';

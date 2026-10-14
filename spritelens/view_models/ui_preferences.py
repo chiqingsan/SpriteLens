@@ -10,7 +10,7 @@ VIEWS = frozenset({"point", "card", "table"})
 IMAGE_MODES = frozenset({"portrait", "artwork"})
 FIELDS = ("groups", "height", "weight", "voice", "positions")
 SHORTCUT_KEYS = frozenset({"search", "level_min", "level_max", "natures", "types", "talent_min", "gender", "egg_groups", "egg_mode",
-    "pool", "pool_mode", "shiny", "colorful", "medal", "marks", "speciality", "acquisition", "captured_days",
+    "pool", "pool_mode", "shiny", "colorful", "medal", "medals", "marks", "speciality", "acquisition", "captured_days",
     "height_min", "height_max", "weight_min", "weight_max", "voice_min", "voice_max",
     "height_position_min", "height_position_max", "weight_position_min", "weight_position_max"})
 
@@ -38,9 +38,9 @@ def validate_shortcuts(raw: object) -> list:
                 valid = isinstance(value, list) and all(isinstance(item, str) and item in allowed for item in value)
             elif key in ("medal", "speciality", "acquisition", "captured_days"):
                 valid = type(value) is int and value >= 0 and (key != "captured_days" or value in (0, 1, 3, 7))
-            elif key in ("natures", "types", "egg_groups"):
-                expected = int if key == "natures" else str
-                valid = isinstance(value, list) and len(value) <= 50 and all(type(v) is expected and (v >= 0 if expected is int else 0 < len(v) <= 40) for v in value)
+            elif key in ("natures", "medals", "types", "egg_groups"):
+                expected = int if key in ("natures", "medals") else str
+                valid = isinstance(value, list) and len(value) <= 50 and all(type(v) is expected and (v >= (1 if key == "medals" else 0) if expected is int else 0 < len(v) <= 40) for v in value)
             elif key in ("search", "egg_mode"):
                 valid = isinstance(value, str) and len(value) <= 100 and (key != "egg_mode" or value in ("any", "all"))
             elif key in ("level_min", "level_max", "talent_min", "gender"):
@@ -65,6 +65,10 @@ def normalize_preferences(raw: object) -> dict:
         shortcuts = validate_shortcuts(saved)
     except ValueError:
         shortcuts = []
+    if not raw.get("shortcuts_initialized"):
+        # 旧版四个预设在界面写死；迁移为完整快捷列表，空列表也可明确保存。
+        shortcuts = [{"name": name, "filters": {"marks": [name]}}
+                     for name in ("大块头", "小不点", "婉转声", "粗嗓门")] + shortcuts
     return {"theme": raw.get("theme") if isinstance(raw.get("theme"), str) and raw.get("theme") in THEMES else "miaomiao",
             "pet_view": raw.get("pet_view") if isinstance(raw.get("pet_view"), str) and raw.get("pet_view") in VIEWS else "point",
             "pet_image": raw.get("pet_image") if isinstance(raw.get("pet_image"), str) and raw["pet_image"] in IMAGE_MODES else "portrait",
@@ -98,5 +102,6 @@ class UIPreferencesViewModel:
             value["fields"].update(fields)
             if shortcuts is not None:
                 value["shortcuts"] = shortcuts
+            value["shortcuts_initialized"] = True
             return value
-        return self._settings.update_checked("ui.preferences", merge)
+        return normalize_preferences(self._settings.update_checked("ui.preferences", merge))
