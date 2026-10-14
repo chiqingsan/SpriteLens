@@ -74,7 +74,13 @@ test('列表错误保留可见重试入口，错误槽位不能提交', async ({
   await expect(page.locator('#pet-count')).toContainText('命中 40 / 40')
   await expect(page.locator('#btn-pets-retry')).toHaveCount(0)
   await page.locator('#pet-view [data-view="card"]').click()
-  const card = page.locator('#pet-grid .point-pet').first()
+  // 定位断言需要箱内个体：默认按图鉴 ID 排序后首卡可能是出战个体（无箱位）。
+  // 逐页找到箱内的护主犬（gid 1025 起，不做出战个体），再验证定位。
+  let card = page.locator('#pet-grid .point-pet').filter({ hasText: '护主犬' }).first()
+  for (let page_ = 1; page_ < 5 && !(await card.isVisible()); page_ += 1) {
+    await page.locator('#pet-page-navigation button[data-page="' + (page_ + 1) + '"]').click()
+    await page.waitForTimeout(150)
+  }
   const gid = await card.getAttribute('data-gid')
   await card.click()
   await page.locator('#pet-detail [data-locate-team], #pet-detail [data-locate-box]').click()
