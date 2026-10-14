@@ -3,7 +3,7 @@ import { initialMeasurementLimits, parsePetFilterOptions, type PetFilters, type 
 
 function defaults(): PetFilters {
   return { search: '', level_min: 1, level_max: 60, natures: [], types: [],
-    gender: 0, sort: 'gid', desc: false,
+    gender: 0, sort: 'dex_no', desc: false,
     pool: [], pool_mode: 'and', shiny: false, colorful: false, medal: 0, marks: [], speciality: 0, acquisition: 0, captured_days: 0 }
 }
 
@@ -45,7 +45,7 @@ export function usePetFilters(reload: () => void, invalidate: () => void) {
     // 快捷条件还含蛋组/体型等原生切片的字段，不能把它们复制进 Vue 状态。
     Object.assign(filters, { search: value.search ?? '', level_min: Math.max(1, Math.min(value.level_min ?? 1, 60)),
       level_max: Math.min(value.level_max ?? 60, 60), natures: [...(value.natures || [])], types: [...(value.types || [])],
-      gender: value.gender ?? 0, sort: value.sort ?? 'gid', desc: value.desc ?? false,
+      gender: value.gender ?? 0, sort: value.sort ?? 'dex_no', desc: value.desc ?? false,
       pool: [...(value.pool || [])], pool_mode: value.pool_mode ?? 'and', shiny: value.shiny ?? false,
       colorful: value.colorful ?? false, medal: value.medal ?? 0, marks: [...(value.marks || [])], speciality: value.speciality ?? 0, acquisition: value.acquisition ?? 0, captured_days: value.captured_days ?? 0 })
   }

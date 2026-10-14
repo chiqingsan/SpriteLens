@@ -34,7 +34,7 @@ it('上下限保持一致，恢复不保留旧条件或共享数组，账号选�
   natures.push(3)
   expect(model.query()).toMatchObject({ search: 'A', natures: '1,2', types: '火', desc: '1', sort: 'level' })
   model.restore({ search: '下一条件' })
-  expect(model.query()).toMatchObject({ natures: '', types: '', desc: '', sort: 'gid' })
+  expect(model.query()).toMatchObject({ natures: '', types: '', desc: '', sort: 'dex_no' })
   const shortcut = { search: '基础与扩展组合', egg_groups: ['动物组'], height_min: 1, talent_min: 4 }
   model.restore(shortcut)
   expect(model.query()).not.toHaveProperty('egg_groups')

@@ -14,13 +14,12 @@ function value(event: Event) { return (event.target as HTMLInputElement).value }
         id="f-search" :value="filters.search" type="text" placeholder="搜索名字 / 编号 / 图鉴 ID"
         autocomplete="off" @input="model.search(value($event))">
     </label>
-    <label class="inline-field" :hidden="fixed">排序
+  </Teleport>
+  <Teleport to="#pet-sort-root">
+    <label class="inline-field pet-sort-field" :hidden="fixed">排序
       <select id="f-sort" v-model="filters.sort" :disabled="fixed" @change="model.changed()">
         <option v-for="item in options.sorts" :key="item.key" :value="item.key">{{ item.label }}</option>
       </select>
-    </label>
-    <label class="check-row compact" :hidden="fixed">
-      <input id="f-desc" v-model="filters.desc" type="checkbox" :disabled="fixed" @change="model.changed()"><span>降序</span>
     </label>
   </Teleport>
   <section class="direct-filter" style="order: 0">

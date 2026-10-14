@@ -1,7 +1,7 @@
 import { parsePetFilterOptions, type PetFilterOptions } from './petFilters'
 import { parsePetConditions, type PetConditions } from './petConditions'
 
-export type PetView = 'point' | 'card' | 'table'
+export type PetView = 'point' | 'card'
 export interface PetStat { key: string; label: string; value: number; race: number; ratio: number; race_ratio: number }
 export interface RangePosition { ratio: number | null; status: string }
 export interface ColorCard { card_id: string; name: string; particle_name: string; particle_id: number; base_color: string; mix_color: string }

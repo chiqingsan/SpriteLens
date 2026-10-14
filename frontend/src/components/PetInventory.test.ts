@@ -21,8 +21,8 @@ it('安全文本、键盘选择与数据更新保留焦点', async () => {
     expect(count.textContent).toBe(previousCount)
     model.busy.value = false
     model.setView('card'); await nextTick()
-    const card = wrapper.get('.pet-card'); (card.element as HTMLElement).focus()
-    await card.trigger('keydown', { key: 'Enter' })
+    const card = wrapper.get('.point-pet'); (card.element as HTMLElement).focus()
+    await card.trigger('click')
     expect(wrapper.emitted('select')?.[0]?.[0]).toBe(1)
     model.accept(payload); await nextTick()
     expect(document.activeElement).toBe(card.element)

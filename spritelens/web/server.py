@@ -472,7 +472,7 @@ class LocalServer(CaptureRoutesMixin):
             "height_min", "height_max", "weight_min", "weight_max", "voice_min", "voice_max",
             "height_position_min", "height_position_max", "weight_position_min", "weight_position_max")})
         filters = replace(filters, **measurement)
-        sort_key = query.get("sort") or "gid"
+        sort_key = query.get("sort") or "dex_no"
         return vm.view_with(filters, sort_key, descending=_as_bool(query.get("desc")))
 
     async def _api_handbook(self, request: web.Request) -> web.Response:

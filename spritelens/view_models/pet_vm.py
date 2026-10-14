@@ -20,12 +20,9 @@ from spritelens.services.pet_repository import PetRepository
 
 # 排序键（UI 排序菜单用）
 SORT_KEYS: tuple[tuple[str, str], ...] = (
-    ("gid", "编号"),
-    ("conf_id", "图鉴 ID"),
+    ("dex_no", "图鉴 ID"),
+    ("add_time", "捕捉时间"),
     ("level", "等级"),
-    ("talent_rank", "天赋阶"),
-    ("stat_sum", "六维总和"),
-    ("name", "名字"),
     ("height", "身高"),
     ("weight", "体重"),
     ("voice", "声音"),
@@ -101,7 +98,7 @@ class PetViewModel:
         self._static = static_data
         self._search = ""
         self._filters = PetFilters()
-        self._sort_key = "gid"
+        self._sort_key = "dex_no"
         self._sort_desc = False
 
     # -- 命令 ----------------------------------------------------------
@@ -158,7 +155,7 @@ class PetViewModel:
 
     def set_sort(self, key: str, *, descending: bool = False) -> None:
         if key not in {k for k, _ in SORT_KEYS}:
-            key = "gid"
+            key = "dex_no"
         self._sort_key = key
         self._sort_desc = descending
 
@@ -181,7 +178,7 @@ class PetViewModel:
     def view_with(
         self,
         filters: PetFilters,
-        sort_key: str = "gid",
+        sort_key: str = "dex_no",
         *,
         descending: bool = False,
     ) -> "PetView":
@@ -192,7 +189,7 @@ class PetViewModel:
         互不污染。
         """
         if sort_key not in {k for k, _ in SORT_KEYS}:
-            sort_key = "gid"
+            sort_key = "dex_no"
         return PetView(self, filters, sort_key, descending)
 
     def filtered_pets(self) -> tuple[Pet, ...]:
@@ -382,13 +379,19 @@ class PetViewModel:
 
     def _apply_sort_with(self, pets: tuple[Pet, ...], key: str, reverse: bool) -> tuple[Pet, ...]:
         def sort_value(pet: Pet):
-            if key == "name":
-                return pet.name
-            if key == "stat_sum":
-                return sum(a.final_value for a in pet.attributes)
+            if key == "dex_no":
+                species = self._static.species(pet.base_conf_id) if self._static else None
+                return species.dex_no if species is not None else 0
             return getattr(pet, key, 0)
 
-        return tuple(sorted(pets, key=sort_value, reverse=reverse))
+        def tie_value(pet: Pet):
+            species = self._static.species(pet.base_conf_id) if self._static else None
+            return (species.dex_no if species is not None else 0, pet.add_time)
+
+        # 主键可能降序，但并列时固定按（图鉴 ID, 捕捉时间）升序：先升序排次级，
+        # 再用稳定排序按主键排，相等项保留次级顺序。
+        ranked = sorted(pets, key=tie_value)
+        return tuple(sorted(ranked, key=sort_value, reverse=reverse))
 
     def _primary_type(self, pet: Pet) -> str:
         if self._static is None:

@@ -13,7 +13,9 @@ export function testPet(gid = 1): Pet {
 export function testPets(count = 1): Pets {
   return { uid: 101, version: 10, total: count, shown: count,
     pets: Array.from({ length: count }, (_, index) => testPet(index + 1)), filters: {},
-    options: { natures: [], types: ['火'], sorts: [{ key: 'gid', label: '编号' }], talent_max: 2, measurement_limits: initialMeasurementLimits, egg_groups: ['动物组'] },
+    options: { natures: [], types: ['火'], sorts: [{ key: 'dex_no', label: '图鉴 ID' }, { key: 'add_time', label: '捕捉时间' },
+      { key: 'level', label: '等级' }, { key: 'height', label: '身高' }, { key: 'weight', label: '体重' }, { key: 'voice', label: '声音' }],
+      talent_max: 2, measurement_limits: initialMeasurementLimits, egg_groups: ['动物组'] },
     backpack: { boxes: count ? [{ box_id: 1, name: '合成箱', historical: true, matched: 1, occupied: 2, unknown: 1,
       slots: [{ gid: 1, state: 'matched' }, { gid: 999, state: 'missing' }, { gid: null, state: 'unknown' },
         ...Array.from({ length: 27 }, () => ({ gid: 0, state: 'empty' as const }))] }] : [],

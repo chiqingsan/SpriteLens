@@ -10,7 +10,7 @@ const options = { natures: Array.from({ length: 10 }, (_, index) => ({ id: index
   types: ['火'], sorts: [{ key: 'gid', label: '编号' }, { key: 'level', label: '等级' }], talent_max: 4, measurement_limits: initialMeasurementLimits }
 
 it('选项更新保留按钮和焦点，全部性格、排序与安全插值', async () => {
-  document.body.innerHTML = '<div id="pet-search-controls"></div>'
+  document.body.innerHTML = '<div id="pet-search-controls"></div><div id="pet-sort-root"></div>'
   const model = usePetFilters(vi.fn(), vi.fn())
   model.activate(); model.updateOptions({ ...options, natures: [{ id: 1, name: '<img onerror=alert(1)>' }, ...options.natures.slice(1)] })
   const wrapper = mount(PetBasicFilters, { props: { model }, attachTo: document.body })
@@ -31,7 +31,7 @@ it('选项更新保留按钮和焦点，全部性格、排序与安全插值', a
 
 it('卸载清理防抖和 Teleport，重新挂载只有一套控件', async () => {
   vi.useFakeTimers()
-  document.body.innerHTML = '<div id="pet-search-controls"></div><div id="pet-filter-actions"></div><div id="root"></div>'
+  document.body.innerHTML = '<div id="pet-search-controls"></div><div id="pet-sort-root"></div><div id="pet-filter-actions"></div><div id="root"></div>'
   const reload = vi.fn()
   const host = { busy: () => false, persist: async () => {}, notify: vi.fn() }
   const bridge = mountPetFilters(document.getElementById('root')!, reload, vi.fn(), host)

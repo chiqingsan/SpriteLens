@@ -64,9 +64,6 @@
   --code-leaf: #607079;
   --code-text: #7a4fb5;
   --overlay: rgba(32, 43, 33, .45);
-  --chart-h: #4f9df7;
-  --chart-w: #f0a63c;
-  --chart-v: #9a7ef0;
 }
 
 :root[data-theme="huohua"] {

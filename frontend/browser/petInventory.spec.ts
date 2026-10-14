@@ -48,16 +48,9 @@ test('真实槽位语义、多箱滚动、三队、分页与详情键盘桥', as
   await expect(page.locator('#pet-grid .pet-team-heading')).toHaveCount(3)
   await expect(page.locator('#pet-box-navigation button[data-box="0"]')).toContainText('出战')
   await page.locator('#pet-view [data-view="card"]').click()
-  await expect(page.locator('#pet-grid .pet-card')).toHaveCount(60)
-  await page.locator('#pet-pager button').getByText('下一页', { exact: true }).click()
-  await page.locator('#pet-pager button').getByText('下一页', { exact: true }).click()
-  await expect(page.locator('#pet-grid .pet-card')).toHaveCount(10)
-  await page.locator('#pet-view [data-view="table"]').click()
-  await expect(page.locator('#pet-rows tr')).toHaveCount(130)
-  for (const theme of ['miaomiao', 'huohua', 'shuilanlan']) {
-    await page.evaluate(value => { document.documentElement.dataset.theme = value }, theme)
-    await page.screenshot({ path: `test-results/pet-inventory-table-${theme}.png` })
-  }
+  await expect(page.locator('#pet-grid .point-pet')).toHaveCount(30)
+  await page.locator('#pet-page-navigation button[data-page="5"]').click()
+  await expect(page.locator('#pet-grid .point-pet')).toHaveCount(10)
   expect(errors).toEqual([])
 })
 
@@ -81,7 +74,7 @@ test('列表错误保留可见重试入口，错误槽位不能提交', async ({
   await expect(page.locator('#pet-count')).toContainText('命中 40 / 40')
   await expect(page.locator('#btn-pets-retry')).toHaveCount(0)
   await page.locator('#pet-view [data-view="card"]').click()
-  const card = page.locator('#pet-grid .pet-card').first()
+  const card = page.locator('#pet-grid .point-pet').first()
   const gid = await card.getAttribute('data-gid')
   await card.click()
   await page.locator('#pet-detail [data-locate-team], #pet-detail [data-locate-box]').click()

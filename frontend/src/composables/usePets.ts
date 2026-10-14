@@ -13,10 +13,12 @@ export function usePets(api: ApiClient, account: () => PetAccount, query: () => 
   const boxes = computed(() => (data.value?.backpack.boxes || []).filter(box => box.slots.some(slot => slot.state !== 'empty')))
   const box = computed(() => boxes.value.find(item => item.box_id === boxId.value))
   const pets = computed(() => data.value?.pets || [])
-  const pages = computed(() => Math.max(1, Math.ceil(pets.value.length / 60)))
-  const cards = computed(() => pets.value.slice((page.value - 1) * 60, page.value * 60))
+  const pages = computed(() => Math.max(1, Math.ceil(pets.value.length / 30)))
+  const cards = computed(() => pets.value.slice((page.value - 1) * 30, page.value * 30))
   const slots = computed(() => teams.value ? (data.value?.backpack.teams || []).flatMap(team => team.slots) : box.value?.slots || [])
   const byGid = computed(() => new Map(pets.value.map(pet => [pet.gid, pet])))
+  // 自定义排序视图：把当前页宠物包成全 matched 槽位，复用箱位卡片渲染与键盘导航，无中间空位。
+  const cardSlots = computed(() => cards.value.map(pet => ({ gid: pet.gid, state: 'matched' as const })))
   function commit(payload: ReturnType<typeof parsePets>) {
     data.value = payload; error.value = ''
     if (!box.value) boxId.value = (boxes.value.find(item => item.matched) || boxes.value[0])?.box_id ?? null
@@ -53,7 +55,7 @@ export function usePets(api: ApiClient, account: () => PetAccount, query: () => 
     } finally { if (ticket === sequence) busy.value = false }
   }
   function resetAccount() { invalidate(); busy.value = false; data.value = null; selected.value = null; boxId.value = null; teams.value = false; page.value = 1; error.value = '' }
-  return { data, view, page, boxId, teams, selected, busy, error, visible, boxes, box, pets, pages, cards, slots, byGid,
+  return { data, view, page, boxId, teams, selected, busy, error, visible, boxes, box, pets, pages, cards, cardSlots, slots, byGid,
     load, accept, invalidate, resetAccount,
     activate: () => { active = true; visible.value = true }, pause: () => { active = false; visible.value = false; invalidate(); busy.value = false },
     setBox: (id: number) => { teams.value = id === 0; if (id) boxId.value = id },

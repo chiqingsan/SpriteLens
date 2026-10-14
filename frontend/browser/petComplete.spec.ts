@@ -39,7 +39,7 @@ for (const width of [1440, 640]) {
     await page.locator('[data-page="pets"]').click()
     await expect(page.locator('#pet-count')).toContainText('命中 40 / 40')
     await page.locator('#pet-view [data-view="card"]').click()
-    const card = page.locator('#pet-grid .pet-card').first()
+    const card = page.locator('#pet-grid .point-pet').first()
     await card.focus(); await card.press('Enter')
     const detail = page.locator('#pet-detail')
     await expect(detail).toBeVisible()

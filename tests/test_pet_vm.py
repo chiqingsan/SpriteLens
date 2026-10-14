@@ -55,9 +55,9 @@ def _make_static(tmp: Path) -> StaticData:
     (tmp / "species.json").write_text(
         json.dumps(
             {
-                "100": {"name": "火兽", "types": [1], "type_names": ["火"], "stats": {"hp": 100, "sum": 500}},
-                "200": {"name": "水兽", "types": [2], "type_names": ["水"], "stats": {"hp": 90, "sum": 480}},
-                "300": {"name": "双系兽", "types": [1, 3], "type_names": ["火", "草"], "stats": {"hp": 80, "sum": 460}},
+                "100": {"name": "火兽", "types": [1], "type_names": ["火"], "stats": {"hp": 100, "sum": 500}, "dex_no": 10},
+                "200": {"name": "水兽", "types": [2], "type_names": ["水"], "stats": {"hp": 90, "sum": 480}, "dex_no": 20},
+                "300": {"name": "双系兽", "types": [1, 3], "type_names": ["火", "草"], "stats": {"hp": 80, "sum": 460}, "dex_no": 30},
             },
             ensure_ascii=False,
         ),
@@ -159,16 +159,19 @@ class PetViewModelTest(unittest.TestCase):
         self.vm.set_sort("level", descending=True)
         self.assertEqual([p.gid for p in self.vm.filtered_pets()], [4, 1, 2, 3])
 
-    def test_sort_by_stat_sum(self):
-        self.vm.set_sort("stat_sum", descending=True)
-        # gid1 sum=700 最高
-        self.assertEqual(self.vm.filtered_pets()[0].gid, 1)
-        self.vm.set_sort("stat_sum")
-        self.assertEqual(self.vm.filtered_pets()[0].gid, 2)  # 默认 600
+    def test_default_sort_is_dex_no(self):
+        # 默认按图鉴 ID(newdex) 升序：dex10(gid1,gid4), dex20(gid2), dex30(gid3)。
+        self.assertEqual([p.gid for p in self.vm.filtered_pets()], [1, 4, 2, 3])
+
+    def test_sort_ties_break_by_dex_then_capture_time(self):
+        self.repo._pets[1] = replace(self.repo._pets[1], add_time=500)
+        self.repo._pets[4] = replace(self.repo._pets[4], add_time=100)
+        # gid1 与 gid4 同为图鉴 10，并列时按捕捉时间升序 → gid4 在前。
+        self.assertEqual([p.gid for p in self.vm.filtered_pets()], [4, 1, 2, 3])
 
     def test_sort_unknown_key_falls_back(self):
         self.vm.set_sort("nope")
-        self.assertEqual(self.vm.sort_state[0], "gid")
+        self.assertEqual(self.vm.sort_state[0], "dex_no")
 
     # -- 聚合 ----------------------------------------------------------
     def test_stats(self):

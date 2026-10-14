@@ -261,7 +261,7 @@ class UpgradeAPITest(unittest.TestCase):
         self.assertEqual(_http_post(self.url + "/api/ui/preferences", "upgrade-test", {"shortcuts": [{"name": "bad", "filters": {"height_position_min": 150}}]})[0], 400)
 
     def test_ratios_do_not_depend_on_filter_result(self):
-        first = self.get_pets()["pets"][0]
+        first = next(pet for pet in self.get_pets()["pets"] if pet["gid"] == 1)
         filtered = self.get_pets(search="A")["pets"][0]
         self.assertEqual(first["height_pct"], .5)
         self.assertEqual(first["range_positions"], filtered["range_positions"])

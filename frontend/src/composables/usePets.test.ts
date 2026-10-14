@@ -63,8 +63,10 @@ it('A→B→A、错 uid 和过期版本拒绝，当前错误保留可重试状�
 
 it('选中箱与分页更新保持或收敛；切号清除缓存、箱号、队伍与选择', () => {
   const model = usePets(vi.fn(), () => ({ uid: 101, version: 10, generation: 1 }), () => ({}), vi.fn(), vi.fn())
-  model.accept(testPets(130)); model.page.value = 3; model.selected.value = 100
+  model.accept(testPets(130)); model.page.value = 5; model.selected.value = 100
   expect(model.cards.value).toHaveLength(10)
+  expect(model.cardSlots.value).toHaveLength(10)
+  expect(model.cardSlots.value.every(slot => slot.state === 'matched')).toBe(true)
   model.accept(testPets(2))
   expect(model.page.value).toBe(1); expect(model.selected.value).toBeNull()
   expect(model.box.value?.box_id).toBe(1)
