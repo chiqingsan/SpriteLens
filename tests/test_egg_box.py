@@ -14,7 +14,6 @@ from spritelens.repositories.egg_store import EggStore
 from spritelens.services.egg_repository import EggBoxRepository
 from spritelens.events import PacketEvent
 from spritelens.web.payloads import egg_box_payload, male_matrix_payload
-from spritelens.web.pet_media import pet_images
 
 
 def _field(no: int, raw: object, children: list[dict] | None = None) -> dict:
@@ -26,7 +25,7 @@ def _field(no: int, raw: object, children: list[dict] | None = None) -> dict:
 
 def _egg_row(
     instance_id: int = 9001,
-    item_conf_id: int = 3001001,
+    item_conf_id: int = 107001,
     quantity: int = 1,
     *,
     hatch_seconds: int = 43200,
@@ -39,7 +38,7 @@ def _egg_row(
             15,
             None,
             [
-                _field(1, 3001),
+                _field(1, 3001001),
                 _field(2, 25),
                 _field(3, 1300),
                 _field(6, hatch_seconds),
@@ -103,8 +102,8 @@ class ExtractEggsTests(unittest.TestCase):
         self.assertEqual(len(eggs), 1)
         egg = eggs[0]
         self.assertEqual(egg.instance_id, 9001)
-        self.assertEqual(egg.egg_conf_id, 3001001)
-        self.assertEqual(egg.pet_conf_id, 3001)
+        self.assertEqual(egg.egg_conf_id, 107001)
+        self.assertEqual(egg.pet_conf_id, 3001001)
         self.assertEqual(egg.hatch_seconds, 43200)
         self.assertEqual(egg.category, 6)
         self.assertFalse(egg.hatching)
@@ -120,6 +119,30 @@ class ExtractEggsTests(unittest.TestCase):
         eggs = extract_eggs(_event(_egg_row(hatched_seconds=21600)))
         self.assertTrue(eggs[0].hatching)
         self.assertAlmostEqual(eggs[0].hatch_progress, 0.5, places=3)
+
+    def test_rejects_trial_appearance_as_egg(self) -> None:
+        # 试炼条目也会碰巧含 field14=8，但 field15 只有外观 type/value。
+        row = _field(3, None, [
+            _field(1, 1700000000), _field(2, 3501), _field(3, 60),
+            _field(4, 5), _field(14, 8),
+            _field(15, None, [_field(1, 1), _field(2, 2097161)]),
+        ])
+        self.assertEqual(extract_eggs(_event(row, opcode=0x1959)), [])
+
+    def test_rejects_repeated_bag_scalars(self) -> None:
+        row = _egg_row()
+        row["children"].append(_field(2, 107002))
+        self.assertEqual(extract_eggs(_event(row)), [])
+
+    def test_collects_precious_and_glass_fields(self) -> None:
+        row = _egg_row()
+        row["children"][-1]["children"].extend([
+            _field(11, 1), _field(18, 8), _field(21, 6),
+            _field(19, None, [_field(1, 1), _field(2, 1048605)]),
+        ])
+        egg = extract_eggs(_event(row))[0]
+        self.assertTrue(egg.is_precious)
+        self.assertEqual((egg.appearance_type, egg.extension_type, egg.glass_type, egg.glass_value), (8, 6, 1, 1048605))
 
 class HatchSlotTests(unittest.TestCase):
     def test_extract_slot_ids(self) -> None:
@@ -283,7 +306,8 @@ class EggBoxRepositoryTests(unittest.TestCase):
                     obtained_at=1791661300, bag_type=8, height_cm=25, weight_g=1300,
                     hatch_seconds=100, hatched_seconds=50, hatch_updated_at=0,
                     start_hatch_time=0, category=6, special_egg_conf_id=0,
-                    appearance_type=0, extension_type=0,
+                    appearance_type=8, extension_type=6, is_precious=True,
+                    glass_type=1, glass_value=1048605,
                 )
                 self.assertEqual(store.put(101, [egg]), 1)
                 uid, loaded = store.load_latest()
@@ -293,6 +317,7 @@ class EggBoxRepositoryTests(unittest.TestCase):
                 self.assertEqual(got.instance_id, 7)
                 self.assertEqual(got.hatch_seconds, 100)
                 self.assertTrue(got.hatching)
+                self.assertEqual((got.is_precious, got.glass_type, got.glass_value), (True, 1, 1048605))
                 store.close()
             finally:
                 db.close()
@@ -435,8 +460,58 @@ class EggBoxPayloadTests(unittest.TestCase):
             row = payload["eggs"][0]
             self.assertEqual(row["egg_name"], "喵喵蛋")
             self.assertEqual(row["icon_url"], "/static/egg-icons/107001.png")
-            self.assertEqual(row["fallback_icon_url"], pet_images(3001)["portrait_url"])
+            self.assertEqual(row["fallback_icon_url"], "")
+            self.assertEqual(row["egg_kind"], "regular")
             self.assertEqual(payload["total_quantity"], 1)
+
+    def test_inventory_variant_uses_exact_ranges_and_item_texture(self) -> None:
+        import json
+        from dataclasses import replace
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            (directory / "eggs.json").write_text(json.dumps({"eggs": [{
+                "egg_key": "synthetic", "egg_conf_id": 4001001, "base_id": 4001,
+                "name": "测试精灵", "egg_name": "测试精灵蛋", "egg_item_id": 108001,
+                "egg_group_names": ["动物组"], "height_low": 10, "height_high": 20,
+            }]}), encoding="utf-8")
+            (directory / "egg_inventory.json").write_text(json.dumps({
+                "configs": {"4001002": {"name": "测试精灵", "base_id": 4001, "precious_type": 2,
+                    "height_low": 30, "height_high": 40, "weight_low": 500, "weight_high": 900}},
+                "items": {"150999": {"name": "测试精灵的异色蛋", "icon_item_id": 108001, "egg_conf_id": 4001002}},
+                "random": {"1": {"precious_type": 0, "mutation_type": 0}},
+            }), encoding="utf-8")
+            catalog = EggCatalog(directory)
+            egg = extract_eggs(_event(_egg_row(12, 150999)))[0]
+            egg = replace(egg, pet_conf_id=4001002)
+            repo = SimpleNamespace(consistent_snapshot=lambda: SimpleNamespace(
+                entries=(egg,), slots=frozenset(), slots_source="unknown", historical_ids=frozenset(),
+                source="observed", uid=101, version=1))
+            row = egg_box_payload(repo, catalog)["eggs"][0]
+            self.assertEqual(row["species_name"], "测试精灵")
+            self.assertEqual(row["egg_kind"], "shiny")
+            self.assertEqual(row["icon_url"], "/static/egg-icons/108001.png")
+            self.assertEqual(row["egg_group_names"], ["动物组"])
+            self.assertEqual(row["measurement_ranges"]["height_cm"], {"min": 30, "max": 40})
+            # 随机配置本身不等于特殊蛋；未知新配置保持未知，不借普通蛋范围。
+            random_info = catalog.inventory_egg(310049, 0, 1)
+            from spritelens.domain.egg_box import egg_kind
+            self.assertEqual(egg_kind(replace(egg, appearance_type=0), random_info.precious_type, 0, True), "mystery")
+            unknown = catalog.inventory_egg(999999, 9999999)
+            self.assertEqual(unknown.height_high, 0)
+            self.assertEqual(egg_kind(egg, unknown.precious_type, 0, False), "unknown")
+
+    def test_kind_uses_precious_enum_and_mutation_bits(self) -> None:
+        from dataclasses import replace
+        from spritelens.domain.egg_box import egg_kind
+        egg = extract_eggs(_event(_egg_row()))[0]
+        for precious, expected in ((0, "regular"), (1, "special"), (2, "shiny"),
+                                   (3, "colorful"), (4, "special"), (5, "special"),
+                                   (6, "colorful"), (7, "colorful")):
+            with self.subTest(precious=precious):
+                self.assertEqual(egg_kind(egg, precious, 0, False), expected)
+        self.assertEqual(egg_kind(replace(egg, appearance_type=8), 0, 0, True), "colorful")
+        self.assertEqual(egg_kind(replace(egg, appearance_type=1), 0, 0, False), "shiny")
+        self.assertEqual(egg_kind(replace(egg, is_precious=True), None, 0, False), "special")
 
 class MaleMatrixPayloadTests(unittest.TestCase):
     def _pet(self, gid, name, nature, gender, base_conf_id):

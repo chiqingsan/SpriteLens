@@ -214,7 +214,7 @@ button:not(.nav-item):has(> .ui-icon) { display: inline-flex; align-items: cente
 .point-pet, .point-grid .point-pet.selected { background: var(--surface-1); }
 .point-pet.male, .point-grid .point-pet.male.selected { background: var(--male); }
 .point-pet.female, .point-grid .point-pet.female.selected { background: var(--female); }
-.point-grid { --pet-portrait: 64px; --pet-height: 164px; --pet-medal: 26px; --pet-name: 14px; --pet-number: 11px; }
+.point-grid { --pet-portrait: 64px; --pet-height: 164px; --pet-medal: 28px; --pet-name: 14px; --pet-number: 11px; }
 .point-pet { position: relative; border: 1px solid var(--line); border-radius: var(--radius-md); justify-items: center; }
 .point-pet:hover { border-color: var(--teal); }
 .point-avatar { display: grid; place-items: center; position: relative; font-weight: 800; }
@@ -262,7 +262,7 @@ button:not(.nav-item):has(> .ui-icon) { display: inline-flex; align-items: cente
 #pet-grid.game-box-grid { grid-template-columns: repeat(6, minmax(136px, 164px)); min-width: 864px; max-width: 1032px; grid-auto-rows: var(--pet-height); gap: 6px; padding: 8px; }
 #pet-grid.game-box-grid:has(.pet-team-heading) .point-pet, #pet-grid.game-box-grid:has(.pet-team-heading) .pet-box-slot { min-height: var(--pet-height); }
 @container backpack (min-width: 948px) {
-  .point-grid { --pet-portrait: 80px; --pet-height: 180px; --pet-medal: 28px; --pet-name: 15px; --pet-number: 12px; }
+  .point-grid { --pet-portrait: 80px; --pet-height: 180px; --pet-medal: 30px; --pet-name: 15px; --pet-number: 12px; }
 }
 @media (max-width: 760px) {
   :root:has(#page-pets.active) { --sidebar: 64px; }

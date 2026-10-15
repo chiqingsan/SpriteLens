@@ -2,7 +2,7 @@
 
 数据文件 data/static/eggs.json（tools/import_egg_data.py 转制自游戏客户端配置）。
 为孵蛋工具链（蛋图鉴 / 蛋蛋仓库 / 配窝推断）提供静态联查：
-  - egg_conf_id（协议蛋条目 itemConfId）→ 蛋记录
+  - egg_conf_id（协议 detail.conf_id）→ 蛋记录；itemConfId 是另一类道具 ID
   - base_id（物种 base_conf_id）→ 蛋记录（该物种产什么蛋）
 
 设计约束同 static_data：零 IO 副作用、加载失败整体降级空表。
@@ -53,6 +53,24 @@ class EggInfo:
     gender_female: int
 
 
+@dataclass(frozen=True)
+class InventoryEggInfo:
+    egg_name: str
+    species_name: str
+    description: str
+    description_source: str
+    icon_item_id: int
+    egg_group_names: tuple[str, ...]
+    hatch_seconds: int
+    precious_type: int | None
+    mutation_type: int
+    random: bool
+    height_low: int
+    height_high: int
+    weight_low: int
+    weight_high: int
+
+
 class EggCatalog:
     """蛋目录只读索引；全量加载一次，进程内共享。"""
 
@@ -61,9 +79,17 @@ class EggCatalog:
         self._by_base_id: dict[int, EggInfo] = {}
         self._entries: tuple[EggInfo, ...] = ()
         self._groups: dict[str, str] = {}
+        self._inventory: dict = {"configs": {}, "items": {}, "random": {}}
+        self._egg_descriptions: dict = {}
         if directory is None:
             return
         self._load(directory / EGGS_FILE)
+        inventory = directory / "egg_inventory.json"
+        if inventory.is_file():
+            self._inventory = json.loads(inventory.read_text(encoding="utf-8"))
+        descriptions = directory / "egg_descriptions.json"
+        if descriptions.is_file():
+            self._egg_descriptions = json.loads(descriptions.read_text(encoding="utf-8"))
 
     def _load(self, path: Path) -> None:
         if not path.is_file():
@@ -131,6 +157,37 @@ class EggCatalog:
 
     def egg_by_base_id(self, base_id: int) -> EggInfo | None:
         return self._by_base_id.get(base_id)
+
+    def inventory_egg(self, item_id: int, pet_conf_id: int, random_conf_id: int = 0) -> InventoryEggInfo:
+        """协议道具 ID 与蛋配置 ID 分别联查；随机蛋不冒认具体物种。"""
+        item = self._inventory["items"].get(str(item_id), {})
+        config_id = pet_conf_id or item.get("egg_conf_id", 0)
+        config = self._inventory["configs"].get(str(config_id), {})
+        exact = self.egg(config_id)
+        species = exact or self.egg_by_base_id(item.get("base_id") or config.get("base_id", 0))
+        random_id = random_conf_id or item.get("random_conf_id", 0)
+        random_config = self._inventory["random"].get(str(random_id), {})
+        name = item.get("species_name") or config.get("name") or (exact.name if exact else "")
+        base_id = item.get("base_id") or config.get("base_id", 0)
+        description = self._egg_descriptions.get("base_ids", {}).get(str(base_id), {}).get(item.get("kind", ""), {})
+        item_name = item.get("name", "")
+        egg_name = exact.egg_name if exact else item_name
+        if not egg_name or egg_name == "精灵蛋":
+            egg_name = f"{name}蛋" if name else f"随机精灵蛋 #{item_id}" if random_id else f"蛋 #{item_id}"
+        precious = random_config.get("precious_type") if random_id else config.get("precious_type", exact.egg_type_id if exact else None)
+        if item.get("kind") in ("special", "shiny", "colorful"):
+            precious = {"special": 1, "shiny": 2, "colorful": 6}[item["kind"]]
+        return InventoryEggInfo(
+            egg_name=egg_name, species_name=name,
+            description=description.get("text", ""), description_source=description.get("source", ""),
+            icon_item_id=item.get("icon_item_id", 0) or (exact.egg_item_id if exact else 0),
+            egg_group_names=tuple(item.get("egg_group_names", species.egg_group_names if species else ())),
+            hatch_seconds=config.get("hatch_seconds", exact.hatch_seconds if exact else 0),
+            precious_type=precious,
+            mutation_type=random_config.get("mutation_type", 0), random=bool(random_id),
+            **{field: config.get(field, getattr(exact, field) if exact else 0)
+               for field in ("height_low", "height_high", "weight_low", "weight_high")},
+        )
 
     def entries(self) -> tuple[EggInfo, ...]:
         return self._entries

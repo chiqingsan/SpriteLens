@@ -24,6 +24,7 @@ ICONS = {
     "trash": ["clear", "delete"], "circle-check": ["selected", "success"],
     "layout-grid": ["grid", "card"], "adjustments": ["appearance", "display"],
     "clock": ["hatch", "time"],
+    "ruler-2": ["egg", "height", "size"], "weight": ["egg", "weight", "mass"],
     "eye": ["uid", "show"], "eye-off": ["uid", "hide"],
     "square": ["stop", "capture"], "chevron-down": ["account", "expand"],
     "gender-male": ["male", "gender"], "gender-female": ["female", "gender"],

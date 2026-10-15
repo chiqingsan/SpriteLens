@@ -55,7 +55,15 @@
   var accountRequests = window.SpriteLensAccountRequests.create(api);
   var petFilters = null;
   var petInventory = null;
-  window.addEventListener("pagehide", function () { if (petInventory) { petInventory.unmount(); } if (petFilters) { petFilters.unmount(); } });
+  var eggBoxPage = null;
+  var eggBoxPageGeneration = 0;
+  var eggBoxVersion = -1;
+  window.addEventListener("pagehide", function () {
+    eggBoxPageGeneration++;
+    if (eggBoxPage) { eggBoxPage.unmount(); eggBoxPage = null; }
+    if (petInventory) { petInventory.unmount(); }
+    if (petFilters) { petFilters.unmount(); }
+  });
 
   /* ---------- 小工具 ---------- */
   var $ = function (id) { return document.getElementById(id); };
@@ -120,7 +128,8 @@
 
   /* ---------- 导航 ---------- */
   function switchPage(name) {
-    accountRequests.cancel(state.page);
+    if (state.page === "egg-box" && name !== "egg-box") { pauseEggBoxPage(); }
+    else { accountRequests.cancel(state.page); }
     if (state.page === "breeder-library") {
       accountRequests.cancel("breeder-male"); accountRequests.cancel("breeder-female");
     }
@@ -142,7 +151,7 @@
     if (name === "pets") { petInventory.activate(); petFilters.activate(); loadPets(false, true); }
     if (name === "handbook") { loadHandbook(); }
     if (name === "egg-dex") { eggDex.load(); }
-    if (name === "egg-box") { loadEggBox(); }
+    if (name === "egg-box") { loadEggBoxPage(); }
     if (name === "male-matrix") { loadMaleMatrix(); }
     if (name === "home") { loadHome(); }
     if (name === "breeder-library") { loadBreederLibrary(); }
@@ -250,8 +259,8 @@
     if (state.page !== "egg-dex") { window.SpriteLensUI.closeDetail(false, true); }
     petInventory.resetAccount(); petFilters.resetAccount(); state._petsVersion = -1;
     state.hbData = null; state.hbSpecies = []; state.hbSelected = null;
-    eggBoxState.data = { eggs: [], total: 0, hatching: null, source: "unknown" };
-    eggBoxState.selected = null; eggBoxState.version = -1; renderEggBox();
+    eggBoxVersion = -1;
+    if (eggBoxPage) { eggBoxPage.resetAccount(); }
     homeState.data = { available: false }; homeState.version = -1; renderHome();
     flowerState.data = { available: false }; flowerState.version = -1; renderFlowers();
     mmState.data = null; mmState.selected = null;
@@ -261,7 +270,7 @@
     ["hb-count", "mm-count", "bl-male-count", "bl-female-count", "cl-meta", "cl-seasonal-count", "cl-unknown-count"].forEach(function (id) {
       $(id).textContent = "等待当前账号数据";
     });
-    ["hb-detail", "eb-detail", "mm-detail"].forEach(function (id) {
+    ["hb-detail", "mm-detail"].forEach(function (id) {
       $(id).innerHTML = '<div class="empty-hint">请选择当前账号的条目</div>';
     });
   }
@@ -300,9 +309,9 @@
     $("btn-capture-stop").disabled = !capture.running;
 
     // 蛋仓有新数据且当前在蛋仓页 → 自动刷新（版本号变化才触发）
-    if (payload.egg_box_version !== undefined && payload.egg_box_version !== eggBoxState.version) {
-      eggBoxState.version = payload.egg_box_version;
-      if (state.page === "egg-box") { loadEggBox(); }
+    if (payload.egg_box_version !== undefined && payload.egg_box_version !== eggBoxVersion) {
+      eggBoxVersion = payload.egg_box_version;
+      if (state.page === "egg-box") { loadEggBoxPage(); }
     }
     if (payload.home_version !== undefined && payload.home_version !== homeState.version) {
       homeState.version = payload.home_version;
@@ -817,119 +826,29 @@
     });
   }
 
-  /* ---------- 蛋蛋仓库 ---------- */
-  var eggBoxState = { search: "", mode: "all", data: null, selected: null, version: -1 };
-
-  function loadEggBox() {
-    return accountRequests.request("egg-box", "/api/egg-box").then(function (payload) {
-      if (!payload) { return; }
-      eggBoxState.data = payload;
-      eggBoxState.version = payload.version || 0;
-      renderEggBox();
-    }).catch(function (err) { toast("蛋仓加载失败：" + err.message, true); });
+  /* ---------- Vue 蛋仓页迁移桥：账号请求与版本仍由应用壳负责 ---------- */
+  function pauseEggBoxPage() {
+    eggBoxPageGeneration++;
+    if (eggBoxPage) { eggBoxPage.pause(); }
   }
 
-  function eggBoxFilter(eggs) {
-    var keyword = eggBoxState.search.trim().toLowerCase();
-    return (eggs || []).filter(function (egg) {
-      if (eggBoxState.mode === "hatching" && !egg.hatching) { return false; }
-      if (!keyword) { return true; }
-      return (egg.egg_name || "").toLowerCase().indexOf(keyword) >= 0
-        || (egg.species_name || "").toLowerCase().indexOf(keyword) >= 0
-        || String(egg.instance_id).indexOf(keyword) >= 0;
-    });
-  }
-
-  function renderEggBox() {
-    var payload = eggBoxState.data;
-    if (!payload) { return; }
-    var shown = eggBoxFilter(payload.eggs);
-    $("eb-count").textContent = payload.source === "unknown" ? "蛋仓状态未知" : (payload.source === "historical" ? "历史缓存 " : payload.source === "mixed" ? "观察与历史 " : "已观察 ") + payload.total + " 枚（完整性未确认）";
-    $("eb-hatching").textContent = payload.hatching === null ? "当前孵化状态未知" + (payload.historical_hatching ? " · 历史在孵 " + payload.historical_hatching : "") : "已观察在孵 " + payload.hatching;
-    $("eb-grid").innerHTML = shown.map(function (egg) {
-      var progress = Math.round((egg.hatch_progress || 0) * 100);
-      var bar = egg.hatching
-        ? '<div class="egg-progress"><i style="width:' + progress + '%"></i><b>' + progress + "%</b></div>"
-        : '<span class="hb-badge none">' + (egg.hatch_known ? "未孵化" : egg.historical_hatching ? "历史在孵 · 当前未知" : "孵化状态未知") + "</span>";
-      var qty = egg.quantity > 1 ? '<span class="egg-qty">×' + egg.quantity + "</span>" : "";
-      var img = egg.icon_url
-        ? '<img src="' + esc(egg.icon_url) + '" alt="" loading="lazy" '
-          + 'onerror="this.onerror=function(){this.remove()};this.src=\'' + esc(egg.fallback_icon_url || "") + '\'">'
-        : "";
-      return '<article class="hb-card' + (eggBoxState.selected === egg.instance_id ? " active" : "")
-        + '" data-eb="' + egg.instance_id + '" role="button" tabindex="0" aria-label="查看' + esc(egg.egg_name) + '详情">'
-        + '<div class="hb-head"><span class="hb-key">#' + esc(egg.instance_id) + "</span>"
-        + '<span class="hb-art">' + esc((egg.egg_name || "?").slice(0, 1)) + img + "</span>"
-        + "<div><strong>" + esc(egg.egg_name) + "</strong>"
-        + "<small>" + esc(egg.species_name || "—") + "</small></div>" + qty + "</div>"
-        + '<div class="hb-meta"><span class="muted">' + esc(egg.egg_type_name || "") + "</span>"
-        + '<span class="muted">' + esc(egg.hatch_label || "") + "</span></div>"
-        + bar
-        + "</article>";
-    }).join("");
-    $("eb-empty").hidden = shown.length > 0;
-    $("eb-empty").textContent = payload.total ? "没有符合筛选条件的蛋" : payload.source === "unknown" ? "尚未观察到蛋仓数据，请进入游戏打开蛋仓" : "当前观察/缓存中没有蛋，不能据此确认游戏蛋仓为空";
-    if (eggBoxState.selected !== null) { renderEggBoxDetail(eggBoxState.selected); }
-  }
-
-  function renderEggBoxDetail(instanceId) {
-    var payload = eggBoxState.data;
-    var eggs = (payload || {}).eggs || [];
-    var egg = null;
-    for (var i = 0; i < eggs.length; i++) {
-      if (eggs[i].instance_id === instanceId) { egg = eggs[i]; break; }
-    }
-    var panel = $("eb-detail");
-    document.querySelectorAll("#eb-grid [data-eb]").forEach(function (node) {
-      node.classList.toggle("active", Number(node.dataset.eb) === Number(instanceId));
-    });
-    if (!egg) { panel.innerHTML = '<div class="empty-hint">蛋不存在或已被清空</div>'; return; }
-    var progress = Math.round((egg.hatch_progress || 0) * 100);
-    var hatchedMinutes = egg.hatching && egg.hatch_progress
-      ? "（孵化数据以游戏内为准）" : "";
-    panel.innerHTML =
-      '<div class="detail-title"><h2>' + esc(egg.egg_name) + "</h2>"
-      + '<span class="muted">#' + esc(egg.instance_id) + "</span></div>"
-      + '<div class="detail-sub">' + (egg.historical ? "历史条目 · " : "当前观察条目 · ") + esc(egg.species_name || "未知物种")
-      + (egg.egg_type_name ? " · " + esc(egg.egg_type_name) : "")
-      + (egg.quantity > 1 ? " · 数量 ×" + egg.quantity : "") + "</div>"
-      + '<div class="detail-section"><h3>孵化状态</h3>'
-      + (egg.hatching
-        ? '<div class="egg-progress large"><i style="width:' + progress + '%"></i><b>' + progress + "%</b></div>"
-          + '<div class="info-line muted">孵化时长参考 ' + esc(egg.hatch_label || "—") + hatchedMinutes + "</div>"
-        : '<div class="info-line">' + (egg.hatch_known ? "未开始孵化" : egg.historical_hatching ? "历史记录为在孵，当前状态未知" : "当前孵化状态未知") + " · 参考时长 " + esc(egg.hatch_label || "—") + "</div>")
-      + "</div>"
-      + '<div class="detail-section"><h3>个体实际值</h3><dl class="detail-rows">'
-      + '<div><dt>获得时间</dt><dd>' + (egg.obtained_at ? new Date(egg.obtained_at * 1000).toLocaleString() : "未知") + "</dd></div>"
-      + '<div><dt>身高</dt><dd>' + (egg.height_cm ? (egg.height_cm / 100).toFixed(2) + " m" : "暂无数据") + "</dd></div>"
-      + '<div><dt>体重</dt><dd>' + (egg.weight_g ? (egg.weight_g / 1000).toFixed(2) + " kg" : "暂无数据") + "</dd></div>"
-      + "</dl></div>"
-      + window.SpriteLensAppearance.ranges("蛋基础范围", egg.reference_ranges);
-  }
-
-  function bindEggBoxActions() {
-    var debounced = null;
-    $("eb-search").addEventListener("input", function (event) {
-      eggBoxState.search = event.target.value;
-      clearTimeout(debounced);
-      debounced = setTimeout(renderEggBox, 200);
-    });
-    $("eb-mode").addEventListener("click", function (event) {
-      var btn = event.target.closest("[data-mode]");
-      if (!btn) { return; }
-      eggBoxState.mode = btn.dataset.mode;
-      document.querySelectorAll("#eb-mode [data-mode]").forEach(function (node) {
-        node.classList.toggle("active", node === btn);
+  function loadEggBoxPage() {
+    if (eggBoxPage) { return eggBoxPage.load(); }
+    var current = ++eggBoxPageGeneration;
+    var root = $("egg-box-root");
+    root.textContent = "正在加载精灵蛋仓…";
+    return import("/static/vue/entry.js").then(function (page) {
+      if (current !== eggBoxPageGeneration || state.page !== "egg-box") { return; }
+      eggBoxPage = page.mountEggBox(root, {
+        load: function () { return accountRequests.request("egg-box", "/api/egg-box"); },
+        cancel: function () { accountRequests.cancel("egg-box"); },
+        versionChanged: function (version) { eggBoxVersion = version; }
       });
-      renderEggBox();
+    }).catch(function (err) {
+      if (current !== eggBoxPageGeneration) { return; }
+      root.textContent = "精灵蛋仓启动失败，请切页重试：" + err.message;
+      toast("精灵蛋仓启动失败：" + err.message, true);
     });
-    $("eb-grid").addEventListener("click", function (event) {
-      var card = event.target.closest("[data-eb]");
-      if (!card) { return; }
-      eggBoxState.selected = Number(card.dataset.eb);
-      renderEggBoxDetail(eggBoxState.selected);
-    });
-
   }
 
   /* ---------- 种公阵列（性格 × 蛋组覆盖矩阵） ---------- */
@@ -1292,7 +1211,6 @@
       renderState(payload.state || {});
       renderFeaturePlaceholders();
       bindHandbookFilters();
-      bindEggBoxActions();
       bindMaleMatrixActions();
       bindCaptureActions();
       loadIfaces();

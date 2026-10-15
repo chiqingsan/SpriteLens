@@ -50,18 +50,25 @@ npm test -- src/composables/usePets.test.ts
 
 ## 页面与迁移桥
 
-蛋图鉴由旧 `app.js` 在导航时动态 import `vue/entry.js`，传入根节点和启动 token；
-桥的代次阻止离页后完成的 import 挂载。Vue mount 返回同步 dispose，离页卸载。
+蛋图鉴与精灵蛋仓由旧 `app.js` 在导航时动态 import `vue/entry.js` 并挂载；
+蛋图鉴传入根节点和启动 token，蛋仓只接收应用壳提供的账号请求/取消/版本回调。
+桥的代次阻止离页后完成的 import 挂载。Vue mount 返回同步 dispose，离页取消请求。
 Vue Router 使用 memory history，Pinia 已安装；本页无共享业务状态，不创建空 store。
 唯一 WS、bootstrap、主题偏好仍由旧壳持有，F04 迁完整壳时删除桥。
 
 蛋图鉴根带 `data-vue-page`，ui.js 与 icons.js 跳过该子树。Vue 负责模板、图标、详情、
 焦点和窄窗 inert，卸载解除 inert 与事件监听。主题继承根 CSS 变量，不复制主题状态。
-筛选、选择、错误与请求状态归页面/composable；离页取消请求和 debounce，返回时重新加载默认筛选。
+蛋图鉴筛选、选择、错误与请求状态归页面/composable；离页取消请求和 debounce，返回时重新加载默认筛选。
 同页筛选使用 AbortController + 请求代次；输入立即废弃旧响应，不能等 debounce 才作废。
 加载、无数据、筛选空态、可重试错误分别展示；移除旧蛋图鉴脚本与 HTML。
 
-蛋图鉴是静态目录，不伪造 uid/version；账号页迁移仍依赖 F01/F02 的快照与失效语义。
+蛋图鉴是静态目录，不伪造 uid/version。精灵蛋仓复用 `accountRequests` 的 UID、域版本、账号代次和取消语义；
+蛋仓 DTO 运行校验包含目录蛋组、数值测量范围与快照来源，分类使用后端 `egg_kind`，
+协议 `category` 仍表示获取来源，不作为蛋类型筛选。
+蛋仓数据、筛选、选中项及详情由 `EggBoxPage.vue` 独占；账号切换清空页面数据，离页暂停并取消请求。
+后端按精确配置、Wiki 物品变体与协议 `mutation_type` / `precious_egg_type` 分类；随机配置 ID 不等于特殊蛋。
+图片只使用蛋图，随机蛋的物种/蛋组显示为孵化前未确定，缺范围不借用普通蛋范围。
+账号页迁移仍依赖 F01/F02 的快照与失效语义。
 宠物基础筛选在 bootstrap 时通过 mountPetFilters 挂载；控件与基础状态归 Vue。
 查询/恢复/清理接口连接应用壳与矩阵跳转；usePetAdvancedFilters 独占蛋组、绝对范围与位置筛选。
 Vue 使用 Teleport 独占搜索/排序和天赋占位子树，挂载容器用 display:contents 保持旧布局。

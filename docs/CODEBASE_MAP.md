@@ -124,6 +124,8 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `web/pet_media.py` | 物种 ID → 本地头像/立绘 URL（pet_media.json；缺图映射到同源图片路由） |
 | `web/pet_media_cache.py` | 精灵图本地优先；缺失时按需校验、转码、缓存官方 CDN 图片并记录哈希 |
 | `frontend/src/pages/EggDexPage.vue`、`components/`、`composables/useEggDex.ts` | 蛋图鉴展示、详情与请求生命周期；局部状态、卸载/取消与代次失效 |
+| `frontend/src/pages/EggBoxPage.vue`、`components/EggBox*.vue`、`composables/useEggBox.ts`、`types/eggBox.ts` | 精灵蛋仓列表/详情、筛选/排序、数值范围展示与 REST DTO 校验；请求归属由原壳桥接 |
+| `tools/import_egg_inventory.py`、`data/static/egg_inventory*.json` | 蛋仓专用道具/蛋配置/随机蛋索引与导入哈希；游戏配置和 Wiki 变体分开记录，不扩充蛋图鉴展示列表 |
 | `frontend/src/components/PetBasicFilters.vue`、`composables/usePetFilters.ts`、`types/petFilters.ts` | F03 第一刀：基础筛选的唯一状态/DOM 所有者、防抖与 options 运行校验；相关 Vitest 同目录 |
 | `frontend/src/petFilterBridge.ts` | 原生页查询/恢复/清理/请求失效桥；卸载与重新挂载由相关轻量回归验证 |
 | `frontend/src/components/PetFiltersPanel.vue`、`PetAdvancedFilters.vue`、`PetShortcuts.vue` | 完整筛选、顶部AND/OR匹配与快捷追加；扩展状态在 usePetAdvancedFilters，条件运行契约在 types/petConditions.ts |
@@ -134,7 +136,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `frontend/src/components/PetAvatar.vue`、`PetMarks.vue`、`petDisplay.ts` | 安全模板展示本地头像/立绘、色卡/粒子、稀有/奖牌及 UI 格式；不复制 Python 业务规则 |
 | `frontend/src/petTestData.ts`、`composables/usePets.test.ts` | 合成数据、异步/账号/DTO/槽位回归 |
 | `frontend/src/api/client.ts`、`types/eggDex.ts` | 同源 token/取消/错误归一与页面 DTO 运行校验 |
-| `frontend/src/main.ts`、工程配置/锁文件 | memory Router/Pinia 装配、strict TS/Vite 与必要 Vitest 回归；无 ESLint/Playwright |
+| `frontend/src/main.ts`、工程配置/锁文件 | memory Router/Pinia 装配、蛋图鉴与蛋仓页面挂载、strict TS/Vite 与必要 Vitest 回归；无 ESLint/Playwright |
 | `tools/frontend.py`、`web/frontend_assets.py` | 暂存构建/专用目录发布、源指纹及运行产物清单/哈希校验 |
 | `tests/test_frontend_contract.py` | JSON→JS ID 精度与构建负例 |
 | `tests/test_desktop_startup.py` | 原生拖动设置、正常窗口边界保存、带桌面标识的重试 URL 与销毁后交接 |

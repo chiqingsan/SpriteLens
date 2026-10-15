@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from spritelens.domain.static_data import StaticData
 from spritelens.domain.display import TYPE_COLORS
+from spritelens.domain.egg_box import EGG_KIND_LABELS, egg_kind
 from spritelens.domain.measurements import range_position, range_text
 from spritelens.web.pet_media import pet_images
 from spritelens.services.egg_repository import EggBoxSnapshot
@@ -321,7 +322,12 @@ def egg_box_payload(egg_box, catalog) -> dict:
     historical_hatching = 0
     total_quantity = 0
     for egg in entries:
-        info = catalog.egg(egg.egg_conf_id) if catalog is not None else None
+        info = catalog.inventory_egg(egg.egg_conf_id, egg.pet_conf_id, egg.special_egg_conf_id) if catalog is not None else None
+        kind = egg_kind(egg, info.precious_type if info else None, info.mutation_type if info else 0,
+                        info.random if info else bool(egg.special_egg_conf_id))
+        hatch_seconds = egg.hatch_seconds or (info.hatch_seconds if info else 0)
+        hatch_label = (f"{hatch_seconds // 3600}小时" if hatch_seconds % 3600 == 0 else
+                       f"{hatch_seconds // 60}分钟" if hatch_seconds % 60 == 0 else f"{hatch_seconds}秒") if hatch_seconds else ""
         total_quantity += egg.quantity or 1
         in_slot = egg.instance_id in slots
         hatching = in_slot and view.slots_source == "observed"
@@ -336,17 +342,19 @@ def egg_box_payload(egg_box, catalog) -> dict:
                 "instance_id": egg.instance_id,
                 "egg_conf_id": egg.egg_conf_id,
                 "egg_name": info.egg_name if info else f"蛋 #{egg.egg_conf_id}",
-                "species_name": info.name if info else "",
+                "species_name": info.species_name if info else "",
+                "description": info.description if info else "",
+                "description_source": info.description_source if info else "",
                 "icon_url": (
-                    f"/static/egg-icons/{info.egg_item_id}.png"
-                    if info is not None and info.egg_item_id
+                    f"/static/egg-icons/{info.icon_item_id}.png"
+                    if info is not None and info.icon_item_id
                     else ""
                 ),
-                "fallback_icon_url": (
-                    species_icon_url(info.base_id) if info is not None else ""
-                ),
-                "egg_type_name": info.egg_type_name if info is not None else "",
-                "hatch_label": info.hatch_label if info is not None else "",
+                "fallback_icon_url": "",
+                "egg_kind": kind,
+                "egg_type_name": EGG_KIND_LABELS[kind],
+                "egg_group_names": list(info.egg_group_names) if info is not None else [],
+                "hatch_label": hatch_label,
                 "quantity": egg.quantity,
                 "obtained_at": egg.obtained_at,
                 "historical": historical,
@@ -356,8 +364,15 @@ def egg_box_payload(egg_box, catalog) -> dict:
                 "in_slot": in_slot,
                 "hatch_progress": round(egg.hatch_progress, 4),
                 "category": egg.category,
+                "special_egg_conf_id": egg.special_egg_conf_id,
                 "height_cm": egg.height_cm,
                 "weight_g": egg.weight_g,
+                "measurement_ranges": {
+                    "height_cm": {"min": info.height_low, "max": info.height_high}
+                    if info is not None and info.height_high > info.height_low else None,
+                    "weight_g": {"min": info.weight_low, "max": info.weight_high}
+                    if info is not None and info.weight_high > info.weight_low else None,
+                },
                 "reference_ranges": {"height": range_text((info.height_low, info.height_high), 100, "m") if info else "暂无数据",
                                      "weight": range_text((info.weight_low, info.weight_high), 1000, "kg") if info else "暂无数据"},
             }

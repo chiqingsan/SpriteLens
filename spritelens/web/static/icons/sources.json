@@ -446,6 +446,32 @@
         "down"
       ],
       "sha256": "34efc2d5737ffa3f29f8056e6d861ea8218d8f40858539a959a9482811f6bd05"
+    },
+    {
+      "name": "ruler-2",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/ruler-2",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/ruler-2.svg",
+      "license": "MIT",
+      "search_tags": [
+        "egg",
+        "height",
+        "size"
+      ],
+      "sha256": "d7024458069cdabbdd59a8c21e279bdd42c7e8e2400f95196259c32800a223b2"
+    },
+    {
+      "name": "weight",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/weight",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/weight.svg",
+      "license": "MIT",
+      "search_tags": [
+        "egg",
+        "weight",
+        "mass"
+      ],
+      "sha256": "f6d08a8374007c97464ca1b7756dd326cf05fa919b85267543f901595e9c4d03"
     }
   ]
 }

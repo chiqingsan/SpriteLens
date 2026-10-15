@@ -5,9 +5,9 @@
            field4=obtainedAtUnix  field14=bagType(==8)   field15=detail 子消息
     detail field1=petConfId  2=height_cm  3=weight_g  4=hatchedSeconds
            5=hatchUpdatedAt  6=hatchSeconds  9=startHatchTime  10=category
-           17=specialEggConfId  18=appearanceType  21=extensionType
+           17=randomEggConf  18=mutationType  19=glassInfo  21=preciousEggType
 
-bagType==8 是蛋背包的独占标记；detail 子消息必须含孵化/身高/体重特征之一，
+bagType==8 是蛋背包标记；detail 子消息必须同时含孵化时长、身高和体重，
 用于与宠物节点（field1/field2 同为 int 但无 bagType）区分。
 
 来源覆盖：0x1344 蛋背包分页（全量快照）、0x0243 家园拾蛋结果、0x0164/0x0300
@@ -42,16 +42,13 @@ _D_EXTENSION_TYPE = 21
 BAG_TYPE_EGG = 8
 OP_HATCH_SLOTS = 0x0312
 
-_EGG_TRAIT_NOS = (_D_HATCH_SECONDS, _D_HEIGHT_CM, _D_WEIGHT_G, _D_CATEGORY)
-
-
 @dataclass(frozen=True)
 class EggBoxEntry:
     """一枚蛋（按 instance_id 唯一；quantity>1 表示堆叠的同类蛋）。"""
 
     instance_id: int
-    egg_conf_id: int  # itemConfId，联查蛋目录（data/static/eggs.json 的 egg_conf_id）
-    pet_conf_id: int  # detail.petConfId（物种侧 ID）
+    egg_conf_id: int  # 历史字段名，实际为 itemConfId（道具 ID），不能查 egg_conf_id 索引
+    pet_conf_id: int  # detail.conf_id，联查蛋目录的 egg_conf_id
     quantity: int
     obtained_at: int  # unix 秒
     bag_type: int
@@ -65,6 +62,9 @@ class EggBoxEntry:
     special_egg_conf_id: int
     appearance_type: int
     extension_type: int
+    is_precious: bool = False
+    glass_type: int = 0
+    glass_value: int = 0
 
     @property
     def hatching(self) -> bool:
@@ -109,13 +109,19 @@ def _egg_from_node(fields: list[dict]) -> EggBoxEntry | None:
     detail = _children_by_no(fields, _NO_DETAIL)
     if detail is None:
         return None
-    # detail 特征：孵化时长/身高/体重/分类至少出现一项（排除巧合的同号节点）
-    if not any(_raw_by_no(detail, no) is not None for no in _EGG_TRAIT_NOS):
+    # 必须是完整 BagItem 标量与 PetEggBrief 测量/孵化结构；试炼节点的 field15
+    # 是只有两个标量的外观消息，仅碰巧含 field2，旧的“任一特征”会误收。
+    for no in (_NO_INSTANCE_ID, _NO_ITEM_CONF_ID, _NO_QUANTITY, _NO_OBTAINED_AT, _NO_BAG_TYPE):
+        values = [f.get("raw") for f in fields if f.get("no") == no]
+        if len(values) != 1 or not isinstance(values[0], int):
+            return None
+    if not all(isinstance(_raw_by_no(detail, no), int) for no in (_D_HEIGHT_CM, _D_WEIGHT_G, _D_HATCH_SECONDS)):
         return None
 
     def detail_int(no: int) -> int:
         return _coerce_int(_raw_by_no(detail, no))
 
+    glass = _children_by_no(detail, 19) or []
     return EggBoxEntry(
         instance_id=instance_id,
         egg_conf_id=item_conf_id,
@@ -133,6 +139,9 @@ def _egg_from_node(fields: list[dict]) -> EggBoxEntry | None:
         special_egg_conf_id=detail_int(_D_SPECIAL_EGG_CONF_ID),
         appearance_type=detail_int(_D_APPEARANCE_TYPE),
         extension_type=detail_int(_D_EXTENSION_TYPE),
+        is_precious=bool(detail_int(11)),
+        glass_type=_coerce_int(_raw_by_no(glass, 1)),
+        glass_value=_coerce_int(_raw_by_no(glass, 2)),
     )
 
 
@@ -154,6 +163,25 @@ def extract_eggs(event: PacketEvent) -> list[EggBoxEntry]:
     out: list[EggBoxEntry] = []
     _walk(event.decoded, out)
     return out
+
+
+EGG_KIND_LABELS = {"regular": "普通蛋", "special": "特殊蛋", "shiny": "异色蛋",
+                   "colorful": "炫彩蛋", "mystery": "神奇蛋", "unknown": "未收录分类"}
+
+
+def egg_kind(egg: EggBoxEntry, precious_type: int | None, mutation_type: int, random: bool) -> str:
+    """优先使用协议与精确配置，不把获取来源当外观类型。"""
+    precious = egg.extension_type or precious_type
+    mutation = egg.appearance_type | mutation_type
+    if precious in (3, 6, 7) or mutation & 8:
+        return "colorful"
+    if precious == 2 or mutation & 1:
+        return "shiny"
+    if precious in (1, 4, 5) or egg.is_precious:
+        return "special"
+    if random:
+        return "mystery"
+    return "regular" if precious == 0 else "unknown"
 
 
 def extract_hatch_slots(event: PacketEvent) -> tuple[int, ...] | None:

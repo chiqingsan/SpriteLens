@@ -95,6 +95,8 @@ SQLite v9追加两列，旧行保留并默认为未知；须再次收到游戏�
 
 ## 版本适配指引
 
+蛋仓 2026-10-15 核对：BagItem.field2 是道具 ID，field15.conf_id 是蛋配置 ID，二者不能共用索引。PetEggBrief 的 field11/is_precious、field17/random_egg_conf、field18/mutation_type、field19/glass_info、field21/precious_egg_type 分开处理。草系试炼 `0x1959` 也有 field14=8 和两字段外观子消息，不能只以这些弱特征收为蛋。形状识别要求 BagItem 关键标量唯一且 PetEggBrief 身高、体重、孵化时长同时存在；真实录制保留 530 条分页与两类各 5 条更新，拒收 24 条试炼节点。缓存清理与资源证据见 [蛋仓修复记录](reviews/EGG_INVENTORY_REPAIR_2026-10-15.md)。
+
 游戏更新后若解不出数据，按以下顺序排查：
 1. 密钥仍从 0x1002 ACK 取？`extract_ack_key` 偏移 [2:18] 是否仍成立。
 2. 0x4013 双变体是否覆盖新流量？先用 `analyze_recording.py --key` 手动解录制的

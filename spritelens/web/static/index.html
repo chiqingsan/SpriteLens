@@ -234,29 +234,8 @@
       </section>
 
       <!-- 蛋蛋仓库 -->
-      <section id="page-egg-box" class="page">
-        <div class="workspace split">
-          <section class="content-panel">
-            <div class="panel-toolbar">
-              <span id="eb-count" class="count-badge">0 枚</span>
-              <span id="eb-hatching" class="muted">在孵 0</span>
-              <label class="inline-field">搜索
-                <input id="eb-search" type="text" placeholder="蛋名 / 物种 / 编号">
-              </label>
-              <div class="segmented" id="eb-mode">
-                <button data-mode="all" class="active">全部</button>
-                <button data-mode="hatching">孵化中</button>
-              </div>
-            </div>
-            <div class="table-wrap">
-              <div id="eb-grid" class="hb-grid eggbox-grid"></div>
-              <div id="eb-empty" class="empty-hint" hidden>蛋仓为空：开始采集后进入游戏，打开蛋仓面板，数据会自动积累</div>
-            </div>
-          </section>
-          <aside id="eb-detail" class="detail-panel">
-            <div class="empty-hint">点击蛋卡片查看详情</div>
-          </aside>
-        </div>
+      <section id="page-egg-box" class="page" data-vue-page>
+        <div id="egg-box-root"></div>
       </section>
 
       <!-- 种公阵列：性格 × 蛋组覆盖矩阵 -->

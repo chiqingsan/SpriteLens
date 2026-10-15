@@ -53,6 +53,9 @@ def _detail_json(egg: EggBoxEntry) -> str:
             "special_egg_conf_id": egg.special_egg_conf_id,
             "appearance_type": egg.appearance_type,
             "extension_type": egg.extension_type,
+            "is_precious": egg.is_precious,
+            "glass_type": egg.glass_type,
+            "glass_value": egg.glass_value,
         },
         ensure_ascii=False,
         separators=(",", ":"),
@@ -214,6 +217,9 @@ class EggStore:
             special_egg_conf_id=int(detail.get("special_egg_conf_id") or 0),
             appearance_type=int(detail.get("appearance_type") or 0),
             extension_type=int(detail.get("extension_type") or 0),
+            is_precious=bool(detail.get("is_precious", False)),
+            glass_type=int(detail.get("glass_type") or 0),
+            glass_value=int(detail.get("glass_value") or 0),
         )
 
     def load_latest(self) -> tuple[int, tuple[EggBoxEntry, ...]]:

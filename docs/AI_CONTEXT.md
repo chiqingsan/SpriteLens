@@ -8,7 +8,7 @@
 
 SpriteLens（小洛探探）是 Windows 本地游戏数据观测工具。当前技术栈为 Python 3.12、Npcap/scapy、aiohttp、pywebview/WebView2、SQLite 和原生 JS。采集为被动旁听，运行数据在用户数据目录；静态数据和页面资源随包分发。
 
-前端已落地 Vue 3 + TypeScript + Vite、蛋图鉴与宠物完整页面；其余职责仍为原生 JS，后端与桌面壳保留。
+前端已落地 Vue 3 + TypeScript + Vite、蛋图鉴、精灵蛋仓与宠物完整页面；其余职责仍为原生 JS，后端与桌面壳保留。
 按 [Vue 演进决策](VUE3_MIGRATION.md) 和路线图分任务建设，避免先大规模拆原生 JS 再重做 Vue。
 
 开发前先检查工作区，再读 [开发指南](DEVELOPMENT_GUIDE.md) 与 [架构](ARCHITECTURE.md)。当前演进顺序以 [路线图](ROADMAP.md) 为准，文件定位见 [代码地图](CODEBASE_MAP.md)，文档导航见 [文档索引](README.md)。

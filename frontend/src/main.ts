@@ -1,10 +1,24 @@
-import { createApp, h } from 'vue'
+import { createApp, h, ref } from 'vue'
 import { createPinia } from 'pinia'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 import { createApiClient } from './api/client'
+import EggBoxPage from './pages/EggBoxPage.vue'
+import type { EggBoxHost } from './composables/useEggBox'
 import EggDexPage from './pages/EggDexPage.vue'
 export { mountPetFilters } from './petFilterBridge'
 export { mountPetInventory } from './petInventoryBridge'
+
+export function mountEggBox(root: HTMLElement, host: EggBoxHost) {
+  const page = ref<InstanceType<typeof EggBoxPage> | null>(null)
+  const app = createApp({ render: () => h(EggBoxPage, { ref: page, host }) })
+  app.mount(root)
+  return {
+    load: () => page.value?.load(),
+    pause: () => page.value?.pause(),
+    resetAccount: () => page.value?.resetAccount(),
+    unmount: () => app.unmount(),
+  }
+}
 
 export function mount(root: HTMLElement, token: string): () => void {
   const router = createRouter({ history: createMemoryHistory(), routes: [

@@ -16,6 +16,7 @@
 9. [VUE3_MIGRATION.md](VUE3_MIGRATION.md) — 已确认的 Vue 3 技术方向、配套工程、接口/状态与逐页迁移边界（工程与蛋图鉴已落地）
 
 - [FRONTEND_DEVELOPMENT.md](FRONTEND_DEVELOPMENT.md) — 前端安装/构建/验收、生成文件与临时桥所有权
+- [reviews/EGG_INVENTORY_REPAIR_2026-10-15.md](reviews/EGG_INVENTORY_REPAIR_2026-10-15.md) — 蛋仓两类配置 ID 联查、试炼误识别清理与资源补齐证据
 - [reviews/VUE_EGG_DEX_VERIFICATION_2026-10-13.md](reviews/VUE_EGG_DEX_VERIFICATION_2026-10-13.md) — F00/V01/V02 实施范围与本机验证，WebView2/exe 待验收
 - [reviews/PET_SNAPSHOT_VERIFICATION_2026-10-13.md](reviews/PET_SNAPSHOT_VERIFICATION_2026-10-13.md) — F01 宠物响应/选项/身份同源、bootstrap 单次快照与离线归属
 - [reviews/ACCOUNT_DOMAIN_VERIFICATION_2026-10-13.md](reviews/ACCOUNT_DOMAIN_VERIFICATION_2026-10-13.md) — F02 三域单次快照、跨域归属、历史恢复与原生账号页旧请求失效

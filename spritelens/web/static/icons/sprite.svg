@@ -174,4 +174,15 @@
   <path d="M18 13l-6 6" />
   <path d="M6 13l6 6" />
 </symbol>
+<symbol id="ruler-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M17 3l4 4l-14 14l-4 -4l14 -14" />
+  <path d="M16 7l-1.5 -1.5" />
+  <path d="M13 10l-1.5 -1.5" />
+  <path d="M10 13l-1.5 -1.5" />
+  <path d="M7 16l-1.5 -1.5" />
+</symbol>
+<symbol id="weight" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M9 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" />
+  <path d="M6.835 9h10.33a1 1 0 0 1 .984 .821l1.637 9a1 1 0 0 1 -.984 1.179h-13.604a1 1 0 0 1 -.984 -1.179l1.637 -9a1 1 0 0 1 .984 -.821" />
+</symbol>
 </svg>

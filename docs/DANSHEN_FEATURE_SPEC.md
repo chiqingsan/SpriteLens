@@ -76,7 +76,7 @@ SpriteLens 已按此骨架重构（保留自有"概览/协议流/采集与设置
 ### 3.2 蛋仓（egg_inventory）
 
 - 自带 protobuf varint 解析（read_varint / parse_protobuf_fields / iter_length_delimited_messages）
-- 蛋条目字段：`itemConfId`（→蛋目录 egg_conf_id）、`petConfId`、`category`（来源：trade/nest/boss/random/activity/special/unknown）、`preciousEggType`、`obtainedAtUnix`、`bagType`、`instanceId`、`quantity`
+- 蛋条目字段：`itemConfId`（道具 ID）、`petConfId`（detail.conf_id → 蛋目录 egg_conf_id）、`category`（获取来源）、`preciousEggType`、`obtainedAtUnix`、`bagType`、`instanceId`、`quantity`。2026-10-15 已纠正两类 ID 混用；field17 是随机蛋配置，不等于特殊蛋类型。
 - 分页聚合：`EggInventoryPages.feed(payload)`（多页快照合并）
 - 静态联查：egg_static_config.json（我们用 data/static/eggs.json 的 egg_conf_index）
 - "智能标注"：对每枚蛋挂证据与推断结论（见 3.4）
