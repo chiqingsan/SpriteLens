@@ -8,6 +8,7 @@ const { pet } = defineProps<{ pet: Pet }>()
 // 特性表 id=1 的名称就是“无”，speciality_id=0 时返回“特性未知”，两者都视为无特性，只显示性格。
 const hasSpeciality = computed(() => !/^(特性未知|无)$/.test(pet.detail.speciality_name))
 const traits = computed(() => hasSpeciality.value ? pet.nature_name + ' · ' + pet.detail.speciality_name : pet.nature_name)
+const hasRarity = computed(() => pet.is_shiny || pet.is_colorful)
 </script>
 <template>
   <section class="pet-detail-art" :class="{ male: pet.gender === 1, female: pet.gender === 2 }" :aria-label="pet.name">
@@ -17,6 +18,9 @@ const traits = computed(() => hasSpeciality.value ? pet.nature_name + ' · ' + p
       <div class="detail-art-meta"><div v-if="pet.detail.types.length" class="detail-type-icons"><img v-for="type in pet.detail.types" :key="type.name" :src="type.icon_url" :alt="type.name" :title="type.name"></div><span class="detail-art-traits" :title="traits">{{ traits }}</span></div>
     </div>
     <div class="detail-art-groups"><span v-for="group in pet.egg_groups.filter(value => !/^(未知|未知组|未发现|未发现组|暂无数据)$/.test(value))" :key="group">{{ group }}</span></div>
-    <div v-if="pet.is_shiny || pet.is_colorful" class="detail-art-rarity"><PetMarks :pet="pet" kind="card" /><PetMarks :pet="pet" kind="rarity" /></div>
+    <div v-if="pet.medal_marks.length || hasRarity" class="detail-art-badges">
+      <div v-if="pet.medal_marks.length" class="detail-art-medals"><PetMarks :pet="pet" kind="medals" /></div>
+      <div v-if="hasRarity" class="detail-art-rarity"><PetMarks :pet="pet" kind="card" /><PetMarks :pet="pet" kind="rarity" /></div>
+    </div>
   </section>
 </template>

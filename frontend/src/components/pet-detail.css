@@ -35,7 +35,10 @@
 .detail-art-groups > span { padding: var(--space-1) var(--space-2); background: var(--amber-soft); color: var(--amber-ink); border-radius: var(--radius-sm); font-size: var(--fs-xs); overflow-wrap: anywhere; }
 .detail-type-icons { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .detail-type-icons img { width: 26px; height: 26px; object-fit: contain; }
-.detail-art-rarity { position: absolute; right: var(--space-5); bottom: var(--space-5); display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2); background: color-mix(in srgb, var(--panel) 85%, transparent); border-radius: var(--radius-sm); }
+.detail-art-badges { position: absolute; right: var(--space-5); bottom: var(--space-5); display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); }
+.detail-art-medals { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); }
+.detail-art-medals .pet-medal { width: 32px; height: 32px; }
+.detail-art-rarity { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2); background: color-mix(in srgb, var(--panel) 85%, transparent); border-radius: var(--radius-sm); }
 .detail-art-rarity .pet-color-card { width: 48px; height: 28px; flex: none; }
 .detail-art-rarity .pet-rarity { width: 28px; height: 28px; padding: 0; flex: none; }
 .detail-art-rarity .pet-rarity img { width: 28px; height: 28px; }
