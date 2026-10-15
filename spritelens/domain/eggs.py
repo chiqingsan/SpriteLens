@@ -69,6 +69,7 @@ class InventoryEggInfo:
     height_high: int
     weight_low: int
     weight_high: int
+    chain_members: tuple[int, ...]
 
 
 class EggCatalog:
@@ -185,6 +186,7 @@ class EggCatalog:
             hatch_seconds=config.get("hatch_seconds", exact.hatch_seconds if exact else 0),
             precious_type=precious,
             mutation_type=random_config.get("mutation_type", 0), random=bool(random_id),
+            chain_members=species.chain_members if species else (),
             **{field: config.get(field, getattr(exact, field) if exact else 0)
                for field in ("height_low", "height_high", "weight_low", "weight_high")},
         )

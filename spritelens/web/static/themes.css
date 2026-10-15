@@ -1,5 +1,17 @@
 /* 三套初始精灵配色；组件规则共用，游戏资源色保持原值。 */
 :root {
+  --egg-card-frame: #729569;
+  --egg-card-surface: #fcfefb;
+  --egg-card-ink: #203b2b;
+  --egg-nest-normal-bg: #f0f1ee;
+  --egg-nest-normal-line: #d3d8cf;
+  --egg-nest-normal-ink: #596652;
+  --egg-tag-nature-bg: #def3d8;
+  --egg-tag-nature-line: #b1dfaa;
+  --egg-tag-nature-ink: #21552d;
+  --egg-tag-voice-bg: #eee5fc;
+  --egg-tag-voice-line: #cbb5ef;
+  --egg-tag-voice-ink: #512b7c;
   --shadow: 0 2px 8px rgba(52, 64, 51, .04);
   --shadow-hover: 0 4px 12px rgba(52, 64, 51, .08);
   --shadow-pop: 0 10px 24px rgba(35, 48, 33, .20);

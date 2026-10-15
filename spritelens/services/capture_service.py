@@ -58,12 +58,13 @@ class CaptureService:
         keys_dir: Path,
         recordings_dir: Path,
         port: int,
+        key_store: KeyStore | None = None,
         extra_ports: tuple[int, ...] = (),
         iface: str | None = None,
         recording_wanted: bool = False,
     ) -> None:
         self._monitor = monitor
-        self._key_store = KeyStore(keys_dir)
+        self._key_store = key_store or KeyStore(keys_dir)
         self._recorder = StreamRecorder()
         self._recordings_dir = recordings_dir
         self._port = port
@@ -161,16 +162,20 @@ class CaptureService:
 
     def _stop_locked(self) -> None:
         with self._command_lock:
+            recording_error = None
             try:
                 self._recorder.stop()
-            except Exception as exc:  # noqa: BLE001 - 录制失败不阻断停源
-                logger.warning("录制器停止失败（继续停采集）: %s", exc)
+            except Exception as exc:  # noqa: BLE001 - 先停采集，再把录制失败交给关闭方
+                logger.warning("录制器停止失败，继续停止采集: %s", exc)
+                recording_error = exc
             self._monitor.stop()
             source = self._source
             if source is not None and (
                 source.is_stale_worker_active() or source.has_unfinished_sniffer()
             ):
                 raise TimeoutError("采集线程尚未退出，保留资源并等待重试停止")
+            if recording_error is not None:
+                raise recording_error
 
     def set_iface(self, name: str | None) -> None:
         with self._command_lock:
@@ -197,7 +202,7 @@ class CaptureService:
             try:
                 if enabled and running and not self._recorder.is_recording:
                     self._start_recording_locked()
-                elif not enabled and self._recorder.is_recording:
+                elif not enabled:
                     self._recorder.stop()
             except OSError as exc:
                 raise RecordingCommandError(

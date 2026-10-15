@@ -6,6 +6,11 @@ import './pet-detail.css'
 const props = defineProps<{ model: PetsModel; open: boolean; enabled: boolean; trigger: HTMLElement | null; imageMode: string }>()
 const emit = defineEmits<{ close: [restore?: boolean]; locate: [id: number] }>()
 const pet = computed(() => props.model.selected.value === null ? null : props.model.find(props.model.selected.value))
+const detailedPet = computed(() => {
+  const loaded = props.model.detail.value
+  return loaded && loaded.gid === pet.value?.gid && loaded.uid === props.model.data.value?.uid
+    && loaded.version >= props.model.data.value?.version ? loaded.pet : null
+})
 const place = computed(() => pet.value?.location ?? null)
 const showing = computed(() => props.open && props.enabled && !!pet.value)
 const panel = ref<HTMLElement>(), closeButton = ref<HTMLButtonElement>(), body = ref<HTMLElement>()
@@ -38,6 +43,9 @@ function keydown(event: KeyboardEvent) {
 }
 watch(showing, value => { sync(); if (value) void nextTick(() => closeButton.value?.focus({ preventScroll: true })) }, { flush: 'sync' })
 watch(() => pet.value?.gid, (gid, previous) => { if (gid !== previous) void nextTick(() => { if (body.value) body.value.scrollTop = 0 }) })
+watch(() => [showing.value, pet.value?.gid, props.model.data.value?.version] as const, ([visible, gid]) => {
+  if (visible && gid !== undefined) void props.model.loadDetail(gid)
+})
 watch(() => props.model.selected.value, value => { if (value === null && props.open) emit('close', false) })
 onMounted(() => { narrow.addEventListener('change', resize); document.addEventListener('keydown', keydown, true) })
 onUnmounted(() => { inert.forEach(node => { node.inert = false }); workspace().classList.remove('has-detail'); narrow.removeEventListener('change', resize); document.removeEventListener('keydown', keydown, true) })
@@ -46,7 +54,14 @@ onUnmounted(() => { inert.forEach(node => { node.inert = false }); workspace().c
   <Teleport to="#pet-detail-root">
 <div v-if="showing && modal" class="detail-backdrop" data-vue-page @click="close()"></div><aside v-if="showing && pet" id="pet-detail" ref="panel" class="detail-panel detail-open" data-vue-page :role="modal ? 'dialog' : 'region'" :aria-modal="modal || undefined" :aria-label="pet.name + '详情'">
     <header class="pet-detail-toolbar"><h2>精灵详情</h2><div><button v-if="place" type="button" class="ghost-button small" :aria-label="'team_id' in place ? '定位到出战背包' : '定位到此箱'" :data-locate-team="'team_id' in place ? place.team_id : undefined" :data-locate-box="'box_id' in place ? place.box_id : undefined" @click="locate">{{ 'team_id' in place ? '定位到出战背包' : '定位到此箱' }}</button><button ref="closeButton" type="button" class="ghost-button small" aria-label="关闭详情" @click="close()">关闭</button></div></header>
-    <div ref="body" class="pet-detail-body"><PetDetail :pet="pet" :boxes="model.data.value!.backpack.boxes" @locate="emit('locate', $event)" /></div>
+    <div ref="body" class="pet-detail-body">
+      <PetDetail v-if="detailedPet" :pet="detailedPet" :boxes="model.data.value!.backpack.boxes" @locate="emit('locate', $event)" />
+      <p v-else-if="model.detailBusy.value" class="filter-note">正在加载详情…</p>
+      <div v-else class="filter-note" role="status">
+        <p>{{ model.detailError.value || '详情暂不可用' }}</p>
+        <button type="button" class="ghost-button small" @click="model.loadDetail(pet!.gid)">重试</button>
+      </div>
+    </div>
   </aside>
 </Teleport>
 </template>

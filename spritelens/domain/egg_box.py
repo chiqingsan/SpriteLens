@@ -65,6 +65,7 @@ class EggBoxEntry:
     is_precious: bool = False
     glass_type: int = 0
     glass_value: int = 0
+    home_egg: bool = False
 
     @property
     def hatching(self) -> bool:

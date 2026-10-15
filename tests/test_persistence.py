@@ -13,11 +13,13 @@ import unittest
 from pathlib import Path
 
 from spritelens.domain.identity import extract_identity
+from spritelens.domain.egg_box import EggBoxEntry
 from spritelens.domain.pets import Pet
 from spritelens.domain.pet_locations import Backpack
 from spritelens.capture.key_store import KeyStore
 from spritelens.protocol.opcodes import OpcodeCatalog
 from spritelens.repositories.database import Database
+from spritelens.repositories.egg_store import EggStore
 from spritelens.repositories.pet_store import PetStore
 from spritelens.repositories.settings import SettingsRepository
 from spritelens.events import PacketEvent
@@ -715,7 +717,8 @@ class DatabaseMigrationTest(unittest.TestCase):
 
         db.execute_many = failing_execute_many  # type: ignore[method-assign]
         try:
-            self.assertEqual(store.flush(), 0)
+            with self.assertRaises(sqlite3.OperationalError):
+                store.flush()
         finally:
             db.execute_many = real_execute_many  # type: ignore[method-assign]
         self.assertEqual(store.pending_count, 1)
@@ -729,6 +732,71 @@ class DatabaseMigrationTest(unittest.TestCase):
         self.assertEqual(loaded.level, 20)
         store.close()
         db.close()
+
+    def test_close_waits_for_external_flush_in_both_stores(self):
+        """Store.close 必须等待已经受理的显式 flush 后，才允许关闭数据库。"""
+        import threading
+
+        def verify_close_waits(store, db, enqueue):
+            gate = threading.Event()
+            write_started = threading.Event()
+            close_done = threading.Event()
+            errors: list[BaseException] = []
+            real_execute_many = db.execute_many
+
+            def gated_execute_many(sql, rows):
+                write_started.set()
+                if not gate.wait(timeout=5):
+                    raise TimeoutError("test gate timed out")
+                return real_execute_many(sql, rows)
+
+            db.execute_many = gated_execute_many  # type: ignore[method-assign]
+            enqueue()
+            flush_thread = threading.Thread(target=store.flush)
+            flush_thread.start()
+            self.assertTrue(write_started.wait(timeout=5), "显式 flush 未进入写库")
+
+            def close_store():
+                try:
+                    store.close()
+                except BaseException as exc:
+                    errors.append(exc)
+                finally:
+                    close_done.set()
+
+            close_thread = threading.Thread(target=close_store)
+            close_thread.start()
+            try:
+                self.assertFalse(close_done.wait(timeout=0.1), "close 越过了正在写库的显式 flush")
+            finally:
+                gate.set()
+                flush_thread.join(timeout=5)
+                close_thread.join(timeout=5)
+                db.execute_many = real_execute_many  # type: ignore[method-assign]
+            self.assertFalse(flush_thread.is_alive(), "显式 flush 未退出")
+            self.assertFalse(close_thread.is_alive(), "close 未退出")
+            self.assertEqual(errors, [])
+
+        with self.subTest(store="pet"):
+            db = Database(self.tmp_path / "pet-close.sqlite")
+            store = PetStore(db, flush_interval=60.0)
+            pet = Pet(gid=1, conf_id=20508, name="猫", level=1, exp=0, nature=0,
+                      gender=0, blood_id=0, talent_rank=0, is_first_catch=False)
+            verify_close_waits(store, db, lambda: store.put(UID, [pet]))
+            db.close()
+
+        with self.subTest(store="egg"):
+            db = Database(self.tmp_path / "egg-close.sqlite")
+            store = EggStore(db, flush_interval=60.0)
+            egg = EggBoxEntry(
+                instance_id=1, egg_conf_id=3001001, pet_conf_id=3001, quantity=1,
+                obtained_at=1, bag_type=8, height_cm=0, weight_g=0,
+                hatch_seconds=0, hatched_seconds=0, hatch_updated_at=0,
+                start_hatch_time=0, category=0, special_egg_conf_id=0,
+                appearance_type=0, extension_type=0,
+            )
+            verify_close_waits(store, db, lambda: store.put(UID, [egg]))
+            db.close()
 
     def test_corrupt_row_isolated_not_fatal(self):
         """单条坏行不阻断整个账号恢复：合法行照常读出，坏行留日志（R04）。

@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 from spritelens.domain.egg_box import EggBoxEntry, extract_eggs, extract_hatch_slots
 from spritelens.domain.eggs import EggCatalog
@@ -165,6 +166,22 @@ class HatchSlotTests(unittest.TestCase):
         self.assertIsNone(extract_hatch_slots(event))
 
 class EggBoxRepositoryTests(unittest.TestCase):
+    def test_annotation_and_favorite_changes_invalidate_page_version(self) -> None:
+        store = Mock()
+        repo = EggBoxRepository(store=store)
+        before = repo.version()
+        repo.save_annotations(42, 1, 7, "green", "note", "")
+        self.assertEqual(repo.version(), before + 1)
+        repo.save_favorite(42, 1, True)
+        self.assertEqual(repo.version(), before + 2)
+        store.save_annotations.side_effect = OSError("synthetic disk failure")
+        store.save_favorite.side_effect = OSError("synthetic disk failure")
+        with self.assertRaises(OSError):
+            repo.save_annotations(42, 1, 0, "", "", "")
+        with self.assertRaises(OSError):
+            repo.save_favorite(42, 1, False)
+        self.assertEqual(repo.version(), before + 2)
+
     def test_merge_dedup_and_version(self) -> None:
         repo = EggBoxRepository()
         repo.handle_packet(_event(_egg_row(1), _egg_row(2)))
@@ -473,6 +490,7 @@ class EggBoxPayloadTests(unittest.TestCase):
                 "egg_key": "synthetic", "egg_conf_id": 4001001, "base_id": 4001,
                 "name": "测试精灵", "egg_name": "测试精灵蛋", "egg_item_id": 108001,
                 "egg_group_names": ["动物组"], "height_low": 10, "height_high": 20,
+                "chain_members": [4001, 4002, 4003],
             }]}), encoding="utf-8")
             (directory / "egg_inventory.json").write_text(json.dumps({
                 "configs": {"4001002": {"name": "测试精灵", "base_id": 4001, "precious_type": 2,
@@ -486,12 +504,44 @@ class EggBoxPayloadTests(unittest.TestCase):
             repo = SimpleNamespace(consistent_snapshot=lambda: SimpleNamespace(
                 entries=(egg,), slots=frozenset(), slots_source="unknown", historical_ids=frozenset(),
                 source="observed", uid=101, version=1))
-            row = egg_box_payload(repo, catalog)["eggs"][0]
+            class Static:
+                def species(self, base_id):
+                    name = {4001: "测试精灵", 4002: "罗隐"}.get(base_id)
+                    return SimpleNamespace(name=name) if name else None
+
+            row = egg_box_payload(repo, catalog, static=Static())["eggs"][0]
             self.assertEqual(row["species_name"], "测试精灵")
+            self.assertEqual(row["chain_names"], ["测试精灵", "罗隐"])
             self.assertEqual(row["egg_kind"], "shiny")
             self.assertEqual(row["icon_url"], "/static/egg-icons/108001.png")
             self.assertEqual(row["egg_group_names"], ["动物组"])
             self.assertEqual(row["measurement_ranges"]["height_cm"], {"min": 30, "max": 40})
+            extreme_weights = tuple(
+                replace(egg, instance_id=index, weight_g=weight)
+                for index, weight in enumerate((500, 501, 508, 892, 899, 900), start=20)
+            )
+            extreme_repo = SimpleNamespace(consistent_snapshot=lambda: SimpleNamespace(
+                entries=extreme_weights, slots=frozenset(), slots_source="unknown", historical_ids=frozenset(),
+                source="observed", uid=101, version=1))
+            extreme_rows = egg_box_payload(extreme_repo, catalog)["eggs"]
+            self.assertEqual([row["tags"]["weight"] for row in extreme_rows],
+                             ["底重", None, None, None, None, "满重"])
+            self.assertEqual([row["tags"]["medals"] for row in extreme_rows],
+                             [[], ["小不点"], [], [], ["大块头"], []])
+
+            voice_annotations = {
+                20: {"voice_tag": "满分"}, 21: {"voice_tag": "婉转声"},
+                22: {"voice_tag": "底分"}, 23: {"voice_tag": "粗嗓门"},
+            }
+            voice_entries = tuple(replace(egg, instance_id=index, weight_g=700)
+                                  for index in range(20, 24))
+            voice_repo = SimpleNamespace(consistent_snapshot=lambda: SimpleNamespace(
+                entries=voice_entries, slots=frozenset(), slots_source="unknown", historical_ids=frozenset(),
+                source="observed", uid=101, version=1))
+            voice_rows = egg_box_payload(voice_repo, catalog, annotations=voice_annotations)["eggs"]
+            self.assertEqual([row["tags"]["voice"] for row in voice_rows], ["满分", None, "底分", None])
+            self.assertEqual([row["tags"]["medals"] for row in voice_rows],
+                             [[], ["婉转声"], [], ["粗嗓门"]])
             # 随机配置本身不等于特殊蛋；未知新配置保持未知，不借普通蛋范围。
             random_info = catalog.inventory_egg(310049, 0, 1)
             from spritelens.domain.egg_box import egg_kind

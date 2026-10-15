@@ -313,15 +313,27 @@ def home_payload(home_repo, static: StaticData | None) -> dict:
         "nests": nests,
         **metadata,
     }
-def egg_box_payload(egg_box, catalog) -> dict:
+def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_options=()) -> dict:
     """蛋蛋仓库载荷：蛋仓快照 + 蛋目录联查（名字/孵化时长/图标）+ 聚合统计。"""
-    view = egg_box.consistent_snapshot() if egg_box is not None else EggBoxSnapshot((), frozenset(), 0, 0, frozenset(), "unknown", "unknown")
+    view = (
+        egg_box if isinstance(egg_box, EggBoxSnapshot)
+        else egg_box.consistent_snapshot() if egg_box is not None
+        else EggBoxSnapshot((), frozenset(), 0, 0, frozenset(), "unknown", "unknown")
+    )
     entries, slots = view.entries, view.slots
+    annotations = annotations or {}
+    nature_names = dict(nature_options)
     rows: list[dict] = []
     hatching_count = 0
     historical_hatching = 0
     total_quantity = 0
     for egg in entries:
+        annotation = annotations.get(egg.instance_id, {})
+        nature_id = int(annotation.get("nature_id", 0))
+        nest_override = str(annotation.get("nest_override", ""))
+        note = str(annotation.get("note", ""))
+        voice_tag = str(annotation.get("voice_tag", ""))
+        favorite = bool(annotation.get("is_favorite", False))
         info = catalog.inventory_egg(egg.egg_conf_id, egg.pet_conf_id, egg.special_egg_conf_id) if catalog is not None else None
         kind = egg_kind(egg, info.precious_type if info else None, info.mutation_type if info else 0,
                         info.random if info else bool(egg.special_egg_conf_id))
@@ -337,12 +349,40 @@ def egg_box_payload(egg_box, catalog) -> dict:
             hatching_count += 1
         if history_hatch:
             historical_hatching += 1
+        weight_range = (info.weight_low, info.weight_high) if info else (0, 0)
+        weight_label = None
+        low, high = weight_range
+        if egg.weight_g > 0 and low > 0 and high > low:
+            if egg.weight_g == high:
+                weight_label = "满重"
+            elif egg.weight_g == low:
+                weight_label = "底重"
+        voice_label = voice_tag if voice_tag in ("满分", "底分") else None
+        chain_names = [
+            species.name for base_id in (info.chain_members if info else ())
+            if static is not None and (species := static.species(base_id)) is not None
+        ]
+        medals = []
+        if not weight_label and egg.weight_g > 0 and low > 0 and high > low:
+            position = egg.weight_g - low
+            width = high - low
+            if 0 < position < width * 0.02:
+                medals.append("小不点")
+            elif width * 0.98 < position < width:
+                medals.append("大块头")
+        if voice_tag in ("婉转声", "粗嗓门"):
+            medals.append(voice_tag)
+        nature_label = nature_names.get(nature_id, str(nature_id)) if nature_id else ""
+        nest_label = {"normal": "普通窝", "green": "学院绿窝"}.get(
+            nest_override or ("normal" if egg.home_egg else ""), ""
+        )
         rows.append(
             {
                 "instance_id": egg.instance_id,
                 "egg_conf_id": egg.egg_conf_id,
                 "egg_name": info.egg_name if info else f"蛋 #{egg.egg_conf_id}",
                 "species_name": info.species_name if info else "",
+                "chain_names": chain_names,
                 "description": info.description if info else "",
                 "description_source": info.description_source if info else "",
                 "icon_url": (
@@ -361,12 +401,18 @@ def egg_box_payload(egg_box, catalog) -> dict:
                 "hatching": hatching,
                 "hatch_known": view.slots_source == "observed",
                 "historical_hatching": history_hatch,
+                "favorite": favorite,
                 "in_slot": in_slot,
                 "hatch_progress": round(egg.hatch_progress, 4),
                 "category": egg.category,
                 "special_egg_conf_id": egg.special_egg_conf_id,
                 "height_cm": egg.height_cm,
                 "weight_g": egg.weight_g,
+                "home_egg": egg.home_egg,
+                "annotations": {"nature_id": nature_id, "nest_override": nest_override,
+                                "note": note, "voice_tag": voice_tag},
+                "tags": {"nature": nature_label, "weight": weight_label, "voice": voice_label,
+                         "medals": medals, "nest": nest_label},
                 "measurement_ranges": {
                     "height_cm": {"min": info.height_low, "max": info.height_high}
                     if info is not None and info.height_high > info.height_low else None,
@@ -380,6 +426,7 @@ def egg_box_payload(egg_box, catalog) -> dict:
     return {
         "eggs": rows,
         "total": len(entries),
+        "nature_options": [{"id": key, "name": value} for key, value in nature_options],
         "total_quantity": total_quantity,
         "hatching": hatching_count if view.slots_source == "observed" else None,
         "historical_hatching": historical_hatching,

@@ -66,14 +66,15 @@ class AppContext:
     home_repo: HomeRepository | None = None  # 家园快照（缺失时家园页空态）
     flower_repo: FlowerRepository | None = None  # 花田快照（缺失时花种页空态）
     database: Database | None = None  # 组合根持有并负责关闭（R09）
+    key_store: KeyStore | None = None  # 会话文件 writer 的生命周期归组合根持有
+    _capture_stopped: bool = False
 
     def close(self) -> None:
-        """停监听、落盘、关日志（幂等；退出路径唯一）。
+        """停监听、排空异步写入并按逆序释放资源（幂等；退出路径唯一）。
 
-        资源逆序清理（R09）：先停采集，再关事件日志与两个 Store（各自
-        做最终 flush），最后关 Database。某一项失败记录并继续，不跳过
-        其余资源——退出路径必须尽量多释放；首个异常重新抛出让调用方
-        感知（调用方通常在 finally 中调用 close，不影响退出）。
+        先停采集，再关闭事件日志、两个 Store 与 KeyStore，最后关闭
+        Database。任何持久化 worker 未确认退出或仍有待写数据时，保留
+        其下游资源和可重试的关闭所有权。
         """
         if self._closed:
             return
@@ -86,23 +87,44 @@ class AppContext:
                 failures.append((label, exc))
                 logger.warning("关闭 %s 失败: %s", label, exc)
 
-        try:
-            self.capture_vm.stop()
-        except TimeoutError:
-            # 旧回调仍可能访问日志/Store/DB；保持可重试，不关闭其下游。
-            logger.warning("采集未确认停止，延后关闭存储资源")
-            raise
-        except Exception as exc:
-            failures.append(("采集", exc))
-        self._closed = True
+        if not self._capture_stopped:
+            try:
+                self.capture_vm.stop()
+            except TimeoutError:
+                # 旧回调仍可能访问日志/Store/DB；保持可重试，不关闭其下游。
+                logger.warning("采集未确认停止，延后关闭存储资源")
+                raise
+            except Exception as exc:
+                logger.warning("停止采集失败，保留下游资源供重试: %s", exc)
+                raise
+            self._capture_stopped = True
         if self.event_log is not None:
             _try("事件日志", self.event_log.close)
+        if self.key_store is not None:
+            self.key_store.close()
+        store_failures: list[tuple[str, BaseException]] = []
         if self.pet_store is not None:
-            _try("宠物仓库", self.pet_store.close)
+            try:
+                self.pet_store.close()
+            except Exception as exc:  # noqa: BLE001 - 两个 Store 都需停止 worker
+                store_failures.append(("宠物仓库", exc))
+                logger.warning("关闭宠物仓库失败: %s", exc)
         if self.egg_store is not None:
-            _try("蛋仓仓库", self.egg_store.close)
+            try:
+                self.egg_store.close()
+            except Exception as exc:  # noqa: BLE001 - 失败时仍保留 Database
+                store_failures.append(("蛋仓仓库", exc))
+                logger.warning("关闭蛋仓仓库失败: %s", exc)
+        if store_failures:
+            label, exc = store_failures[0]
+            raise RuntimeError(f"关闭 {label} 失败: {exc}") from exc
         if self.database is not None:
-            _try("数据库", self.database.close)
+            try:
+                self.database.close()
+            except Exception as exc:  # noqa: BLE001 - 保持可重试
+                logger.warning("关闭数据库失败: %s", exc)
+                raise RuntimeError(f"关闭数据库失败: {exc}") from exc
+        self._closed = True
         if failures:
             label, exc = failures[0]
             raise RuntimeError(f"关闭 {label} 失败: {exc}") from exc
@@ -149,6 +171,7 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
 
     # 启动即恢复上次捕获的会话密钥：连接未重连时（AES 无跨包状态）可立即续解
     key_store = KeyStore(keys_dir())
+    _created(key_store.close)
     monitor = MonitorService(
         catalog=load_catalog(),
         key_store=key_store,
@@ -200,6 +223,7 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
         keys_dir=keys_dir(),
         recordings_dir=recordings_dir(),
         port=settings.get_int("capture.port", DEFAULT_CAPTURE_PORT, lo=1, hi=65535),
+        key_store=key_store,
         event_log=event_log,
     )
     # autostart 之后失败也必须停源（D01）：capture 停机在逆序回滚里先于
@@ -224,6 +248,7 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
         home_repo=home_repo,
         flower_repo=flower_repo,
         database=database,
+        key_store=key_store,
     )
     if autostart and capture_vm.start_if_autostart():
         logger.info("已自动开始采集（可在采集页关闭「打开即采集」）")

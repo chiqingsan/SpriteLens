@@ -63,6 +63,7 @@
     if (eggBoxPage) { eggBoxPage.unmount(); eggBoxPage = null; }
     if (petInventory) { petInventory.unmount(); }
     if (petFilters) { petFilters.unmount(); }
+    eggDex.unmount();
   });
 
   /* ---------- 小工具 ---------- */
@@ -128,6 +129,8 @@
 
   /* ---------- 导航 ---------- */
   function switchPage(name) {
+    if (state.page === name) { return; }
+    if (name === "pets" || name === "egg-box") { $("page-" + name).classList.add("page-cached"); }
     if (state.page === "egg-box" && name !== "egg-box") { pauseEggBoxPage(); }
     else { accountRequests.cancel(state.page); }
     if (state.page === "breeder-library") {
@@ -148,10 +151,10 @@
       if (node.dataset.page === name) { node.setAttribute("aria-current", "page"); }
       else { node.removeAttribute("aria-current"); }
     });
-    if (name === "pets") { petInventory.activate(); petFilters.activate(); loadPets(false, true); }
-    if (name === "handbook") { loadHandbook(); }
+    if (name === "pets") { petFilters.activate(); loadPets(false, true); }
+    if (name === "handbook") { loadHandbook(false, true); }
     if (name === "egg-dex") { eggDex.load(); }
-    if (name === "egg-box") { loadEggBoxPage(); }
+    if (name === "egg-box") { loadEggBoxPage(true); }
     if (name === "male-matrix") { loadMaleMatrix(); }
     if (name === "home") { loadHome(); }
     if (name === "breeder-library") { loadBreederLibrary(); }
@@ -159,7 +162,6 @@
     if (name === "colors") { loadColors(); }
     if (name === "events") { loadEvents(); }
     if (name === "capture") { loadCapture(); }
-    if (name === "overview") { loadOverview(); }
   }
 
   document.querySelectorAll(".nav-item").forEach(function (node) {
@@ -234,14 +236,6 @@
         + '<span class="type-track"><i style="width:' + width + "%;background:" + color + '"></i></span>'
         + "<b>" + item.count + "</b></div>";
     }).join("");
-  }
-
-  function loadOverview() {
-    accountRequests.request("overview", "/api/pets").then(function (payload) {
-      if (!payload) { return; }
-      // 概览统计从 bootstrap 的 overview 已给；单独刷新时用 pets 的 total 兜底
-      $("ov-total").textContent = payload.total || 0;
-    }).catch(function (err) { toast("概览加载失败：" + err.message, true); });
   }
 
   /* ---------- 顶栏状态 ---------- */
@@ -333,7 +327,7 @@
     renderOverviewSide(payload.identity);
     renderOverviewCapture(payload.capture);
 
-    if (payload.stats && payload.stats.types && state.page === "overview") {
+    if (payload.stats && payload.stats.types) {
       renderTypeDist(payload.stats.types || []);
     }
 
@@ -350,7 +344,7 @@
 
   /* ---------- 宠物仓库 ---------- */
   function loadPets(resetPage, restoreWorkspace) {
-    return petInventory.load(resetPage !== false).then(function () {
+    return (restoreWorkspace ? petInventory.resume() : petInventory.load(resetPage !== false)).then(function () {
       if (restoreWorkspace && state.page === "pets") {
         petInventory.restoreScroll();
         if (petInventory.selected()) {
@@ -362,8 +356,9 @@
 
   /* ---------- 精灵图鉴 ---------- */
   var HB_PAGE_SIZE = 120; // 一次渲染上限：1015 个富卡片全量入 DOM 会明显卡顿
+  var hbQuery = "";
 
-  function loadHandbook(resetLimit) {
+  function loadHandbook(resetLimit, reuse) {
     if (resetLimit !== false) { state.hbLimit = HB_PAGE_SIZE; }
     var params = {
       search: state.hb.search,
@@ -371,9 +366,14 @@
       collected: state.hb.mode === "collected" ? "1" : "",
       uncollected: state.hb.mode === "uncollected" ? "1" : ""
     };
-    return accountRequests.request("handbook", "/api/handbook" + query(params)).then(function (payload) {
+    var path = "/api/handbook" + query(params);
+    var owner = accountRequests.petContext();
+    if (reuse && state.hbData && state.hbData.uid === owner.uid
+        && state.hbData.version >= owner.version && hbQuery === path) { return Promise.resolve(); }
+    return accountRequests.request("handbook", path).then(function (payload) {
       if (!payload) { return; }
       state.hbData = payload;
+      hbQuery = path;
       state.hbSpecies = payload.species || [];
       renderHandbook(payload);
     }).catch(function (err) { toast("图鉴加载失败：" + err.message, true); });
@@ -793,19 +793,21 @@
   /* 临时迁移桥：壳只传根节点/token 和挂载生命周期，页面状态归 Vue。F04 删除。 */
   var eggDex = (function () {
     var generation = 0;
-    var dispose = null;
+    var mounted = null;
     return {
       leave: function () {
         generation++;
-        if (dispose) { dispose(); dispose = null; }
+        if (mounted) { mounted.pause(); }
       },
+      unmount: function () { generation++; if (mounted) { mounted.unmount(); mounted = null; } },
       load: function () {
+        if (mounted) { mounted.resume(); return; }
         var current = ++generation;
         var root = $("page-egg-dex");
         root.textContent = "正在加载蛋图鉴…";
         return import("/static/vue/entry.js").then(function (page) {
           if (current !== generation) { return; }
-          dispose = page.mount(root, TOKEN);
+          mounted = page.mount(root, TOKEN);
         }).catch(function (err) {
           if (current !== generation) { return; }
           root.textContent = "蛋图鉴启动失败，请切页重试：" + err.message;
@@ -832,8 +834,8 @@
     if (eggBoxPage) { eggBoxPage.pause(); }
   }
 
-  function loadEggBoxPage() {
-    if (eggBoxPage) { return eggBoxPage.load(); }
+  function loadEggBoxPage(reuse) {
+    if (eggBoxPage) { return reuse ? eggBoxPage.resume(eggBoxVersion) : eggBoxPage.load(); }
     var current = ++eggBoxPageGeneration;
     var root = $("egg-box-root");
     root.textContent = "正在加载精灵蛋仓…";
@@ -841,6 +843,8 @@
       if (current !== eggBoxPageGeneration || state.page !== "egg-box") { return; }
       eggBoxPage = page.mountEggBox(root, {
         load: function () { return accountRequests.request("egg-box", "/api/egg-box"); },
+        saveAnnotations: function (value) { return api("/api/egg-box/annotations", { method: "POST", body: value }); },
+        saveFavorite: function (value) { return api("/api/egg-box/favorite", { method: "POST", body: value }); },
         cancel: function () { accountRequests.cancel("egg-box"); },
         versionChanged: function (version) { eggBoxVersion = version; }
       });

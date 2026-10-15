@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import json
 import secrets
+import sqlite3
 import threading
 import webbrowser
 from dataclasses import replace
@@ -33,6 +34,7 @@ from spritelens.paths import data_root
 from spritelens.view_models.ui_preferences import UIPreferencesViewModel
 from spritelens.web.payloads import (
     overview_payload,
+    pet_row,
     pets_payload,
     type_color_for,
 )
@@ -58,6 +60,8 @@ def _app_version() -> str:
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 PUSH_INTERVAL = 0.5  # 状态推送节拍（秒）
+WS_SEND_TIMEOUT = 0.1
+WS_SEND_BATCH = 8
 
 # query 解析助手统一在 server_helpers（S04：消除重复定义，锁定原语义）
 from spritelens.web.server_helpers import _as_bool, _as_int, _id_set, _name_set  # noqa: E402,F401
@@ -101,6 +105,7 @@ class LocalServer(CaptureRoutesMixin):
         self._start_error: Exception | None = None
         self._bound_port: int | None = None
         self._sockets: set[web.WebSocketResponse] = set()
+        self._blocking_tasks: set[asyncio.Task] = set()
         self._push_task: asyncio.Task | None = None
         self._last_state_json: str | None = None
         self._pet_media_cache: PetMediaCache | None = None
@@ -303,9 +308,13 @@ class LocalServer(CaptureRoutesMixin):
         app.router.add_post("/api/ui/preferences", self._api_save_ui_preferences)
         app.router.add_post("/api/ui/open-browser", self._api_open_browser)
         app.router.add_get("/api/pets", self._api_pets)
+        app.router.add_get(r"/api/pets/{gid:\d+}", self._api_pet_detail)
         app.router.add_get("/api/handbook", self._api_handbook)
         app.router.add_get("/api/eggs", self._api_eggs)
         app.router.add_get("/api/egg-box", self._api_egg_box)
+        app.router.add_post("/api/egg-box/annotations", self._api_save_egg_annotations)
+        app.router.add_post("/api/egg-box/favorite", self._api_save_egg_favorite)
+        app.router.add_post("/api/pets/voice", self._api_save_pet_voice)
         app.router.add_get("/api/male-matrix", self._api_male_matrix)
         app.router.add_get("/api/home", self._api_home)
         app.router.add_get("/api/flowers", self._api_flowers)
@@ -355,7 +364,10 @@ class LocalServer(CaptureRoutesMixin):
             self._push_task = None
         for ws in list(self._sockets):
             try:
-                await ws.close(code=WSMsgType.CLOSE, message=b"server shutdown")
+                await asyncio.wait_for(
+                    ws.close(code=WSMsgType.CLOSE, message=b"server shutdown"),
+                    timeout=WS_SEND_TIMEOUT,
+                )
             except Exception:  # noqa: BLE001
                 pass
         self._sockets.clear()
@@ -363,6 +375,8 @@ class LocalServer(CaptureRoutesMixin):
         if runner is not None:
             await runner.cleanup()
             self._runner = None  # cleanup 完成前由 loop 唯一持有
+        if self._blocking_tasks:
+            await asyncio.gather(*list(self._blocking_tasks), return_exceptions=True)
         await asyncio.sleep(0)
         logger.info("本地服务已停止")
 
@@ -423,6 +437,13 @@ class LocalServer(CaptureRoutesMixin):
 
     # -- 数据 API ------------------------------------------------------
     async def _api_bootstrap(self, request: web.Request) -> web.Response:
+        try:
+            return await self._thread_json_response(self._bootstrap_payload)
+        except sqlite3.Error:
+            logger.exception("启动数据读取失败")
+            return web.json_response({"error": "本地数据读取失败，请检查数据库"}, status=500)
+
+    def _bootstrap_payload(self) -> dict:
         ctx = self._context
         from spritelens.view_models.pet_vm import PetFilters
         view = ctx.pet_vm.view_with(PetFilters())
@@ -438,7 +459,21 @@ class LocalServer(CaptureRoutesMixin):
             "state": self._state_payload(view),
             "ui_preferences": UIPreferencesViewModel(ctx.settings).snapshot(),
         }
-        return web.json_response(payload)
+        return payload
+
+    async def _thread_json_response(self, build_payload) -> web.Response:
+        """在线程池完成同步载荷构造和 JSON 编码，避免阻塞 aiohttp 事件循环。"""
+        body = await self._run_blocking(
+            lambda: json.dumps(build_payload(), ensure_ascii=False, separators=(",", ":"))
+        )
+        return web.Response(text=body, content_type="application/json")
+
+    async def _run_blocking(self, function, *args):
+        """跟踪同步工作；HTTP 取消后仍等线程结束再释放组合根资源。"""
+        task = asyncio.create_task(asyncio.to_thread(function, *args))
+        self._blocking_tasks.add(task)
+        task.add_done_callback(self._blocking_tasks.discard)
+        return await asyncio.shield(task)
 
     async def _api_ui_preferences(self, request: web.Request) -> web.Response:
         return web.json_response(UIPreferencesViewModel(self._context.settings).snapshot())
@@ -470,10 +505,145 @@ class LocalServer(CaptureRoutesMixin):
         # 请求级查询（R08）：条件构造为不可变 PetFilters，经一次性视图
         # 出载荷，不写共享 VM——无参请求、bootstrap 与多客户端互不污染；
         # 保留 app.js 的请求序号机制防止旧响应覆盖新结果
-        view = self._pet_view_from_query(request.query)
-        return web.json_response(
-            pets_payload(view, self._context.static_data, self._context.color_catalog, self._context.egg_catalog)
+        query = request.query
+        return await self._thread_json_response(
+            lambda: self._pets_payload_for_query(query)
         )
+
+    def _pets_payload_for_query(self, query) -> dict:
+        view = self._pet_view_from_query(query)
+        return pets_payload(
+            view, self._context.static_data, self._context.color_catalog, self._context.egg_catalog,
+            include_options=query.get("options_version") != str(view.version()),
+        )
+
+    async def _api_pet_detail(self, request: web.Request) -> web.Response:
+        try:
+            uid = int(request.query["uid"])
+            version = int(request.query["version"])
+            gid = int(request.match_info["gid"])
+        except (KeyError, ValueError):
+            return web.json_response({"error": "账号、精灵编号或版本无效"}, status=400)
+        if uid < 0 or gid <= 0 or version < 0:
+            return web.json_response({"error": "账号、精灵编号或版本无效"}, status=400)
+        status, payload = await self._run_blocking(self._pet_detail_payload, uid, version, gid)
+        if status != 200:
+            return web.json_response(payload, status=status)
+        return await self._thread_json_response(lambda: payload)
+
+    def _pet_detail_payload(self, uid: int, version: int, gid: int) -> tuple[int, dict]:
+        ctx = self._context
+        snapshot = ctx.pet_repository.consistent_snapshot()
+        if snapshot.uid != uid or snapshot.version < version:
+            return 409, {"error": "精灵数据已更新，请刷新列表"}
+        pet = next((item for item in snapshot.pets if item.gid == gid), None)
+        if pet is None:
+            return 404, {"error": "找不到该账号下的精灵"}
+        location = snapshot.locations.get(gid)
+        location_payload = location.payload() if location else None
+        if location_payload is None:
+            for team in snapshot.backpack.teams:
+                if gid in team.slots:
+                    location_payload = {
+                        "team_id": team.box_id,
+                        "slot": team.slots.index(gid) + 1,
+                        "historical": team.historical,
+                    }
+                    break
+        detail = pet_row(
+            pet, ctx.static_data,
+            max((item.height for item in snapshot.pets), default=0),
+            max((item.weight for item in snapshot.pets), default=0),
+            ctx.color_catalog, ctx.egg_catalog,
+        )
+        detail["location"] = location_payload
+        return 200, {"uid": snapshot.uid, "version": snapshot.version, "gid": gid, "pet": detail}
+
+    async def _api_save_pet_voice(self, request: web.Request) -> web.Response:
+        try:
+            body = await request.json()
+        except (ValueError, TypeError):
+            return web.json_response({"error": "分贝数据格式无效"}, status=400)
+        uid, gid, voice = (
+            (body.get(key) for key in ("uid", "gid", "voice"))
+            if isinstance(body, dict) else (None, None, None)
+        )
+        if type(uid) is not int or uid <= 0 or type(gid) is not int or gid <= 0 or not (
+            voice is None or type(voice) is int and -100 <= voice <= 100
+        ):
+            return web.json_response({"error": "账号、精灵编号或分贝值无效"}, status=400)
+        if self._context.pet_store is None:
+            return web.json_response({"error": "宠物存储不可用"}, status=503)
+        try:
+            found = await self._run_blocking(
+                self._context.pet_repository.save_voice_override, uid, gid, voice
+            )
+        except sqlite3.Error:
+            logger.exception("保存精灵声音失败")
+            return web.json_response({"error": "保存分贝失败，请检查本地数据库"}, status=500)
+        if not found:
+            return web.json_response({"error": "找不到该账号下的精灵"}, status=404)
+        return web.json_response({"uid": uid, "gid": gid, "voice": voice})
+
+    async def _api_save_egg_annotations(self, request: web.Request) -> web.Response:
+        try:
+            body = await request.json()
+        except (ValueError, TypeError):
+            return web.json_response({"error": "标签数据格式无效"}, status=400)
+        if not isinstance(body, dict):
+            return web.json_response({"error": "标签数据格式无效"}, status=400)
+        uid, instance_id = body.get("uid"), body.get("instance_id")
+        nature_id = body.get("nature_id", 0)
+        nest = body.get("nest_override", "")
+        note = body.get("note", "")
+        voice_tag = body.get("voice_tag", "")
+        valid_natures = (
+            {nature_id for nature_id, _ in self._context.static_data.nature_items()}
+            if self._context.static_data else set()
+        )
+        if type(uid) is not int or uid <= 0 or type(instance_id) is not int or instance_id <= 0 \
+                or type(nature_id) is not int or nature_id != 0 and nature_id not in valid_natures \
+                or nest not in ("", "normal", "green") \
+                or not isinstance(note, str) or len(note) > 500 \
+                or voice_tag not in ("", "婉转声", "满分", "粗嗓门", "底分"):
+            return web.json_response({"error": "性格、窝类型、备注或声音标签无效"}, status=400)
+        repository = self._context.egg_box
+        if self._context.egg_store is None or repository is None:
+            return web.json_response({"error": "蛋仓存储不可用"}, status=503)
+        try:
+            await self._run_blocking(
+                repository.save_annotations,
+                uid, instance_id, nature_id, nest, note, voice_tag,
+            )
+        except KeyError:
+            return web.json_response({"error": "找不到该账号下的蛋"}, status=404)
+        except sqlite3.Error:
+            logger.exception("保存蛋仓标注失败")
+            return web.json_response({"error": "保存标注失败，请检查本地数据库"}, status=500)
+        return web.json_response({"uid": uid, "instance_id": instance_id})
+
+    async def _api_save_egg_favorite(self, request: web.Request) -> web.Response:
+        try:
+            body = await request.json()
+        except (ValueError, TypeError):
+            return web.json_response({"error": "收藏数据格式无效"}, status=400)
+        if not isinstance(body, dict):
+            return web.json_response({"error": "收藏数据格式无效"}, status=400)
+        uid, instance_id, favorite = body.get("uid"), body.get("instance_id"), body.get("favorite")
+        if type(uid) is not int or uid <= 0 or type(instance_id) is not int or instance_id <= 0 \
+                or type(favorite) is not bool:
+            return web.json_response({"error": "账号、蛋编号或收藏状态无效"}, status=400)
+        repository = self._context.egg_box
+        if self._context.egg_store is None or repository is None:
+            return web.json_response({"error": "蛋仓存储不可用"}, status=503)
+        try:
+            await self._run_blocking(repository.save_favorite, uid, instance_id, favorite)
+        except KeyError:
+            return web.json_response({"error": "找不到该账号下的蛋"}, status=404)
+        except sqlite3.Error:
+            logger.exception("保存蛋仓收藏失败")
+            return web.json_response({"error": "保存收藏失败，请检查本地数据库"}, status=500)
+        return web.json_response({"uid": uid, "instance_id": instance_id, "favorite": favorite})
 
     def _pet_view_from_query(self, query):
         """HTTP query → 不可变筛选 + 一次性视图（无共享状态写入）。"""
@@ -531,8 +701,21 @@ class LocalServer(CaptureRoutesMixin):
         )
 
     async def _api_egg_box(self, request: web.Request) -> web.Response:
-        return web.json_response(
-            egg_box_payload(self._context.egg_box, self._context.egg_catalog)
+        try:
+            return await self._thread_json_response(self._egg_box_payload)
+        except sqlite3.Error:
+            logger.exception("蛋仓数据读取失败")
+            return web.json_response({"error": "蛋仓数据读取失败，请检查本地数据库"}, status=500)
+
+    def _egg_box_payload(self) -> dict:
+        ctx = self._context
+        view = ctx.egg_box.consistent_snapshot() if ctx.egg_box is not None else None
+        uid = view.uid if view is not None else 0
+        return egg_box_payload(
+            view, ctx.egg_catalog,
+            static=ctx.static_data,
+            annotations=ctx.egg_box.annotations(uid) if ctx.egg_box is not None else {},
+            nature_options=tuple((key, info.name) for key, info in ctx.static_data.nature_items()) if ctx.static_data else (),
         )
 
     async def _api_male_matrix(self, request: web.Request) -> web.Response:
@@ -629,14 +812,23 @@ class LocalServer(CaptureRoutesMixin):
             await asyncio.sleep(PUSH_INTERVAL)
 
     async def _broadcast(self, text: str) -> None:
-        for ws in list(self._sockets):
-            if ws.closed:
-                self._sockets.discard(ws)
-                continue
+        sockets = list(self._sockets)
+        for start in range(0, len(sockets), WS_SEND_BATCH):
+            batch = sockets[start:start + WS_SEND_BATCH]
+            await asyncio.gather(*(self._send_socket(ws, text) for ws in batch))
+
+    async def _send_socket(self, ws: web.WebSocketResponse, text: str) -> None:
+        if ws.closed:
+            self._sockets.discard(ws)
+            return
+        try:
+            await asyncio.wait_for(ws.send_str(text), timeout=WS_SEND_TIMEOUT)
+        except Exception:  # noqa: BLE001 - 单连接异常或超时不拖住其他连接
+            self._sockets.discard(ws)
             try:
-                await ws.send_str(text)
-            except Exception:  # noqa: BLE001 - 单个连接异常不影响其他
-                self._sockets.discard(ws)
+                await asyncio.wait_for(ws.close(), timeout=WS_SEND_TIMEOUT)
+            except Exception:  # noqa: BLE001 - 关闭本身也必须有预算
+                pass
 
     async def _ws(self, request: web.Request) -> web.WebSocketResponse:
         ws = web.WebSocketResponse(heartbeat=30)
@@ -644,11 +836,17 @@ class LocalServer(CaptureRoutesMixin):
         self._sockets.add(ws)
         # 连上先给一份当前状态，前端不必等下一拍
         try:
-            await ws.send_str(
-                json.dumps(self._state_payload(), ensure_ascii=False, separators=(",", ":"))
+            await asyncio.wait_for(
+                ws.send_str(json.dumps(self._state_payload(), ensure_ascii=False, separators=(",", ":"))),
+                timeout=WS_SEND_TIMEOUT,
             )
         except Exception:  # noqa: BLE001
-            pass
+            self._sockets.discard(ws)
+            try:
+                await asyncio.wait_for(ws.close(), timeout=WS_SEND_TIMEOUT)
+            except Exception:  # noqa: BLE001
+                pass
+            return ws
         try:
             async for message in ws:
                 if message.type == WSMsgType.ERROR:

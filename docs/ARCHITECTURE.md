@@ -90,7 +90,7 @@ PacketEvent → MonitorService.add_packet_listener
 命中后关键字段按**字段号**读取（六维=14、技能=12、身高=26、体重=27、
 声音=93、物种键=15），schema 命名漂移不影响提取。
 
-## 持久化（v8：宠物 / 蛋仓 / 账号 / 箱位 / 孵化槽）
+## 持久化（v11：宠物 / 蛋仓 / 账号 / 箱位 / 孵化槽 / 手工标签）
 
 **分层**：`repositories/database.py` 管连接与迁移（`PRAGMA user_version`，
 追加式迁移可安全升级历史库；每个版本的多条 DDL 在单事务内执行、失败整体
@@ -137,6 +137,9 @@ v5 佩戴奖牌列 + `pet_locations` 表（箱位快照）；v6 试用个体标�
 （`is_trial_pet`）；v7 好友镜像标记（`is_mirror_pet`，与 v6 一起用于
 修正历史误收的非自有精灵）；v8 `egg_hatch_slots` 表（孵化槽快照，
 slots 帧按 uid 落「槽中蛋 id」集合，恢复标记历史状态）。追加式迁移，
+v9 补充精灵获取方式和获得时间；v10 奖牌收藏快照；v11 为蛋增加家园来源标记，
+并新增账号隔离的 `egg_annotations` 与 `pet_voice_overrides` 表。手工性格、蛋窝、
+蛋到精灵的绑定和分贝覆盖独立于抓包快照，后续协议更新不会覆盖。追加式迁移，
 v1 老库自动逐级升级、历史数据保留
 （`test_persistence.py::test_v1_database_upgrades_to_v2`）。
 

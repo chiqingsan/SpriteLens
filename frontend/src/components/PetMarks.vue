@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue'
-import type { Pet, MedalMark } from '../types/pets'
-const props = defineProps<{ pet: Pet; kind?: 'all' | 'rarity' | 'card' | 'medals'; slots?: boolean }>()
+import type { PetSummary, MedalMark } from '../types/pets'
+const props = defineProps<{ pet: PetSummary; kind?: 'all' | 'rarity' | 'card' | 'medals'; slots?: boolean }>()
 const failed = reactive<Record<string, boolean>>({})
 const label = computed(() => (props.pet.is_shiny ? '异色' : '') + (props.pet.is_colorful ? '炫彩' : ''))
 const rarity = computed(() => {

@@ -157,6 +157,39 @@ _MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
         "ALTER TABLE pets ADD COLUMN add_time INTEGER NOT NULL DEFAULT 0",
     )),
     (10, ("ALTER TABLE pets ADD COLUMN awarded_medals_json TEXT DEFAULT NULL",)),
+    (11, (
+        "ALTER TABLE eggs ADD COLUMN home_egg INTEGER NOT NULL DEFAULT 0",
+        """
+        CREATE TABLE IF NOT EXISTS egg_annotations (
+            uid            INTEGER NOT NULL,
+            instance_id    INTEGER NOT NULL,
+            nature_id      INTEGER NOT NULL DEFAULT 0,
+            nest_override  TEXT    NOT NULL DEFAULT '',
+            pet_gid        INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (uid, instance_id)
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS pet_voice_overrides (
+            uid        INTEGER NOT NULL,
+            gid        INTEGER NOT NULL,
+            voice      INTEGER NOT NULL,
+            updated_at REAL    NOT NULL,
+            PRIMARY KEY (uid, gid)
+        )
+        """,
+    )),
+    (12, (
+        "ALTER TABLE egg_annotations ADD COLUMN note TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE egg_annotations ADD COLUMN voice_extreme TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE egg_annotations ADD COLUMN voice_medal TEXT NOT NULL DEFAULT ''",
+    )),
+    (13, (
+        "ALTER TABLE egg_annotations ADD COLUMN voice_tag TEXT NOT NULL DEFAULT ''",
+        "UPDATE egg_annotations SET voice_tag = CASE WHEN voice_extreme != '' THEN voice_extreme "
+        "ELSE voice_medal END",
+    )),
+    (14, ("ALTER TABLE egg_annotations ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0",)),
 )
 
 

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { PetSlot, Pet } from '../types/pets'
+import type { PetSlot, PetSummary } from '../types/pets'
 import { gender, pointValue } from './petDisplay'
-defineProps<{ slots: PetSlot[]; pets: Map<number, Pet>; selected: number | null; teams: boolean; activeTeam: number; imageMode: string }>()
+defineProps<{ slots: PetSlot[]; pets: Map<number, PetSummary>; selected: number | null; teams: boolean; activeTeam: number; imageMode: string }>()
 const emit = defineEmits<{ select: [gid: number, element: HTMLElement] }>()
 const labels = { empty: '空格', filtered: '筛掉', missing: '待补', unknown: '未采集', matched: '' }
-function select(pet: Pet, event: Event) { emit('select', pet.gid, event.currentTarget as HTMLElement) }
+function select(pet: PetSummary, event: Event) { emit('select', pet.gid, event.currentTarget as HTMLElement) }
 function navigate(event: KeyboardEvent) {
   const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -6, ArrowDown: 6 }[event.key as 'ArrowLeft']
   if (!step) return

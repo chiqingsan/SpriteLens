@@ -58,28 +58,32 @@ def run_replay(path: str, *, logger: logging.Logger) -> int:
 
     catalog = OpcodeCatalog.load(OPCODES_PATH)
     load_library(SCHEMAS_DIR)
-    monitor = MonitorService(catalog=catalog, key_store=KeyStore(keys_dir()))
-    source = ReplaySource(chunks, on_chunk=monitor.on_chunk)
-    monitor.bind(source)
-    started = time.perf_counter()
-    source.start()
-    elapsed = time.perf_counter() - started
+    key_store = KeyStore(keys_dir())
+    try:
+        monitor = MonitorService(catalog=catalog, key_store=key_store)
+        source = ReplaySource(chunks, on_chunk=monitor.on_chunk)
+        monitor.bind(source)
+        started = time.perf_counter()
+        source.start()
+        elapsed = time.perf_counter() - started
 
-    sessions, totals = monitor.snapshot()
-    print(f"[replay] 处理耗时 {elapsed * 1000:.1f}ms")
-    print(
-        f"[replay] 解密成功 {totals.decrypt_ok} | 解密失败 {totals.decrypt_fail}"
-        f" | 缺密钥 {totals.key_miss} | 拆分失败 {totals.parse_fail}"
-    )
-    for session in sessions:
-        key_state = "有密钥" if session.has_key else "无密钥"
-        print(f"[replay] 会话 {session.session_id}  DATA {session.data_frames} 帧 ({key_state})")
-
-    events = monitor.drain_events()
-    print(f"[replay] 事件 {len(events)} 条（最多显示 30 条）:")
-    for event in events[:30]:
+        sessions, totals = monitor.snapshot()
+        print(f"[replay] 处理耗时 {elapsed * 1000:.1f}ms")
         print(
-            f"  {event.direction:>3} 0x{event.opcode:04X} {event.opcode_name:<24}"
-            f" len={event.payload_len:<5} fields={len(event.decoded)}"
+            f"[replay] 解密成功 {totals.decrypt_ok} | 解密失败 {totals.decrypt_fail}"
+            f" | 缺密钥 {totals.key_miss} | 拆分失败 {totals.parse_fail}"
         )
-    return 0
+        for session in sessions:
+            key_state = "有密钥" if session.has_key else "无密钥"
+            print(f"[replay] 会话 {session.session_id}  DATA {session.data_frames} 帧 ({key_state})")
+
+        events = monitor.drain_events()
+        print(f"[replay] 事件 {len(events)} 条（最多显示 30 条）:")
+        for event in events[:30]:
+            print(
+                f"  {event.direction:>3} 0x{event.opcode:04X} {event.opcode_name:<24}"
+                f" len={event.payload_len:<5} fields={len(event.decoded)}"
+            )
+        return 0
+    finally:
+        key_store.close()

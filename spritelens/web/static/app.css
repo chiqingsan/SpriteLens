@@ -8,7 +8,6 @@
   /* ── 动效：全局统一缓动与时长（对标同类产品的 motion 体系） ── */
   --motion-fast: 120ms;
   --motion-base: 220ms;
-  --motion-panel: 280ms;
   --motion-ease: cubic-bezier(.2, .8, .2, 1);
   --motion-spring: cubic-bezier(.34, 1.56, .64, 1);
   --motion-lift: translateY(-1px);
@@ -100,9 +99,6 @@ button:not(:disabled):active { transform: scale(.97); }
 button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible {
   outline: 2px solid var(--focus-ring); outline-offset: 2px;
 }
-/* 页面切换淡入 + 卡片入场 */
-.page.active { animation: page-in var(--motion-panel) var(--motion-ease); }
-@keyframes page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .001ms !important;
@@ -244,11 +240,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .ghost-button.small { height: 30px; padding: 0 var(--space-4); font-size: var(--fs-sm); }
 
 /* 页面 */
-.page { display: none; overflow: auto; padding: var(--space-5); }
+.page { display: none; grid-row: 2; grid-column: 1; overflow: auto; padding: var(--space-5); }
 .page.active { display: block; }
 /* 防御：任何未激活的 page 一律不可见——防止后续变体规则的 display 声明把
    隐藏页漏出来（实际发生过：feature-page 的 grid 展示规则盖过了 display:none） */
-.page:not(.active) { display: none !important; }
+.page:not(.active):not(.page-cached) { display: none !important; }
+.page.page-cached { display: block; min-height: 0; visibility: hidden; pointer-events: none; }
+.page.page-cached.active { visibility: visible; pointer-events: auto; }
 .page .workspace.split { display: grid; grid-template-columns: 236px minmax(0, 1fr) 316px; gap: var(--space-4); align-items: start; }
 /* 背包右侧筛选与详情共用一列，查看详情不改变网格宽度。 */
 #page-pets .workspace.split { grid-template-columns: minmax(0, 1fr) var(--pet-side-width); }

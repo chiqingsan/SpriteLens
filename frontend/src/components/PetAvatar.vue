@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { Pet } from '../types/pets'
-const props = defineProps<{ pet: Pet; klass: string; imageMode: string }>()
+import type { PetSummary } from '../types/pets'
+const props = defineProps<{ pet: PetSummary; klass: string; imageMode: string }>()
 const url = computed(() => props.imageMode === 'artwork' ? props.pet.artwork_url : props.pet.portrait_url)
 const failed = ref(false)
 watch(url, () => { failed.value = false })

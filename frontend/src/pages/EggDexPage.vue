@@ -6,8 +6,12 @@ import type { Egg } from '../types/eggDex'
 import EggAvatar from '../components/EggAvatar.vue'
 import EggDetail from '../components/EggDetail.vue'
 import UiIcon from '../components/UiIcon.vue'
-const props = defineProps<{ api: ApiClient }>()
-const { filters, data, loading, error, load, clear } = useEggDex(props.api)
+const props = defineProps<{ api: ApiClient; active: boolean }>()
+const { filters, data, loading, error, load, pause, resume, clear } = useEggDex(props.api)
+const visibleCount = ref(40)
+const shownEggs = computed(() => data.value?.eggs.slice(0, visibleCount.value) || [])
+const viewport = ref<HTMLElement>(), more = ref<HTMLElement>()
+let observer: IntersectionObserver
 const selected = ref<number | null>(null)
 const egg = computed(() => data.value?.eggs.find(item => item.egg_conf_id === selected.value))
 const content = ref<HTMLElement>()
@@ -45,9 +49,21 @@ function keydown(event: KeyboardEvent) {
     closeButton.value?.focus()
   }
 }
-watch(data, () => { if (selected.value !== null && !egg.value) close() })
-onMounted(() => { void load(); narrow.addEventListener('change', resize); document.addEventListener('keydown', keydown) })
-onUnmounted(() => { close(false); narrow.removeEventListener('change', resize); document.removeEventListener('keydown', keydown) })
+watch(data, () => {
+  visibleCount.value = 40
+  if (viewport.value) viewport.value.scrollTop = 0
+  if (selected.value !== null && !egg.value) close()
+})
+watch(() => props.active, value => { if (value) void resume(); else { close(false); pause() } }, { flush: 'sync' })
+onMounted(() => {
+  if (props.active) void resume(); else pause()
+  observer = new IntersectionObserver(entries => {
+    if (props.active && entries.some(entry => entry.isIntersecting)) visibleCount.value += 40
+  }, { root: viewport.value, rootMargin: '200px' })
+  observer.observe(more.value!)
+  narrow.addEventListener('change', resize); document.addEventListener('keydown', keydown)
+})
+onUnmounted(() => { observer.disconnect(); close(false); narrow.removeEventListener('change', resize); document.removeEventListener('keydown', keydown) })
 </script>
 <template>
   <div class="workspace split" :class="{ 'detail-collapsed': !egg }" data-vue-page>
@@ -60,12 +76,12 @@ onUnmounted(() => { close(false); narrow.removeEventListener('change', resize); 
         <label class="inline-field">孵化时长<select id="ed-hatch" v-model="filters.hatch_min_hours"><option value="">全部</option><option v-for="hours in [8, 12, 16, 20]" :key="hours" :value="String(hours)">≥ {{ hours }} 小时</option></select></label>
         <button type="button" class="ghost-button small" @click="clear">清除筛选</button>
       </div>
-      <div class="table-wrap">
-        <div v-if="loading" class="empty-hint" role="status"><UiIcon name="clock" />正在加载蛋图鉴…</div>
+      <div ref="viewport" class="table-wrap">
+        <div v-if="loading && !data" class="empty-hint" role="status"><UiIcon name="clock" />正在加载蛋图鉴…</div>
         <div v-else-if="error" class="empty-hint" role="alert"><UiIcon name="search" />蛋图鉴加载失败：{{ error }}<div class="button-row"><button class="ghost-button" @click="load">重试</button></div></div>
         <template v-else>
           <div id="ed-grid" class="hb-grid eggdex-grid">
-            <article v-for="item in data?.eggs" :key="item.egg_conf_id" class="hb-card" :class="{ active: selected === item.egg_conf_id }" role="button" tabindex="0" :aria-label="`查看${item.egg_name}详情`" :aria-pressed="selected === item.egg_conf_id" @click="open(item, $event)" @keydown.enter.prevent.stop="open(item, $event)" @keydown.space.prevent.stop="open(item, $event)">
+            <article v-for="item in shownEggs" :key="item.egg_conf_id" class="hb-card" :class="{ active: selected === item.egg_conf_id }" role="button" tabindex="0" :aria-label="`查看${item.egg_name}详情`" :aria-pressed="selected === item.egg_conf_id" @click="open(item, $event)" @keydown.enter.prevent.stop="open(item, $event)" @keydown.space.prevent.stop="open(item, $event)">
               <div class="hb-head"><span class="hb-key">{{ item.handbook_no || '—' }}</span><EggAvatar :egg="item" /><div><strong>{{ item.egg_name }}</strong><small>{{ item.name }}</small></div></div>
               <div class="hb-meta"><span v-for="group in item.egg_group_names" :key="group" class="skill-chip">{{ group }}</span><span v-if="!item.egg_group_names.length" class="muted">—</span></div>
               <span class="hb-badge"><UiIcon name="clock" /> {{ item.hatch_label || '—' }}</span>
@@ -73,6 +89,7 @@ onUnmounted(() => { close(false); narrow.removeEventListener('change', resize); 
           </div>
           <div v-if="data && !data.eggs.length" class="empty-hint"><UiIcon name="search" />{{ data.total ? '没有符合筛选条件的蛋' : '尚无蛋图鉴数据' }}<div v-if="data.total" class="button-row"><button class="ghost-button" @click="clear">清除筛选</button></div></div>
         </template>
+        <div ref="more" v-show="!loading && !error && data && visibleCount < data.eggs.length" class="empty-hint" role="status">正在加载更多…</div>
       </div>
     </section>
     <div v-if="egg && modal" class="detail-backdrop" @click="close()"></div>

@@ -27,8 +27,8 @@ DEFAULT_FLUSH_INTERVAL = 0.5
 
 _UPSERT_EGG = """
 INSERT INTO eggs (uid, instance_id, egg_conf_id, pet_conf_id, quantity,
-                  obtained_at, hatching, detail_json, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  obtained_at, hatching, detail_json, updated_at, home_egg)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (uid, instance_id) DO UPDATE SET
     egg_conf_id = excluded.egg_conf_id,
     pet_conf_id = excluded.pet_conf_id,
@@ -36,7 +36,8 @@ ON CONFLICT (uid, instance_id) DO UPDATE SET
     obtained_at = excluded.obtained_at,
     hatching    = excluded.hatching,
     detail_json = excluded.detail_json,
-    updated_at  = excluded.updated_at
+    updated_at  = excluded.updated_at,
+    home_egg    = MAX(eggs.home_egg, excluded.home_egg)
 """
 
 
@@ -78,6 +79,7 @@ class EggStore:
         self._stop = threading.Event()
         self._worker: threading.Thread | None = None
         self._closed = False
+        self._close_complete = False
         self._written = 0
 
     # -- 写入（任意线程，无 IO）----------------------------------------
@@ -101,17 +103,22 @@ class EggStore:
     def flush(self) -> int:
         """把待写表批量写入 SQLite；返回本次写入的条数。
 
-        待写表在锁内换出；整次提交由落盘锁串行化（与 PetStore 同型），
-        并发 flush 按取得批次的先后顺序落库。
+        先取得落盘锁，再换出批次，确保取批次顺序与提交顺序一致；
+        同时让读取方等待已取出但尚未提交的批次。
         """
         with self._lock:
-            pending = self._pending
-            pending_slots = self._pending_slots
-            self._pending = {}
-            self._pending_slots = {}
-        if not pending and not pending_slots:
-            return 0
+            if self._closed and threading.current_thread() is not self._worker:
+                if self._close_complete:
+                    return 0
+                raise RuntimeError("EggStore 已关闭")
         with self._flush_lock:
+            with self._lock:
+                pending = self._pending
+                pending_slots = self._pending_slots
+                self._pending = {}
+                self._pending_slots = {}
+            if not pending and not pending_slots:
+                return 0
             return self._commit_batch(pending, pending_slots)
 
     def _commit_batch(
@@ -120,6 +127,7 @@ class EggStore:
         pending_slots: dict[int, frozenset[int]],
     ) -> int:
         now = time.time()
+        slots_error: sqlite3.Error | None = None
         if pending_slots:
             try:
                 self._db.execute_many(
@@ -136,7 +144,10 @@ class EggStore:
                 with self._lock:
                     for uid, slots in pending_slots.items():
                         self._pending_slots.setdefault(uid, slots)
+                slots_error = exc
         if not pending:
+            if slots_error is not None:
+                raise slots_error
             return 0
         rows = [
             (
@@ -149,6 +160,7 @@ class EggStore:
                 1 if egg.hatching else 0,
                 _detail_json(egg),
                 now,
+                1 if egg.home_egg else 0,
             )
             for (uid, _iid), egg in pending.items()
         ]
@@ -159,9 +171,11 @@ class EggStore:
             with self._lock:
                 for key, egg in pending.items():  # 新值优先：不覆盖期间已合并的新数据
                     self._pending.setdefault(key, egg)
-            return 0
+            raise
         with self._lock:
             self._written += len(rows)
+        if slots_error is not None:
+            raise slots_error
         return len(rows)
 
     # -- 读取 ----------------------------------------------------------
@@ -175,7 +189,7 @@ class EggStore:
         try:
             rows = self._db.query(
                 "SELECT instance_id, egg_conf_id, pet_conf_id, quantity, obtained_at,"
-                " hatching, detail_json FROM eggs WHERE uid = ? ORDER BY obtained_at, instance_id",
+                " hatching, detail_json, home_egg FROM eggs WHERE uid = ? ORDER BY obtained_at, instance_id",
                 (uid,),
             )
         except Exception as exc:  # noqa: BLE001
@@ -220,7 +234,71 @@ class EggStore:
             is_precious=bool(detail.get("is_precious", False)),
             glass_type=int(detail.get("glass_type") or 0),
             glass_value=int(detail.get("glass_value") or 0),
+            home_egg=bool(row["home_egg"]),
         )
+
+    def annotations(self, uid: int) -> dict[int, dict[str, int | str | bool]]:
+        if uid <= 0:
+            return {}
+        rows = self._db.query(
+            "SELECT instance_id, nature_id, nest_override, note, voice_tag, is_favorite "
+            "FROM egg_annotations WHERE uid = ?",
+            (uid,),
+        )
+        return {
+            int(row["instance_id"]): {
+                "nature_id": int(row["nature_id"]),
+                "nest_override": str(row["nest_override"]),
+                "note": str(row["note"]),
+                "voice_tag": str(row["voice_tag"]),
+                "is_favorite": bool(row["is_favorite"]),
+            }
+            for row in rows
+        }
+
+    def save_annotations(self, uid: int, instance_id: int, nature_id: int, nest_override: str,
+                         note: str, voice_tag: str) -> None:
+        if uid <= 0 or instance_id <= 0:
+            raise ValueError("账号或蛋编号无效")
+        self.flush()
+        if not self._db.query("SELECT 1 FROM eggs WHERE uid = ? AND instance_id = ?", (uid, instance_id)):
+            raise KeyError(instance_id)
+        if not nature_id and not nest_override and not note and not voice_tag:
+            self._db.execute(
+                "UPDATE egg_annotations SET nature_id = 0, nest_override = '', note = '', voice_tag = '' "
+                "WHERE uid = ? AND instance_id = ?", (uid, instance_id)
+            )
+            self._db.execute(
+                "DELETE FROM egg_annotations WHERE uid = ? AND instance_id = ? AND is_favorite = 0",
+                (uid, instance_id),
+            )
+            return
+        self._db.execute(
+            "INSERT INTO egg_annotations (uid, instance_id, nature_id, nest_override, pet_gid, note, voice_tag) "
+            "VALUES (?, ?, ?, ?, 0, ?, ?) "
+            "ON CONFLICT(uid, instance_id) DO UPDATE SET nature_id = excluded.nature_id, "
+            "nest_override = excluded.nest_override, pet_gid = 0, note = excluded.note, "
+            "voice_tag = excluded.voice_tag",
+            (uid, instance_id, nature_id, nest_override, note, voice_tag),
+        )
+
+    def save_favorite(self, uid: int, instance_id: int, favorite: bool) -> None:
+        if uid <= 0 or instance_id <= 0:
+            raise ValueError("账号或蛋编号无效")
+        self.flush()
+        if not self._db.query("SELECT 1 FROM eggs WHERE uid = ? AND instance_id = ?", (uid, instance_id)):
+            raise KeyError(instance_id)
+        self._db.execute(
+            "INSERT INTO egg_annotations (uid, instance_id, is_favorite) VALUES (?, ?, ?) "
+            "ON CONFLICT(uid, instance_id) DO UPDATE SET is_favorite = excluded.is_favorite",
+            (uid, instance_id, int(favorite)),
+        )
+        if not favorite:
+            self._db.execute(
+                "DELETE FROM egg_annotations WHERE uid = ? AND instance_id = ? AND nature_id = 0 "
+                "AND nest_override = '' AND note = '' AND voice_tag = '' AND is_favorite = 0",
+                (uid, instance_id),
+            )
 
     def load_latest(self) -> tuple[int, tuple[EggBoxEntry, ...]]:
         """最近活跃账号的蛋仓快照（离线展示用）。"""
@@ -273,14 +351,33 @@ class EggStore:
 
     # -- 生命周期 ------------------------------------------------------
     def close(self) -> None:
-        """停止 worker 并做最后一次落盘（退出不丢数据）。"""
+        """停止 worker 并确认待写数据已落盘；失败时保留数据库供重试。"""
         with self._lock:
             self._closed = True
         self._stop.set()
         worker = self._worker
         if worker is not None:
             worker.join(timeout=5)
-        self.flush()
+            if worker.is_alive():
+                raise TimeoutError("EggStore worker 未在 5 秒内退出")
+        if not self._flush_lock.acquire(timeout=5):
+            raise TimeoutError("EggStore 仍有已受理的 flush 未完成")
+        try:
+            with self._lock:
+                pending = len(self._pending) + len(self._pending_slots)
+                if pending:
+                    raise OSError(f"EggStore 仍有 {pending} 条待写数据")
+                self._close_complete = True
+        finally:
+            self._flush_lock.release()
+
+    def _has_pending(self) -> bool:
+        with self._lock:
+            return bool(self._pending or self._pending_slots)
+
+    def _pending_total(self) -> int:
+        with self._lock:
+            return len(self._pending) + len(self._pending_slots)
 
     def _ensure_worker_locked(self) -> None:
         if self._worker is not None and self._worker.is_alive():
@@ -290,7 +387,17 @@ class EggStore:
 
     def _run(self) -> None:
         while not self._stop.wait(self._flush_interval):
-            self.flush()
+            try:
+                self.flush()
+            except sqlite3.Error:
+                pass  # _commit_batch 已回填；下一周期重试
+        while self._has_pending():
+            try:
+                self.flush()
+            except sqlite3.Error:
+                pass
+            if self._has_pending():
+                time.sleep(self._flush_interval)
 
     # -- 观测 ----------------------------------------------------------
     @property

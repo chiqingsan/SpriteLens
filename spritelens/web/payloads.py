@@ -131,6 +131,34 @@ def pet_row(
     }
 
 
+def pet_summary_row(pet: Pet, static: StaticData | None, color_catalog=None) -> dict:
+    """列表卡片所需的轻量字段；详情、技能和六维条按需单独加载。"""
+    species = static.species(pet.base_conf_id) if static is not None else None
+    height_range = species.height_range if species else (0, 0)
+    weight_range = species.weight_range if species else (0, 0)
+    height_position = range_position(pet.height, height_range)
+    weight_position = range_position(pet.weight, weight_range)
+    return {
+        "gid": pet.gid,
+        "name": pet.name,
+        "gender": pet.gender,
+        "nature_name": static.nature_name(pet.nature) if static is not None else str(pet.nature),
+        "species_name": species.name if species is not None else "",
+        "egg_groups": list(species.egg_groups) if species is not None else [],
+        "icon_url": species_icon_url(pet.base_conf_id) if pet.base_conf_id else "",
+        **pet_images(pet.base_conf_id, bool(pet.mutation_type & 1)),
+        "is_colorful": bool(pet.mutation_type & 8),
+        "is_shiny": bool(pet.mutation_type & 1),
+        "color_card": color_catalog.effect_for(pet.glass_type, pet.glass_value)
+        if color_catalog and pet.mutation_type & 8 else None,
+        "medal_marks": pet_marks(pet, weight_range),
+        "height_text": f"{pet.height / 100:.2f} m" if pet.height else "暂无数据",
+        "weight_text": f"{pet.weight / 1000:.2f} kg" if pet.weight else "暂无数据",
+        "voice_text": f"{pet.voice:+d}" if pet.voice else "暂无数据",
+        "range_positions": {"height": height_position, "weight": weight_position},
+    }
+
+
 def _glass_colors(pet: Pet, catalog) -> list[str] | None:
     """glass 参数 → 色卡 [底色 hex, 混色 hex]；无卡/未携带返回 None。"""
     if catalog is None or (not pet.glass_type and not pet.glass_value):
@@ -146,14 +174,14 @@ def pets_payload(
     static: StaticData | None,
     color_catalog=None,
     egg_catalog=None,
+    *,
+    include_options: bool = True,
 ) -> dict:
     """宠物列表页载荷：行数据 + 可选值与当前筛选状态（一次给全）。"""
     if isinstance(vm, PetViewModel):
         sort_key, sort_desc = vm.sort_state
         vm = vm.view_with(vm.filters, sort_key, descending=sort_desc)
     pets = vm.filtered_pets()
-    height_max = max((p.height for p in pets), default=0)
-    weight_max = max((p.weight for p in pets), default=0)
     filters = vm.filters
     sort_key, sort_desc = vm.sort_state
     backpack = vm.backpack()
@@ -164,8 +192,8 @@ def pets_payload(
     def slot_payload(gid):
         return {"gid": gid, "state": "unknown" if gid is None else "empty" if gid == 0
                 else "missing" if gid not in all_gids else "matched" if gid in matched else "filtered"}
-    return {
-        "pets": [dict(pet_row(p, static, height_max, weight_max, color_catalog, egg_catalog), location=vm.location_of(p)) for p in pets],
+    payload = {
+        "pets": [dict(pet_summary_row(p, static, color_catalog), location=vm.location_of(p)) for p in pets],
         "total": vm.total_count(),
         "shown": len(pets),
         "backpack": {
@@ -203,7 +231,9 @@ def pets_payload(
                 "height_position_min", "height_position_max", "weight_position_min", "weight_position_max")},
         },
         "sort": {"key": sort_key, "desc": sort_desc},
-        "options": {
+    }
+    if include_options:
+        payload["options"] = {
             "natures": [{"id": i, "name": n} for i, n in vm.nature_options()],
             "types": list(vm.type_options()),
             "type_icons": {info.name: f"/static/type-icons/type-{key}.png" for key, info in static.type_items()} if static else {},
@@ -220,8 +250,8 @@ def pets_payload(
             "stat_labels": [label for _, label in STAT_LABELS],
             "acquisitions": [{"id": key, "name": ACQUISITION_NAMES.get(key, f"方式 #{key}")}
                              for key in sorted(set(ACQUISITION_NAMES) | {pet.catch_way for pet in vm.all_pets() if pet.catch_way})],
-        },
-    }
+        }
+    return payload
 
 
 def pet_summary_payload(vm: PetView, static: StaticData | None) -> dict:

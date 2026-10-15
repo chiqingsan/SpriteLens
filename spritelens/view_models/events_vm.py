@@ -33,11 +33,13 @@ class EventsViewModel:
         self._monitor = monitor
         self._rows: deque[EventRow] = deque(maxlen=max_rows)
         self._details: dict[int, str] = {}
+        self._detail_events: dict[int, PacketEvent] = {}
+        self._detail_order: deque[int] = deque()
         self._next_index = 0
         self.total_events = 0
 
     def drain(self) -> list[EventRow]:
-        """取走 monitor 攒的事件，转为行视图（含详情缓存）。"""
+        """取走 monitor 攒的事件，转为轻量行视图并有界保留详情源事件。"""
         new_rows: list[EventRow] = []
         for event in self._monitor.drain_events():
             row = EventRow(
@@ -51,19 +53,29 @@ class EventsViewModel:
             self._next_index += 1
             self._rows.append(row)
             self.total_events += 1
-            self._details[row.index] = self._format_detail(event)
+            self._detail_events[row.index] = event
+            self._detail_order.append(row.index)
             new_rows.append(row)
-        # 详情缓存与行同步有界，防长会话内存增长
-        if len(self._details) > MAX_DETAILS:
-            for idx in sorted(self._details)[: len(self._details) - MAX_DETAILS]:
-                del self._details[idx]
+        # 原始事件与已格式化详情合计有界，避免关闭详情页时仍保存大解码树。
+        while len(self._detail_order) > MAX_DETAILS:
+            expired = self._detail_order.popleft()
+            self._detail_events.pop(expired, None)
+            self._details.pop(expired, None)
         return new_rows
 
     def rows(self) -> list[EventRow]:
         return list(self._rows)
 
     def detail(self, index: int) -> str:
-        return self._details.get(index, "(详情已随滚动淘汰)")
+        cached = self._details.get(index)
+        if cached is not None:
+            return cached
+        event = self._detail_events.pop(index, None)
+        if event is None:
+            return "(详情已随滚动淘汰)"
+        formatted = self._format_detail(event)
+        self._details[index] = formatted
+        return formatted
 
     @staticmethod
     def _format_detail(event: PacketEvent) -> str:

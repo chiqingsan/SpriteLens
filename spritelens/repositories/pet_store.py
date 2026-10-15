@@ -195,7 +195,7 @@ class PetStore:
         self._lock = threading.Lock()
         # 批次串行化：保护「换出批次 → 写库/失败回填」整段顺序。待写表锁
         # 保持短促（put 不等磁盘）；落盘锁保证并发 flush 按取出顺序提交，
-        # 旧批次不会在新批次之后落库把值拉回去（R02）。
+        # 旧批次不会在新批次之后落库把值拉回去（R01）。
         self._flush_lock = threading.Lock()
         self._pending: dict[tuple[int, int], Pet] = {}
         self._pending_accounts: dict[int, tuple[str, int]] = {}
@@ -203,6 +203,7 @@ class PetStore:
         self._stop = threading.Event()
         self._worker: threading.Thread | None = None
         self._closed = False
+        self._close_complete = False
         self._written = 0
 
     # -- 写入（任意线程，无 IO）----------------------------------------
@@ -246,6 +247,7 @@ class PetStore:
         return self.load_backpack(uid).locations()
 
     def load_backpack(self, uid: int) -> Backpack:
+        self.flush()
         rows = self._db.query("SELECT snapshot_json FROM pet_locations WHERE uid = ?", (uid,))
         try:
             raw = json.loads(rows[0]["snapshot_json"]) if rows else []
@@ -256,19 +258,24 @@ class PetStore:
     def flush(self) -> int:
         """把待写表批量写入 SQLite；返回本次写入的宠物条数。
 
-        线程安全：待写表在校验锁内整体换出；整次提交由落盘锁串行化，
-        并发调用按取得批次的先后顺序写库，旧批次不可能后到覆盖新值。
+        先取得落盘锁，再换出批次，确保取批次顺序与提交顺序一致；
+        同时让读取方等待已取出但尚未提交的批次。
         """
         with self._lock:
-            pets = self._pending
-            accounts = self._pending_accounts
-            locations = self._pending_locations
-            self._pending = {}
-            self._pending_accounts = {}
-            self._pending_locations = {}
-        if not pets and not accounts and not locations:
-            return 0
+            if self._closed and threading.current_thread() is not self._worker:
+                if self._close_complete:
+                    return 0
+                raise RuntimeError("PetStore 已关闭")
         with self._flush_lock:
+            with self._lock:
+                pets = self._pending
+                accounts = self._pending_accounts
+                locations = self._pending_locations
+                self._pending = {}
+                self._pending_accounts = {}
+                self._pending_locations = {}
+            if not pets and not accounts and not locations:
+                return 0
             return self._commit_batch(pets, accounts, locations)
 
     def _commit_batch(
@@ -320,7 +327,7 @@ class PetStore:
                     self._pending_accounts.setdefault(uid, info)
                 for uid, snapshot in locations.items():
                     self._pending_locations.setdefault(uid, snapshot)
-            return 0
+            raise
         with self._lock:
             self._written += len(pets)
         return len(pets)
@@ -334,6 +341,7 @@ class PetStore:
         """
         if uid <= 0:
             return ()
+        self.flush()
         rows = self._db.query(_SELECT_PETS, (uid,))
         pets: list[Pet] = []
         for row in rows:
@@ -345,6 +353,28 @@ class PetStore:
                     uid, row["gid"], row["name"], exc,
                 )
         return tuple(pets)
+
+    def voice_overrides(self, uid: int) -> dict[int, int]:
+        if uid <= 0:
+            return {}
+        rows = self._db.query("SELECT gid, voice FROM pet_voice_overrides WHERE uid = ?", (uid,))
+        return {int(row["gid"]): int(row["voice"]) for row in rows}
+
+    def set_voice_override(self, uid: int, gid: int, voice: int | None) -> None:
+        if uid <= 0 or gid <= 0:
+            raise ValueError("账号或精灵编号无效")
+        if voice is None:
+            self._db.execute("DELETE FROM pet_voice_overrides WHERE uid = ? AND gid = ?", (uid, gid))
+            return
+        self._db.execute(
+            "INSERT INTO pet_voice_overrides (uid, gid, voice, updated_at) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(uid, gid) DO UPDATE SET voice = excluded.voice, updated_at = excluded.updated_at",
+            (uid, gid, voice, time.time()),
+        )
+
+    def has_pet(self, uid: int, gid: int) -> bool:
+        self.flush()
+        return bool(self._db.query("SELECT 1 FROM pets WHERE uid = ? AND gid = ?", (uid, gid)))
 
     @staticmethod
     def _pet_from_row(row) -> Pet:
@@ -385,23 +415,44 @@ class PetStore:
 
     def list_accounts(self) -> tuple[tuple[int, str], ...]:
         """本地库中有历史的账号（uid, 名字），按最近活跃优先。"""
+        self.flush()
         rows = self._db.query(_SELECT_ACCOUNTS)
         return tuple((int(row["uid"]), str(row["name"])) for row in rows)
 
     def load_account(self, uid: int) -> tuple[int, str, int] | None:
+        self.flush()
         rows = self._db.query("SELECT uid, name, level FROM accounts WHERE uid = ?", (uid,))
         return (int(rows[0]["uid"]), str(rows[0]["name"]), int(rows[0]["level"])) if rows else None
 
     # -- 生命周期 ------------------------------------------------------
     def close(self) -> None:
-        """停止 worker 并做最后一次落盘（退出不丢数据）。"""
+        """停止 worker 并确认待写数据已落盘；失败时保留数据库供重试。"""
         with self._lock:
             self._closed = True
         self._stop.set()
         worker = self._worker
         if worker is not None:
             worker.join(timeout=5)
-        self.flush()
+            if worker.is_alive():
+                raise TimeoutError("PetStore worker 未在 5 秒内退出")
+        if not self._flush_lock.acquire(timeout=5):
+            raise TimeoutError("PetStore 仍有已受理的 flush 未完成")
+        try:
+            with self._lock:
+                pending = len(self._pending) + len(self._pending_accounts) + len(self._pending_locations)
+                if pending:
+                    raise OSError(f"PetStore 仍有 {pending} 条待写数据")
+                self._close_complete = True
+        finally:
+            self._flush_lock.release()
+
+    def _has_pending(self) -> bool:
+        with self._lock:
+            return bool(self._pending or self._pending_accounts or self._pending_locations)
+
+    def _pending_total(self) -> int:
+        with self._lock:
+            return len(self._pending) + len(self._pending_accounts) + len(self._pending_locations)
 
     def _ensure_worker_locked(self) -> None:
         if self._worker is not None and self._worker.is_alive():
@@ -411,7 +462,17 @@ class PetStore:
 
     def _run(self) -> None:
         while not self._stop.wait(self._flush_interval):
-            self.flush()
+            try:
+                self.flush()
+            except sqlite3.Error:
+                pass  # _commit_batch 已回填；下一周期重试
+        while self._has_pending():
+            try:
+                self.flush()
+            except sqlite3.Error:
+                pass
+            if self._has_pending():
+                time.sleep(self._flush_interval)
 
     # -- 观测 ----------------------------------------------------------
     @property

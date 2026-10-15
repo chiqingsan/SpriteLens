@@ -2,7 +2,9 @@
 
 import tempfile
 import unittest
+import logging
 from pathlib import Path
+from unittest.mock import patch
 
 from spritelens.capture.base import StreamChunk
 from spritelens.capture.key_store import KeyStore
@@ -10,6 +12,7 @@ from spritelens.protocol.opcodes import OpcodeCatalog
 from spritelens.protocol.records import Direction
 from spritelens.recording.recorder import StreamRecorder, read_recording
 from spritelens.recording.replay import ReplaySource
+from spritelens.recording import replay as replay_module
 from spritelens.services.monitor_service import MonitorService
 from spritelens.services.session_tracker import SessionTracker
 from tests._synth import SYNTH_KEY, make_ack_frame, make_data_frame, make_protobuf_payload
@@ -73,21 +76,49 @@ class ReplayPipelineTest(unittest.TestCase):
             chunks = read_recording(path)
 
         with tempfile.TemporaryDirectory() as tmp_keys:
-            monitor = MonitorService(
-                catalog=OpcodeCatalog({}),
-                key_store=KeyStore(Path(tmp_keys)),
-                tracker=SessionTracker(),
-            )
-        source = ReplaySource(chunks, on_chunk=monitor.on_chunk)
-        monitor.bind(source)
-        source.start()
+            key_store = KeyStore(Path(tmp_keys))
+            try:
+                monitor = MonitorService(
+                    catalog=OpcodeCatalog({}),
+                    key_store=key_store,
+                    tracker=SessionTracker(),
+                )
+                source = ReplaySource(chunks, on_chunk=monitor.on_chunk)
+                monitor.bind(source)
+                source.start()
 
-        events = monitor.drain_events()
-        self.assertEqual(len(events), 1)
-        self.assertEqual(events[0].opcode, 0x1888)
-        self.assertEqual(events[0].payload_len, len(make_protobuf_payload()))
-        _sessions, totals = monitor.snapshot()
-        self.assertEqual(totals.decrypt_ok, 1)
+                events = monitor.drain_events()
+                self.assertEqual(len(events), 1)
+                self.assertEqual(events[0].opcode, 0x1888)
+                self.assertEqual(events[0].payload_len, len(make_protobuf_payload()))
+                _sessions, totals = monitor.snapshot()
+                self.assertEqual(totals.decrypt_ok, 1)
+            finally:
+                key_store.close()
+
+    def test_run_replay_closes_its_key_store(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            recording_path = root / "ack.jsonl"
+            recorder = StreamRecorder()
+            recorder.start(recording_path)
+            recorder.append(StreamChunk(SESSION, Direction.S2C, make_ack_frame(SYNTH_KEY), 1))
+            recorder.stop()
+
+            created: list[KeyStore] = []
+
+            class TrackingKeyStore(KeyStore):
+                def __init__(self, keys_path: Path) -> None:
+                    super().__init__(keys_path)
+                    created.append(self)
+
+            with patch.object(replay_module, "KeyStore", TrackingKeyStore), \
+                    patch.object(replay_module, "keys_dir", lambda: root / "keys"):
+                self.assertEqual(replay_module.run_replay(str(recording_path), logger=logging.getLogger("test-replay")), 0)
+
+            self.assertEqual(len(created), 1)
+            self.assertTrue(created[0]._closed)
+            self.assertFalse(created[0]._writer and created[0]._writer.is_alive())
 
 
 if __name__ == "__main__":

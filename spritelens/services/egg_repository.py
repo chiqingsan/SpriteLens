@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from spritelens.domain.egg_box import EggBoxEntry, extract_eggs, extract_hatch_slots
 from spritelens.domain.identity import extract_identity
@@ -22,6 +22,7 @@ from spritelens.events import PacketEvent
 logger = get_logger("egg_repository")
 
 MAX_EGGS = 5000  # 安全上限（蛋仓实测几百枚量级）
+OP_HOME_EGG_PICKUP = 0x0243
 
 
 @dataclass(frozen=True)
@@ -85,10 +86,15 @@ class EggBoxRepository:
         eggs = extract_eggs(event)
         if not eggs:
             return
+        if event.opcode == OP_HOME_EGG_PICKUP:
+            eggs = [replace(egg, home_egg=True) for egg in eggs]
         with self._lock:
             for egg in eggs:
                 if egg.instance_id <= 0 or len(self._eggs) >= MAX_EGGS and egg.instance_id not in self._eggs:
                     continue
+                previous = self._eggs.get(egg.instance_id)
+                if previous is not None and previous.home_egg and not egg.home_egg:
+                    egg = replace(egg, home_egg=True)
                 self._eggs[egg.instance_id] = egg
                 self._historical_ids.discard(egg.instance_id)
             self._source = "mixed" if self._historical_ids else "observed"
@@ -161,6 +167,24 @@ class EggBoxRepository:
     def hatch_slots(self) -> set[int]:
         with self._lock:
             return set(self._hatch_slots)
+
+    def annotations(self, uid: int) -> dict[int, dict[str, int | str | bool]]:
+        return self._store.annotations(uid) if self._store is not None else {}
+
+    def save_annotations(self, uid: int, instance_id: int, nature_id: int, nest: str,
+                         note: str, voice_tag: str) -> None:
+        if self._store is None:
+            raise RuntimeError("蛋仓存储不可用")
+        self._store.save_annotations(uid, instance_id, nature_id, nest, note, voice_tag)
+        with self._lock:
+            self._version += 1
+
+    def save_favorite(self, uid: int, instance_id: int, favorite: bool) -> None:
+        if self._store is None:
+            raise RuntimeError("蛋仓存储不可用")
+        self._store.save_favorite(uid, instance_id, favorite)
+        with self._lock:
+            self._version += 1
 
     def clear(self) -> None:
         with self._lock:

@@ -58,8 +58,9 @@ class PetRepository:
         # 炫彩形态名字学习：花种帧按 colorful_conf_id（130xxx 系）引用宠物，
         # 图鉴静态表不含该体系，只能从宠物帧的 (field58, name) 对现场学习。
         # 该表是全局学习结果（与账号无关），账号切换时不清空。
-        for pet in extract_pets(event):
-            if pet.colorful_conf_id > 0 and pet.name:
+        pets = extract_pets(event, include_non_owned=True)
+        for pet in pets:
+            if not pet.is_trial_pet and not pet.is_mirror_pet and pet.colorful_conf_id > 0 and pet.name:
                 self._colorful_names.setdefault(pet.colorful_conf_id, pet.name)
         # 身份跟踪无条件进行（无 store 的回放场景同样要防跨账号混合）
         identity = extract_identity(event)
@@ -110,7 +111,6 @@ class PetRepository:
             self._store.put(uid, changed_medals)
         if backpack is not None and self._store is not None and uid > 0:
             self._store.put_backpack(uid, backpack)
-        pets = extract_pets(event, include_non_owned=True)
         if not pets:
             return
         merged: list[Pet] = []
@@ -248,6 +248,15 @@ class PetRepository:
         if self._store is None:
             return ()
         return self._store.list_accounts()
+
+    def save_voice_override(self, uid: int, gid: int, voice: int | None) -> bool:
+        """保存已有宠物的声音修正；返回目标是否属于指定账号。"""
+        if self._store is None or not self._store.has_pet(uid, gid):
+            return False
+        self._store.set_voice_override(uid, gid, voice)
+        with self._lock:
+            self._version += 1
+        return True
 
     def load_last_account(self) -> int:
         """载入最近账号的历史宠物；返回补入条数。"""

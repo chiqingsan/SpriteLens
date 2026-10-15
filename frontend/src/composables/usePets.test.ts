@@ -86,3 +86,47 @@ it('边界契约拒绝坏槽、缺匹配个体与 unsafe ID；未知不变成空
   value.pets[0]!.gid = 1; value.backpack.boxes[0]!.slots[2] = { gid: 0, state: 'unknown' }
   expect(() => parsePets(value)).toThrow('格式不正确')
 })
+
+it('当前队伍未知时保留 null，不拒绝合法宠物摘要', () => {
+  const value = testPets()
+  value.backpack.active_team = null
+  expect(parsePets(value).backpack.active_team).toBeNull()
+})
+
+it('返回同账号同版本同筛选复用快照，版本或筛选变化才加载', async () => {
+  let version = 10, search = ''
+  const api = vi.fn(async () => ({ ...testPets(), version }))
+  const model = usePets(api, () => ({ uid: 101, version, generation: 1 }), () => ({ search }), vi.fn(), vi.fn())
+  model.accept(testPets()); model.page.value = 1; model.selected.value = 1
+  model.pause(); await model.resume()
+  expect(api).not.toHaveBeenCalled()
+  expect(model.visible.value).toBe(true); expect(model.selected.value).toBe(1)
+  model.pause(); version = 11; await model.resume()
+  expect(api).toHaveBeenCalledTimes(1)
+  model.pause(); search = '新筛选'; await model.resume()
+  expect(api).toHaveBeenCalledTimes(2)
+  expect(api.mock.calls[1]?.[0]).toContain('search=')
+})
+
+it('返回时重试失败请求，切号不复用前账号快照', async () => {
+  let owner = { uid: 101, version: 10, generation: 1 }
+  const api = vi.fn().mockRejectedValueOnce(new Error('失败'))
+  const model = usePets(api, () => owner, () => ({}), vi.fn(), vi.fn())
+  model.activate(); model.accept(testPets()); await model.load()
+  model.pause(); api.mockResolvedValueOnce(testPets()); await model.resume()
+  expect(api).toHaveBeenCalledTimes(2); expect(model.error.value).toBe('')
+  owner = { uid: 202, version: 11, generation: 2 }; model.resetAccount()
+  api.mockResolvedValueOnce({ ...testPets(), uid: 202, version: 11 })
+  await model.resume()
+  expect(api).toHaveBeenCalledTimes(3); expect(model.data.value?.uid).toBe(202)
+})
+
+it('返回复用快照后，离页前取消的请求不能覆盖当前数据', async () => {
+  const pending = deferred(), api = vi.fn().mockReturnValue(pending.promise)
+  const model = usePets(api, () => ({ uid: 101, version: 10, generation: 1 }), () => ({}), vi.fn(), vi.fn())
+  model.activate(); model.accept(testPets())
+  const old = model.load(); model.pause(); await model.resume()
+  expect(api).toHaveBeenCalledTimes(1)
+  pending.resolve(testPets(2)); await old
+  expect(model.data.value?.total).toBe(1)
+})

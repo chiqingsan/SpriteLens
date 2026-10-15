@@ -17,21 +17,27 @@ export interface RangePosition { ratio: number | null; status: string }
 export interface ColorCard { card_id: string; name: string; particle_name: string; particle_id: number; base_color: string; mix_color: string }
 export interface MedalMark { label: string; name: string; source: string }
 export type PetLocation = { team_id: number; slot: number; historical: boolean } | { box_id: number; slot: number; row: number; column: number }
-export interface Pet {
+export interface PetSummary {
   [key: string]: unknown
-  gid: number; name: string; level: number; gender: number; nature_name: string
-  nature_positive: string | null; nature_negative: string | null; dex_no: number; species_name: string
-  talent_rank: number; talent_color: string; type_names: string[]; type_colors: string[]; egg_groups: string[]
-  stats: PetStat[]; height_text: string; weight_text: string; voice_text: string
-  height_pct: number; weight_pct: number; voice_pct: number
-  range_positions: { height: RangePosition; weight: RangePosition }
-  skills: { name: string; equipped: boolean }[]
+  gid: number; name: string; gender: number; nature_name: string; species_name: string; egg_groups: string[]
   portrait_url: string; artwork_url: string; icon_url: string; is_shiny: boolean; is_colorful: boolean
   color_card: ColorCard | null; medal_marks: MedalMark[]
+  height_text: string; weight_text: string; voice_text: string
+  range_positions: { height: RangePosition; weight: RangePosition }
+  location: PetLocation | null
+}
+export interface Pet extends PetSummary {
+  [key: string]: unknown
+  level: number
+  nature_positive: string | null; nature_negative: string | null; dex_no: number; species_name: string
+  talent_rank: number; talent_color: string; type_names: string[]; type_colors: string[]; egg_groups: string[]
+  stats: PetStat[]
+  height_pct: number; weight_pct: number; voice_pct: number
+  skills: { name: string; equipped: boolean }[]
   base_conf_id: number; stat_sum: number; species_stat_sum: number; worn_medal_id: number; worn_medal_name: string
   catch_way: number; add_time: number
   detail: PetDetailData
-  location: PetLocation | null; reference_ranges: { height: string; weight: string }; egg_ranges: { height: string; weight: string }
+  reference_ranges: { height: string; weight: string }; egg_ranges: { height: string; weight: string }
 }
 export interface PetSlot { gid: number | null; state: 'unknown' | 'empty' | 'missing' | 'matched' | 'filtered' }
 export interface PetBox {
@@ -39,13 +45,14 @@ export interface PetBox {
 }
 export interface PetTeam { team_id: number; name: string; historical: boolean; slots: PetSlot[]; matched: number }
 export interface PetBackpack {
-  boxes: PetBox[]; teams: PetTeam[]; active_team: number; filtering: boolean
+  boxes: PetBox[]; teams: PetTeam[]; active_team: number | null; filtering: boolean
   unlocated_total: number; unlocated_shown: number
 }
 export interface Pets {
-  uid: number; version: number; total: number; shown: number; pets: Pet[]; backpack: PetBackpack
+  uid: number; version: number; total: number; shown: number; pets: PetSummary[]; backpack: PetBackpack
   options: PetFilterOptions & { egg_groups: string[] }; filters: Partial<PetConditions>
 }
+export interface PetDetailResponse { uid: number; version: number; gid: number; pet: Pet }
 export interface PetAccount { uid: number; version: number; generation: number }
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -104,6 +111,18 @@ function pet(value: unknown): value is Pet {
     && ['base_conf_id', 'stat_sum', 'species_stat_sum', 'worn_medal_id', 'catch_way', 'add_time'].every(key => integer(value[key])) && typeof value.worn_medal_name === 'string'
     && detail(value.detail) && location(value.location) && ranges(value.reference_ranges) && ranges(value.egg_ranges)
 }
+function petSummary(value: unknown): value is PetSummary {
+  return record(value) && integer(value.gid) && value.gid > 0
+    && ['name', 'nature_name', 'species_name', 'height_text', 'weight_text', 'voice_text'].every(key => typeof value[key] === 'string')
+    && integer(value.gender) && strings(value.egg_groups)
+    && ['portrait_url', 'artwork_url', 'icon_url'].every(key => typeof value[key] === 'string')
+    && typeof value.is_shiny === 'boolean' && typeof value.is_colorful === 'boolean'
+    && (value.color_card === null || colorCard(value.color_card))
+    && Array.isArray(value.medal_marks) && value.medal_marks.every(item => record(item)
+      && ['label', 'name', 'source'].every(key => typeof item[key] === 'string'))
+    && record(value.range_positions) && position(value.range_positions.height) && position(value.range_positions.weight)
+    && location(value.location)
+}
 function slot(value: unknown): value is PetSlot {
   return record(value) && (value.gid === null || integer(value.gid))
     && ['unknown', 'empty', 'missing', 'matched', 'filtered'].includes(String(value.state))
@@ -122,11 +141,11 @@ function team(value: unknown): value is PetTeam {
 }
 export function parsePets(value: unknown): Pets {
   if (!record(value) || !integer(value.uid) || !integer(value.version) || !integer(value.total) || !integer(value.shown)
-    || !Array.isArray(value.pets) || !value.pets.every(pet) || !record(value.filters) || !record(value.options)
+    || !Array.isArray(value.pets) || !value.pets.every(petSummary) || !record(value.filters) || !record(value.options)
     || !strings(value.options.egg_groups) || !record(value.backpack)
     || !Array.isArray(value.backpack.boxes) || !value.backpack.boxes.every(box)
     || !Array.isArray(value.backpack.teams) || !value.backpack.teams.every(team)
-    || !integer(value.backpack.active_team) || typeof value.backpack.filtering !== 'boolean'
+    || !(value.backpack.active_team === null || integer(value.backpack.active_team)) || typeof value.backpack.filtering !== 'boolean'
     || !integer(value.backpack.unlocated_total) || !integer(value.backpack.unlocated_shown)) {
     throw new Error('宠物列表数据格式不正确')
   }
@@ -139,4 +158,12 @@ export function parsePets(value: unknown): Pets {
     filters: parsePetConditions(value.filters), options: { ...parsePetFilterOptions(value.options), egg_groups: value.options.egg_groups },
     backpack: { boxes: value.backpack.boxes, teams: value.backpack.teams, active_team: value.backpack.active_team,
       filtering: value.backpack.filtering, unlocated_total: value.backpack.unlocated_total, unlocated_shown: value.backpack.unlocated_shown } }
+}
+
+export function parsePetDetail(value: unknown): PetDetailResponse {
+  if (!record(value) || !integer(value.uid) || !integer(value.version) || !integer(value.gid)
+    || !pet(value.pet) || value.pet.gid !== value.gid) {
+    throw new Error('精灵详情数据格式不正确')
+  }
+  return value as unknown as PetDetailResponse
 }

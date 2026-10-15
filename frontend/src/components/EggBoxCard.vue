@@ -1,10 +1,22 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { EggBoxEntry } from '../types/eggBox'
 import EggBoxArtwork from './EggBoxArtwork.vue'
 import UiIcon from './UiIcon.vue'
 
-defineProps<{ egg: EggBoxEntry; selected: boolean }>()
-const emit = defineEmits<{ select: [egg: EggBoxEntry, event: MouseEvent] }>()
+const props = defineProps<{ egg: EggBoxEntry; selected: boolean; favoriteSaving: boolean }>()
+const emit = defineEmits<{ select: [egg: EggBoxEntry, event: MouseEvent]; favorite: [egg: EggBoxEntry] }>()
+
+const cardTags = computed(() => {
+  const tags = props.egg.tags
+  const voice = tags.voice || tags.medals.find(label => label === '婉转声' || label === '粗嗓门')
+  return [
+    ...(tags.nature ? [{ label: tags.nature, kind: 'nature' }] : []),
+    ...(tags.weight ? [{ label: tags.weight, kind: 'weight' }] : []),
+    ...(voice ? [{ label: voice, kind: 'voice' }] : []),
+    ...tags.medals.filter(label => label !== voice).map(label => ({ label, kind: 'medal' })),
+  ]
+})
 
 function height(value: number) { return value > 0 ? `${(value / 100).toFixed(2)}m` : '—' }
 function weight(value: number) { return value > 0 ? `${(value / 1000).toFixed(3)}kg` : '—' }
@@ -16,19 +28,33 @@ function date(value: number) {
 </script>
 
 <template>
-  <button type="button" class="eggbox-card" :class="{ selected }" :data-egg-instance="egg.instance_id" :aria-pressed="selected" :aria-label="`${egg.egg_name}，编号${egg.instance_id}`" @click="emit('select', egg, $event)">
-    <span v-if="egg.hatching" class="eggbox-card-status">孵化中 {{ Math.round(egg.hatch_progress * 100) }}%</span>
-    <span v-if="egg.quantity > 1" class="eggbox-card-quantity">×{{ egg.quantity }}</span>
-    <div class="eggbox-card-heading">
-      <EggBoxArtwork :egg="egg" size="card" />
-      <strong class="eggbox-card-name" :title="egg.egg_name">{{ egg.egg_name }}</strong>
-    </div>
-    <div class="eggbox-card-foot">
-      <div class="eggbox-card-measures">
-        <span :title="`尺寸 ${height(egg.height_cm)}`"><UiIcon name="ruler-2" /><span class="sr-only">尺寸</span>{{ height(egg.height_cm) }}</span>
-        <span :title="`重量 ${weight(egg.weight_g)}`"><UiIcon name="weight" /><span class="sr-only">重量</span>{{ weight(egg.weight_g) }}</span>
+  <article class="eggbox-card" :class="{ selected, favorite: egg.favorite }" :data-egg-instance="egg.instance_id">
+    <button type="button" class="eggbox-card-select" :aria-pressed="selected" :aria-label="`${egg.egg_name}，编号${egg.instance_id}`" @click="emit('select', egg, $event)">
+      <div class="eggbox-card-topline">
+        <span v-if="egg.tags.nest" class="eggbox-card-nest" :class="egg.tags.nest === '学院绿窝' ? 'green' : 'normal'">{{ egg.tags.nest }}</span>
+        <span v-if="egg.hatching" class="eggbox-card-status">孵化中 {{ Math.round(egg.hatch_progress * 100) }}%</span>
+        <span v-if="egg.quantity > 1" class="eggbox-card-quantity">×{{ egg.quantity }}</span>
       </div>
-      <time :datetime="egg.obtained_at > 0 ? new Date(egg.obtained_at * 1000).toISOString() : undefined"><UiIcon name="clock" />{{ date(egg.obtained_at) }}</time>
-    </div>
-  </button>
+      <div class="eggbox-card-heading">
+        <EggBoxArtwork :egg="egg" size="card" />
+        <strong class="eggbox-card-name" :title="egg.egg_name"><span class="eggbox-card-name-text">{{ egg.egg_name }}</span><img v-if="egg.egg_kind === 'shiny'" class="eggbox-card-shiny-icon" src="/static/rarity/shiny-fit.png" alt="异色" title="异色蛋"></strong>
+      </div>
+      <div class="eggbox-card-labels" aria-label="蛋标签">
+        <div v-if="cardTags.length" class="eggbox-card-tag-row" :class="{ 'eggbox-card-tag-row--dense': cardTags.length > 3 }">
+          <span v-for="(tag, index) in cardTags" :key="`${tag.kind}-${index}`" class="eggbox-card-tag" :class="`eggbox-card-tag--${tag.kind}`" :title="tag.label">{{ tag.label }}</span>
+        </div>
+        <p v-else class="eggbox-card-empty-copy"><span>一颗充满活力的精灵蛋，</span><span>正等待新的冒险。</span></p>
+      </div>
+      <div class="eggbox-card-foot">
+        <div class="eggbox-card-measures">
+          <span :title="`尺寸 ${height(egg.height_cm)}`"><UiIcon name="ruler-2" /><span class="sr-only">尺寸</span>{{ height(egg.height_cm) }}</span>
+          <span :title="`重量 ${weight(egg.weight_g)}`"><UiIcon name="weight" /><span class="sr-only">重量</span>{{ weight(egg.weight_g) }}</span>
+        </div>
+        <time :datetime="egg.obtained_at > 0 ? new Date(egg.obtained_at * 1000).toISOString() : undefined"><UiIcon name="clock" />{{ date(egg.obtained_at) }}</time>
+      </div>
+    </button>
+    <button type="button" class="eggbox-favorite-button" :class="{ active: egg.favorite }"
+      :aria-label="egg.favorite ? '取消收藏' : '收藏这枚蛋'" :aria-pressed="egg.favorite" :disabled="favoriteSaving"
+      @click="emit('favorite', egg)"><UiIcon :name="egg.favorite ? 'star-filled' : 'star'" /></button>
+  </article>
 </template>

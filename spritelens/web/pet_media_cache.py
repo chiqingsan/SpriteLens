@@ -36,6 +36,7 @@ class PetMediaCache:
         self._cache_dir = cache_dir
         self._downloads = asyncio.Semaphore(3)
         self._misses: dict[str, float] = {}
+        self._inflight: dict[str, asyncio.Task[tuple[Path | None, float]]] = {}
         self._network_retry_after = 0.0
         self._manifest_lock = Lock()
 
@@ -61,13 +62,34 @@ class PetMediaCache:
                 local = self._local_asset(name)
                 if local is not None:
                     return local
-                cached, retry_after = await asyncio.to_thread(self._download, species_id, candidate, use)
+                now = time.monotonic()
+                if self._misses.get(name, 0) > now or self._network_retry_after > now:
+                    continue
+                task = self._inflight.get(name)
+                if task is None:
+                    task = asyncio.create_task(self._download_and_remember(name, species_id, candidate, use))
+                    self._inflight[name] = task
+                    task.add_done_callback(lambda completed, key=name: self._clear_inflight(key, completed))
+                cached, retry_after = await asyncio.shield(task)
             if cached is not None:
                 return cached
-            self._misses[name] = time.monotonic() + retry_after
-            if retry_after == _NETWORK_COOLDOWN:
-                self._network_retry_after = time.monotonic() + _NETWORK_COOLDOWN
         return None
+
+    async def _download_and_remember(
+        self, name: str, species_id: str, variant: str, use: str,
+    ) -> tuple[Path | None, float]:
+        result = await asyncio.to_thread(self._download, species_id, variant, use)
+        cached, retry_after = result
+        if cached is None:
+            retry_at = time.monotonic() + retry_after
+            self._misses[name] = retry_at
+            if retry_after == _NETWORK_COOLDOWN:
+                self._network_retry_after = retry_at
+        return result
+
+    def _clear_inflight(self, name: str, task: asyncio.Task[tuple[Path | None, float]]) -> None:
+        if self._inflight.get(name) is task:
+            self._inflight.pop(name, None)
 
     def _local_asset(self, name: str) -> Path | None:
         packaged = self._static_dir / "pet-media" / name

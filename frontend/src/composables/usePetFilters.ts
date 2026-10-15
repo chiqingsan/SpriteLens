@@ -15,12 +15,12 @@ export function usePetFilters(reload: () => void, invalidate: () => void) {
   const options = ref<PetFilterOptions>({ natures: [], types: [], sorts: [], talent_max: 0, measurement_limits: initialMeasurementLimits })
   const selectedMedals = computed(() => [...filters.medals, ...Object.entries(markMedals).filter(([, name]) => filters.marks.includes(name)).map(([id]) => Number(id))])
   const fixed = ref(false)
-  let active = false
+  const active = ref(false)
   let timer: ReturnType<typeof setTimeout> | undefined
   function cancel() { clearTimeout(timer); timer = undefined }
   function changed(delay = 0) {
     cancel()
-    if (!active) return
+    if (!active.value) return
     invalidate()
     if (delay) timer = setTimeout(() => { timer = undefined; reload() }, delay)
     else reload()
@@ -72,6 +72,7 @@ export function usePetFilters(reload: () => void, invalidate: () => void) {
     filters.level_min = enabled ? 1 : 60; filters.level_max = 60; changed()
   }
   return { filters, options, fixed, selectedMedals, search, level, nature, type, medal, changed, toggleMaxed,
+    active,
     query: () => ({ ...filters, search: filters.search.trim(), natures: filters.natures.join(','),
       types: filters.types.join(','), medals: filters.medals.join(','), desc: filters.desc ? '1' : '', pool: filters.pool.join(','), marks: filters.marks.join(','),
       shiny: filters.shiny ? '1' : '0', colorful: filters.colorful ? '1' : '0' }),
@@ -82,7 +83,7 @@ export function usePetFilters(reload: () => void, invalidate: () => void) {
       parsed.medals = parsed.medals?.filter(item => medals.includes(item.id)).sort((a, b) => medals.indexOf(a.id) - medals.indexOf(b.id))
       options.value = parsed
     },
-    activate: () => { active = true }, pause: () => { active = false; cancel(); invalidate() } }
+    activate: () => { active.value = true }, pause: () => { active.value = false; cancel(); invalidate() } }
 }
 export type PetFilterModel = ReturnType<typeof usePetFilters>
 export interface PetFilterBridge {

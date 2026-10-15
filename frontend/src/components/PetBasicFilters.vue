@@ -1,12 +1,23 @@
 <script setup lang="ts">
+import { ref, watch } from 'vue'
 import type { PetFilterModel } from '../composables/usePetFilters'
 import DualRangeSlider from './DualRangeSlider.vue'
 import UiIcon from './UiIcon.vue'
 
 const { model } = defineProps<{ model: PetFilterModel }>()
 const { filters, options, fixed, selectedMedals } = model
+const specialitiesOpen = ref(false)
+const specialityDetails = ref<HTMLDetailsElement | null>(null)
 function value(event: Event) { return (event.target as HTMLInputElement).value }
 function setSortDirection(desc: boolean) { if (filters.desc !== desc) model.patch({ desc }) }
+function syncSpecialitiesOpen(event: Event) {
+  specialitiesOpen.value = (event.currentTarget as HTMLDetailsElement).open
+}
+watch(() => model.active.value, active => {
+  if (active || !specialitiesOpen.value) return
+  specialitiesOpen.value = false
+  if (specialityDetails.value) specialityDetails.value.open = false
+}, { flush: 'sync' })
 </script>
 
 <template>
@@ -58,9 +69,9 @@ function setSortDirection(desc: boolean) { if (filters.desc !== desc) model.patc
     <button v-if="filters.natures.length" class="text-button filter-clear" @click="model.patch({ natures: [] })">清除性格</button>
     <p v-if="filters.natures.length > 1 && filters.pool_mode === 'and'" class="filter-note">AND 要求同时符合多个性格，会无匹配；可只选一种或改用 OR。</p>
   </details>
-  <details class="filter-section" style="order: 7">
+  <details ref="specialityDetails" class="filter-section" style="order: 7" @toggle="syncSpecialitiesOpen">
 <summary>特性<small>{{ filters.speciality ? options.specialities?.find(item => item.id === filters.speciality)?.name : '不限' }}</small></summary>
-    <div class="chip-group"><button v-for="item in options.specialities" :key="item.id" class="chip" :class="{ active: filters.speciality === item.id }" :aria-pressed="filters.speciality === item.id" @click="model.patch({ speciality: filters.speciality === item.id ? 0 : item.id })">{{ item.name }}</button></div>
+    <div v-if="specialitiesOpen" class="chip-group"><button v-for="item in options.specialities" :key="item.id" class="chip" :class="{ active: filters.speciality === item.id }" :aria-pressed="filters.speciality === item.id" @click="model.patch({ speciality: filters.speciality === item.id ? 0 : item.id })">{{ item.name }}</button></div>
     <p v-if="!options.specialities?.length" class="filter-note">当前背包没有已采集的特性。</p>
     <button v-if="filters.speciality" class="text-button filter-clear" @click="model.patch({ speciality: 0 })">清除特性</button>
   </details>

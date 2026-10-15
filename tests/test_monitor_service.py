@@ -28,9 +28,11 @@ class MonitorServiceTest(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
         self.tmp_path = Path(self._tmp.name)
         self.tracker = SessionTracker()
+        self.key_store = KeyStore(self.tmp_path / "keys")
+        self.addCleanup(self.key_store.close)
         self.monitor = MonitorService(
             catalog=OpcodeCatalog({}),
-            key_store=KeyStore(self.tmp_path / "keys"),
+            key_store=self.key_store,
             tracker=self.tracker,
         )
 
@@ -51,9 +53,11 @@ class MonitorServiceTest(unittest.TestCase):
             messages={"SynthMsg": {1: {"name": "injected_name", "type": ""}}},
             source_dir=None,
         )
+        key_store = KeyStore(self.tmp_path / "keys-injected")
+        self.addCleanup(key_store.close)
         monitor = MonitorService(
             catalog=OpcodeCatalog({0x1234: OpcodeInfo("SynthTest", "test", "SynthMsg")}),
-            key_store=KeyStore(self.tmp_path / "keys"),
+            key_store=key_store,
             tracker=self.tracker,
             schema_library=library,
         )
@@ -96,7 +100,7 @@ class MonitorServiceTest(unittest.TestCase):
 
     def test_key_persisted_to_store(self):
         self._feed_raw(make_ack_frame(SYNTH_KEY))
-        latest = KeyStore(self.tmp_path / "keys").load_latest()
+        latest = self.key_store.load_latest()
         self.assertEqual(latest, SYNTH_KEY)
 
     def test_data_without_key_counts_miss(self):
@@ -145,9 +149,11 @@ class MonitorServiceTest(unittest.TestCase):
 
     def test_preset_key_replays_without_ack(self):
         """工具重启续解：无 ACK 时用 preset key 直接解密。"""
+        key_store = KeyStore(self.tmp_path / "keys-preset")
+        self.addCleanup(key_store.close)
         monitor = MonitorService(
             catalog=OpcodeCatalog({}),
-            key_store=KeyStore(self.tmp_path / "keys"),
+            key_store=key_store,
             tracker=SessionTracker(),
             preset_key=SYNTH_KEY,
         )

@@ -7,8 +7,6 @@ self._json_body / _environment_payload 等由宿主 LocalServer 提供）。
 
 from __future__ import annotations
 
-import asyncio
-
 from aiohttp import web
 
 from spritelens.web.payloads import pet_summary_payload
@@ -25,11 +23,11 @@ class CaptureRoutesMixin:
         return web.json_response(self._capture_payload())
 
     async def _api_capture_ifaces(self, request: web.Request) -> web.Response:
-        ifaces = await asyncio.to_thread(self._context.capture_vm.refresh_ifaces)
+        ifaces = await self._run_blocking(self._context.capture_vm.refresh_ifaces)
         # 活跃网卡排前面（PowerShell 查询在开销时执行；失败则保持原序）
         from spritelens.capture.nic_rank import rank_ifaces
 
-        ifaces = await asyncio.to_thread(rank_ifaces, list(ifaces))
+        ifaces = await self._run_blocking(rank_ifaces, list(ifaces))
         return web.json_response(
             {"ifaces": [{"name": name, "description": desc} for name, desc in ifaces]}
         )
@@ -47,7 +45,7 @@ class CaptureRoutesMixin:
                 {"error": "字段 name 必须是字符串（清空选择用空字符串）"}, status=400
             )
         try:
-            await asyncio.to_thread(self._context.capture_vm.select_iface, name)
+            await self._run_blocking(self._context.capture_vm.select_iface, name)
         except OSError as exc:
             return web.json_response(
                 {"error": f"下次采集使用的网卡选择保存失败（重启后可能恢复原值）：{exc}"}, status=500
@@ -55,12 +53,12 @@ class CaptureRoutesMixin:
         return web.json_response(self._capture_payload())
 
     async def _api_capture_start(self, request: web.Request) -> web.Response:
-        await asyncio.to_thread(self._context.capture_vm.start)
+        await self._run_blocking(self._context.capture_vm.start)
         return web.json_response(self._capture_payload())
 
     async def _api_capture_stop(self, request: web.Request) -> web.Response:
         try:
-            await asyncio.to_thread(self._context.capture_vm.stop)
+            await self._run_blocking(self._context.capture_vm.stop)
         except TimeoutError as exc:
             return web.json_response({"error": str(exc), "stopped": False}, status=503)
         return web.json_response(self._capture_payload())
@@ -72,7 +70,7 @@ class CaptureRoutesMixin:
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=400)
         try:
-            await asyncio.to_thread(self._context.capture_vm.set_recording_requested, enabled)
+            await self._run_blocking(self._context.capture_vm.set_recording_requested, enabled)
         except RecordingCommandError as exc:
             message = {
                 "start": "录制器启动失败，未开始录制",
@@ -93,7 +91,7 @@ class CaptureRoutesMixin:
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=400)
         try:
-            await asyncio.to_thread(self._context.capture_vm.set_autostart, enabled)
+            await self._run_blocking(self._context.capture_vm.set_autostart, enabled)
         except OSError as exc:
             return web.json_response(
                 {"error": f"自动采集设置已生效，但保存失败（重启后可能恢复原值）：{exc}"}, status=500
@@ -108,15 +106,15 @@ class CaptureRoutesMixin:
         text = body.get("text")
         if not isinstance(text, str):
             return web.json_response({"error": "字段 text 必须是字符串", "ok": False}, status=400)
-        ok, message = await asyncio.to_thread(self._context.capture_vm.apply_manual_key, text)
+        ok, message = await self._run_blocking(self._context.capture_vm.apply_manual_key, text)
         return web.json_response({"ok": ok, "message": message}, status=200 if ok else 400)
 
     async def _api_npcap_install(self, request: web.Request) -> web.Response:
-        await asyncio.to_thread(self._context.capture_vm.start_npcap_install)
+        await self._run_blocking(self._context.capture_vm.start_npcap_install)
         return web.json_response(self._capture_payload())
 
     async def _api_rsc(self, request: web.Request) -> web.Response:
-        await asyncio.to_thread(self._context.capture_vm.start_disable_rsc)
+        await self._run_blocking(self._context.capture_vm.start_disable_rsc)
         return web.json_response(self._capture_payload())
 
     async def _api_state(self, request: web.Request) -> web.Response:

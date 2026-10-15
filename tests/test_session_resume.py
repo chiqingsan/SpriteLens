@@ -23,7 +23,12 @@ class SessionResumeTest(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.directory = Path(self.temporary.name)
         self.store = KeyStore(self.directory)
+        self.addCleanup(self.store.close)
         load_library(ROOT / "data/schemas")
+
+    def checkpoint(self):
+        self.store.flush()
+        return self.store.load_session()
 
     def monitor(self):
         monitor = MonitorService(catalog=OpcodeCatalog.load(ROOT / "data/schemas/opcodes.json"), key_store=self.store)
@@ -42,10 +47,11 @@ class SessionResumeTest(unittest.TestCase):
     def seed(self):
         monitor, repo = self.monitor()
         self.feed(monitor, make_ack_frame(SYNTH_KEY))
-        self.assertIsNone(self.store.load_session().identity)
+        self.assertIsNone(self.checkpoint().identity)
         self.login(monitor)
         self.assertEqual(repo.identity, PlayerIdentity(123, "测试角色", 55))
         monitor.stop()
+        self.store.flush()
 
     def test_restart_resumes_from_server_data_without_relogin(self):
         self.seed()
@@ -56,7 +62,7 @@ class SessionResumeTest(unittest.TestCase):
         self.feed(monitor, make_data_frame(SYNTH_KEY, 0x013D, b"", sequence=11))
         self.assertEqual(repo.identity, PlayerIdentity(123, "测试角色", 55))
         self.assertEqual(monitor.drain_events()[-1].resumed_identity, (123, "测试角色", 55))
-        self.assertEqual(self.store.load_session().server_sequence, 11)
+        self.assertEqual(self.checkpoint().server_sequence, 11)
 
     def test_other_flow_wrong_key_and_sequence_reset_do_not_restore_old_role(self):
         self.seed()
@@ -67,7 +73,7 @@ class SessionResumeTest(unittest.TestCase):
         self.assertIsNone(repo.identity)
         self.feed(monitor, make_data_frame(SYNTH_KEY, 0x1AA, make_protobuf_payload(), sequence=2))
         self.assertIsNone(repo.identity)
-        self.assertIsNone(self.store.load_session().identity)
+        self.assertIsNone(self.checkpoint().identity)
         again, repo = self.monitor()
         self.feed(again, make_data_frame(SYNTH_KEY, 0x1AA, make_protobuf_payload(), sequence=100))
         self.assertIsNone(repo.identity)
@@ -79,12 +85,12 @@ class SessionResumeTest(unittest.TestCase):
             self.feed(monitor, make_ack_frame(key))
             self.feed(monitor, make_data_frame(key, 0x1AA, make_protobuf_payload(), sequence=11))
             self.assertIsNone(repo.identity)
-            self.assertIsNone(self.store.load_session().identity)
+            self.assertIsNone(self.checkpoint().identity)
             self.login(monitor, uid=456, name="新角色", key=key, sequence=12)
             self.assertEqual(repo.identity.uid, 456)
-            self.assertEqual(self.store.load_session().identity[0], 456)
+            self.assertEqual(self.checkpoint().identity[0], 456)
             monitor.close_session(SESSION)
-            self.assertIsNone(self.store.load_session().identity)
+            self.assertIsNone(self.checkpoint().identity)
 
     def test_new_syn_invalidates_cache_even_before_key_arrives(self):
         self.seed()
@@ -92,7 +98,7 @@ class SessionResumeTest(unittest.TestCase):
         self.feed(monitor, encode_frame(0x1001, 0, 1, b"", b""), direction="c2s")
         self.feed(monitor, make_data_frame(SYNTH_KEY, 0x1AA, make_protobuf_payload(), sequence=11))
         self.assertIsNone(repo.identity)
-        self.assertIsNone(self.store.load_session().identity)
+        self.assertIsNone(self.checkpoint().identity)
 
     def test_new_identity_overrides_cache_and_stop_saves_latest_sequence(self):
         self.seed()
@@ -101,13 +107,13 @@ class SessionResumeTest(unittest.TestCase):
         self.assertEqual(repo.identity.uid, 456)
         self.feed(monitor, make_data_frame(SYNTH_KEY, 0x1AA, make_protobuf_payload(), sequence=12))
         monitor.stop()
-        checkpoint = self.store.load_session()
+        checkpoint = self.checkpoint()
         self.assertEqual(checkpoint.identity, (456, "另一角色", 55))
         self.assertEqual(checkpoint.server_sequence, 12)
 
     def test_corrupt_cache_and_old_key_only_are_not_role_evidence(self):
         self.store.save_latest(SYNTH_KEY, SESSION)
-        self.assertIsNone(self.store.load_session())
+        self.assertIsNone(self.checkpoint())
         monitor, repo = self.monitor()
         monitor.set_preset_key(self.store.load_latest())
         self.feed(monitor, make_data_frame(SYNTH_KEY, 0x1AA, make_protobuf_payload(), sequence=11))
@@ -115,4 +121,4 @@ class SessionResumeTest(unittest.TestCase):
         for text in ('{', '[]', '{"version":1,"key_hex":"00","flow_id":"s","server_sequence":2}',
                      '{"version":1,"key_hex":"0123456789abcdef0123456789abcdef","flow_id":"s","server_sequence":2,"identity":[0,"x",2]}'):
             (self.directory / "session.json").write_text(text, encoding="utf-8")
-            self.assertIsNone(self.store.load_session())
+            self.assertIsNone(self.checkpoint())

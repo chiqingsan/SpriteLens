@@ -18,7 +18,7 @@ export function mountPetInventory(root: HTMLElement, token: string, host: PetInv
     onView: host.view, onReset: host.reset }) })
   app.mount(root)
   const stop = watch(model.view, value => host.fixed(value === 'point'), { immediate: true, flush: 'sync' })
-  return { load: model.load, seed: model.accept, find: model.find, payload: () => model.data.value,
+  return { load: model.load, resume: model.resume, seed: model.accept, find: model.find, payload: () => model.data.value,
     selected: () => model.selected.value, isBusy: () => model.busy.value,
     closeDetail: (preserve = false) => inventory.value!.closeDetail(preserve), openDetail: () => inventory.value!.openDetail(),
     setView: model.setView, setBox: (id: number) => inventory.value!.setBox(id), invalidate: model.invalidate,

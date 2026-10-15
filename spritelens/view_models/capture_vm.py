@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from spritelens.capture.base import SourceError
+from spritelens.capture.key_store import KeyStore
 from spritelens.capture.npcap_source import NpcapCaptureSource
 from spritelens.logs import get_logger
 from spritelens.repositories.settings import SettingsRepository
@@ -85,6 +86,7 @@ class CaptureViewModel:
         keys_dir: Path,
         recordings_dir: Path,
         port: int,
+        key_store: KeyStore | None = None,
         installer_dir: Path | None = None,
         event_log=None,
         resolver=None,
@@ -114,6 +116,7 @@ class CaptureViewModel:
             keys_dir=keys_dir,
             recordings_dir=recordings_dir,
             port=port,
+            key_store=key_store,
             extra_ports=self._extra_ports,
             iface=self._iface or None,
             recording_wanted=settings.get_bool(RECORD_SETTING_KEY, False),

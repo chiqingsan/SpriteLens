@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock
 
 from spritelens.capture.base import StreamChunk
 from spritelens.capture.key_store import KeyStore
@@ -212,6 +213,19 @@ def _wire_children(data: bytes):
 
 
 class PetRepositoryTest(unittest.TestCase):
+    def test_voice_changes_invalidate_page_version_only_after_success(self):
+        store = Mock()
+        repo = PetRepository(store=store)
+        before = repo.version
+        self.assertTrue(repo.save_voice_override(42, 1, 80))
+        self.assertEqual(repo.version, before + 1)
+        store.set_voice_override.side_effect = OSError("synthetic disk failure")
+        with self.assertRaises(OSError):
+            repo.save_voice_override(42, 1, None)
+        store.has_pet.return_value = False
+        self.assertFalse(repo.save_voice_override(42, 2, 80))
+        self.assertEqual(repo.version, before + 1)
+
     def _feed(self, repo: PetRepository, gid: int, name: bytes, level: int) -> None:
         repo.handle_packet(_named_event("s2c", [_named_pet_node(gid, 20508, name, level)]))
 
@@ -241,7 +255,9 @@ class PipelineIntegrationTest(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
-        self.monitor = _make_monitor_with_schema(Path(self._tmp.name))
+        self.key_store = KeyStore(Path(self._tmp.name) / "keys")
+        self.addCleanup(self.key_store.close)
+        self.monitor = _make_monitor_with_schema(Path(self._tmp.name), self.key_store)
         self.repo = PetRepository()
         self.monitor.add_packet_listener(self.repo.handle_packet)
 
@@ -270,7 +286,9 @@ class PipelineIntegrationTest(unittest.TestCase):
 
     def test_no_schema_still_safe(self):
         """无 schema 环境（wire 占位名）下提取不到宠物但不抛错。"""
-        monitor = MonitorService(catalog=OpcodeCatalog({}), key_store=KeyStore(Path(self._tmp.name) / "k2"))
+        key_store = KeyStore(Path(self._tmp.name) / "k2")
+        self.addCleanup(key_store.close)
+        monitor = MonitorService(catalog=OpcodeCatalog({}), key_store=key_store)
         repo = PetRepository()
         monitor.add_packet_listener(repo.handle_packet)
         monitor.on_chunk(
@@ -284,7 +302,7 @@ class PipelineIntegrationTest(unittest.TestCase):
         self.assertEqual(repo.snapshot(), ())
 
 
-def _make_monitor_with_schema(tmp: Path) -> MonitorService:
+def _make_monitor_with_schema(tmp: Path, key_store: KeyStore) -> MonitorService:
     """带完整宠物 schema 的监视器（临时 schema 目录，模拟导入后的环境）。"""
     messages_dir = tmp / "messages"
     messages_dir.mkdir(exist_ok=True)
@@ -316,7 +334,7 @@ def _make_monitor_with_schema(tmp: Path) -> MonitorService:
     catalog = OpcodeCatalog(
         {OPCODE_PET_PAGE: OpcodeInfo("GetPetInfoByPageRsp", "pet", "ZoneGetPetInfoByPageRsp")}
     )
-    return MonitorService(catalog=catalog, key_store=KeyStore(tmp / "keys"))
+    return MonitorService(catalog=catalog, key_store=key_store)
 
 
 if __name__ == "__main__":

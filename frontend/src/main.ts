@@ -14,19 +14,21 @@ export function mountEggBox(root: HTMLElement, host: EggBoxHost) {
   app.mount(root)
   return {
     load: () => page.value?.load(),
+    resume: (version: number) => page.value?.resume(version),
     pause: () => page.value?.pause(),
     resetAccount: () => page.value?.resetAccount(),
     unmount: () => app.unmount(),
   }
 }
 
-export function mount(root: HTMLElement, token: string): () => void {
+export function mount(root: HTMLElement, token: string) {
+  const active = ref(true), api = createApiClient(token)
   const router = createRouter({ history: createMemoryHistory(), routes: [
-    { path: '/', component: EggDexPage, props: { api: createApiClient(token) } },
+    { path: '/', component: EggDexPage, props: () => ({ api, active: active.value }) },
   ] })
   const app = createApp({ render: () => h(RouterView) })
   app.use(createPinia()).use(router)
   void router.push('/')
   app.mount(root)
-  return () => app.unmount()
+  return { pause: () => { active.value = false }, resume: () => { active.value = true }, unmount: () => app.unmount() }
 }

@@ -54,3 +54,40 @@ describe('蛋图鉴请求生命周期', () => {
     scope.stop()
   })
 })
+
+const payload = { eggs: [], total: 0, shown: 0, groups: [], egg_types: [] }
+const scopes: ReturnType<typeof effectScope>[] = []
+afterEach(() => { scopes.splice(0).forEach(scope => scope.stop()) })
+function setup(api: Parameters<typeof useEggDex>[0]) {
+  const scope = effectScope(); scopes.push(scope)
+  return scope.run(() => useEggDex(api))!
+}
+it('离页保留已加载目录，返回相同筛选不再请求', async () => {
+  const api = vi.fn().mockResolvedValue(payload), model = setup(api)
+  await model.resume(); const current = model.data.value
+  model.pause(); await model.resume()
+  expect(api).toHaveBeenCalledTimes(1); expect(model.data.value).toBe(current)
+})
+it('搜索 debounce 离页取消，返回按最新筛选请求，旧结果不能覆盖', async () => {
+  vi.useFakeTimers()
+  let resolve!: (value: unknown) => void
+  const pending = new Promise<unknown>(done => { resolve = done })
+  const api = vi.fn().mockResolvedValueOnce(payload).mockReturnValueOnce(pending).mockResolvedValue(payload)
+  const model = setup(api); await model.load()
+  model.filters.group = '旧筛选'
+  model.filters.search = '新搜索'; model.pause(); vi.runAllTimers()
+  expect(api).toHaveBeenCalledTimes(2)
+  await model.resume(); const current = model.data.value
+  expect(api).toHaveBeenCalledTimes(3); expect(api.mock.calls[2]![0]).toContain('search=')
+  resolve({ ...payload, total: 99 }); await pending; await Promise.resolve()
+  expect(model.data.value).toBe(current)
+})
+it('隐藏时筛选变化不发请求，返回加载；失败后再次返回可重试', async () => {
+  const api = vi.fn().mockResolvedValueOnce(payload).mockRejectedValueOnce(new Error('读取失败')).mockResolvedValue(payload)
+  const model = setup(api); await model.load(); model.pause()
+  model.filters.group = '新筛选'
+  expect(api).toHaveBeenCalledTimes(1)
+  await model.resume(); expect(model.error.value).toBe('读取失败')
+  model.pause(); await model.resume()
+  expect(api).toHaveBeenCalledTimes(3); expect(model.error.value).toBe('')
+})

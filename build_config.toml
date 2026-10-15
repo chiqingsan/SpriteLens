@@ -73,8 +73,12 @@ include_modules = [
 include_data_dirs = [
   "data/schemas=data/schemas",
   "data/static=data/static",
-  "resources=resources",
   "spritelens/web/static=spritelens/web/static",
+]
+
+# 仅图标是运行资源；resources 下的 wiki/source 候选素材不进入发布包。
+include_data_files = [
+  "resources/app.ico=resources/app.ico",
 ]
 
 # 排除确定用不到的大件，控制体积。

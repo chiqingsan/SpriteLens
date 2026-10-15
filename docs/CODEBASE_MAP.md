@@ -93,9 +93,9 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `domain/home.py` | 家园语义层：0x014A 快照 → 居民/家具/产蛋窝（实证字段映射 + NEST_TYPES） |
 | `domain/flowers.py` | 花种语义层：0x0375 花田帧 → 自己的花/好友花田（含宠物三维） |
 | `domain/display.py` | 展示常量：系别配色、六维标签、天赋阶配色（框架无关） |
-| `repositories/database.py` | SQLite 底座：连接、user_version 追加迁移至 v8（孵化槽），整组事务化 + 半迁移自修复；真损坏备份恢复，备份失败保留原文件 |
+| `repositories/database.py` | SQLite 底座：连接、user_version 追加迁移至 v11（蛋窝来源与蛋/精灵手工标签），整组事务化 + 半迁移自修复；真损坏备份恢复，备份失败保留原文件 |
 | `repositories/pet_store.py` | 宠物持久化网关：write-behind 批量落盘 + 读取（适配器模式） |
-| `repositories/egg_store.py` | 蛋仓持久化网关：write-behind 批量落盘，按 uid 读取蛋与 v8 孵化槽快照 |
+| `repositories/egg_store.py` | 蛋仓持久化网关：write-behind 批量落盘，按 uid 读取蛋、孵化槽与性格/蛋窝/绑定标注 |
 | `repositories/settings.py` | JSON 配置仓库（原子写、脏值归一、窗口几何） |
 | `services/monitor_service.py` | 采集管线编排：字节流 → 帧 → 解密 → 解码 → PacketEvent；会话释放/空闲回收/硬上限 |
 | `services/capture_service.py` | 采集运行服务：接入层创建与生命周期、录制 tee、手动密钥、副作用命令串行化（阶段1.3 自 capture_vm 抽出） |

@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -52,25 +53,38 @@ def _ascii_or_placeholder(key: bytes) -> str:
 
 
 class KeyStore:
-    """按文件持久化最近一次会话密钥；失败只告警不阻断监听。"""
+    """按文件持久化最近一次密钥；checkpoint 由单写者异步合并。"""
 
     def __init__(self, keys_dir: Path) -> None:
         self._dir = keys_dir
         self._latest = keys_dir / "latest.key"
         self._session = keys_dir / "session.json"
+        self._condition = threading.Condition()
+        self._revision = 0
+        self._written_revision = 0
+        self._pending_session: tuple[int, SessionCheckpoint] | None = None
+        self._writer: threading.Thread | None = None
+        self._closing = False
+        self._closed = False
 
     def save_session(self, checkpoint: SessionCheckpoint) -> None:
         """原子保存会话关联；密钥仅写本地文件，不进入日志或界面。"""
+        with self._condition:
+            if self._closing or self._closed:
+                raise RuntimeError("KeyStore 已进入关闭状态")
+            self._revision += 1
+            self._pending_session = (self._revision, checkpoint)
+            self._ensure_writer_locked()
+            self._condition.notify()
+
+    def _write_session(self, revision: int, checkpoint: SessionCheckpoint) -> None:
         record = {"version": 1, "flow_id": checkpoint.flow_id, "key_hex": checkpoint.key.hex(),
                   "identity": list(checkpoint.identity) if checkpoint.identity else None,
                   "server_sequence": checkpoint.server_sequence, "updated_at": time.time()}
-        try:
-            self._session.parent.mkdir(parents=True, exist_ok=True)
-            temporary = self._session.with_suffix(".json.tmp")
-            temporary.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
-            temporary.replace(self._session)
-        except OSError as exc:
-            logger.warning("会话接续信息保存失败: %s", exc)
+        self._session.parent.mkdir(parents=True, exist_ok=True)
+        temporary = self._session.with_suffix(f".{revision}.json.tmp")
+        temporary.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
+        temporary.replace(self._session)
 
     def load_session(self) -> SessionCheckpoint | None:
         try:
@@ -105,6 +119,60 @@ class KeyStore:
             self._latest.write_text(text, encoding="utf-8")
         except OSError as exc:
             logger.warning("key 持久化失败: %s", exc)
+
+    def _ensure_writer_locked(self) -> None:
+        if self._writer is None:
+            self._writer = threading.Thread(target=self._run_writer, name="spritelens-key-store", daemon=True)
+            self._writer.start()
+
+    def _run_writer(self) -> None:
+        while True:
+            with self._condition:
+                while self._pending_session is None and not self._closing:
+                    self._condition.wait()
+                if self._pending_session is None and self._closing:
+                    return
+                revision, checkpoint = self._pending_session
+                self._pending_session = None
+            try:
+                self._write_session(revision, checkpoint)
+                with self._condition:
+                    self._written_revision = max(self._written_revision, revision)
+                    self._condition.notify_all()
+            except OSError as exc:
+                logger.warning("会话密钥信息保存失败，稍后重试: %s", exc)
+                with self._condition:
+                    if self._pending_session is None or self._pending_session[0] < revision:
+                        self._pending_session = (revision, checkpoint)
+                    self._condition.wait(timeout=0.5)
+
+    def flush(self, *, timeout: float = 5) -> None:
+        """等待调用前已受理的 checkpoint 原子写入完成。"""
+        deadline = time.monotonic() + timeout
+        with self._condition:
+            revision = self._revision
+            while self._written_revision < revision:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError("KeyStore checkpoint 未在等待期限内写入")
+                self._condition.wait(timeout=remaining)
+
+    def close(self, *, timeout: float = 5) -> None:
+        """排空最后的 checkpoint；超时保留唯一 writer，允许稍后重试。"""
+        with self._condition:
+            if self._closed:
+                return
+            self._closing = True
+            writer = self._writer
+            self._condition.notify_all()
+        if writer is not None:
+            writer.join(timeout=timeout)
+            if writer.is_alive():
+                raise TimeoutError("KeyStore writer 未在关闭预算内完成")
+        with self._condition:
+            if self._written_revision < self._revision:
+                raise OSError("KeyStore 仍有未写入的 checkpoint")
+            self._closed = True
 
     def load_latest(self) -> bytes | None:
         try:

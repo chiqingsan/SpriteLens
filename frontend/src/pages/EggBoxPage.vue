@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import type { EggBoxHost } from '../composables/useEggBox'
 import { useEggBox } from '../composables/useEggBox'
 import EggBoxCard from '../components/EggBoxCard.vue'
 import EggBoxDetail from '../components/EggBoxDetail.vue'
 import UiIcon from '../components/UiIcon.vue'
+import type { EggBoxAnnotations, EggBoxEntry } from '../types/eggBox'
 import './egg-box.css'
 
 const props = defineProps<{ host: EggBoxHost }>()
@@ -14,6 +15,8 @@ const narrow = window.matchMedia('(max-width: 960px)')
 const isNarrow = ref(narrow.matches)
 const mobileDetailOpen = ref(false)
 const detailRef = ref<InstanceType<typeof EggBoxDetail> | null>(null)
+const favoriteBusy = reactive(new Set<string>())
+const favoriteError = ref('')
 const listViewport = ref<HTMLElement | null>(null)
 const columnCount = ref(5)
 const eggRows = computed(() => {
@@ -27,7 +30,7 @@ const eggRows = computed(() => {
 const rowVirtualizerOptions = computed(() => ({
   count: eggRows.value.length,
   getScrollElement: () => listViewport.value,
-  estimateSize: () => 260,
+  estimateSize: () => 230,
   getItemKey: (index: number) => eggRows.value[index]?.[0]?.instance_id ?? index,
   overscan: 2,
 }))
@@ -38,6 +41,9 @@ const position = computed(() => model.visibleEggs.value.findIndex(egg => egg.ins
 let trigger: HTMLElement | undefined
 let inertNodes: HTMLElement[] = []
 let columnObserver: ResizeObserver
+let pageGeneration = 0
+let pageActive = true
+function favoriteKey(uid: number, instanceId: number) { return `${uid}:${instanceId}` }
 const summary = computed(() => {
   const data = model.data.value
   if (!data || data.source === 'unknown') return '蛋仓状态未知 · 完整性未确认'
@@ -51,7 +57,10 @@ const emptyMessage = computed(() => {
     ? '尚未观察到蛋仓数据。开始采集后，进入游戏并打开蛋仓即可积累记录。'
     : '当前观察或缓存中没有蛋，不能据此确认游戏蛋仓为空。'
 })
-watch(model.visibleEggs, async () => {
+watch(model.visibleEggs, async (eggs, previousEggs) => {
+  const orderChanged = eggs.length !== previousEggs.length
+    || eggs.some((egg, index) => egg.instance_id !== previousEggs[index]?.instance_id)
+  if (!orderChanged) return
   if (listViewport.value) listViewport.value.scrollTop = 0
   await nextTick()
   syncColumnCount()
@@ -116,15 +125,57 @@ async function moveSelection(offset: number) {
     document.querySelector<HTMLElement>(`[data-egg-instance="${model.selectedId.value}"]`)?.scrollIntoView({ block: 'nearest' })
   }
 }
+function updateAnnotations(value: EggBoxAnnotations) {
+  const uid = model.data.value?.uid
+  const egg = model.selected.value
+  if (uid && egg) model.updateAnnotations(uid, egg.instance_id, value)
+}
+function saveAnnotations() {
+  const uid = model.data.value?.uid
+  const egg = model.selected.value
+  if (uid && egg) model.saveAnnotations(uid, egg.instance_id)
+}
+async function toggleFavorite(egg: EggBoxEntry) {
+  const uid = model.data.value?.uid
+  if (!uid) return
+  const generation = pageGeneration
+  const key = favoriteKey(uid, egg.instance_id)
+  if (favoriteBusy.has(key)) return
+  favoriteBusy.add(key)
+  favoriteError.value = ''
+  try {
+    await props.host.saveFavorite({ uid, instance_id: egg.instance_id, favorite: !egg.favorite })
+    if (!pageActive || generation !== pageGeneration || model.data.value?.uid !== uid) return
+    model.setFavorite(egg.instance_id, !egg.favorite)
+  } catch (cause) {
+    if (pageActive && generation === pageGeneration) {
+      favoriteError.value = cause instanceof Error ? cause.message : String(cause)
+    }
+  } finally {
+    favoriteBusy.delete(key)
+  }
+}
 function pause() {
+  pageActive = false
+  pageGeneration += 1
   mobileDetailOpen.value = false
   syncInert()
   model.pause()
 }
 function resetAccount() {
+  pageActive = false
+  pageGeneration += 1
   mobileDetailOpen.value = false
   syncInert()
   model.resetAccount()
+}
+function load() {
+  pageActive = true
+  return model.load()
+}
+function resume(version: number) {
+  pageActive = true
+  return model.resume(version)
 }
 function keydown(event: KeyboardEvent) {
   if (!isNarrow.value || !mobileDetailOpen.value) return
@@ -147,14 +198,17 @@ function keydown(event: KeyboardEvent) {
 }
 
 onMounted(() => {
+  pageActive = true
   columnObserver = new ResizeObserver(syncColumnCount)
   if (listViewport.value) columnObserver.observe(listViewport.value)
   syncColumnCount()
   narrow.addEventListener('change', onResize)
   document.addEventListener('keydown', keydown)
-  void model.load()
+  void load()
 })
 onUnmounted(() => {
+  pageActive = false
+  pageGeneration += 1
   columnObserver.disconnect()
   narrow.removeEventListener('change', onResize)
   document.removeEventListener('keydown', keydown)
@@ -162,7 +216,8 @@ onUnmounted(() => {
 })
 
 defineExpose({
-  load: model.load,
+  load,
+  resume,
   pause,
   resetAccount,
 })
@@ -170,6 +225,7 @@ defineExpose({
 
 <template>
   <div class="eggbox-page">
+    <p v-if="favoriteError" class="eggbox-favorite-error" role="alert">收藏失败：{{ favoriteError }}</p>
     <section class="eggbox-list-panel" :aria-busy="model.loading.value">
       <header class="eggbox-list-toolbar">
         <div class="eggbox-list-summary">
@@ -188,7 +244,7 @@ defineExpose({
           <label class="eggbox-search">
             <UiIcon name="search" />
             <span class="sr-only">搜索蛋</span>
-            <input v-model="model.filters.search" type="search" placeholder="搜索蛋名 / 物种 / 编号">
+            <input v-model="model.filters.search" type="search" placeholder="搜索蛋名 / 精灵 / 进化链 / 编号">
           </label>
         </div>
       </header>
@@ -217,7 +273,8 @@ defineExpose({
               :data-index="row.index" :style="{ transform: `translateY(${row.start}px)` }">
               <div class="eggbox-grid">
                 <EggBoxCard v-for="egg in eggRows[row.index]" :key="egg.instance_id" :egg="egg"
-                  :selected="model.selectedId.value === egg.instance_id" @select="open" />
+                  :selected="model.selectedId.value === egg.instance_id" :favorite-saving="Boolean(model.data.value && favoriteBusy.has(favoriteKey(model.data.value.uid, egg.instance_id)))"
+                  @select="open" @favorite="toggleFavorite" />
               </div>
             </div>
           </div>
@@ -229,8 +286,11 @@ defineExpose({
     <aside v-if="!isNarrow || mobileDetailOpen" class="eggbox-detail-panel"
       :role="isNarrow ? 'dialog' : 'region'" :aria-modal="isNarrow || undefined" aria-label="精灵蛋详情">
       <EggBoxDetail v-if="model.selected.value" ref="detailRef" :egg="model.selected.value" :position="position"
-        :total="model.visibleEggs.value.length" @previous="moveSelection(-1)"
-        @next="moveSelection(1)" @close="closeMobileDetail" />
+        :total="model.visibleEggs.value.length" :nature-options="model.data.value?.nature_options || []"
+        :annotations="model.annotationsFor(model.selected.value)" :annotation-error="model.annotationErrorFor(model.selected.value)"
+        :favorite-saving="Boolean(model.data.value && favoriteBusy.has(favoriteKey(model.data.value.uid, model.selected.value.instance_id)))"
+        @update-annotations="updateAnnotations" @save-annotations="saveAnnotations" @previous="moveSelection(-1)"
+        @next="moveSelection(1)" @close="closeMobileDetail" @favorite="toggleFavorite" />
       <div v-else class="empty-hint eggbox-detail-empty"><UiIcon name="egg" />选择一枚蛋查看详情</div>
     </aside>
   </div>

@@ -8,11 +8,23 @@ export interface EggBoxMeasurementRanges {
   weight_g: EggBoxRange | null
 }
 
+export type EggNest = '' | 'normal' | 'green'
+export type EggBoxVoiceTag = '' | '婉转声' | '满分' | '粗嗓门' | '底分'
+export interface EggBoxAnnotations {
+  nature_id: number
+  nest_override: EggNest
+  note: string
+  voice_tag: EggBoxVoiceTag
+}
+export interface EggBoxTags { nature: string; weight: string | null; voice: string | null; medals: string[]; nest: string }
+export interface EggBoxSaveAnnotations extends EggBoxAnnotations { uid: number; instance_id: number }
+
 export interface EggBoxEntry {
   instance_id: number
   egg_conf_id: number
   egg_name: string
   species_name: string
+  chain_names: string[]
   description: string
   description_source: string
   icon_url: string
@@ -27,20 +39,26 @@ export interface EggBoxEntry {
   hatching: boolean
   hatch_known: boolean
   historical_hatching: boolean
+  favorite: boolean
   hatch_progress: number
   special_egg_conf_id: number
   height_cm: number
   weight_g: number
+  home_egg: boolean
+  annotations: EggBoxAnnotations
+  tags: EggBoxTags
   measurement_ranges: EggBoxMeasurementRanges
 }
 
 export interface EggBox {
   eggs: EggBoxEntry[]
+  uid: number
   total: number
   hatching: number | null
   historical_hatching: number
   source: 'unknown' | 'observed' | 'historical' | 'mixed'
   version: number
+  nature_options: { id: number; name: string }[]
 }
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -73,6 +91,19 @@ function isRanges(value: unknown): value is EggBoxMeasurementRanges {
     && (value.weight_g === null || isRange(value.weight_g))
 }
 
+function isAnnotations(value: unknown): value is EggBoxAnnotations {
+  return record(value) && safeInteger(value.nature_id) && value.nature_id >= 0
+    && (value.nest_override === '' || value.nest_override === 'normal' || value.nest_override === 'green')
+    && string(value.note)
+    && (value.voice_tag === '' || value.voice_tag === '婉转声' || value.voice_tag === '满分'
+      || value.voice_tag === '粗嗓门' || value.voice_tag === '底分')
+}
+
+function isTags(value: unknown): value is EggBoxTags {
+  return record(value) && string(value.nature) && (value.weight === null || string(value.weight))
+    && (value.voice === null || string(value.voice)) && strings(value.medals) && string(value.nest)
+}
+
 function isSource(value: unknown): value is EggBox['source'] {
   return value === 'unknown' || value === 'observed' || value === 'historical' || value === 'mixed'
 }
@@ -83,10 +114,14 @@ function isEntry(value: unknown): value is EggBoxEntry {
     .every(key => safeInteger(value[key]))
     && ['egg_name', 'species_name', 'description', 'description_source', 'icon_url', 'fallback_icon_url', 'egg_type_name', 'hatch_label']
       .every(key => string(value[key]))
+    && strings(value.chain_names)
     && typeof value.egg_kind === 'string' && ['regular', 'special', 'shiny', 'colorful', 'mystery', 'unknown'].includes(value.egg_kind)
     && strings(value.egg_group_names)
     && ['historical', 'hatching', 'hatch_known', 'historical_hatching']
       .every(key => typeof value[key] === 'boolean')
+    && typeof value.favorite === 'boolean'
+    && typeof value.home_egg === 'boolean' && isAnnotations(value.annotations)
+    && isTags(value.tags)
     && finite(value.hatch_progress) && value.hatch_progress >= 0 && value.hatch_progress <= 1
     && isRanges(value.measurement_ranges)
 }
@@ -94,8 +129,9 @@ function isEntry(value: unknown): value is EggBoxEntry {
 function isEggBox(value: unknown): value is EggBox {
   if (!record(value)) return false
   return Array.isArray(value.eggs) && value.eggs.every(isEntry)
-    && ['total', 'historical_hatching', 'version'].every(key => safeInteger(value[key]))
+    && ['uid', 'total', 'historical_hatching', 'version'].every(key => safeInteger(value[key]))
     && (value.hatching === null || safeInteger(value.hatching))
+    && Array.isArray(value.nature_options) && value.nature_options.every(item => record(item) && safeInteger(item.id) && string(item.name))
     && isSource(value.source)
 }
 
