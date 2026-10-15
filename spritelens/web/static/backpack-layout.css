@@ -34,6 +34,7 @@
 .pet-view-settings { margin-left: 0; }
 .pet-sort-root { flex: none; display: flex; align-items: center; }
 .pet-sort-root .pet-sort-field { margin-left: var(--space-3); }
+.pet-sort-root .pet-sort-direction { margin-left: var(--space-2); }
 .pet-view-settings > summary { display: flex; align-items: center; padding: 0 var(--space-4); white-space: nowrap; }
 #pet-count-root { flex: none; }
 .pet-toolbar .count-badge { display: inline-flex; align-items: center; min-height: var(--backpack-control); padding: 0 var(--space-4); border-radius: var(--radius-md); }
