@@ -1,8 +1,9 @@
 # 家园 UI 重绘执行计划
+> 证据边界：本文引用的实际页面截图（`output/home-ui-redesign-luna6-20261016.png` 等）未随仓库提交，可按本文方法用合成数据重新生成；仓库内仅保留本计划与其中的结论。
 
 状态：Luna6 两批实现及 Codex 浏览器复核完成；真实游戏/WebView2 仍待 F 验收。读者：Luna6 实现者与 Codex 复核者。维护边界：本次 UI 交接记录，不代替 ROADMAP 和 UI_GUIDE。
 归属：F04-U2-D 已有家园 Vue 展示的视觉迭代；F04-U2-F 的真实游戏/WebView2 验收仍独立待验。
-参考图：C:/Users/CHIQIN~1/AppData/Local/Temp/codex-clipboard-77d7fb29-546e-4674-a45d-c13d2cd2d6d4.png
+参考图：本机剪贴板临时图（未随仓库提交）
 
 ## 目标与布局分析
 

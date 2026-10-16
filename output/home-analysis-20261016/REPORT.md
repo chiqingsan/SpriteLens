@@ -28,7 +28,7 @@ SpriteLens 能通过自己的被动采集实现蛋神截图中的主要家园功
 ## 证据与分析范围
 
 - 项目基线：HEAD c327833，工作区已有家园协议、Vue 页面及文档等未提交改动；本轮保留原状。
-- 目标：用户指定的 D:/code_resources/roco_resources/danshen-v1.2.0-extracted。
+- 目标：用户指定的蛋神助手解包目录（danshen-v1.2.0-extracted）。
 - JavaScript：REA 6.5.0 静态分析 feature-pages.js、home-breeding.js、home-interactions.js。Evidence ID：ev_64d3c9988866fb28dcbf0f495e05d788539d16ebc1ec1521cbc877f352294574。3 个选择文件全部解析成功，另 43 个库存文件未纳入该次语义分析，不能据此声称完整覆盖整个客户端。完整结果见 rea-webui.json。
 - Python：使用版本匹配的 Python 3.12 marshal/dis 读取 pyc，未导入或执行目标模块。来源哈希及函数清单见 python-evidence.json；反汇编分别保存在 *.dis.txt、*.compact.txt。这些是普通本地静态分析证据，不冒称 REA Python 反编译结果。
 - 实际样本：读取用户数据目录现有 eventlog_20261016.jsonl，调用项目当前纯解析函数检查已保存字段树；只保存聚合计数至 sample-summary.json，没有复制原始运行数据或密钥为测试样本。

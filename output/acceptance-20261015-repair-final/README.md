@@ -1,8 +1,9 @@
 # 2026-10-15 标注保存修复与复验
+> 证据边界：本文引用的探针脚本与结果数据（`probe_*.py`、`probe_*.cjs`、`*-results.jsonl`、`measurements.json`、`after.jpg` 等）已随本次资源整理从仓库移除，可按本文方法重新采集；仓库内仅保留本说明与其中的结论数字。
 
 状态：B01–B03 修复完成，本轮受控验收通过。读者：实现者与复核者。维护边界：本目录记录本轮工作区证据，不代替真实桌面、抓包或发布验收；后续代码变化需要重新验证。
 
-基线：HEAD `de12fca` 加原有未提交改动。本轮仅修改 `frontend/src/composables/useEggBox.ts`、对应回归测试，并通过官方构建更新忽略的 Vue 运行产物；没有回滚或清理原有改动。历史失败快照保留在 [上一轮验收](../acceptance-20261015-repair/README.md)。
+基线：HEAD `de12fca` 加原有未提交改动。本轮仅修改 `frontend/src/composables/useEggBox.ts`、对应回归测试，并通过官方构建更新忽略的 Vue 运行产物；没有回滚或清理原有改动。历史失败快照所在的上一轮验收目录（output/acceptance-20261015-repair/）未随仓库提交。
 
 ## 修复范围与失败分支
 

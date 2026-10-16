@@ -1,3 +1,0 @@
-{"probe":"original_wrong_target","saves":[{"uid":101,"id":1,"nature_id":1,"nest_override":"","note":"","voice_tag":""},{"uid":101,"id":1,"nature_id":2,"nest_override":"","note":"","voice_tag":""}]}
-{"probe":"return_to_inflight_egg","expectedNature":1,"observedNature":9,"saves":[{"uid":101,"id":1,"nature_id":1,"nest_override":"","note":"","voice_tag":""},{"uid":101,"id":1,"nature_id":9,"nest_override":"","note":"only change note","voice_tag":""}]}
-{"probe":"failed_draft_after_mobile_detail_reopen","before":{"note":"unsaved draft","error":"synthetic disk failure"},"after":{"note":"","error":""}}
