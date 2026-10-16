@@ -19,6 +19,14 @@ export function mountPetInventory(root: HTMLElement, token: string, host: PetInv
   app.mount(root)
   const stop = watch(model.view, value => host.fixed(value === 'point'), { immediate: true, flush: 'sync' })
   return { load: model.load, resume: model.resume, seed: model.accept, find: model.find, payload: () => model.data.value,
+    reveal: async (gid: string) => {
+      const owner = host.account()
+      await model.resume()
+      await nextTick()
+      if (!model.visible.value || owner.generation !== host.account().generation) return
+      if (model.error.value) throw new Error(model.error.value)
+      if (!inventory.value!.reveal(gid)) throw new Error('当前账号未找到该精灵，请刷新产线记录')
+    },
     selected: () => model.selected.value, isBusy: () => model.busy.value,
     selectGid: (gid: number) => inventory.value!.selectGid(gid),
     closeDetail: (preserve = false) => inventory.value!.closeDetail(preserve), openDetail: () => inventory.value!.openDetail(),

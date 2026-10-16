@@ -61,9 +61,19 @@
   var homePage = null;
   var homePageGeneration = 0;
   var homeVersion = -1;
+  var collectionLines = window.SpriteLensCollectionLines.create({
+    load: function (settings) { return accountRequests.request("collection-lines", "/api/collection-lines" + query({
+      goal: settings.goal, sound: settings.sound, full_weight: Number(settings.full_weight),
+      colorful: Number(settings.colorful), ignore_missing_male: Number(settings.ignore_missing_male)
+    })); },
+    cancel: function () { accountRequests.cancel("collection-lines"); },
+    uid: function () { return accountRequests.petContext().uid; },
+    openPet: function (gid) { petFilters.reset(); switchPage("pets", gid); }
+  });
   window.addEventListener("pagehide", function () {
     eggBoxPageGeneration++;
     homePageGeneration++;
+    collectionLines.unmount();
     if (eggBoxPage) { eggBoxPage.unmount(); eggBoxPage = null; }
     if (homePage) { homePage.unmount(); homePage = null; }
     if (petInventory) { petInventory.unmount(); }
@@ -133,12 +143,13 @@
   };
 
   /* ---------- 导航 ---------- */
-  function switchPage(name) {
+  function switchPage(name, revealGid) {
     if (state.page === name) { return; }
     if (name === "pets" || name === "egg-box") { $("page-" + name).classList.add("page-cached"); }
     if (state.page === "egg-box" && name !== "egg-box") { pauseEggBoxPage(); }
     else { accountRequests.cancel(state.page); }
     if (state.page === "home" && name !== "home" && homePage) { homePage.pause(); }
+    if (state.page === "collection-lines") { collectionLines.pause(); }
     if (state.page === "breeder-library") {
       accountRequests.cancel("breeder-male"); accountRequests.cancel("breeder-female");
     }
@@ -157,12 +168,17 @@
       if (node.dataset.page === name) { node.setAttribute("aria-current", "page"); }
       else { node.removeAttribute("aria-current"); }
     });
-    if (name === "pets") { petFilters.activate(); loadPets(false, true); }
+    if (name === "pets") {
+      petFilters.activate();
+      if (revealGid) { petInventory.reveal(revealGid).catch(function (err) { toast("精灵定位失败：" + err.message, true); }); }
+      else { loadPets(false, true); }
+    }
     if (name === "handbook") { loadHandbook(false, true); }
     if (name === "egg-dex") { eggDex.load(); }
     if (name === "egg-box") { loadEggBoxPage(true); }
     if (name === "male-matrix") { loadMaleMatrix(); }
     if (name === "home") { loadHome(true); }
+    if (name === "collection-lines") { collectionLines.load(); }
     if (name === "breeder-library") { loadBreederLibrary(); }
     if (name === "flowers") { loadFlowers(); }
     if (name === "colors") { loadColors(); }
@@ -256,6 +272,7 @@
   }
 
   function resetAccountViews() {
+    collectionLines.resetAccount();
     if (state.page !== "egg-dex") { window.SpriteLensUI.closeDetail(false, true); }
     petInventory.resetAccount(); petFilters.resetAccount(); state._petsVersion = -1;
     state.hbData = null; state.hbSpecies = []; state.hbSelected = null;
@@ -347,6 +364,7 @@
         "breeder-library": loadBreederLibrary, colors: loadColors };
       if (refresh[state.page]) { refresh[state.page](false); }
       if (state.page === "home") { loadHome(false); }
+      if (state.page === "collection-lines") { collectionLines.load(); }
     }
   }
 

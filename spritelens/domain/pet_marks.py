@@ -3,7 +3,7 @@
 
 def size_mark(weight: int, weight_range) -> tuple[str, str] | None:
     low, high = weight_range
-    if weight <= 0 or low <= 0 or high <= low:
+    if low <= 0 or high <= low or not low <= weight <= high:
         return None
     position = (weight - low) * 100
     width = high - low

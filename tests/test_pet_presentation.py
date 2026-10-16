@@ -17,7 +17,8 @@ class PetPresentationTest(unittest.TestCase):
     def test_size_voice_marks_are_exclusive_and_use_exact_boundaries(self):
         pet = _pet(1, name="样本", level=1, first=False)
         for weight, voice, expected in ((1020, -96, ["小", "粗"]), (1980, 96, ["大", "婉"]),
-                                        (1021, -95, []), (1979, 95, []), (0, 0, [])):
+                                        (1021, -95, []), (1979, 95, []), (0, 0, []),
+                                        (999, 0, []), (2001, 0, [])):
             with self.subTest(weight=weight, voice=voice):
                 marks = pet_marks(replace(pet, weight=weight, voice=voice), (1000, 2000))
                 self.assertEqual([m["label"] for m in marks], expected)

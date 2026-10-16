@@ -243,7 +243,7 @@ handbook、egg.upsert、pet.snapshot、team.snapshot 等——这套"结构准�
 8. 炫彩色卡 ✅ 已实装（glass→卡号→底色×混色矩阵）
 
 **第四批（大工程）**：
-9. 产线收集 ⬜ 待做（依赖蛋仓长期积累 + collection_accounts 本地部分；页占位已挂）
+9. 双牌产线 🟡 本地单账号参考版已实现：四目标、同性格／同双牌／蛋组兼容候选、筛选与详情、按账号偏好；游戏繁育效果待实机验证，见 F04-U3 和 COLLECTION_LINES_SPEC。
 10. 证据链闭环 ⬜ 待做（egg_evidence 三级标注——纯本地只做前两级）
 11. 3D 宠物模型 ⬜ 待做（蛋神用 Rust/WebGPU wasm 1.77MB + 云端模型 CDN——需评估本地化方案）
 

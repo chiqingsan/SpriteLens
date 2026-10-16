@@ -6,7 +6,7 @@
     var versions = {};
     var fields = { overview: "pets_version", pets: "pets_version", handbook: "pets_version",
       "male-matrix": "pets_version", "breeder-male": "pets_version", "breeder-female": "pets_version",
-      colors: "pets_version", "egg-box": "egg_box_version", home: "home_version", flowers: "flower_version" };
+      colors: "pets_version", "collection-lines": "pets_version", "egg-box": "egg_box_version", home: "home_version", flowers: "flower_version" };
     var generation = 0;
     var pending = {};
     function cancel(key) {

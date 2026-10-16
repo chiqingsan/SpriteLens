@@ -28,6 +28,13 @@ function selectGid(gid: number) {
   detailOpen.value = true
   return true
 }
+function reveal(gid: string) {
+  const index = pets.value.findIndex(pet => String(pet.gid) === gid)
+  if (index < 0) return false
+  model.setView('card')
+  page.value = Math.floor(index / 30) + 1
+  return selectGid(pets.value[index]!.gid)
+}
 function closeDetail(preserve = false) { detailOpen.value = false; if (!preserve) selected.value = null }
 async function setBox(id: number) {
   closeDetail(true); emit('close', true); model.setBox(id)
@@ -40,7 +47,7 @@ async function setBox(id: number) {
 function setPage(value: number) { closeDetail(); emit('close'); page.value = value; if (wrap.value) wrap.value.scrollTop = 0 }
 function openTeams() { closeDetail(); emit('close'); model.setView('point'); emit('view', 'point'); void setBox(0) }
 function locate(id: number) { model.setView('point'); emit('view', 'point'); void setBox(id) }
-defineExpose({ setBox, closeDetail, openDetail: () => { if (selected.value !== null) detailOpen.value = true },
+defineExpose({ setBox, reveal, closeDetail, openDetail: () => { if (selected.value !== null) detailOpen.value = true },
   selectGid,
   saveScroll: () => { scrollTop = wrap.value!.scrollTop; scrollLeft = wrap.value!.scrollLeft },
   restoreScroll: () => { wrap.value!.scrollTop = scrollTop; wrap.value!.scrollLeft = scrollLeft } })

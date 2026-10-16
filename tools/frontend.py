@@ -60,7 +60,7 @@ def build() -> int:
         f"const link{i} = document.createElement('link'); link{i}.rel = 'stylesheet'; "
         f"link{i}.href = '/static/vue/{name}'; document.head.appendChild(link{i});\n"
         for i, name in enumerate(styles))
-    loader += f"export {{ mount, mountEggBox, mountHome, mountPetFilters, mountPetInventory }} from './{entry['file']}';\n"
+    loader += f"export {{ mount, mountEggBox, mountHome, mountCollectionLines, mountPetFilters, mountPetInventory }} from './{entry['file']}';\n"
     (stage / "entry.js").write_text(loader, encoding="utf-8", newline="\n")
     outputs = {path.relative_to(stage).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
                for path in sorted(stage.rglob("*")) if path.is_file()}

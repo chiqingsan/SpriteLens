@@ -196,7 +196,9 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `tools/sync_ui_icons.py` | 固定官方Git版本的少量SVG导入，无运行时网络依赖 |
 | `tests/test_ui_upgrade.py` | 偏好鉴权/并发/失败、快捷与筛选规则及资源合并回归 |
 | `docs/RESOURCE_COVERAGE_REPORT.md` | 1060物种、646组范围、224蛋、477别名；缺图/缺字段/冲突 |
-| `docs/BREEDING_PLANNER_SPEC.md` / `COLLECTION_LINES_SPEC.md` | 下一轮配窝与产线开发规格，明确已验证规则与未知假设 |
+| `docs/BREEDING_PLANNER_SPEC.md` / `COLLECTION_LINES_SPEC.md` | 配窝研究规格 / 双牌产线实现与参考规则边界 |
+| `domain/collection_lines.py` / `services/collection_lines_service.py` / `view_models/collection_lines_vm.py` | 产线目录与纯规则、单账号快照、进度统计 |
+| `web/collection_lines.py` / `frontend/src/pages/CollectionLinesPage.vue` | 鉴权产线 API、Vue 产线列表与父母详情 |
 
 新增API：鉴权GET/POST `/api/ui/preferences`，bootstrap新增`ui_preferences`。
 `/api/pets`新增egg_groups、egg_mode和height/weight/voice_min/max；原有字段兼容。

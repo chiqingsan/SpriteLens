@@ -6,6 +6,7 @@ import EggBoxPage from './pages/EggBoxPage.vue'
 import type { EggBoxHost } from './composables/useEggBox'
 import EggDexPage from './pages/EggDexPage.vue'
 export { mountHome } from './homeBridge'
+export { mountCollectionLines } from './collectionLinesBridge'
 export { mountPetFilters } from './petFilterBridge'
 export { mountPetInventory } from './petInventoryBridge'
 
