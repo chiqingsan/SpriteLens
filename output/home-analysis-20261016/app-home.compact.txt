@@ -1,0 +1,188 @@
+
+FUNCTION LocalState.handle_decoder_event SOURCE_LINE 1074
+1074: RESUME 
+1075: LOAD_GLOBAL NULL + str / LOAD_FAST event / LOAD_ATTR NULL|self + get / LOAD_CONST 'game_id' / CALL  / COPY  / POP_JUMP_IF_TRUE to 52 / POP_TOP  / LOAD_CONST '' / CALL  / STORE_FAST game_id
+1076: LOAD_GLOBAL NULL + str / LOAD_FAST event / LOAD_ATTR NULL|self + get / LOAD_CONST 'type' / CALL  / COPY  / POP_JUMP_IF_TRUE to 112 / POP_TOP  / LOAD_CONST '' / CALL  / STORE_FAST kind
+1077: LOAD_GLOBAL NULL + isinstance / LOAD_FAST event / LOAD_ATTR NULL|self + get / LOAD_CONST 'game_data' / CALL  / LOAD_GLOBAL dict / CALL  / POP_JUMP_IF_FALSE to 218 / LOAD_FAST event / LOAD_ATTR NULL|self + get / LOAD_CONST 'game_data' / CALL  / JUMP_FORWARD to 220 / BUILD_MAP  / STORE_FAST data
+1078: LOAD_FAST game_id / POP_JUMP_IF_FALSE to 230 / LOAD_FAST kind / POP_JUMP_IF_TRUE to 232
+1079: RETURN_CONST False
+1080: LOAD_GLOBAL NULL + str / LOAD_FAST event / LOAD_ATTR NULL|self + get / LOAD_CONST 'occurred_at' / CALL  / COPY  / POP_JUMP_IF_TRUE to 298 / POP_TOP  / LOAD_GLOBAL NULL + now_iso / CALL  / CALL  / STORE_FAST occurred
+1081: LOAD_CONST False / STORE_FAST changed
+1082: LOAD_FAST self / LOAD_ATTR lock / BEFORE_WITH  / POP_TOP 
+1083: LOAD_FAST kind / LOAD_CONST ('pet.capture', 'pet.snapshot') / CONTAINS_OP  / POP_JUMP_IF_FALSE to 448 / LOAD_GLOBAL NULL + str / LOAD_GLOBAL NULL + first / LOAD_FAST data / LOAD_CONST 'gid' / LOAD_CONST 'id' / LOAD_CONST '' / KW_NAMES ('fallback',) / CALL  / CALL  / LOAD_FAST self / LOAD_ATTR NULL|self + released_pet_ids / LOAD_FAST game_id / CALL  / CONTAINS_OP  / POP_JUMP_IF_FALSE to 448
+1084: NOP 
+1082: LOAD_CONST None / LOAD_CONST None / LOAD_CONST None / CALL  / POP_TOP  / RETURN_CONST False
+1087: LOAD_FAST self / LOAD_ATTR active_game_id / POP_JUMP_IF_TRUE to 486
+1088: LOAD_FAST game_id / LOAD_FAST self / STORE_ATTR active_game_id
+1089: LOAD_FAST kind / LOAD_CONST 'player.profile' / COMPARE_OP == / POP_JUMP_IF_FALSE to 810
+1090: LOAD_FAST data / LOAD_ATTR NULL|self + get / LOAD_CONST 'login' / CALL  / LOAD_CONST True / IS_OP  / POP_JUMP_IF_FALSE to 584
+1091: LOAD_FAST game_id / LOAD_FAST self / STORE_ATTR active_game_id
+1092: LOAD_FAST self / LOAD_ATTR NULL|self + set_preference / LOAD_CONST 'active_game_id' / LOAD_FAST game_id / CALL  / POP_TOP 
+1093: LOAD_FAST self / LOAD_ATTR nest_inference / LOAD_ATTR NULL|self + begin / LOAD_FAST game_id / LOAD_FAST occurred / CALL  / POP_TOP 
+1094: LOAD_GLOBAL NULL + text / LOAD_GLOBAL NULL + first / LOAD_FAST data / LOAD_CONST 'name' / LOAD_CONST 'roleName' / CALL  / LOAD_FAST game_id / CALL  / STORE_FAST role_name
+1095: LOAD_FAST self / LOAD_ATTR db / LOAD_ATTR NULL|self + execute
+1096: LOAD_CONST 'INSERT INTO profiles VALUES (?,?,?) ON CONFLICT(game_id) DO UPDATE SET role_name=excluded.role_name,updated_at=excluded.updated_at'
+1097: LOAD_FAST game_id / LOAD_FAST role_name / LOAD_FAST occurred / BUILD_TUPLE 
+1095: CALL  / POP_TOP 
+1099: LOAD_FAST self / LOAD_ATTR NULL|self + _record / LOAD_FAST game_id / LOAD_CONST 'session.profile' / LOAD_CONST '识别角色：' / LOAD_FAST role_name / FORMAT_VALUE  / BUILD_STRING  / LOAD_CONST 'roleName' / LOAD_FAST role_name / BUILD_MAP  / LOAD_FAST occurred / KW_NAMES ('payload', 'occurred_at') / CALL  / POP_TOP 
+1100: LOAD_CONST True / STORE_FAST changed / EXTENDED_ARG  / JUMP_FORWARD to 4922
+1101: LOAD_FAST kind / LOAD_CONST 'team.snapshot' / COMPARE_OP == / POP_JUMP_IF_FALSE to 862
+1102: LOAD_FAST self / LOAD_ATTR NULL|self + _replace_team / LOAD_FAST game_id / LOAD_FAST data / LOAD_FAST occurred / CALL  / STORE_FAST changed / EXTENDED_ARG  / JUMP_FORWARD to 4922
+1103: LOAD_FAST kind / LOAD_CONST 'flower.snapshot' / COMPARE_OP == / POP_JUMP_IF_FALSE to 1186
+1104: LOAD_CONST 0 / LOAD_CONST ('merge_flowers',) / IMPORT_NAME flower_state / IMPORT_FROM merge_flowers / STORE_FAST merge_flowers / POP_TOP 
+1105: LOAD_CONST 'flowers:' / LOAD_FAST game_id / FORMAT_VALUE  / BUILD_STRING  / STORE_FAST key
+1106: LOAD_GLOBAL NULL + json / LOAD_ATTR loads / LOAD_FAST self / LOAD_ATTR NULL|self + preference / LOAD_FAST key / LOAD_CONST '{}' / CALL  / CALL  / STORE_FAST previous
+1107: PUSH_NULL  / LOAD_FAST merge_flowers / LOAD_FAST previous / LOAD_FAST data / LOAD_FAST occurred / CALL  / STORE_FAST merged
+1108: LOAD_FAST merged / LOAD_FAST previous / COMPARE_OP != / EXTENDED_ARG  / POP_JUMP_IF_FALSE to 4922
+1109: LOAD_FAST self / LOAD_ATTR NULL|self + set_preference / LOAD_FAST key / LOAD_GLOBAL NULL + json / LOAD_ATTR dumps / LOAD_FAST merged / LOAD_CONST False / KW_NAMES ('ensure_ascii',) / CALL  / CALL  / POP_TOP 
+1110: LOAD_FAST self / LOAD_ATTR NULL|self + _record / LOAD_FAST game_id / LOAD_CONST 'flower.snapshot' / LOAD_CONST '花种刷新：' / LOAD_GLOBAL NULL + len / LOAD_FAST merged / LOAD_ATTR NULL|self + get / LOAD_CONST 'rows' / BUILD_LIST  / CALL  / CALL  / FORMAT_VALUE  / LOAD_CONST ' 只' / BUILD_STRING  / LOAD_FAST occurred / KW_NAMES ('occurred_at',) / CALL  / POP_TOP 
+1111: LOAD_CONST True / STORE_FAST changed / EXTENDED_ARG  / JUMP_FORWARD to 4922
+1112: LOAD_FAST kind / LOAD_CONST 'home.snapshot' / COMPARE_OP == / POP_JUMP_IF_FALSE to 1552
+1113: LOAD_GLOBAL NULL + str / LOAD_FAST data / LOAD_ATTR NULL|self + get / LOAD_CONST 'gameId' / CALL  / COPY  / POP_JUMP_IF_TRUE to 1246 / POP_TOP  / LOAD_CONST '' / CALL  / LOAD_FAST game_id / COMPARE_OP != / POP_JUMP_IF_FALSE to 1282
+1114: NOP 
+1082: LOAD_CONST None / LOAD_CONST None / LOAD_CONST None / CALL  / POP_TOP  / RETURN_CONST False
+1115: LOAD_FAST self / LOAD_ATTR nest_inference / LOAD_ATTR NULL|self + home / LOAD_FAST game_id / LOAD_FAST data / LOAD_FAST occurred / CALL  / STORE_FAST data
+1116: LOAD_FAST self / LOAD_ATTR NULL|self + set_preference / LOAD_CONST 'home-capture:' / LOAD_FAST game_id / FORMAT_VALUE  / BUILD_STRING  / LOAD_GLOBAL NULL + json / LOAD_ATTR dumps / BUILD_MAP  / LOAD_FAST data / DICT_UPDATE  / LOAD_CONST 'updatedAt' / LOAD_FAST occurred / BUILD_MAP  / DICT_UPDATE  / LOAD_CONST False / KW_NAMES ('ensure_ascii',) / CALL  / CALL  / POP_TOP 
+1117: LOAD_FAST self / LOAD_ATTR NULL|self + _record / LOAD_FAST game_id / LOAD_CONST 'home.snapshot' / LOAD_CONST '家园入住精灵：' / LOAD_GLOBAL NULL + len / LOAD_FAST data / LOAD_ATTR NULL|self + get / LOAD_CONST 'residents' / CALL  / COPY  / POP_JUMP_IF_TRUE to 1514 / POP_TOP  / BUILD_LIST  / CALL  / FORMAT_VALUE  / LOAD_CONST ' 只' / BUILD_STRING  / BUILD_MAP  / LOAD_FAST occurred / KW_NAMES ('payload', 'occurred_at') / CALL  / POP_TOP 
+1118: LOAD_CONST True / STORE_FAST changed / EXTENDED_ARG  / JUMP_FORWARD to 4922
+1119: LOAD_FAST kind / LOAD_CONST 'pet.inventory_members' / COMPARE_OP == / EXTENDED_ARG  / POP_JUMP_IF_FALSE to 2686
+1120: LOAD_FAST data / LOAD_ATTR NULL|self + get / LOAD_CONST 'complete' / CALL  / LOAD_CONST True / IS_OP  / EXTENDED_ARG  / POP_JUMP_IF_FALSE to 4922 / LOAD_GLOBAL NULL + isinstance / LOAD_FAST data / LOAD_ATTR NULL|self + get / LOAD_CONST 'instanceIds' / CALL  / LOAD_GLOBAL list / CALL  / EXTENDED_ARG  / POP_JUMP_IF_FALSE to 4922
+1121: LOAD_FAST data / LOAD_CONST 'instanceIds' / BINARY_SUBSCR  / GET_ITER  / LOAD_FAST_AND_CLEAR gid / SWAP  / BUILD_SET  / SWAP  / FOR_ITER to 1798 / STORE_FAST gid / LOAD_GLOBAL NULL + str / LOAD_FAST gid / CALL  / LOAD_ATTR NULL|self + isdigit / CALL  / POP_JUMP_IF_TRUE to 1744 / JUMP_BACKWARD to 1686 / LOAD_GLOBAL NULL + int / LOAD_FAST gid / CALL  / LOAD_CONST 0 / COMPARE_OP > / POP_JUMP_IF_TRUE to 1774 / JUMP_BACKWARD to 1686 / LOAD_GLOBAL NULL + str / LOAD_FAST gid / CALL  / SET_ADD  / JUMP_BACKWARD to 1686 / END_FOR  / STORE_FAST members / STORE_FAST gid
+1122: LOAD_FAST self / LOAD_ATTR db / LOAD_ATTR NULL|self + execute
+1123: LOAD_CONST 'SELECT pet_id FROM box_slots WHERE game_id=? UNION SELECT pet_id FROM team_slots WHERE game_id=?' / LOAD_FAST game_id / LOAD_FAST game_id / BUILD_TUPLE 
+1122: CALL  / GET_ITER  / LOAD_FAST_AND_CLEAR row / SWAP  / BUILD_SET  / SWAP  / FOR_ITER to 1908 / STORE_FAST row / LOAD_GLOBAL NULL + str / LOAD_FAST row / LOAD_CONST 0 / BINARY_SUBSCR  / CALL  / SET_ADD  / JUMP_BACKWARD to 1872 / END_FOR  / STORE_FAST old_ids / STORE_FAST row
+1124: LOAD_FAST old_ids / LOAD_FAST members / BINARY_OP - / GET_ITER  / FOR_ITER to 2172 / STORE_FAST gid
+1125: LOAD_FAST self / LOAD_ATTR db / LOAD_ATTR NULL|self + execute / LOAD_CONST 'DELETE FROM box_slots WHERE game_id=? AND pet_id=?' / LOAD_FAST game_id / LOAD_FAST gid / BUILD_TUPLE  / CALL  / POP_TOP 
+1126: LOAD_FAST self / LOAD_ATTR db / LOAD_ATTR NULL|self + execute / LOAD_CONST 'DELETE FROM team_slots WHERE game_id=? AND pet_id=?' / LOAD_FAST game_id / LOAD_FAST gid / BUILD_TUPLE  / CALL  / POP_TOP 
+1127: LOAD_FAST self / LOAD_ATTR db / LOAD_ATTR NULL|self + execute / LOAD_CONST 'UPDATE pets SET box_no=NULL,slot_no=NULL WHERE game_id=? AND instance_id=?' / LOAD_FAST game_id / LOAD_FAST gid / BUILD_TUPLE  / CALL  / POP_TOP 
+1128: LOAD_FAST self / LOAD_ATTR _provisional_positions / LOAD_ATTR NULL|self + pop / LOAD_FAST game_id / LOAD_FAST gid / BUILD_TUPLE  / LOAD_CONST None / CALL  / POP_TOP  / JUMP_BACKWARD to 1924
+1124: END_FOR 
+1129: LOAD_FAST self / LOAD_ATTR db / LOAD_ATTR NULL|self + execute
+1130: LOAD_CONST 'SELECT pet_id FROM box_slots WHERE game_id=? UNION SELECT pet_id FROM team_slots WHERE game_id=?' / LOAD_FAST game_id / LOAD_FAST game_id / BUILD_TUPLE 
+1129: CALL  / GET_ITER  / LOAD_FAST_AND_CLEAR row / SWAP  / BUILD_SET  / SWAP  / FOR_ITER to 2278 / STORE_FAST row / LOAD_GLOBAL NULL + str / LOAD_FAST row / LOAD_CONST 0 / BINARY_SUBSCR  / CALL  / SET_ADD  / JUMP_BACKWARD to 2242 / END_FOR  / STORE_FAST occupied / STORE_FAST row
+1131: LOAD_GLOBAL NULL + sorted / LOAD_FAST data / LOAD_CONST 'instanceIds' / BINARY_SUBSCR  / GET_ITER  / LOAD_FAST_AND_CLEAR gid / SWAP  / BUILD_SET  / SWAP  / FOR_ITER to 2394 / STORE_FAST gid / LOAD_GLOBAL NULL + str / LOAD_FAST gid / CALL  / LOAD_ATTR NULL|self + isdigit / CALL  / POP_JUMP_IF_TRUE to 2370 / JUMP_BACKWARD to 2312 / LOAD_GLOBAL NULL + str / LOAD_FAST gid / CALL  / SET_ADD  / JUMP_BACKWARD to 2312 / END_FOR  / SWAP  / STORE_FAST gid / LOAD_FAST occupied / BINARY_OP - / CALL  / STORE_FAST extras
+1132: LOAD_FAST self / LOAD_ATTR NULL|self + set_preference / LOAD_CONST 'pet-inventory-extras:' / LOAD_FAST game_id / FORMAT_VALUE  / BUILD_STRING  / LOAD_GLOBAL NULL + json / LOAD_ATTR dumps / LOAD_FAST extras / CALL  / CALL  / POP_TOP 
+1133: LOAD_FAST self / LOAD_ATTR NULL|self + set_preference / LOAD_CONST 'pet-inventory-members:' / LOAD_FAST game_id / FORMAT_VALUE  / BUILD_STRING  / LOAD_GLOBAL NULL + json / LOAD_ATTR dumps / LOAD_FAST data / LOAD_CONST 'instanceIds' / BINARY_SUBSCR  / GET_ITER  / LOAD_FAST_AND_CLEAR gid / SWAP  / BUILD_LIST  / SWAP  / FOR_ITER to 2604 / STORE_FAST gid / LOAD_GLOBAL NULL + str / LOAD_FAST gid / CALL  / LIST_APPEND  / JUMP_BACKWARD to 2574 / END_FOR  / SWAP  / STORE_FAST gid / LOAD_FAST occurred / LOAD_CONST ('instanceIds', 'updatedAt') / BUILD_CONST_KEY_MAP  / CALL  / CALL  / POP_TOP 
+1134: LOAD_FAST self / LOAD_ATTR NULL|self + _record / LOAD_FAST game_id / LOAD_CONST 'pet.inventory_members' / LOAD_CONST 'Complete self inventory received' / LOAD_FAST occurred / LOAD_FAST occurred / KW_NAMES ('occurred_at',) / CALL  / POP_TOP 
+1135: LOAD_CONST True / STORE_FAST changed / EXTENDED_ARG  / JUMP_FORWARD to 4922
+1136: LOAD_FAST kind / LOAD_CONST 'pet.released' / COMPARE_OP == / POP_JUMP_IF_FALSE to 3138
+1137: LOAD_FAST data / LOAD_ATTR NULL|self + get / LOAD_CONST 'instanceIds' / BUILD_LIST  / CALL  / GET_ITER  / LOAD_FAST_AND_CLEAR gid / SWAP  / BUILD_SET  / SWAP  / FOR_ITER to 2852 / STORE_FAST gid / LOAD_GLOBAL NULL + str / LOAD_FAST gid / CALL  / LOAD_ATTR NULL|self + isdigit / CALL  / POP_JUMP_IF_TRUE to 2798 / JUMP_BACKWARD to 2740 / LOAD_GLOBAL NULL + int / LOAD_FAST gid / CALL  / LOAD_CONST 0 / COMPARE_OP > / POP_JUMP_IF_TRUE to 2828 / JUMP_BACKWARD to 2740 / LOAD_GLOBAL NULL + str / LOAD_FAST gid / CALL  / SET_ADD  / JUMP_BACKWARD to 2740 / END_FOR  / STORE_FAST ids / STORE_FAST gid
+1138: LOAD_FAST self / LOAD_ATTR NULL|self + released_pet_ids / LOAD_FAST game_id / CALL  / STORE_FAST previous
+1139: LOAD_FAST ids / LOAD_FAST previous / BINARY_OP - / EXTENDED_ARG  / POP_JUMP_IF_FALSE to 4922
+1140: LOAD_FAST self / LOAD_ATTR NULL|self + set_preference / LOAD_CONST 'pet-released:' / LOAD_FAST game_id / FORMAT_VALUE  / BUILD_STRING  / LOAD_GLOBAL NULL + json / LOAD_ATTR dumps / LOAD_GLOBAL NULL + sorted / LOAD_FAST previous / LOAD_FAST ids / BINARY_OP | / CALL  / CALL  / CALL  / POP_TOP 
+1141: LOAD_FAST self / LOAD_ATTR NULL|self + _record / LOAD_FAST game_id / LOAD_CONST 'pet.released' / LOAD_CONST '游戏确认放生精灵' / LOAD_GLOBAL NULL + str / LOAD_FAST event / LOAD_ATTR NULL|self + get / LOAD_CONST 'event_id' / CALL  / COPY  / POP_JUMP_IF_TRUE to 3086 / POP_TOP  / LOAD_FAST occurred / CALL 
+1142: LOAD_CONST 'instanceIds' / LOAD_GLOBAL NULL + sorted / LOAD_FAST ids / CALL  / BUILD_MAP  / LOAD_FAST occurred
+1141: CALL  / POP_TOP 
+1143: LOAD_CONST True / STORE_FAST changed / EXTENDED_ARG  / JUMP_FORWARD to 4922
+1144: LOAD_FAST kind / LOAD_CONST 'pet.snapshot' / COMPARE_OP == / POP_JUMP_IF_FALSE to 3380
+1145: LOAD_FAST self / LOAD_ATTR NULL|self + _upsert_pet / LOAD_FAST game_id / LOAD_FAST data / LOAD_FAST occurred / CALL  / STORE_FAST changed
+1146: LOAD_FAST self / LOAD_ATTR nest_inference / LOAD_ATTR NULL|self + pet / LOAD_FAST game_id / LOAD_GLOBAL NULL + first / LOAD_FAST data / LOAD_CONST 'gid' / LOAD_CONST 'id' / LOAD_CONST '' / KW_NAMES ('fallback',) / CALL  / LOAD_FAST occurred / CALL  / STORE_FAST enriched_home
+1147: LOAD_FAST enriched_home / EXTENDED_ARG  / POP_JUMP_IF_FALSE to 4922
+1148: LOAD_FAST self / LOAD_ATTR NULL|self + set_preference / LOAD_CONST 'home-capture:' / LOAD_FAST game_id / FORMAT_VALUE  / BUILD_STRING  / LOAD_GLOBAL NULL + json / LOAD_ATTR dumps / BUILD_MAP  / LOAD_FAST enriched_home / DICT_UPDATE  / LOAD_CONST 'updatedAt' / LOAD_FAST occurred / BUILD_MAP  / DICT_UPDATE  / LOAD_CONST False / KW_NAMES ('ensure_ascii',) / CALL  / CALL  / POP_TOP 
+1149: LOAD_CONST True / STORE_FAST changed / EXTENDED_ARG  / JUMP_FORWARD to 4922
+1150: LOAD_FAST kind / LOAD_CONST 'pet.capture' / COMPARE_OP == / POP_JUMP_IF_FALSE to 3708
+1151: LOAD_GLOBAL NULL + first / LOAD_FAST data / LOAD_CONST 'gid' / LOAD_CONST 'id' / LOAD_CONST '' / KW_NAMES ('fallback',) / CALL  / STORE_FAST pet_id
+1152: LOAD_GLOBAL NULL + text / LOAD_GLOBAL NULL + first / LOAD_FAST data / LOAD_CONST 'name' / LOAD_CONST 'pet_default_name' / LOAD_CONST 'petDefaultName' / CALL  / LOAD_CONST '精灵#' / LOAD_FAST pet_id / FORMAT_VALUE  / BUILD_STRING  / CALL  / STORE_FAST pet_name
+1153: BUILD_MAP 
+1154: LOAD_FAST data
+1153: DICT_UPDATE 
+1159: LOAD_GLOBAL NULL + str
+1160: LOAD_FAST event / LOAD_ATTR NULL|self + get / LOAD_CONST 'event_id' / CALL  / COPY  / POP_JUMP_IF_TRUE to 3546 / POP_TOP  / LOAD_FAST game_id / FORMAT_VALUE  / LOAD_CONST ':' / LOAD_FAST pet_id / FORMAT_VALUE  / LOAD_CONST ':' / LOAD_FAST occurred / FORMAT_VALUE  / BUILD_STRING 
+1159: CALL 
+1162: LOAD_FAST occurred
+1153: LOAD_CONST ('_live_capture_event_id', '_live_capture_at') / BUILD_CONST_KEY_MAP  / DICT_UPDATE  / STORE_FAST capture_data
+1164: LOAD_FAST self / LOAD_ATTR NULL|self + _upsert_pet / LOAD_FAST game_id / LOAD_FAST capture_data / LOAD_FAST occurred / CALL  / POP_TOP 
+1165: LOAD_FAST self / LOAD_ATTR NULL|self + _place_captured_pet / LOAD_FAST game_id / LOAD_FAST pet_id / LOAD_FAST capture_data / LOAD_FAST occurred / CALL  / STORE_FAST placement
+1166: LOAD_FAST self / LOAD_ATTR NULL|self + _record
+1167: LOAD_FAST game_id
+1168: LOAD_CONST 'pet.captured'
+1169: LOAD_CONST '获得精灵：' / LOAD_FAST pet_name / FORMAT_VALUE  / BUILD_STRING 
+1170: LOAD_FAST pet_id
+1171: LOAD_CONST 'name' / LOAD_FAST pet_name / BUILD_MAP  / LOAD_FAST placement / DICT_UPDATE 
+1172: LOAD_FAST occurred
+1166: CALL  / POP_TOP 
+1174: LOAD_CONST True / STORE_FAST changed / EXTENDED_ARG  / JUMP_FORWARD to 4922
+1175: LOAD_FAST kind / LOAD_CONST 'box.snapshot' / COMPARE_OP == / POP_JUMP_IF_FALSE to 3760
+1176: LOAD_FAST self / LOAD_ATTR NULL|self + _replace_box / LOAD_FAST game_id / LOAD_FAST data / LOAD_FAST occurred / CALL  / STORE_FAST changed / EXTENDED_ARG  / JUMP_FORWARD to 4922
+1177: LOAD_FAST kind / LOAD_CONST 'pet.position' / COMPARE_OP == / POP_JUMP_IF_FALSE to 3812
+1178: LOAD_FAST self / LOAD_ATTR NULL|self + _place_pet_position / LOAD_FAST game_id / LOAD_FAST data / LOAD_FAST occurred / CALL  / STORE_FAST changed / EXTENDED_ARG  / JUMP_FORWARD to 4922
+1179: LOAD_FAST kind / LOAD_CONST 'box.move' / COMPARE_OP == / POP_JUMP_IF_FALSE to 3868
+1180: LOAD_FAST self / LOAD_ATTR NULL|self + _move_pet / LOAD_FAST game_id / LOAD_FAST data / LOAD_FAST occurred / CALL  / POP_TOP 
+1181: LOAD_CONST True / STORE_FAST changed / EXTENDED_ARG  / JUMP_FORWARD to 4922
+1182: LOAD_FAST kind / LOAD_CONST 'egg.inventory' / COMPARE_OP == / POP_JUMP_IF_FALSE to 4016
+1183: LOAD_FAST self / LOAD_ATTR NULL|self + _replace_eggs / LOAD_FAST game_id / LOAD_FAST data / LOAD_FAST occurred / CALL  / STORE_FAST changed
+1184: LOAD_FAST self / LOAD_ATTR nest_inference / LOAD_ATTR NULL|self + eggs / LOAD_FAST game_id / LOAD_FAST data / LOAD_ATTR NULL|self + get / LOAD_CONST 'eggs' / CALL  / COPY  / POP_JUMP_IF_TRUE to 4000 / POP_TOP  / BUILD_LIST  / LOAD_FAST occurred / CALL  / POP_TOP  / EXTENDED_ARG  / JUMP_FORWARD to 4922
+1185: LOAD_FAST kind / LOAD_CONST 'egg.hatch_slots' / COMPARE_OP == / POP_JUMP_IF_FALSE to 4068
+1186: LOAD_FAST self / LOAD_ATTR NULL|self + _apply_egg_hatch_slots / LOAD_FAST game_id / LOAD_FAST data / LOAD_FAST occurred / CALL  / STORE_FAST changed / EXTENDED_ARG  / JUMP_FORWARD to 4922
+1187: LOAD_FAST kind / LOAD_CONST 'egg.quantity' / COMPARE_OP == / POP_JUMP_IF_FALSE to 4178
+1188: LOAD_FAST self / LOAD_ATTR NULL|self + _apply_egg_quantity / LOAD_FAST game_id / LOAD_FAST data / LOAD_FAST occurred / LOAD_GLOBAL NULL + str / LOAD_FAST event / LOAD_ATTR NULL|self + get / LOAD_CONST 'event_id' / CALL  / COPY  / POP_JUMP_IF_TRUE to 4156 / POP_TOP  / LOAD_CONST '' / CALL  / CALL  / STORE_FAST changed / EXTENDED_ARG  / JUMP_FORWARD to 4922
+1189: LOAD_FAST kind / LOAD_CONST 'egg.upsert' / COMPARE_OP == / POP_JUMP_IF_FALSE to 4290
+1190: LOAD_FAST self / LOAD_ATTR NULL|self + _upsert_egg / LOAD_FAST game_id / LOAD_FAST data / LOAD_FAST occurred / CALL  / STORE_FAST changed
+1191: LOAD_FAST self / LOAD_ATTR nest_inference / LOAD_ATTR NULL|self + eggs / LOAD_FAST game_id / LOAD_FAST data / BUILD_LIST  / LOAD_FAST occurred / CALL  / POP_TOP  / EXTENDED_ARG  / JUMP_FORWARD to 4922
+1192: LOAD_FAST kind / LOAD_CONST 'home.egg_collected' / COMPARE_OP == / POP_JUMP_IF_FALSE to 4366
+1193: LOAD_FAST self / LOAD_ATTR nest_inference / LOAD_ATTR NULL|self + collected / LOAD_FAST game_id / LOAD_FAST data / LOAD_FAST occurred / CALL  / POP_TOP 
+1194: LOAD_CONST True / STORE_FAST changed / EXTENDED_ARG  / JUMP_FORWARD to 4922
+1195: LOAD_FAST kind / LOAD_CONST 'handbook.snapshot' / COMPARE_OP == / EXTENDED_ARG  / POP_JUMP_IF_FALSE to 4922
+1196: LOAD_GLOBAL NULL + first / LOAD_FAST data / LOAD_CONST 'handbook_id' / LOAD_CONST 'handbookId' / CALL  / STORE_FAST handbook_id
+1197: NOP 
+1198: LOAD_GLOBAL NULL + int / LOAD_FAST handbook_id / CALL  / STORE_FAST handbook_id
+1201: LOAD_FAST handbook_id / LOAD_CONST 0 / COMPARE_OP > / POP_JUMP_IF_FALSE to 4922
+1202: LOAD_GLOBAL NULL + json / LOAD_ATTR dumps
+1203: LOAD_FAST data / LOAD_CONST False / LOAD_CONST (',', ':')
+1202: KW_NAMES ('ensure_ascii', 'separators') / CALL  / STORE_FAST encoded_handbook
+1205: LOAD_FAST self / LOAD_ATTR db / LOAD_ATTR NULL|self + execute
+1206: LOAD_CONST 'SELECT payload FROM handbooks WHERE game_id=? AND handbook_id=?'
+1207: LOAD_FAST game_id / LOAD_FAST handbook_id / BUILD_TUPLE 
+1205: CALL 
+1208: LOAD_ATTR NULL|self + fetchone / CALL 
+1205: STORE_FAST existing_handbook
+1210: LOAD_FAST existing_handbook / POP_JUMP_IF_NONE to 4692
+1211: LOAD_GLOBAL NULL + str / LOAD_FAST existing_handbook / LOAD_CONST 0 / BINARY_SUBSCR  / COPY  / POP_JUMP_IF_TRUE to 4604 / POP_TOP  / LOAD_CONST '' / CALL  / LOAD_FAST encoded_handbook / COMPARE_OP == / POP_JUMP_IF_FALSE to 4692
+1213: LOAD_FAST self / LOAD_ATTR db / LOAD_ATTR NULL|self + commit / CALL  / POP_TOP 
+1214: NOP 
+1082: LOAD_CONST None / LOAD_CONST None / LOAD_CONST None / CALL  / POP_TOP  / RETURN_CONST False
+1215: LOAD_FAST self / LOAD_ATTR db / LOAD_ATTR NULL|self + execute
+1216: LOAD_CONST 'INSERT INTO handbooks(game_id,handbook_id,payload,updated_at)\n                           VALUES (?,?,?,?) ON CONFLICT(game_id,handbook_id) DO UPDATE SET\n                             payload=excluded.payload,updated_at=excluded.updated_at'
+1220: LOAD_FAST game_id
+1221: LOAD_FAST handbook_id
+1222: LOAD_FAST encoded_handbook
+1223: LOAD_FAST occurred
+1219: BUILD_TUPLE 
+1215: CALL  / POP_TOP 
+1226: LOAD_GLOBAL NULL + len / LOAD_FAST data / LOAD_ATTR NULL|self + get / LOAD_CONST 'record' / CALL  / COPY  / POP_JUMP_IF_TRUE to 4844 / POP_TOP  / LOAD_FAST data / LOAD_ATTR NULL|self + get / LOAD_CONST 'records' / CALL  / COPY  / POP_JUMP_IF_TRUE to 4844 / POP_TOP  / BUILD_LIST  / CALL  / STORE_FAST record_count
+1227: LOAD_FAST self / LOAD_ATTR NULL|self + _record
+1228: LOAD_FAST game_id
+1229: LOAD_CONST 'handbook.snapshot'
+1230: LOAD_CONST '色卡图鉴刷新：图鉴 ' / LOAD_FAST handbook_id / FORMAT_VALUE  / LOAD_CONST ' · ' / LOAD_FAST record_count / FORMAT_VALUE  / LOAD_CONST ' 条记录' / BUILD_STRING 
+1231: LOAD_FAST handbook_id
+1232: LOAD_FAST handbook_id / LOAD_FAST record_count / LOAD_CONST ('handbookId', 'recordCount') / BUILD_CONST_KEY_MAP 
+1233: LOAD_FAST occurred
+1227: CALL  / POP_TOP 
+1235: LOAD_CONST True / STORE_FAST changed
+1236: LOAD_FAST changed / POP_JUMP_IF_FALSE to 4960
+1237: LOAD_FAST self / LOAD_ATTR NULL|self + _prune_released_pet_positions / LOAD_FAST game_id / CALL  / POP_TOP 
+1238: LOAD_FAST kind / LOAD_CONST ('box.snapshot', 'pet.position', 'box.move', 'team.snapshot', 'pet.capture') / CONTAINS_OP  / POP_JUMP_IF_FALSE to 5282
+1239: LOAD_CONST 'pet-inventory-extras:' / LOAD_FAST game_id / FORMAT_VALUE  / BUILD_STRING  / STORE_FAST key
+1240: LOAD_GLOBAL NULL + set / LOAD_GLOBAL NULL + json / LOAD_ATTR loads / LOAD_FAST self / LOAD_ATTR NULL|self + preference / LOAD_FAST key / LOAD_CONST '[]' / CALL  / CALL  / CALL  / STORE_FAST extras
+1241: LOAD_FAST extras / POP_JUMP_IF_FALSE to 5282
+1242: LOAD_FAST self / LOAD_ATTR db / LOAD_ATTR NULL|self + execute
+1243: LOAD_CONST 'SELECT pet_id FROM box_slots WHERE game_id=? UNION SELECT pet_id FROM team_slots WHERE game_id=?' / LOAD_FAST game_id / LOAD_FAST game_id / BUILD_TUPLE 
+1242: CALL  / GET_ITER  / LOAD_FAST_AND_CLEAR row / SWAP  / BUILD_SET  / SWAP  / FOR_ITER to 5178 / STORE_FAST row / LOAD_GLOBAL NULL + str / LOAD_FAST row / LOAD_CONST 0 / BINARY_SUBSCR  / CALL  / SET_ADD  / JUMP_BACKWARD to 5142 / END_FOR  / STORE_FAST occupied / STORE_FAST row
+1244: LOAD_FAST self / LOAD_ATTR NULL|self + set_preference / LOAD_FAST key / LOAD_GLOBAL NULL + json / LOAD_ATTR dumps / LOAD_GLOBAL NULL + sorted / LOAD_FAST extras / LOAD_FAST occupied / BINARY_OP - / CALL  / CALL  / CALL  / POP_TOP 
+1245: LOAD_FAST self / LOAD_ATTR db / LOAD_ATTR NULL|self + commit / CALL  / POP_TOP 
+1246: LOAD_FAST changed / POP_JUMP_IF_FALSE to 5380
+1247: LOAD_FAST self / COPY  / LOAD_ATTR _revision / LOAD_CONST 1 / BINARY_OP += / SWAP  / STORE_ATTR _revision
+1082: LOAD_CONST None / LOAD_CONST None / LOAD_CONST None / CALL  / POP_TOP 
+1248: LOAD_FAST changed / RETURN_VALUE  / SWAP  / POP_TOP 
+1121: SWAP  / STORE_FAST gid / RERAISE  / SWAP  / POP_TOP 
+1122: SWAP  / STORE_FAST row / RERAISE  / SWAP  / POP_TOP 
+1129: SWAP  / STORE_FAST row / RERAISE  / SWAP  / POP_TOP 
+1131: SWAP  / STORE_FAST gid / RERAISE  / SWAP  / POP_TOP 
+1133: SWAP  / STORE_FAST gid / RERAISE  / SWAP  / POP_TOP 
+1137: SWAP  / STORE_FAST gid / RERAISE  / PUSH_EXC_INFO 
+1199: LOAD_GLOBAL TypeError / LOAD_GLOBAL ValueError / BUILD_TUPLE  / CHECK_EXC_MATCH  / POP_JUMP_IF_FALSE to 5500 / POP_TOP 
+1200: LOAD_CONST 0 / STORE_FAST handbook_id / POP_EXCEPT  / EXTENDED_ARG  / JUMP_BACKWARD to 4428
+1199: RERAISE  / COPY  / POP_EXCEPT  / RERAISE  / SWAP  / POP_TOP 
+1242: SWAP  / STORE_FAST row / RERAISE 
+1082: PUSH_EXC_INFO  / WITH_EXCEPT_START  / POP_JUMP_IF_TRUE to 5526 / RERAISE  / POP_TOP  / POP_EXCEPT  / POP_TOP  / POP_TOP 
+1248: LOAD_FAST changed / RETURN_VALUE  / COPY  / POP_EXCEPT  / RERAISE 

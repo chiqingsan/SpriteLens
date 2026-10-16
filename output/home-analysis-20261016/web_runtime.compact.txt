@@ -1,0 +1,163 @@
+
+FUNCTION CollectorService._desktop_account_request SOURCE_LINE 1193
+1193: RESUME 
+1205: LOAD_GLOBAL os / LOAD_ATTR environ / LOAD_ATTR NULL|self + get / LOAD_CONST 'V3_CAPTURE_TOKEN_WINDOWS_PUBLIC' / LOAD_CONST '' / CALL  / LOAD_ATTR NULL|self + strip / CALL  / COPY  / POP_JUMP_IF_TRUE to 116 / POP_TOP  / LOAD_GLOBAL NULL + bundled_cloud_token / CALL  / STORE_FAST token
+1206: LOAD_FAST token / POP_JUMP_IF_TRUE to 144
+1207: LOAD_GLOBAL NULL + RuntimeError / LOAD_CONST '当前安装包未配置云同步凭据' / CALL  / RAISE_VARARGS 
+1208: LOAD_FAST self / LOAD_ATTR NULL|self + _configured_cloud_sync_url / CALL  / LOAD_ATTR NULL|self + strip / CALL  / STORE_FAST sync_url
+1209: LOAD_FAST sync_url / LOAD_ATTR NULL|self + rsplit / LOAD_CONST '/desktop/sync' / LOAD_CONST 1 / CALL  / LOAD_CONST 0 / BINARY_SUBSCR  / STORE_FAST api_root
+1210: LOAD_FAST payload / POP_JUMP_IF_NONE to 326 / LOAD_GLOBAL NULL + json / LOAD_ATTR dumps / LOAD_FAST payload / LOAD_CONST False / KW_NAMES ('ensure_ascii',) / CALL  / LOAD_ATTR NULL|self + encode / LOAD_CONST 'utf-8' / CALL  / JUMP_FORWARD to 328 / LOAD_CONST None / STORE_FAST body_data
+1211: LOAD_CONST 'Bearer ' / LOAD_FAST token / FORMAT_VALUE  / BUILD_STRING  / LOAD_CONST 'application/json' / LOAD_CONST 'gzip' / LOAD_FAST self / LOAD_ATTR desktop_device_id / LOAD_GLOBAL APP_VERSION / LOAD_CONST ('Authorization', 'Accept', 'Accept-Encoding', 'X-Desktop-Device', 'X-Collector-Version') / BUILD_CONST_KEY_MAP  / STORE_FAST headers
+1212: LOAD_FAST body_data / POP_JUMP_IF_NONE to 394
+1213: LOAD_CONST 'application/json' / LOAD_FAST headers / LOAD_CONST 'Content-Type' / STORE_SUBSCR 
+1214: LOAD_FAST session / POP_JUMP_IF_FALSE to 452 / LOAD_FAST self / LOAD_ATTR desktop_session / POP_JUMP_IF_FALSE to 452
+1215: LOAD_FAST self / LOAD_ATTR desktop_session / LOAD_FAST headers / LOAD_CONST 'X-Desktop-Session' / STORE_SUBSCR 
+1216: LOAD_GLOBAL urllib / LOAD_ATTR request / LOAD_ATTR NULL|self + Request / LOAD_FAST api_root / FORMAT_VALUE  / LOAD_FAST path / FORMAT_VALUE  / BUILD_STRING  / LOAD_FAST body_data / LOAD_FAST method / LOAD_FAST headers / KW_NAMES ('data', 'method', 'headers') / CALL  / STORE_FAST request
+1217: NOP 
+1218: LOAD_FAST self / LOAD_ATTR NULL|self + _cloud_json_request
+1219: LOAD_FAST request
+1220: LOAD_FAST label
+1221: LOAD_FAST timeout
+1222: LOAD_FAST cache_key
+1223: LOAD_FAST cache_seconds
+1218: KW_NAMES ('timeout', 'cache_key', 'cache_seconds') / CALL  / RETURN_VALUE  / PUSH_EXC_INFO 
+1225: LOAD_GLOBAL Exception / CHECK_EXC_MATCH  / POP_JUMP_IF_FALSE to 662 / STORE_FAST exc
+1226: LOAD_FAST session / POP_JUMP_IF_FALSE to 652 / LOAD_GLOBAL NULL + _cloud_session_is_invalid / LOAD_FAST exc / CALL  / POP_JUMP_IF_FALSE to 652
+1227: LOAD_FAST self / LOAD_ATTR NULL|self + _handle_invalid_cloud_session / CALL  / POP_TOP 
+1228: RAISE_VARARGS  / LOAD_CONST None / STORE_FAST exc / DELETE_FAST exc / RERAISE 
+1225: RERAISE  / COPY  / POP_EXCEPT  / RERAISE 
+
+FUNCTION CollectorService.cached_home_info SOURCE_LINE 1479
+1479: RESUME 
+1480: LOAD_FAST self / LOAD_ATTR NULL|self + capture_status / CALL  / LOAD_CONST 'running' / BINARY_SUBSCR  / STORE_FAST capture
+1481: LOAD_CONST None / STORE_FAST data
+1482: BUILD_LIST  / STORE_FAST candidates
+1483: LOAD_FAST capture / POP_JUMP_IF_FALSE to 64 / LOAD_CONST 'home-capture:' / LOAD_FAST game_id / FORMAT_VALUE  / BUILD_STRING  / BUILD_TUPLE  / JUMP_FORWARD to 82 / LOAD_CONST 'home-capture:' / LOAD_FAST game_id / FORMAT_VALUE  / BUILD_STRING  / LOAD_CONST 'home-remote:' / LOAD_FAST game_id / FORMAT_VALUE  / BUILD_STRING  / BUILD_TUPLE  / GET_ITER  / FOR_ITER to 312 / STORE_FAST key
+1484: NOP 
+1485: LOAD_GLOBAL NULL + json / LOAD_ATTR loads / LOAD_FAST self / LOAD_ATTR state_store / LOAD_ATTR NULL|self + preference / LOAD_FAST key / LOAD_CONST 'null' / CALL  / CALL  / STORE_FAST value
+1486: LOAD_GLOBAL NULL + isinstance / LOAD_FAST value / LOAD_GLOBAL dict / CALL  / POP_JUMP_IF_FALSE to 310 / LOAD_GLOBAL NULL + str / LOAD_FAST value / LOAD_ATTR NULL|self + get / LOAD_CONST 'gameId' / CALL  / CALL  / LOAD_FAST game_id / COMPARE_OP == / POP_JUMP_IF_FALSE to 310
+1487: LOAD_FAST candidates / LOAD_ATTR NULL|self + append / LOAD_FAST value / CALL  / POP_TOP  / JUMP_BACKWARD to 84
+1483: END_FOR 
+1490: LOAD_FAST candidates / POP_JUMP_IF_FALSE to 346 / LOAD_GLOBAL NULL + max / LOAD_FAST candidates / LOAD_CONST <code object <lambda> at 0x00000000014F4230, file "web_runtime.py", line 1490> / MAKE_FUNCTION  / KW_NAMES ('key',) / CALL  / JUMP_FORWARD to 348 / LOAD_CONST None / STORE_FAST data
+1491: LOAD_FAST data / EXTENDED_ARG  / POP_JUMP_IF_FALSE to 1222
+1494: LOAD_FAST data / LOAD_ATTR NULL|self + get / LOAD_CONST 'residents' / BUILD_LIST  / CALL  / GET_ITER  / LOAD_FAST_AND_CLEAR row / SWAP  / BUILD_LIST  / SWAP  / FOR_ITER to 506 / STORE_FAST row / LOAD_GLOBAL NULL + str / LOAD_FAST row / LOAD_ATTR NULL|self + get / LOAD_CONST 'instanceId' / CALL  / COPY  / POP_JUMP_IF_TRUE to 494 / POP_TOP  / LOAD_FAST row / LOAD_ATTR NULL|self + get / LOAD_CONST 'gid' / CALL  / COPY  / POP_JUMP_IF_TRUE to 494 / POP_TOP  / LOAD_CONST '' / CALL  / LIST_APPEND  / JUMP_BACKWARD to 400 / END_FOR  / STORE_FAST ids / STORE_FAST row
+1495: LOAD_FAST self / LOAD_ATTR state_store / LOAD_ATTR lock / BEFORE_WITH  / POP_TOP 
+1497: LOAD_FAST ids / POP_JUMP_IF_FALSE to 810
+1496: LOAD_FAST self / LOAD_ATTR state_store / LOAD_ATTR db / LOAD_ATTR NULL|self + execute
+1497: LOAD_CONST 'SELECT * FROM pets WHERE game_id=? AND instance_id IN (' / LOAD_CONST ',' / LOAD_ATTR NULL|self + join / LOAD_CONST <code object <genexpr> at 0x00000000014D6790, file "web_runtime.py", line 1497> / MAKE_FUNCTION  / LOAD_FAST ids / GET_ITER  / CALL  / CALL  / FORMAT_VALUE  / LOAD_CONST ')' / BUILD_STRING  / LOAD_FAST game_id / BUILD_LIST  / LOAD_FAST ids / LIST_EXTEND  / CALL_INTRINSIC_1 INTRINSIC_LIST_TO_TUPLE
+1496: CALL 
+1497: LOAD_ATTR NULL|self + fetchall / CALL 
+1496: GET_ITER  / LOAD_FAST_AND_CLEAR row / SWAP  / BUILD_MAP  / SWAP  / FOR_ITER to 802 / STORE_FAST row / LOAD_GLOBAL NULL + str / LOAD_FAST row / LOAD_CONST 'instance_id' / BINARY_SUBSCR  / CALL  / LOAD_FAST self / LOAD_ATTR NULL|self + _pet / LOAD_FAST row / CALL  / MAP_ADD  / JUMP_BACKWARD to 734 / END_FOR  / SWAP  / STORE_FAST row / JUMP_FORWARD to 812
+1497: BUILD_MAP 
+1496: STORE_FAST known
+1495: LOAD_CONST None / LOAD_CONST None / LOAD_CONST None / CALL  / POP_TOP 
+1498: BUILD_MAP  / LOAD_FAST data / DICT_UPDATE  / LOAD_CONST 'residents'
+1501: LOAD_FAST data / LOAD_ATTR NULL|self + get / LOAD_CONST 'residents' / BUILD_LIST  / CALL  / GET_ITER 
+1498: LOAD_FAST_AND_CLEAR row / SWAP  / BUILD_LIST  / SWAP 
+1501: FOR_ITER to 1182 / STORE_FAST row
+1498: BUILD_MAP  / LOAD_FAST_CHECK known / LOAD_ATTR NULL|self + get / LOAD_GLOBAL NULL + str / LOAD_FAST row / LOAD_ATTR NULL|self + get / LOAD_CONST 'instanceId' / CALL  / CALL  / BUILD_MAP  / CALL  / DICT_UPDATE  / LOAD_FAST row / DICT_UPDATE 
+1499: LOAD_CONST 'gender' / LOAD_GLOBAL NULL + _pet_gender / LOAD_FAST row / LOAD_ATTR NULL|self + get / LOAD_CONST 'gender' / CALL  / LOAD_FAST row / LOAD_ATTR NULL|self + get / LOAD_CONST 'genderCode' / CALL 
+1500: LOAD_FAST known / LOAD_ATTR NULL|self + get / LOAD_GLOBAL NULL + str / LOAD_FAST row / LOAD_ATTR NULL|self + get / LOAD_CONST 'instanceId' / CALL  / CALL  / BUILD_MAP  / CALL  / LOAD_ATTR NULL|self + get / LOAD_CONST 'gender' / CALL 
+1499: CALL 
+1498: BUILD_MAP  / DICT_UPDATE  / LIST_APPEND  / JUMP_BACKWARD to 882
+1501: END_FOR 
+1498: SWAP  / STORE_FAST row / BUILD_MAP  / DICT_UPDATE  / STORE_FAST data
+1502: LOAD_CONST 0 / LOAD_CONST ('decorate_home',) / IMPORT_NAME home_scene / IMPORT_FROM decorate_home / STORE_FAST decorate_home / POP_TOP 
+1503: PUSH_NULL  / LOAD_FAST decorate_home / LOAD_FAST data / CALL  / STORE_FAST data
+1504: LOAD_CONST True / LOAD_FAST game_id / LOAD_FAST capture / POP_JUMP_IF_FALSE to 1240 / LOAD_CONST 'capture' / LOAD_FAST data / LOAD_CONST ('ok', 'gameId', 'source', 'remote') / BUILD_CONST_KEY_MAP  / RETURN_VALUE  / LOAD_CONST 'cache' / LOAD_FAST data / LOAD_CONST ('ok', 'gameId', 'source', 'remote') / BUILD_CONST_KEY_MAP  / RETURN_VALUE  / PUSH_EXC_INFO 
+1488: LOAD_GLOBAL ValueError / LOAD_GLOBAL TypeError / BUILD_TUPLE  / CHECK_EXC_MATCH  / POP_JUMP_IF_FALSE to 1286 / POP_TOP 
+1489: POP_EXCEPT  / EXTENDED_ARG  / JUMP_BACKWARD to 84
+1488: RERAISE  / COPY  / POP_EXCEPT  / RERAISE  / SWAP  / POP_TOP 
+1494: SWAP  / STORE_FAST row / RERAISE  / SWAP  / POP_TOP 
+1496: SWAP  / STORE_FAST row / RERAISE 
+1495: PUSH_EXC_INFO  / WITH_EXCEPT_START  / POP_JUMP_IF_TRUE to 1322 / RERAISE  / POP_TOP  / POP_EXCEPT  / POP_TOP  / POP_TOP  / JUMP_BACKWARD to 830 / COPY  / POP_EXCEPT  / RERAISE  / SWAP  / POP_TOP 
+1498: SWAP  / STORE_FAST row / RERAISE 
+
+FUNCTION CollectorService.home_info SOURCE_LINE 1506
+1506: RESUME 
+1507: LOAD_GLOBAL NULL + str / LOAD_FAST game_id / COPY  / POP_JUMP_IF_TRUE to 126 / POP_TOP  / LOAD_FAST self / LOAD_ATTR state_store / LOAD_ATTR active_game_id / COPY  / POP_JUMP_IF_TRUE to 126 / POP_TOP  / LOAD_FAST self / LOAD_ATTR state_store / LOAD_ATTR NULL|self + latest_game_id / CALL  / COPY  / POP_JUMP_IF_TRUE to 126 / POP_TOP  / LOAD_CONST '' / CALL  / LOAD_ATTR NULL|self + strip / CALL  / STORE_FAST game_id
+1508: LOAD_FAST self / LOAD_ATTR NULL|self + cached_home_info / LOAD_FAST game_id / CALL  / STORE_FAST result
+1509: LOAD_FAST self / LOAD_ATTR NULL|self + capture_status / CALL  / LOAD_CONST 'running' / BINARY_SUBSCR  / POP_JUMP_IF_FALSE to 264
+1510: LOAD_FAST result / LOAD_CONST 'remote' / BINARY_SUBSCR  / POP_JUMP_IF_FALSE to 250 / LOAD_CONST '采集中：进入自己的家园即可更新入住精灵；当前显示已采集缓存' / JUMP_FORWARD to 252 / LOAD_CONST '采集中：请进入自己的家园，等待读取入住精灵' / LOAD_FAST result / LOAD_CONST 'warning' / STORE_SUBSCR 
+1511: LOAD_FAST result / RETURN_VALUE 
+1512: LOAD_GLOBAL NULL + _valid_capture_uid / LOAD_FAST game_id / CALL  / POP_JUMP_IF_FALSE to 310 / LOAD_FAST self / LOAD_ATTR desktop_session / POP_JUMP_IF_TRUE to 324
+1513: LOAD_CONST '登录游戏并开启采集可更新家园；付费用户绑定账号后也可在线更新' / LOAD_FAST result / LOAD_CONST 'warning' / STORE_SUBSCR 
+1514: LOAD_FAST result / RETURN_VALUE 
+1515: NOP 
+1516: LOAD_FAST self / LOAD_ATTR NULL|self + _desktop_account_request / LOAD_CONST '/desktop/subscription/status?' / LOAD_GLOBAL urllib / LOAD_ATTR parse / LOAD_ATTR NULL|self + urlencode / LOAD_CONST 'gameId' / LOAD_FAST game_id / BUILD_MAP  / CALL  / FORMAT_VALUE  / BUILD_STRING  / CALL  / STORE_FAST status
+1517: LOAD_FAST status / LOAD_ATTR NULL|self + get / LOAD_CONST 'entitlement' / CALL  / COPY  / POP_JUMP_IF_TRUE to 468 / POP_TOP  / BUILD_MAP  / LOAD_ATTR NULL|self + get / LOAD_CONST 'active' / CALL  / LOAD_CONST True / IS_OP  / POP_JUMP_IF_FALSE to 532
+1518: LOAD_FAST result / LOAD_CONST 'remote' / BINARY_SUBSCR  / POP_JUMP_IF_FALSE to 518 / LOAD_CONST '当前显示本地缓存。请登录游戏并开启采集，或开通付费服务在线更新家园' / JUMP_FORWARD to 520 / LOAD_CONST '请登录游戏并开启采集，或开通付费服务在线更新家园' / LOAD_FAST result / LOAD_CONST 'warning' / STORE_SUBSCR 
+1519: LOAD_FAST result / RETURN_VALUE 
+1520: LOAD_FAST self / LOAD_ATTR NULL|self + capture_status / CALL  / LOAD_CONST 'running' / BINARY_SUBSCR  / POP_JUMP_IF_FALSE to 604
+1521: LOAD_FAST self / LOAD_ATTR NULL|self + cached_home_info / LOAD_FAST game_id / CALL  / RETURN_VALUE 
+1522: LOAD_FAST self / LOAD_ATTR NULL|self + _desktop_account_request
+1523: LOAD_CONST '/desktop/home/info' / LOAD_CONST 'POST'
+1524: LOAD_CONST 'gameId' / LOAD_FAST game_id / BUILD_MAP  / LOAD_FAST sync_task / POP_JUMP_IF_NONE to 648 / LOAD_CONST 'syncTask' / LOAD_FAST sync_task / BUILD_MAP  / JUMP_FORWARD to 650 / BUILD_MAP  / DICT_UPDATE 
+1525: LOAD_CONST '家园位置' / LOAD_CONST 24 / LOAD_CONST 'home-info:' / LOAD_FAST game_id / FORMAT_VALUE  / BUILD_STRING  / LOAD_CONST 0
+1522: KW_NAMES ('method', 'payload', 'label', 'timeout', 'cache_key', 'cache_seconds') / CALL  / STORE_FAST remote
+1526: LOAD_FAST self / LOAD_ATTR NULL|self + capture_status / CALL  / LOAD_CONST 'running' / BINARY_SUBSCR  / POP_JUMP_IF_FALSE to 750
+1527: LOAD_FAST self / LOAD_ATTR NULL|self + cached_home_info / LOAD_FAST game_id / CALL  / RETURN_VALUE 
+1528: LOAD_FAST remote / LOAD_ATTR NULL|self + get / LOAD_CONST 'ok' / CALL  / LOAD_CONST False / IS_OP  / POP_JUMP_IF_FALSE to 858
+1529: LOAD_GLOBAL NULL + str / LOAD_FAST remote / LOAD_ATTR NULL|self + get / LOAD_CONST 'message' / CALL  / COPY  / POP_JUMP_IF_TRUE to 838 / POP_TOP  / LOAD_CONST '家园数据暂未取得，请重试' / CALL  / LOAD_FAST result / LOAD_CONST 'warning' / STORE_SUBSCR 
+1530: LOAD_FAST result / RETURN_VALUE 
+1531: LOAD_FAST result / LOAD_ATTR NULL|self + update / LOAD_CONST 'remote' / LOAD_CONST '洛克魔法书' / LOAD_FAST remote / LOAD_CONST ('source', 'provider', 'remote') / BUILD_CONST_KEY_MAP  / CALL  / POP_TOP 
+1532: LOAD_FAST remote / LOAD_ATTR NULL|self + get / LOAD_CONST 'pending' / CALL  / LOAD_CONST True / IS_OP  / POP_JUMP_IF_FALSE to 1094
+1533: LOAD_FAST self / LOAD_ATTR state_store / LOAD_ATTR NULL|self + set_preference / LOAD_CONST 'home-remote:' / LOAD_FAST game_id / FORMAT_VALUE  / BUILD_STRING  / LOAD_GLOBAL NULL + json / LOAD_ATTR dumps / BUILD_MAP  / LOAD_FAST remote / DICT_UPDATE  / LOAD_FAST game_id / LOAD_GLOBAL NULL + time / LOAD_ATTR strftime / LOAD_CONST '%Y-%m-%dT%H:%M:%S%z' / CALL  / LOAD_CONST ('gameId', 'updatedAt') / BUILD_CONST_KEY_MAP  / DICT_UPDATE  / LOAD_CONST False / KW_NAMES ('ensure_ascii',) / CALL  / CALL  / POP_TOP 
+1536: LOAD_FAST result / RETURN_VALUE  / PUSH_EXC_INFO 
+1534: LOAD_GLOBAL Exception / CHECK_EXC_MATCH  / POP_JUMP_IF_FALSE to 1164 / STORE_FAST exc
+1535: LOAD_GLOBAL NULL + str / LOAD_FAST exc / CALL  / LOAD_FAST result / LOAD_CONST 'warning' / STORE_SUBSCR  / POP_EXCEPT  / LOAD_CONST None / STORE_FAST exc / DELETE_FAST exc
+1536: LOAD_FAST result / RETURN_VALUE  / LOAD_CONST None / STORE_FAST exc / DELETE_FAST exc / RERAISE 
+1534: RERAISE  / COPY  / POP_EXCEPT  / RERAISE 
+
+FUNCTION CollectorService._build_cloud_snapshot SOURCE_LINE 3497
+3497: RESUME 
+3498: LOAD_GLOBAL NULL + _valid_capture_uid / LOAD_FAST game_id / CALL  / POP_JUMP_IF_TRUE to 46
+3499: LOAD_GLOBAL NULL + ValueError / LOAD_CONST '请先采集有效的游戏 UID' / CALL  / RAISE_VARARGS 
+3500: LOAD_FAST self / LOAD_ATTR state_store / LOAD_ATTR lock / BEFORE_WITH  / POP_TOP 
+3501: LOAD_FAST self / LOAD_ATTR state_store / LOAD_ATTR NULL|self + dashboard / LOAD_FAST game_id / LOAD_CONST False / KW_NAMES ('include_events',) / CALL  / UNPACK_SEQUENCE  / STORE_FAST pets / STORE_FAST eggs / STORE_FAST _events / STORE_FAST role
+3502: LOAD_FAST self / LOAD_ATTR state_store / LOAD_ATTR NULL|self + handbook_snapshot / LOAD_FAST game_id / CALL  / STORE_FAST handbook
+3503: LOAD_FAST self / LOAD_ATTR state_store / LOAD_ATTR NULL|self + snapshot_observed_at / LOAD_FAST game_id / CALL  / STORE_FAST observed_at
+3504: LOAD_FAST observed_at / POP_JUMP_IF_TRUE to 294
+3505: LOAD_GLOBAL NULL + ValueError / LOAD_CONST '还没有采集数据，请先开始采集，再打开游戏' / CALL  / RAISE_VARARGS 
+3506: LOAD_FAST self / LOAD_ATTR state_store / LOAD_ATTR NULL|self + preference / LOAD_CONST 'home-capture:' / LOAD_FAST game_id / FORMAT_VALUE  / BUILD_STRING  / LOAD_CONST '' / CALL  / STORE_FAST home_text
+3507: LOAD_FAST home_text / POP_JUMP_IF_FALSE to 402 / LOAD_GLOBAL NULL + json / LOAD_ATTR loads / LOAD_FAST home_text / CALL  / JUMP_FORWARD to 404 / LOAD_CONST None / STORE_FAST home
+3508: LOAD_FAST self / LOAD_ATTR NULL|self + _upload_pets_with_home / LOAD_FAST pets / LOAD_FAST home / LOAD_FAST game_id / CALL  / STORE_FAST pets
+3509: LOAD_GLOBAL NULL + isinstance / LOAD_FAST home / LOAD_GLOBAL dict / CALL  / POP_JUMP_IF_FALSE to 708
+3510: LOAD_FAST self / LOAD_ATTR state_store / LOAD_ATTR NULL|self + released_pet_ids / LOAD_FAST game_id / CALL  / STORE_FAST released
+3511: BUILD_MAP  / LOAD_FAST home / DICT_UPDATE  / LOAD_CONST 'residents' / LOAD_FAST home / LOAD_ATTR NULL|self + get / LOAD_CONST 'residents' / BUILD_LIST  / CALL  / GET_ITER  / LOAD_FAST_AND_CLEAR row / SWAP  / BUILD_LIST  / SWAP  / FOR_ITER to 696 / STORE_FAST row
+3512: LOAD_GLOBAL NULL + str / LOAD_FAST row / LOAD_ATTR NULL|self + get / LOAD_CONST 'instanceId' / CALL  / COPY  / POP_JUMP_IF_TRUE to 676 / POP_TOP  / LOAD_FAST row / LOAD_ATTR NULL|self + get / LOAD_CONST 'gid' / CALL  / COPY  / POP_JUMP_IF_TRUE to 676 / POP_TOP  / LOAD_CONST '' / CALL  / LOAD_FAST released / CONTAINS_OP  / POP_JUMP_IF_FALSE to 694
+3511: LOAD_FAST row / LIST_APPEND  / JUMP_BACKWARD to 582 / END_FOR  / SWAP  / STORE_FAST row / BUILD_MAP  / DICT_UPDATE  / STORE_FAST home
+3513: LOAD_FAST eggs / GET_ITER  / LOAD_FAST_AND_CLEAR row / SWAP  / BUILD_MAP  / SWAP  / FOR_ITER to 854 / STORE_FAST row / LOAD_GLOBAL NULL + str / LOAD_FAST row / LOAD_CONST 'instance_id' / BINARY_SUBSCR  / CALL  / LOAD_FAST self / LOAD_ATTR state_store / LOAD_ATTR nest_inference / LOAD_ATTR NULL|self + get / LOAD_FAST game_id / LOAD_GLOBAL NULL + str / LOAD_FAST row / LOAD_CONST 'instance_id' / BINARY_SUBSCR  / CALL  / CALL  / MAP_ADD  / JUMP_BACKWARD to 720 / END_FOR  / STORE_FAST predictions / STORE_FAST row
+3500: LOAD_CONST None / LOAD_CONST None / LOAD_CONST None / CALL  / POP_TOP 
+3514: LOAD_GLOBAL NULL + CollectorApp / LOAD_ATTR _cloud_snapshot / LOAD_FAST_CHECK pets / LOAD_FAST_CHECK eggs / LOAD_FAST_CHECK role / LOAD_FAST game_id / LOAD_FAST_CHECK handbook / COPY  / POP_JUMP_IF_TRUE to 924 / POP_TOP  / LOAD_CONST None / LOAD_FAST_CHECK home / KW_NAMES ('home',) / CALL  / STORE_FAST snapshot
+3515: LOAD_FAST snapshot / LOAD_CONST 'eggs' / BINARY_SUBSCR  / GET_ITER  / FOR_ITER to 1202 / STORE_FAST egg
+3516: LOAD_FAST_CHECK predictions / LOAD_ATTR NULL|self + get / LOAD_GLOBAL NULL + str / LOAD_FAST egg / LOAD_CONST 'instanceId' / BINARY_SUBSCR  / CALL  / CALL  / STORE_FAST prediction
+3517: LOAD_FAST prediction / POP_JUMP_IF_TRUE to 1018 / JUMP_BACKWARD to 948
+3518: LOAD_FAST prediction / LOAD_ATTR NULL|self + items / CALL  / GET_ITER  / LOAD_FAST_AND_CLEAR key / LOAD_FAST_AND_CLEAR value / SWAP  / BUILD_MAP  / SWAP  / FOR_ITER to 1092 / UNPACK_SEQUENCE  / STORE_FAST key / STORE_FAST value / LOAD_FAST key / LOAD_CONST 'history' / COMPARE_OP != / POP_JUMP_IF_TRUE to 1084 / JUMP_BACKWARD to 1060 / LOAD_FAST key / LOAD_FAST value / MAP_ADD  / JUMP_BACKWARD to 1060 / END_FOR  / STORE_FAST prediction / STORE_FAST key / STORE_FAST value
+3519: LOAD_FAST egg / LOAD_ATTR NULL|self + update / LOAD_FAST prediction / LOAD_FAST prediction / LOAD_ATTR NULL|self + get / LOAD_CONST 'sourceNestGuid' / CALL 
+3520: LOAD_FAST prediction / LOAD_ATTR NULL|self + get / LOAD_CONST 'nestAssociationMethod' / CALL 
+3519: KW_NAMES ('naturePrediction', 'sourceNestGuid', 'nestAssociationMethod') / CALL  / POP_TOP  / JUMP_BACKWARD to 948
+3515: END_FOR 
+3521: LOAD_FAST_CHECK observed_at / LOAD_FAST snapshot / LOAD_CONST 'capturedAt' / STORE_SUBSCR 
+3522: LOAD_GLOBAL NULL + resource_snapshot / LOAD_FAST snapshot / CALL  / RETURN_VALUE  / SWAP  / POP_TOP 
+3511: SWAP  / STORE_FAST row / RERAISE  / SWAP  / POP_TOP 
+3513: SWAP  / STORE_FAST row / RERAISE 
+3500: PUSH_EXC_INFO  / WITH_EXCEPT_START  / POP_JUMP_IF_TRUE to 1264 / RERAISE  / POP_TOP  / POP_EXCEPT  / POP_TOP  / POP_TOP  / JUMP_BACKWARD to 876 / COPY  / POP_EXCEPT  / RERAISE  / SWAP  / POP_TOP 
+3518: SWAP  / STORE_FAST value / STORE_FAST key / RERAISE 
+
+FUNCTION LocalWebServer._home_info SOURCE_LINE 4000
+4000: RETURN_GENERATOR  / POP_TOP  / RESUME 
+4001: LOAD_FAST self / LOAD_ATTR NULL|self + _require / LOAD_FAST request / CALL  / POP_TOP 
+4002: NOP 
+4003: LOAD_FAST request / LOAD_ATTR method / LOAD_CONST 'POST' / COMPARE_OP == / POP_JUMP_IF_FALSE to 120 / LOAD_FAST request / LOAD_ATTR NULL|self + json / CALL  / GET_AWAITABLE  / LOAD_CONST None / SEND to 116 / YIELD_VALUE  / RESUME  / JUMP_BACKWARD_NO_INTERRUPT to 106 / END_SEND  / JUMP_FORWARD to 122 / BUILD_MAP  / STORE_FAST body
+4004: LOAD_GLOBAL NULL + asyncio / LOAD_ATTR to_thread
+4005: LOAD_FAST self / LOAD_ATTR service / LOAD_ATTR home_info
+4006: LOAD_GLOBAL NULL + str / LOAD_FAST request / LOAD_ATTR query / LOAD_ATTR NULL|self + get / LOAD_CONST 'gameId' / CALL  / COPY  / POP_JUMP_IF_TRUE to 266 / POP_TOP  / LOAD_CONST '' / CALL 
+4007: LOAD_FAST body / LOAD_ATTR NULL|self + get / LOAD_CONST 'syncTask' / CALL 
+4004: CALL  / GET_AWAITABLE  / LOAD_CONST None / SEND to 328 / YIELD_VALUE  / RESUME  / JUMP_BACKWARD_NO_INTERRUPT to 318 / END_SEND  / STORE_FAST result
+4009: LOAD_FAST self / LOAD_ATTR NULL|self + _headers / LOAD_GLOBAL NULL + web / LOAD_ATTR json_response / LOAD_FAST result / CALL  / CALL  / RETURN_VALUE 
+4003: CLEANUP_THROW  / JUMP_BACKWARD to 116
+4004: CLEANUP_THROW  / JUMP_BACKWARD to 328 / PUSH_EXC_INFO 
+4010: LOAD_GLOBAL Exception / CHECK_EXC_MATCH  / POP_JUMP_IF_FALSE to 546 / STORE_FAST exc
+4011: LOAD_FAST self / LOAD_ATTR NULL|self + _headers / LOAD_GLOBAL NULL + web / LOAD_ATTR json_response / LOAD_CONST 'error' / LOAD_GLOBAL NULL + str / LOAD_FAST exc / CALL  / BUILD_MAP  / LOAD_CONST 502 / KW_NAMES ('status',) / CALL  / CALL  / SWAP  / POP_EXCEPT  / LOAD_CONST None / STORE_FAST exc / DELETE_FAST exc / RETURN_VALUE  / LOAD_CONST None / STORE_FAST exc / DELETE_FAST exc / RERAISE 
+4010: RERAISE  / COPY  / POP_EXCEPT  / RERAISE  / CALL_INTRINSIC_1 INTRINSIC_STOPITERATION_ERROR / RERAISE 

@@ -1,0 +1,4 @@
+{"probe":"account_aba_save_queues","requests":["old-1","new-3","old-2"],"persisted":"old-2","displayed":"new-3","expected":"new-3"}
+{"probe":"stale_refresh_deletes_new_state","before":"new-draft","after":"saved-old","expected":"new-draft","new_save_inflight_at_cleanup":true,"persistedNoteAfterNatureOnlyEdit":"saved-old"}
+{"probe":"untouched_draft_blocks_refresh","remoteNature":7,"displayedNature":0,"savedNature":0}
+{"probe":"failed_draft_retry","retained":true,"persisted":"retry-me","errorAfterRetry":""}

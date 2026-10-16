@@ -40,6 +40,16 @@ class PetPresentationTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 vm.update({"shortcuts": saved})
 
+    def test_home_display_order_is_saved_per_account_and_rejects_invalid_ids(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            vm = UIPreferencesViewModel(SettingsRepository(Path(tmp) / "config.json"))
+            orders = {"101": ["9007199254740993", "9007199254740994"]}
+            saved = vm.update({"home_orders": orders})
+            self.assertEqual(saved["home_orders"], orders)
+            self.assertEqual(vm.snapshot()["home_orders"], orders)
+            with self.assertRaises(ValueError):
+                vm.update({"home_orders": {"101": ["01"]}})
+
     def test_real_glass_packed_card_and_particles(self):
         catalog = ColorCatalog(static_dir())
         # 觅觅蝠真实样本：卡 37、四角星。

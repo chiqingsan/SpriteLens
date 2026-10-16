@@ -21,8 +21,8 @@
 | `egg_inventory` | 757 行 | 蛋仓快照解析 + 分页 + SQLite | ✅ 已实装（蛋蛋仓库页：形状搜索累积 + SQLite 持久化） |
 | `egg_evidence` | 小 | 孵蛋证据链（性格预测/声音/标注来源） | ⬜ 待做 |
 | `nest_egg_inference` | 1,454 行 | **孵蛋推断引擎**（窝×父本→子代概率） | ⬜ 待做（算法在 §3.4；智能配窝页已占位） |
-| `home_scene` | 737 行 | 家园场景解码（居民/家具/产蛋窝/场景蛋） | ✅ 已实装（我的家园页；增量帧/配对未解析） |
-| `home_breeding_range` | 295 行 | 繁育范围（楼层×距离×蛋组兼容） | ⬜ 待做（智能配窝前置） |
+| `home_scene` | 737 行 | 家园场景解码（居民/家具/产蛋窝/场景蛋） | 🟡 已有解析；场景/主人归属与增量过滤待修，见 F04-U2 |
+| `home_breeding_range` | 295 行 | 繁育范围（楼层×距离×蛋组兼容） | 🟡 家园页用于过期关系候选；智能配窝的全量规划仍待做 |
 | `color_cards` | 小 | 炫彩色卡（glass→卡号/粒子映射） | ✅ 已实装（炫彩色卡页：底色×混色矩阵） |
 | `flower_seeds` / `flower_state` | 小 | 炫彩花种（协议帧 + 按天合并） | ✅ 已实装（炫彩花种页：0x0375 快照 + 宠物名学习表） |
 | `pet_medals` | 4,710 行 | 体型/声音奖牌富化（种群内极值 + 内嵌种群名录） | ⬜ 富化未做（medals.json 静态表已导入） |
@@ -112,11 +112,13 @@ recalculate / reconcile        快照对账（snapshot-species 规则）
 ### 3.5 家园场景（home_scene / home_breeding_range）
 
 - 场景结构：`residents`（居民宠物）、`furniture`（家具：furnitureGuid/configId/position/roomId/floor）、`nests`（产蛋窝：nestType/nestName + `layEggCouples`[{femaleActorId, maleActorIds}]）、`sceneEggs`（场景蛋）
+- v1.2.0 家园页请求本地 `/api/home/info?gameId=...`。采集运行时该路由读取本地 `home-capture` 缓存，结果仍放在 `remote` 字段；停止采集后在线更新才使用云端服务。前端按 `resident/isHomeResident` 筛成员，再以 instance/gid 合并本地个体资料。
 - 楼层：`_home_position` 的 signed x/y/z → 一楼/二楼/地下室（`home_floor`）
-- 请求/响应配对：`pending_home_collection`（前端主动拉家园数据，带 gameId + requestedAt，响应 ambiguous 处理）
+- 请求/响应配对：`pending_home_collection` 用于 0x0137/0x0243 家园拾蛋请求/响应关联，不是主动查询家园成员的机制。
 - 繁育范围：`in_range(a, b, home)`——两窝距离判定 + `compatible(a, b)`（性别不同 + 蛋组交集）
-- opcode（已确认）：0x014A 完整快照已实装（我的家园页）；0x0413/0x0414 增量帧仅作
-  版本提示（未解析）；`layEggCouples`（产蛋配对）与繁育范围未做
+- opcode（已确认）：0x014A 是通用进场景应答，需通过 home_info 主人 UID 与 0x0152/0x015C 场景资源确认目标家园；蛋神排除30002场景。场景记录提供 `instanceId`→宠物个体、`baseId`→物种、`actorId`→场景实体，以及 `layEggCouples` 配对。
+- SpriteLens 嵌套解析已能从真实字段树读出11居民/11窝/6条母本配对，核心数据无需蛋神 API；旧分支误读 actor 类型为房间等级，场景/主人/会话过滤及0x0413/0x0414增量判断仍待修。实施规格见 [家园开发计划](HOME_IMPLEMENTATION_PLAN.md)，状态以 ROADMAP 的 F04-U2 为准。
+- 蛋神家园主关系面板使用场景配对，未开启范围候选选项；SpriteLens 已有明确标记的过期关系候选。性格概率、均值声音和范围规则属于工具预测，不代表游戏内产物已实测。
 
 ### 3.6 炫彩色卡（color_cards）与花种（flower_seeds/flower_state）
 
@@ -217,7 +219,7 @@ handbook、egg.upsert、pet.snapshot、team.snapshot 等——这套"结构准�
 | 静态目录 | `tools/import_*.py` + `data/static/` | 蛋目录 224 / 图鉴描述 601 / 色卡 44 / 花种等级表 / 奖牌表 |
 | 蛋图鉴 / 蛋蛋仓库 | `domain/eggs.py` / `domain/egg_box.py` + `egg_store` | 蛋目录联查 + 蛋仓快照累积 → SQLite 持久化 + 孵化槽标记 |
 | 种公阵列 / 种公母库 | payloads 种公矩阵 + app.js | 性格×蛋组覆盖矩阵、公母分库（可折叠） |
-| 我的家园 | `domain/home.py` + `home_repository` | 0x014A 快照：居民/家具/产蛋窝 |
+| 我的家园 | `domain/home.py` + `domain/home_breeding.py` + `home_repository` + `frontend/src/pages/HomePage.vue` | 0x014A：居民/物种/窝位/场景配对/场景蛋；0x0413/0x0414：居民/场景蛋增量；过期关系按巢穴范围推导候选 |
 | 炫彩色卡 / 炫彩花种 | `domain/color_cards.py` / `domain/flowers.py` | glass→卡号矩阵；0x0375 花田 + 宠物名学习表 |
 | 账号隔离 | `services/account_tracker.py` | 切号清空各域内存快照；同 uid 重复帧不误判 |
 | 持久化底座 | `repositories/*` + `services/event_logger.py` | v1→v4 追加式迁移（事务化）、宠物/蛋仓 write-behind |
@@ -235,7 +237,7 @@ handbook、egg.upsert、pet.snapshot、team.snapshot 等——这套"结构准�
 4. 协议层增强 🟡 部分：32MiB 缓冲 ✅；"3 秒停滞"断流恢复 ⬜、IV exact 模式兼容 ⬜
 
 **第三批（需真实帧验证字段映射）**：
-5. 我的家园 ✅ 已实装（0x014A 快照；增量帧/产蛋配对未解析）
+5. 我的家园 🟡 已有居民/窝位/场景配对/场景蛋解析和Vue展示；真实字段树已确认核心数据具备。场景归属、错误旧路径、增量过滤及参考页面交互待按 F04-U2-A 至 F 实施，游戏繁育效果仍待验证。
 6. 智能配窝 ⬜ 待做（nest_egg_inference 推断引擎（§3.4）+ planner UI；页占位已挂）
 7. 炫彩花种 ✅ 已实装（0x0375 快照 + 名字学习表）
 8. 炫彩色卡 ✅ 已实装（glass→卡号→底色×混色矩阵）

@@ -163,6 +163,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   display: flex;
   align-items: center;
   gap: var(--space-4);
+  /* 导航选中状态需要和页面切换同步，避免旧菜单在过渡期间残留高亮。 */
+  transition: transform var(--motion-fast) var(--motion-ease);
 }
 .nav-item:hover { background: var(--sidebar-hover); }
 .nav-item.active { background: var(--accent); color: var(--on-accent); }

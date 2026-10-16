@@ -1,7 +1,7 @@
 /* 外观与浏览器调试设置；图片模式由背包使用现有载荷重新绘制。 */
 (function () {
   "use strict";
-  var preferences = { theme: "miaomiao", pet_view: "point", pet_image: "portrait", fields: { groups: true, height: true, weight: true, voice: true, positions: false }, shortcuts: [] };
+  var preferences = { theme: "miaomiao", pet_view: "point", pet_image: "portrait", fields: { groups: true, height: true, weight: true, voice: true, positions: false }, shortcuts: [], home_orders: {} };
   var saveQueue = Promise.resolve();
   var save = null;
   var notify = null;
@@ -25,7 +25,8 @@
   function update(changes) {
     var draft = { theme: changes.theme || preferences.theme, pet_view: changes.pet_view || preferences.pet_view,
       pet_image: changes.pet_image || preferences.pet_image || "portrait",
-      fields: Object.assign({}, preferences.fields, changes.fields || {}), shortcuts: changes.shortcuts || preferences.shortcuts || [] };
+      fields: Object.assign({}, preferences.fields, changes.fields || {}), shortcuts: changes.shortcuts || preferences.shortcuts || [],
+      home_orders: changes.home_orders || preferences.home_orders || {} };
     apply(draft);
     document.getElementById("appearance-status").textContent = "保存中…";
     var result = saveQueue.then(function () { return save(draft); }).then(function (value) {

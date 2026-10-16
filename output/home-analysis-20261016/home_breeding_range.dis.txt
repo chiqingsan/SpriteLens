@@ -1,0 +1,988 @@
+
+FUNCTION <module> SOURCE_LINE 1
+  0           0 RESUME                   0
+
+  1           2 NOP
+
+  2           4 LOAD_CONST               0 (0)
+              6 LOAD_CONST               1 (None)
+              8 IMPORT_NAME              0 (math)
+             10 STORE_NAME               0 (math)
+
+  3          12 LOAD_CONST               0 (0)
+             14 LOAD_CONST               1 (None)
+             16 IMPORT_NAME              1 (re)
+             18 STORE_NAME               1 (re)
+
+  5          20 LOAD_CONST               2 (40)
+             22 STORE_NAME               2 (CELL_WORLD)
+
+  6          24 LOAD_CONST               3 (4)
+             26 STORE_NAME               3 (NEST_CELLS)
+
+  7          28 LOAD_CONST               4 (10)
+             30 STORE_NAME               4 (MAX_GAP_CELLS)
+
+  9          32 LOAD_CONST               5 ('二楼')
+             34 LOAD_CONST               6 (298)
+             36 LOAD_CONST               7 (1284)
+             38 LOAD_CONST               8 (2827)
+             40 BUILD_LIST               2
+             42 LOAD_CONST               9 (1264)
+             44 LOAD_CONST              10 (1376)
+             46 BUILD_LIST               2
+             48 LOAD_CONST              11 (2535)
+             50 LOAD_CONST              12 (1386)
+             52 BUILD_LIST               2
+             54 LOAD_CONST              11 (2535)
+             56 LOAD_CONST              13 (2841)
+             58 BUILD_LIST               2
+             60 BUILD_LIST               4
+             62 BUILD_TUPLE              3
+
+ 10          64 LOAD_CONST               5 ('二楼')
+             66 LOAD_CONST              14 (320)
+             68 LOAD_CONST              15 (462)
+             70 LOAD_CONST              16 (1408)
+             72 BUILD_LIST               2
+             74 LOAD_CONST              17 (1256)
+             76 LOAD_CONST              16 (1408)
+             78 BUILD_LIST               2
+             80 LOAD_CONST              18 (1246)
+             82 LOAD_CONST              19 (2018)
+             84 BUILD_LIST               2
+             86 LOAD_CONST              20 (465)
+             88 LOAD_CONST              19 (2018)
+             90 BUILD_LIST               2
+             92 BUILD_LIST               4
+             94 BUILD_TUPLE              3
+
+ 11          96 LOAD_CONST               5 ('二楼')
+             98 LOAD_CONST              21 (310)
+            100 LOAD_CONST              22 (1361)
+            102 LOAD_CONST              23 (1460)
+            104 BUILD_LIST               2
+            106 LOAD_CONST              24 (1200)
+            108 LOAD_CONST              23 (1460)
+            110 BUILD_LIST               2
+            112 LOAD_CONST              24 (1200)
+            114 LOAD_CONST              25 (1893)
+            116 BUILD_LIST               2
+            118 LOAD_CONST              26 (1346)
+            120 LOAD_CONST              25 (1893)
+            122 BUILD_LIST               2
+            124 BUILD_LIST               4
+            126 BUILD_TUPLE              3
+
+ 12         128 LOAD_CONST              27 ('地下室')
+            130 LOAD_CONST              28 (-600)
+            132 LOAD_CONST              29 (2842)
+            134 LOAD_CONST              30 (809)
+            136 BUILD_LIST               2
+            138 LOAD_CONST              31 (1198)
+            140 LOAD_CONST              30 (809)
+            142 BUILD_LIST               2
+            144 LOAD_CONST              32 (1161)
+            146 LOAD_CONST              33 (154)
+            148 BUILD_LIST               2
+            150 LOAD_CONST              34 (2838)
+            152 LOAD_CONST              33 (154)
+            154 BUILD_LIST               2
+            156 BUILD_LIST               4
+            158 BUILD_TUPLE              3
+
+ 13         160 LOAD_CONST              27 ('地下室')
+            162 LOAD_CONST              28 (-600)
+            164 LOAD_CONST              35 (2829)
+            166 LOAD_CONST              36 (-905)
+            168 BUILD_LIST               2
+            170 LOAD_CONST              35 (2829)
+            172 LOAD_CONST              37 (152)
+            174 BUILD_LIST               2
+            176 LOAD_CONST              38 (1625)
+            178 LOAD_CONST              37 (152)
+            180 BUILD_LIST               2
+            182 LOAD_CONST              39 (1628)
+            184 LOAD_CONST              40 (-883)
+            186 BUILD_LIST               2
+            188 BUILD_LIST               4
+            190 BUILD_TUPLE              3
+
+ 14         192 LOAD_CONST              27 ('地下室')
+            194 LOAD_CONST              28 (-600)
+            196 LOAD_CONST              41 (1215)
+            198 LOAD_CONST              42 (158)
+            200 BUILD_LIST               2
+            202 LOAD_CONST              41 (1215)
+            204 LOAD_CONST              43 (-902)
+            206 BUILD_LIST               2
+            208 LOAD_CONST              44 (1629)
+            210 LOAD_CONST              45 (-907)
+            212 BUILD_LIST               2
+            214 LOAD_CONST              44 (1629)
+            216 LOAD_CONST              42 (158)
+            218 BUILD_LIST               2
+            220 BUILD_LIST               4
+            222 BUILD_TUPLE              3
+
+ 15         224 LOAD_CONST              27 ('地下室')
+            226 LOAD_CONST              46 (-484)
+            228 LOAD_CONST              47 (801)
+            230 LOAD_CONST              48 (115)
+            232 BUILD_LIST               2
+            234 LOAD_CONST              49 (1231)
+            236 LOAD_CONST              48 (115)
+            238 BUILD_LIST               2
+            240 LOAD_CONST              49 (1231)
+            242 LOAD_CONST              50 (-900)
+            244 BUILD_LIST               2
+            246 LOAD_CONST              47 (801)
+            248 LOAD_CONST              51 (-897)
+            250 BUILD_LIST               2
+            252 BUILD_LIST               4
+            254 BUILD_TUPLE              3
+
+  8         256 BUILD_LIST               7
+            258 STORE_NAME               5 (FLOOR_AREAS)
+
+ 19         260 LOAD_CONST              52 (<code object point at 0x000000000110EA60, file "home_breeding_range.py", line 19>)
+            262 MAKE_FUNCTION            0
+            264 STORE_NAME               6 (point)
+
+ 29         266 LOAD_CONST              53 (<code object home_floor at 0x00000000010B9C50, file "home_breeding_range.py", line 29>)
+            268 MAKE_FUNCTION            0
+            270 STORE_NAME               7 (home_floor)
+
+ 40         272 LOAD_CONST              54 (<code object nest_point at 0x00000000008CCB00, file "home_breeding_range.py", line 40>)
+            274 MAKE_FUNCTION            0
+            276 STORE_NAME               8 (nest_point)
+
+ 56         278 LOAD_CONST              55 (<code object in_range at 0x00000000010B2EB0, file "home_breeding_range.py", line 56>)
+            280 MAKE_FUNCTION            0
+            282 STORE_NAME               9 (in_range)
+
+ 66         284 LOAD_CONST              56 (<code object compatible at 0x0000000002C7A6B0, file "home_breeding_range.py", line 66>)
+            286 MAKE_FUNCTION            0
+            288 STORE_NAME              10 (compatible)
+            290 RETURN_CONST             1 (None)
+
+FUNCTION point SOURCE_LINE 19
+ 19           0 RESUME                   0
+
+ 20           2 LOAD_GLOBAL              1 (NULL + isinstance)
+             12 LOAD_FAST                0 (value)
+             14 LOAD_GLOBAL              2 (dict)
+             24 CALL                     2
+             32 POP_JUMP_IF_TRUE         1 (to 36)
+
+ 21          34 RETURN_CONST             0 (None)
+
+ 22     >>   36 NOP
+
+ 23          38 LOAD_CONST               1 (('x', 'y', 'z'))
+             40 GET_ITER
+             42 LOAD_FAST_AND_CLEAR      1 (k)
+             44 SWAP                     2
+             46 BUILD_MAP                0
+             48 SWAP                     2
+        >>   50 FOR_ITER                17 (to 88)
+             54 STORE_FAST               1 (k)
+             56 LOAD_FAST                1 (k)
+             58 LOAD_GLOBAL              5 (NULL + float)
+             68 LOAD_FAST                0 (value)
+             70 LOAD_FAST                1 (k)
+             72 BINARY_SUBSCR
+             76 CALL                     1
+             84 MAP_ADD                  2
+             86 JUMP_BACKWARD           19 (to 50)
+        >>   88 END_FOR
+             90 STORE_FAST               2 (result)
+             92 STORE_FAST               1 (k)
+
+ 24          94 LOAD_GLOBAL              7 (NULL + all)
+            104 LOAD_CONST               2 (<code object <genexpr> at 0x000000000155E780, file "home_breeding_range.py", line 24>)
+            106 MAKE_FUNCTION            0
+            108 LOAD_FAST                2 (result)
+            110 LOAD_ATTR                9 (NULL|self + values)
+            130 CALL                     0
+            138 GET_ITER
+            140 CALL                     0
+            148 CALL                     1
+            156 POP_JUMP_IF_FALSE        2 (to 162)
+            158 LOAD_FAST                2 (result)
+            160 RETURN_VALUE
+        >>  162 LOAD_CONST               0 (None)
+            164 RETURN_VALUE
+        >>  166 SWAP                     2
+            168 POP_TOP
+
+ 23         170 SWAP                     2
+            172 STORE_FAST               1 (k)
+            174 RERAISE                  0
+        >>  176 PUSH_EXC_INFO
+
+ 25         178 LOAD_GLOBAL             10 (ValueError)
+            188 LOAD_GLOBAL             12 (TypeError)
+            198 LOAD_GLOBAL             14 (KeyError)
+            208 BUILD_TUPLE              3
+            210 CHECK_EXC_MATCH
+            212 POP_JUMP_IF_FALSE        3 (to 220)
+            214 POP_TOP
+
+ 26         216 POP_EXCEPT
+            218 RETURN_CONST             0 (None)
+
+ 25     >>  220 RERAISE                  0
+        >>  222 COPY                     3
+            224 POP_EXCEPT
+            226 RERAISE                  1
+ExceptionTable:
+  38 to 44 -> 176 [0]
+  46 to 88 -> 166 [2]
+  90 to 158 -> 176 [0]
+  162 to 162 -> 176 [0]
+  166 to 174 -> 176 [0]
+  176 to 214 -> 222 [1] lasti
+  220 to 220 -> 222 [1] lasti
+
+FUNCTION point.<locals>.<genexpr> SOURCE_LINE 24
+ 24           0 RETURN_GENERATOR
+              2 POP_TOP
+              4 RESUME                   0
+              6 LOAD_FAST                0 (.0)
+        >>    8 FOR_ITER                25 (to 62)
+             12 STORE_FAST               1 (v)
+             14 LOAD_GLOBAL              1 (NULL + math)
+             24 LOAD_ATTR                2 (isfinite)
+             44 LOAD_FAST                1 (v)
+             46 CALL                     1
+             54 YIELD_VALUE              1
+             56 RESUME                   1
+             58 POP_TOP
+             60 JUMP_BACKWARD           27 (to 8)
+        >>   62 END_FOR
+             64 RETURN_CONST             0 (None)
+        >>   66 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             68 RERAISE                  1
+ExceptionTable:
+  4 to 64 -> 66 [0] lasti
+
+FUNCTION home_floor SOURCE_LINE 29
+ 29           0 RESUME                   0
+
+ 30           2 LOAD_GLOBAL              0 (FLOOR_AREAS)
+             12 GET_ITER
+        >>   14 FOR_ITER               127 (to 272)
+             18 UNPACK_SEQUENCE          3
+             22 STORE_FAST               1 (floor)
+             24 STORE_FAST               2 (z)
+             26 STORE_FAST               3 (vertices)
+
+ 31          28 LOAD_CONST               1 (False)
+             30 STORE_FAST               4 (inside)
+
+ 32          32 LOAD_GLOBAL              3 (NULL + zip)
+             42 LOAD_FAST                3 (vertices)
+             44 LOAD_FAST                3 (vertices)
+             46 LOAD_CONST               2 (-1)
+             48 LOAD_CONST               0 (None)
+             50 BINARY_SLICE
+             52 LOAD_FAST                3 (vertices)
+             54 LOAD_CONST               0 (None)
+             56 LOAD_CONST               2 (-1)
+             58 BINARY_SLICE
+             60 BINARY_OP                0 (+)
+             64 CALL                     2
+             72 GET_ITER
+        >>   74 FOR_ITER                62 (to 202)
+             78 UNPACK_SEQUENCE          2
+             82 UNPACK_SEQUENCE          2
+             86 STORE_FAST               5 (xi)
+             88 STORE_FAST               6 (yi)
+             90 UNPACK_SEQUENCE          2
+             94 STORE_FAST               7 (xj)
+             96 STORE_FAST               8 (yj)
+
+ 33          98 LOAD_FAST                6 (yi)
+            100 LOAD_FAST                0 (pos)
+            102 LOAD_CONST               3 ('y')
+            104 BINARY_SUBSCR
+            108 COMPARE_OP              68 (>)
+            112 LOAD_FAST                8 (yj)
+            114 LOAD_FAST                0 (pos)
+            116 LOAD_CONST               3 ('y')
+            118 BINARY_SUBSCR
+            122 COMPARE_OP              68 (>)
+            126 COMPARE_OP              55 (!=)
+            130 POP_JUMP_IF_TRUE         1 (to 134)
+            132 JUMP_BACKWARD           30 (to 74)
+        >>  134 LOAD_FAST                0 (pos)
+            136 LOAD_CONST               4 ('x')
+            138 BINARY_SUBSCR
+            142 LOAD_FAST                7 (xj)
+            144 LOAD_FAST                5 (xi)
+            146 BINARY_OP               10 (-)
+            150 LOAD_FAST                0 (pos)
+            152 LOAD_CONST               3 ('y')
+            154 BINARY_SUBSCR
+            158 LOAD_FAST                6 (yi)
+            160 BINARY_OP               10 (-)
+            164 BINARY_OP                5 (*)
+            168 LOAD_FAST                8 (yj)
+            170 LOAD_FAST                6 (yi)
+            172 BINARY_OP               10 (-)
+            176 BINARY_OP               11 (/)
+            180 LOAD_FAST                5 (xi)
+            182 BINARY_OP                0 (+)
+            186 COMPARE_OP               2 (<)
+            190 POP_JUMP_IF_TRUE         1 (to 194)
+            192 JUMP_BACKWARD           60 (to 74)
+
+ 34     >>  194 LOAD_FAST                4 (inside)
+            196 UNARY_NOT
+            198 STORE_FAST               4 (inside)
+            200 JUMP_BACKWARD           64 (to 74)
+
+ 32     >>  202 END_FOR
+
+ 35         204 LOAD_FAST                4 (inside)
+            206 POP_JUMP_IF_TRUE         1 (to 210)
+            208 JUMP_BACKWARD           98 (to 14)
+        >>  210 LOAD_FAST                1 (floor)
+            212 LOAD_CONST               5 ('地下室')
+            214 COMPARE_OP              40 (==)
+            218 POP_JUMP_IF_FALSE       13 (to 246)
+            220 LOAD_FAST                0 (pos)
+            222 LOAD_CONST               6 ('z')
+            224 BINARY_SUBSCR
+            228 LOAD_CONST               7 (0)
+            230 COMPARE_OP               2 (<)
+            234 POP_JUMP_IF_TRUE         1 (to 238)
+            236 JUMP_BACKWARD          112 (to 14)
+
+ 36     >>  238 LOAD_FAST                1 (floor)
+            240 SWAP                     2
+            242 POP_TOP
+            244 RETURN_VALUE
+
+ 35     >>  246 LOAD_FAST                0 (pos)
+            248 LOAD_CONST               6 ('z')
+            250 BINARY_SUBSCR
+            254 LOAD_FAST                2 (z)
+            256 COMPARE_OP              92 (>=)
+            260 POP_JUMP_IF_TRUE         1 (to 264)
+            262 JUMP_BACKWARD          125 (to 14)
+
+ 36     >>  264 LOAD_FAST                1 (floor)
+            266 SWAP                     2
+            268 POP_TOP
+            270 RETURN_VALUE
+
+ 30     >>  272 END_FOR
+
+ 37         274 RETURN_CONST             8 ('一楼')
+
+FUNCTION nest_point SOURCE_LINE 40
+              0 MAKE_CELL                6 (guid)
+
+ 40           2 RESUME                   0
+
+ 41           4 LOAD_GLOBAL              1 (NULL + str)
+             14 LOAD_FAST                0 (pet)
+             16 LOAD_ATTR                3 (NULL|self + get)
+             36 LOAD_CONST               1 ('furnitureGuid')
+             38 CALL                     1
+             46 COPY                     1
+             48 POP_JUMP_IF_TRUE         2 (to 54)
+             50 POP_TOP
+             52 LOAD_CONST               2 ('')
+        >>   54 CALL                     1
+             62 STORE_DEREF              6 (guid)
+
+ 42          64 LOAD_DEREF               6 (guid)
+             66 LOAD_CONST               3 (('', '0'))
+             68 CONTAINS_OP              0
+             70 POP_JUMP_IF_FALSE        1 (to 74)
+
+ 43          72 RETURN_CONST             0 (None)
+
+ 44     >>   74 LOAD_FAST                1 (home)
+             76 LOAD_ATTR                3 (NULL|self + get)
+             96 LOAD_CONST               4 ('furniture')
+             98 LOAD_FAST                1 (home)
+            100 LOAD_ATTR                3 (NULL|self + get)
+            120 LOAD_CONST               5 ('nests')
+            122 CALL                     1
+            130 CALL                     2
+            138 STORE_FAST               2 (layout)
+
+ 45         140 LOAD_GLOBAL              5 (NULL + next)
+            150 LOAD_CLOSURE             6 (guid)
+            152 BUILD_TUPLE              1
+            154 LOAD_CONST               6 (<code object <genexpr> at 0x0000000001572550, file "home_breeding_range.py", line 45>)
+            156 MAKE_FUNCTION            8 (closure)
+            158 LOAD_FAST                2 (layout)
+            160 COPY                     1
+            162 POP_JUMP_IF_TRUE         2 (to 168)
+            164 POP_TOP
+            166 BUILD_LIST               0
+        >>  168 GET_ITER
+            170 CALL                     0
+            178 LOAD_CONST               0 (None)
+            180 CALL                     2
+            188 STORE_FAST               3 (furniture)
+
+ 46         190 LOAD_FAST                0 (pet)
+            192 LOAD_ATTR                3 (NULL|self + get)
+            212 LOAD_CONST               7 ('homeApiRow')
+            214 CALL                     1
+            222 COPY                     1
+            224 POP_JUMP_IF_TRUE         2 (to 230)
+            226 POP_TOP
+            228 BUILD_MAP                0
+        >>  230 LOAD_ATTR                3 (NULL|self + get)
+            250 LOAD_CONST               8 ('nest')
+            252 CALL                     1
+            260 COPY                     1
+            262 POP_JUMP_IF_TRUE        21 (to 306)
+            264 POP_TOP
+            266 LOAD_FAST                0 (pet)
+            268 LOAD_ATTR                3 (NULL|self + get)
+            288 LOAD_CONST               8 ('nest')
+            290 CALL                     1
+            298 COPY                     1
+            300 POP_JUMP_IF_TRUE         2 (to 306)
+            302 POP_TOP
+            304 BUILD_MAP                0
+        >>  306 STORE_FAST               4 (attached)
+
+ 47         308 LOAD_FAST                3 (furniture)
+            310 POP_JUMP_IF_NOT_NONE    33 (to 378)
+            312 LOAD_FAST                2 (layout)
+            314 POP_JUMP_IF_NOT_NONE    31 (to 378)
+            316 LOAD_GLOBAL              1 (NULL + str)
+            326 LOAD_FAST                4 (attached)
+            328 LOAD_ATTR                3 (NULL|self + get)
+            348 LOAD_CONST               1 ('furnitureGuid')
+            350 CALL                     1
+            358 CALL                     1
+            366 LOAD_DEREF               6 (guid)
+            368 COMPARE_OP              40 (==)
+            372 POP_JUMP_IF_FALSE        2 (to 378)
+
+ 48         374 LOAD_FAST                4 (attached)
+            376 STORE_FAST               3 (furniture)
+
+ 49     >>  378 LOAD_FAST                3 (furniture)
+            380 COPY                     1
+            382 POP_JUMP_IF_TRUE         2 (to 388)
+            384 POP_TOP
+            386 BUILD_MAP                0
+        >>  388 STORE_FAST               3 (furniture)
+
+ 50         390 LOAD_GLOBAL              7 (NULL + point)
+            400 LOAD_FAST                3 (furniture)
+            402 LOAD_ATTR                3 (NULL|self + get)
+            422 LOAD_CONST               9 ('position')
+            424 CALL                     1
+            432 CALL                     1
+            440 STORE_FAST               5 (pos)
+
+ 51         442 LOAD_FAST                5 (pos)
+            444 POP_JUMP_IF_NOT_NONE     1 (to 448)
+
+ 52         446 RETURN_CONST             0 (None)
+
+ 53     >>  448 BUILD_MAP                0
+            450 LOAD_FAST                5 (pos)
+            452 DICT_UPDATE              1
+            454 LOAD_CONST              10 ('floor')
+            456 LOAD_FAST                3 (furniture)
+            458 LOAD_ATTR                3 (NULL|self + get)
+            478 LOAD_CONST              11 ('floorName')
+            480 CALL                     1
+            488 COPY                     1
+            490 POP_JUMP_IF_TRUE        30 (to 552)
+            492 POP_TOP
+            494 LOAD_FAST                3 (furniture)
+            496 LOAD_ATTR                3 (NULL|self + get)
+            516 LOAD_CONST              10 ('floor')
+            518 CALL                     1
+            526 COPY                     1
+            528 POP_JUMP_IF_TRUE        11 (to 552)
+            530 POP_TOP
+            532 LOAD_GLOBAL              9 (NULL + home_floor)
+            542 LOAD_FAST                5 (pos)
+            544 CALL                     1
+        >>  552 BUILD_MAP                1
+            554 DICT_UPDATE              1
+            556 RETURN_VALUE
+
+FUNCTION nest_point.<locals>.<genexpr> SOURCE_LINE 45
+              0 COPY_FREE_VARS           1
+
+ 45           2 RETURN_GENERATOR
+              4 POP_TOP
+              6 RESUME                   0
+              8 LOAD_FAST                0 (.0)
+        >>   10 FOR_ITER                36 (to 86)
+             14 STORE_FAST               1 (f)
+             16 LOAD_GLOBAL              1 (NULL + str)
+             26 LOAD_FAST                1 (f)
+             28 LOAD_ATTR                3 (NULL|self + get)
+             48 LOAD_CONST               0 ('furnitureGuid')
+             50 CALL                     1
+             58 CALL                     1
+             66 LOAD_DEREF               2 (guid)
+             68 COMPARE_OP              40 (==)
+             72 POP_JUMP_IF_TRUE         1 (to 76)
+             74 JUMP_BACKWARD           33 (to 10)
+        >>   76 LOAD_FAST                1 (f)
+             78 YIELD_VALUE              1
+             80 RESUME                   1
+             82 POP_TOP
+             84 JUMP_BACKWARD           38 (to 10)
+        >>   86 END_FOR
+             88 RETURN_CONST             1 (None)
+        >>   90 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             92 RERAISE                  1
+ExceptionTable:
+  6 to 72 -> 90 [0] lasti
+  76 to 88 -> 90 [0] lasti
+
+FUNCTION in_range SOURCE_LINE 56
+              0 MAKE_CELL                5 (pa)
+              2 MAKE_CELL                6 (pb)
+
+ 56           4 RESUME                   0
+
+ 57           6 LOAD_GLOBAL              1 (NULL + nest_point)
+             16 LOAD_FAST                0 (a)
+             18 LOAD_FAST                2 (home)
+             20 CALL                     2
+             28 LOAD_GLOBAL              1 (NULL + nest_point)
+             38 LOAD_FAST                1 (b)
+             40 LOAD_FAST                2 (home)
+             42 CALL                     2
+             50 SWAP                     2
+             52 STORE_DEREF              5 (pa)
+             54 STORE_DEREF              6 (pb)
+
+ 58          56 LOAD_DEREF               5 (pa)
+             58 POP_JUMP_IF_NONE         2 (to 64)
+             60 LOAD_DEREF               6 (pb)
+             62 POP_JUMP_IF_NOT_NONE     1 (to 66)
+
+ 59     >>   64 RETURN_CONST             0 (None)
+
+ 60     >>   66 LOAD_DEREF               5 (pa)
+             68 LOAD_CONST               1 ('floor')
+             70 BINARY_SUBSCR
+             74 LOAD_DEREF               6 (pb)
+             76 LOAD_CONST               1 ('floor')
+             78 BINARY_SUBSCR
+             82 COMPARE_OP              55 (!=)
+             86 POP_JUMP_IF_FALSE        1 (to 90)
+
+ 61          88 RETURN_CONST             2 (False)
+
+ 62     >>   90 LOAD_CLOSURE             5 (pa)
+             92 LOAD_CLOSURE             6 (pb)
+             94 BUILD_TUPLE              2
+             96 LOAD_CONST               3 (<code object <genexpr> at 0x0000000001324B70, file "home_breeding_range.py", line 62>)
+             98 MAKE_FUNCTION            8 (closure)
+            100 LOAD_CONST               4 (('x', 'y'))
+            102 GET_ITER
+            104 CALL                     0
+            112 UNPACK_SEQUENCE          2
+            116 STORE_FAST               3 (dx)
+            118 STORE_FAST               4 (dy)
+
+ 63         120 LOAD_GLOBAL              3 (NULL + math)
+            130 LOAD_ATTR                4 (hypot)
+            150 LOAD_FAST                3 (dx)
+            152 LOAD_FAST                4 (dy)
+            154 CALL                     2
+            162 LOAD_GLOBAL              6 (MAX_GAP_CELLS)
+            172 LOAD_CONST               5 (1e-09)
+            174 BINARY_OP                0 (+)
+            178 COMPARE_OP              26 (<=)
+            182 RETURN_VALUE
+
+FUNCTION in_range.<locals>.<genexpr> SOURCE_LINE 62
+              0 COPY_FREE_VARS           2
+
+ 62           2 RETURN_GENERATOR
+              4 POP_TOP
+              6 RESUME                   0
+              8 LOAD_FAST                0 (.0)
+        >>   10 FOR_ITER                48 (to 110)
+             14 STORE_FAST               1 (k)
+             16 LOAD_GLOBAL              1 (NULL + max)
+             26 LOAD_CONST               0 (0)
+             28 LOAD_GLOBAL              3 (NULL + abs)
+             38 LOAD_DEREF               2 (pa)
+             40 LOAD_FAST                1 (k)
+             42 BINARY_SUBSCR
+             46 LOAD_DEREF               3 (pb)
+             48 LOAD_FAST                1 (k)
+             50 BINARY_SUBSCR
+             54 BINARY_OP               10 (-)
+             58 CALL                     1
+             66 LOAD_GLOBAL              4 (CELL_WORLD)
+             76 BINARY_OP               11 (/)
+             80 LOAD_GLOBAL              6 (NEST_CELLS)
+             90 BINARY_OP               10 (-)
+             94 CALL                     2
+            102 YIELD_VALUE              1
+            104 RESUME                   1
+            106 POP_TOP
+            108 JUMP_BACKWARD           50 (to 10)
+        >>  110 END_FOR
+            112 RETURN_CONST             1 (None)
+        >>  114 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+            116 RERAISE                  1
+ExceptionTable:
+  6 to 112 -> 114 [0] lasti
+
+FUNCTION compatible SOURCE_LINE 66
+ 66           0 RESUME                   0
+
+ 67           2 LOAD_FAST                0 (a)
+              4 LOAD_FAST                1 (b)
+              6 BUILD_TUPLE              2
+              8 GET_ITER
+        >>   10 FOR_ITER                80 (to 174)
+             14 STORE_FAST               2 (p)
+
+ 68          16 LOAD_FAST                2 (p)
+             18 LOAD_ATTR                1 (NULL|self + get)
+             38 LOAD_CONST               1 ('guard')
+             40 CALL                     1
+             48 LOAD_CONST               2 (True)
+             50 IS_OP                    0
+             52 POP_JUMP_IF_TRUE        58 (to 170)
+             54 LOAD_FAST                2 (p)
+             56 LOAD_ATTR                1 (NULL|self + get)
+             76 LOAD_CONST               3 ('isGuardPet')
+             78 CALL                     1
+             86 LOAD_CONST               2 (True)
+             88 IS_OP                    0
+             90 POP_JUMP_IF_TRUE        39 (to 170)
+             92 LOAD_FAST                2 (p)
+             94 LOAD_ATTR                1 (NULL|self + get)
+            114 LOAD_CONST               4 ('breedable')
+            116 CALL                     1
+            124 LOAD_CONST               5 (False)
+            126 IS_OP                    0
+            128 POP_JUMP_IF_TRUE        20 (to 170)
+            130 LOAD_FAST                2 (p)
+            132 LOAD_ATTR                1 (NULL|self + get)
+            152 LOAD_CONST               6 ('isBreedable')
+            154 CALL                     1
+            162 LOAD_CONST               5 (False)
+            164 IS_OP                    0
+            166 POP_JUMP_IF_TRUE         1 (to 170)
+            168 JUMP_BACKWARD           80 (to 10)
+
+ 69     >>  170 POP_TOP
+            172 RETURN_CONST             5 (False)
+
+ 67     >>  174 END_FOR
+
+ 70         176 LOAD_CONST               7 (<code object sex at 0x000000000130A230, file "home_breeding_range.py", line 70>)
+            178 MAKE_FUNCTION            0
+            180 STORE_FAST               3 (sex)
+
+ 76         182 LOAD_CONST               8 (<code object groups at 0x0000000001329920, file "home_breeding_range.py", line 76>)
+            184 MAKE_FUNCTION            0
+            186 STORE_FAST               4 (groups)
+
+ 79         188 PUSH_NULL
+            190 LOAD_FAST                3 (sex)
+            192 LOAD_FAST                0 (a)
+            194 CALL                     1
+            202 PUSH_NULL
+            204 LOAD_FAST                3 (sex)
+            206 LOAD_FAST                1 (b)
+            208 CALL                     1
+            216 STORE_FAST               6 (sb)
+            218 STORE_FAST               5 (sa)
+
+ 80         220 PUSH_NULL
+            222 LOAD_FAST                4 (groups)
+            224 LOAD_FAST                0 (a)
+            226 CALL                     1
+            234 PUSH_NULL
+            236 LOAD_FAST                4 (groups)
+            238 LOAD_FAST                1 (b)
+            240 CALL                     1
+            248 STORE_FAST               8 (gb)
+            250 STORE_FAST               7 (ga)
+
+ 81         252 LOAD_FAST                5 (sa)
+            254 POP_JUMP_IF_FALSE        8 (to 272)
+            256 LOAD_FAST                6 (sb)
+            258 POP_JUMP_IF_FALSE        6 (to 272)
+            260 LOAD_FAST                5 (sa)
+            262 LOAD_FAST                6 (sb)
+            264 COMPARE_OP              40 (==)
+            268 POP_JUMP_IF_FALSE        1 (to 272)
+
+ 82         270 RETURN_CONST             5 (False)
+
+ 83     >>  272 LOAD_GLOBAL              3 (NULL + any)
+            282 LOAD_CONST               9 (<code object <genexpr> at 0x0000000001296B50, file "home_breeding_range.py", line 83>)
+            284 MAKE_FUNCTION            0
+            286 LOAD_FAST                7 (ga)
+            288 LOAD_FAST                8 (gb)
+            290 BINARY_OP                0 (+)
+            294 GET_ITER
+            296 CALL                     0
+            304 CALL                     1
+            312 POP_JUMP_IF_FALSE        1 (to 316)
+
+ 84         314 RETURN_CONST             5 (False)
+
+ 85     >>  316 LOAD_CONST              10 (<code object <genexpr> at 0x00000000010FFA60, file "home_breeding_range.py", line 85>)
+            318 MAKE_FUNCTION            0
+            320 LOAD_FAST                7 (ga)
+            322 LOAD_FAST                8 (gb)
+            324 BUILD_TUPLE              2
+            326 GET_ITER
+            328 CALL                     0
+            336 UNPACK_SEQUENCE          2
+            340 STORE_FAST               9 (aa)
+            342 STORE_FAST              10 (bb)
+
+ 86         344 LOAD_FAST                9 (aa)
+            346 POP_JUMP_IF_FALSE       20 (to 388)
+            348 LOAD_FAST               10 (bb)
+            350 POP_JUMP_IF_FALSE       18 (to 388)
+            352 LOAD_FAST                9 (aa)
+            354 LOAD_ATTR                5 (NULL|self + intersection)
+            374 LOAD_FAST               10 (bb)
+            376 CALL                     1
+            384 POP_JUMP_IF_TRUE         1 (to 388)
+
+ 87         386 RETURN_CONST             5 (False)
+
+ 88     >>  388 LOAD_FAST                5 (sa)
+            390 POP_JUMP_IF_FALSE        8 (to 408)
+            392 LOAD_FAST                6 (sb)
+            394 POP_JUMP_IF_FALSE        6 (to 408)
+            396 LOAD_FAST                9 (aa)
+            398 POP_JUMP_IF_FALSE        4 (to 408)
+            400 LOAD_FAST               10 (bb)
+            402 POP_JUMP_IF_FALSE        2 (to 408)
+            404 LOAD_CONST               2 (True)
+            406 RETURN_VALUE
+        >>  408 LOAD_CONST               0 (None)
+            410 RETURN_VALUE
+
+FUNCTION compatible.<locals>.sex SOURCE_LINE 70
+ 70           0 RESUME                   0
+
+ 71           2 LOAD_FAST                0 (p)
+              4 LOAD_ATTR                1 (NULL|self + get)
+             24 LOAD_CONST               1 ('gender')
+             26 CALL                     1
+             34 COPY                     1
+             36 POP_JUMP_IF_TRUE        40 (to 118)
+             38 POP_TOP
+             40 LOAD_FAST                0 (p)
+             42 LOAD_ATTR                1 (NULL|self + get)
+             62 LOAD_CONST               2 ('genderCode')
+             64 CALL                     1
+             72 COPY                     1
+             74 POP_JUMP_IF_TRUE        21 (to 118)
+             76 POP_TOP
+             78 LOAD_FAST                0 (p)
+             80 LOAD_ATTR                1 (NULL|self + get)
+            100 LOAD_CONST               3 ('genderText')
+            102 CALL                     1
+            110 COPY                     1
+            112 POP_JUMP_IF_TRUE         2 (to 118)
+            114 POP_TOP
+            116 LOAD_CONST               4 ('')
+        >>  118 STORE_FAST               1 (raw)
+
+ 72         120 LOAD_GLOBAL              3 (NULL + isinstance)
+            130 LOAD_FAST                1 (raw)
+            132 LOAD_GLOBAL              4 (dict)
+            142 CALL                     2
+            150 POP_JUMP_IF_FALSE       40 (to 232)
+
+ 73         152 LOAD_FAST                1 (raw)
+            154 LOAD_ATTR                1 (NULL|self + get)
+            174 LOAD_CONST               5 ('code')
+            176 CALL                     1
+            184 COPY                     1
+            186 POP_JUMP_IF_TRUE        21 (to 230)
+            188 POP_TOP
+            190 LOAD_FAST                1 (raw)
+            192 LOAD_ATTR                1 (NULL|self + get)
+            212 LOAD_CONST               6 ('name')
+            214 CALL                     1
+            222 COPY                     1
+            224 POP_JUMP_IF_TRUE         2 (to 230)
+            226 POP_TOP
+            228 LOAD_CONST               4 ('')
+        >>  230 STORE_FAST               1 (raw)
+
+ 74     >>  232 LOAD_GLOBAL              7 (NULL + str)
+            242 LOAD_FAST                1 (raw)
+            244 CALL                     1
+            252 LOAD_ATTR                9 (NULL|self + lower)
+            272 CALL                     0
+            280 STORE_FAST               2 (value)
+
+ 75         282 LOAD_FAST                2 (value)
+            284 LOAD_CONST               7 (('1', '雄', '雄性', '男', 'male'))
+            286 CONTAINS_OP              0
+            288 POP_JUMP_IF_FALSE        2 (to 294)
+            290 LOAD_CONST               8 ('male')
+            292 RETURN_VALUE
+        >>  294 LOAD_FAST                2 (value)
+            296 LOAD_CONST               9 (('2', '雌', '雌性', '女', 'female'))
+            298 CONTAINS_OP              0
+            300 POP_JUMP_IF_FALSE        2 (to 306)
+            302 LOAD_CONST              10 ('female')
+            304 RETURN_VALUE
+        >>  306 LOAD_CONST               4 ('')
+            308 RETURN_VALUE
+
+FUNCTION compatible.<locals>.groups SOURCE_LINE 76
+              0 MAKE_CELL                0 (p)
+
+ 76           2 RESUME                   0
+
+ 77           4 LOAD_GLOBAL              1 (NULL + next)
+             14 LOAD_CLOSURE             0 (p)
+             16 BUILD_TUPLE              1
+             18 LOAD_CONST               1 (<code object <genexpr> at 0x000000000155CF10, file "home_breeding_range.py", line 77>)
+             20 MAKE_FUNCTION            8 (closure)
+             22 LOAD_CONST               2 (('eggGroupNames', 'eggGroups', 'eggGroup', 'eggGroupText'))
+             24 GET_ITER
+             26 CALL                     0
+             34 BUILD_LIST               0
+             36 CALL                     2
+             44 STORE_FAST               1 (value)
+
+ 78          46 LOAD_GLOBAL              3 (NULL + isinstance)
+             56 LOAD_FAST                1 (value)
+             58 LOAD_GLOBAL              4 (list)
+             68 CALL                     2
+             76 POP_JUMP_IF_FALSE        2 (to 82)
+             78 LOAD_FAST                1 (value)
+             80 RETURN_VALUE
+        >>   82 LOAD_GLOBAL              7 (NULL + re)
+             92 LOAD_ATTR                8 (split)
+            112 LOAD_CONST               3 ('[、/,，\\s]+')
+            114 LOAD_GLOBAL             11 (NULL + str)
+            124 LOAD_FAST                1 (value)
+            126 CALL                     1
+            134 CALL                     2
+            142 RETURN_VALUE
+
+FUNCTION compatible.<locals>.groups.<locals>.<genexpr> SOURCE_LINE 77
+              0 COPY_FREE_VARS           1
+
+ 77           2 RETURN_GENERATOR
+              4 POP_TOP
+              6 RESUME                   0
+              8 LOAD_FAST                0 (.0)
+        >>   10 FOR_ITER                27 (to 68)
+             14 STORE_FAST               1 (k)
+             16 LOAD_DEREF               2 (p)
+             18 LOAD_ATTR                1 (NULL|self + get)
+             38 LOAD_FAST                1 (k)
+             40 CALL                     1
+             48 POP_JUMP_IF_NOT_NONE     1 (to 52)
+             50 JUMP_BACKWARD           21 (to 10)
+        >>   52 LOAD_DEREF               2 (p)
+             54 LOAD_FAST                1 (k)
+             56 BINARY_SUBSCR
+             60 YIELD_VALUE              1
+             62 RESUME                   1
+             64 POP_TOP
+             66 JUMP_BACKWARD           29 (to 10)
+        >>   68 END_FOR
+             70 RETURN_CONST             0 (None)
+        >>   72 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             74 RERAISE                  1
+ExceptionTable:
+  6 to 48 -> 72 [0] lasti
+  52 to 70 -> 72 [0] lasti
+
+FUNCTION compatible.<locals>.<genexpr> SOURCE_LINE 83
+ 83           0 RETURN_GENERATOR
+              2 POP_TOP
+              4 RESUME                   0
+              6 LOAD_FAST                0 (.0)
+        >>    8 FOR_ITER                 8 (to 28)
+             12 STORE_FAST               1 (g)
+             14 LOAD_FAST                1 (g)
+             16 LOAD_CONST               0 (('无', '未发现', '无法孵蛋', '无蛋组'))
+             18 CONTAINS_OP              0
+             20 YIELD_VALUE              1
+             22 RESUME                   1
+             24 POP_TOP
+             26 JUMP_BACKWARD           10 (to 8)
+        >>   28 END_FOR
+             30 RETURN_CONST             1 (None)
+        >>   32 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             34 RERAISE                  1
+ExceptionTable:
+  4 to 30 -> 32 [0] lasti
+
+FUNCTION compatible.<locals>.<genexpr> SOURCE_LINE 85
+ 85           0 RETURN_GENERATOR
+              2 POP_TOP
+              4 RESUME                   0
+              6 LOAD_FAST                0 (.0)
+        >>    8 FOR_ITER                37 (to 86)
+             12 STORE_FAST               1 (values)
+             14 LOAD_FAST                1 (values)
+             16 GET_ITER
+             18 LOAD_FAST_AND_CLEAR      2 (g)
+             20 SWAP                     2
+             22 BUILD_SET                0
+             24 SWAP                     2
+        >>   26 FOR_ITER                21 (to 72)
+             30 STORE_FAST               2 (g)
+             32 LOAD_FAST                2 (g)
+             34 POP_JUMP_IF_TRUE         1 (to 38)
+             36 JUMP_BACKWARD            6 (to 26)
+        >>   38 LOAD_FAST                2 (g)
+             40 LOAD_CONST               0 (('未知', '暂无蛋组'))
+             42 CONTAINS_OP              1
+             44 POP_JUMP_IF_TRUE         1 (to 48)
+             46 JUMP_BACKWARD           11 (to 26)
+        >>   48 LOAD_GLOBAL              1 (NULL + str)
+             58 LOAD_FAST                2 (g)
+             60 CALL                     1
+             68 SET_ADD                  2
+             70 JUMP_BACKWARD           23 (to 26)
+        >>   72 END_FOR
+             74 SWAP                     2
+             76 STORE_FAST               2 (g)
+             78 YIELD_VALUE              1
+             80 RESUME                   1
+             82 POP_TOP
+             84 JUMP_BACKWARD           39 (to 8)
+        >>   86 END_FOR
+             88 RETURN_CONST             1 (None)
+        >>   90 SWAP                     2
+             92 POP_TOP
+             94 SWAP                     2
+             96 STORE_FAST               2 (g)
+             98 RERAISE                  0
+        >>  100 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+            102 RERAISE                  1
+ExceptionTable:
+  4 to 20 -> 100 [0] lasti
+  22 to 34 -> 90 [3]
+  38 to 44 -> 90 [3]
+  48 to 72 -> 90 [3]
+  74 to 98 -> 100 [0] lasti

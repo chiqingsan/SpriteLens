@@ -213,6 +213,13 @@ def _wire_children(data: bytes):
 
 
 class PetRepositoryTest(unittest.TestCase):
+    def test_voice_overrides_are_read_through_the_public_repository(self):
+        store = Mock()
+        store.voice_overrides.return_value = {1: 0, 2: -35}
+        repo = PetRepository(store=store)
+        self.assertEqual(repo.voice_overrides(42), {1: 0, 2: -35})
+        store.voice_overrides.assert_called_once_with(42)
+
     def test_voice_changes_invalidate_page_version_only_after_success(self):
         store = Mock()
         repo = PetRepository(store=store)

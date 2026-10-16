@@ -278,37 +278,7 @@
       <section id="page-collection-lines" class="page feature-page"><div class="feature-page-root" data-feature="产线收集" data-hint="需要蛋仓与孵化事件的长期积累"></div></section>
       <!-- 我的家园 -->
       <section id="page-home" class="page">
-        <div class="stack">
-          <section class="panel">
-            <div class="panel-head">
-              <h2>家园概览</h2>
-              <span id="home-meta" class="muted">等待家园快照（进入家园后自动更新）</span>
-            </div>
-            <div id="home-deltas" class="banner warn" hidden>
-              <div class="banner-copy"><strong>家园有最新变化</strong>
-                <p>收到增量帧但尚未合并到快照；重新进入家园可刷新完整数据。</p></div>
-            </div>
-          </section>
-          <div class="overview-lower">
-            <section class="panel">
-              <div class="panel-head"><h2>居民宠物</h2><span id="home-resident-count" class="muted"></span></div>
-              <div id="home-residents" class="home-residents"></div>
-              <div id="home-residents-empty" class="empty-hint" hidden>家园中没有居民：进入家园并让宠物上架</div>
-            </section>
-            <div class="overview-side">
-              <section class="panel">
-                <div class="panel-head"><h2>产蛋窝</h2><span id="home-nest-count" class="muted"></span></div>
-                <div id="home-nests" class="home-nests"></div>
-                <div id="home-nests-empty" class="empty-hint" hidden>未发现产蛋窝：放置小窝后自动识别</div>
-              </section>
-              <section class="panel">
-                <div class="panel-head"><h2>家具</h2><span id="home-furniture-count" class="muted"></span></div>
-                <p class="info-line" id="home-furniture-line">—</p>
-                <p class="muted">产蛋配对（layEggCouples）待增量帧样本采集后开放</p>
-              </section>
-            </div>
-          </div>
-        </div>
+        <div id="home-root"></div>
       </section>
       <!-- 炫彩色卡：底色 × 混色矩阵 -->
       <section id="page-colors" class="page">

@@ -28,7 +28,8 @@ class AccountDomainContractTest(unittest.TestCase):
             repo.handle_packet(_identity_event(101))
         self.egg.handle_packet(_event(_egg_row(9001)))
         self.egg.handle_packet(_hatch_event([9001]))
-        self.home.handle_packet(_resident_event(99, "居民 A"))
+        self.home.handle_packet(home_fixtures._scene_event(30001, session_id="s1"))
+        self.home.handle_packet(_resident_event(99, "居民 A", session_id="s1"))
         self.flower.handle_packet(home_fixtures.FlowerTests()._flower_event())
 
     def test_serialization_keeps_captured_owner_after_switch(self) -> None:

@@ -258,6 +258,12 @@ class PetRepository:
             self._version += 1
         return True
 
+    def voice_overrides(self, uid: int) -> dict[int, int]:
+        """读取指定账号的手动声音值；无存储时没有覆盖值。"""
+        if self._store is None or uid <= 0:
+            return {}
+        return self._store.voice_overrides(uid)
+
     def load_last_account(self) -> int:
         """载入最近账号的历史宠物；返回补入条数。"""
         accounts = self.cached_accounts()

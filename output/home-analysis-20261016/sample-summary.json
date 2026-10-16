@@ -1,0 +1,188 @@
+{
+  "source_log_name": "eventlog_20261016.jsonl",
+  "notes": [
+    "Only aggregate numeric observations are retained; decoded byte fields in JSONL are lossy and not raw packet fixtures.",
+    "Read-only SQLite lookup against the current database; no live game traffic or cloud API requested."
+  ],
+  "pet_db_matches": {
+    "residents": 11,
+    "matched_instances": 11
+  },
+  "scene_sequence": [
+    {
+      "line": 15,
+      "opcode": "0x0152",
+      "scene_resource": 30001
+    },
+    {
+      "line": 23,
+      "opcode": "0x014A",
+      "has_home_info": true,
+      "counts": {
+        "room_level": 5,
+        "residents": 11,
+        "furniture": 81,
+        "nests": 11,
+        "ordinary_nests": 10,
+        "academy_nests": 1,
+        "couples": 6,
+        "father_links": 14
+      },
+      "legacy_interpretation": {
+        "room_level": 10,
+        "residents": 1,
+        "furniture": 1
+      }
+    },
+    {
+      "line": 1818,
+      "opcode": "0x015C",
+      "scene_resource": 10003
+    },
+    {
+      "line": 1826,
+      "opcode": "0x014A",
+      "has_home_info": false,
+      "counts": {
+        "room_level": 6,
+        "residents": 0,
+        "furniture": 1,
+        "nests": 0,
+        "ordinary_nests": 0,
+        "academy_nests": 0,
+        "couples": 0,
+        "father_links": 0
+      },
+      "legacy_interpretation": {
+        "room_level": 6,
+        "residents": 0,
+        "furniture": 1
+      }
+    },
+    {
+      "line": 1949,
+      "opcode": "0x015C",
+      "scene_resource": 30001
+    },
+    {
+      "line": 1955,
+      "opcode": "0x014A",
+      "has_home_info": true,
+      "counts": {
+        "room_level": 5,
+        "residents": 11,
+        "furniture": 81,
+        "nests": 11,
+        "ordinary_nests": 10,
+        "academy_nests": 1,
+        "couples": 6,
+        "father_links": 14
+      },
+      "legacy_interpretation": {
+        "room_level": 10,
+        "residents": 1,
+        "furniture": 1
+      }
+    },
+    {
+      "line": 3752,
+      "opcode": "0x015C",
+      "scene_resource": 30002
+    },
+    {
+      "line": 3757,
+      "opcode": "0x014A",
+      "has_home_info": true,
+      "counts": {
+        "room_level": 5,
+        "residents": 0,
+        "furniture": 81,
+        "nests": 11,
+        "ordinary_nests": 10,
+        "academy_nests": 1,
+        "couples": 6,
+        "father_links": 14
+      },
+      "legacy_interpretation": {
+        "room_level": 10,
+        "residents": 1,
+        "furniture": 1
+      }
+    },
+    {
+      "line": 4630,
+      "opcode": "0x015C",
+      "scene_resource": 10003
+    },
+    {
+      "line": 4636,
+      "opcode": "0x014A",
+      "has_home_info": false,
+      "counts": {
+        "room_level": 6,
+        "residents": 0,
+        "furniture": 1,
+        "nests": 0,
+        "ordinary_nests": 0,
+        "academy_nests": 0,
+        "couples": 0,
+        "father_links": 0
+      },
+      "legacy_interpretation": {
+        "room_level": 6,
+        "residents": 0,
+        "furniture": 1
+      }
+    },
+    {
+      "line": 5818,
+      "opcode": "0x015C",
+      "scene_resource": 30002
+    },
+    {
+      "line": 5831,
+      "opcode": "0x014A",
+      "has_home_info": true,
+      "counts": {
+        "room_level": 5,
+        "residents": 0,
+        "furniture": 81,
+        "nests": 11,
+        "ordinary_nests": 10,
+        "academy_nests": 1,
+        "couples": 6,
+        "father_links": 14
+      },
+      "legacy_interpretation": {
+        "room_level": 10,
+        "residents": 1,
+        "furniture": 1
+      }
+    },
+    {
+      "line": 5919,
+      "opcode": "0x015C",
+      "scene_resource": 30001
+    },
+    {
+      "line": 5922,
+      "opcode": "0x014A",
+      "has_home_info": true,
+      "counts": {
+        "room_level": 5,
+        "residents": 11,
+        "furniture": 81,
+        "nests": 11,
+        "ordinary_nests": 10,
+        "academy_nests": 1,
+        "couples": 6,
+        "father_links": 14
+      },
+      "legacy_interpretation": {
+        "room_level": 10,
+        "residents": 1,
+        "furniture": 1
+      }
+    }
+  ]
+}

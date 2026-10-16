@@ -58,9 +58,14 @@
   var eggBoxPage = null;
   var eggBoxPageGeneration = 0;
   var eggBoxVersion = -1;
+  var homePage = null;
+  var homePageGeneration = 0;
+  var homeVersion = -1;
   window.addEventListener("pagehide", function () {
     eggBoxPageGeneration++;
+    homePageGeneration++;
     if (eggBoxPage) { eggBoxPage.unmount(); eggBoxPage = null; }
+    if (homePage) { homePage.unmount(); homePage = null; }
     if (petInventory) { petInventory.unmount(); }
     if (petFilters) { petFilters.unmount(); }
     eggDex.unmount();
@@ -133,6 +138,7 @@
     if (name === "pets" || name === "egg-box") { $("page-" + name).classList.add("page-cached"); }
     if (state.page === "egg-box" && name !== "egg-box") { pauseEggBoxPage(); }
     else { accountRequests.cancel(state.page); }
+    if (state.page === "home" && name !== "home" && homePage) { homePage.pause(); }
     if (state.page === "breeder-library") {
       accountRequests.cancel("breeder-male"); accountRequests.cancel("breeder-female");
     }
@@ -156,7 +162,7 @@
     if (name === "egg-dex") { eggDex.load(); }
     if (name === "egg-box") { loadEggBoxPage(true); }
     if (name === "male-matrix") { loadMaleMatrix(); }
-    if (name === "home") { loadHome(); }
+    if (name === "home") { loadHome(true); }
     if (name === "breeder-library") { loadBreederLibrary(); }
     if (name === "flowers") { loadFlowers(); }
     if (name === "colors") { loadColors(); }
@@ -255,7 +261,8 @@
     state.hbData = null; state.hbSpecies = []; state.hbSelected = null;
     eggBoxVersion = -1;
     if (eggBoxPage) { eggBoxPage.resetAccount(); }
-    homeState.data = { available: false }; homeState.version = -1; renderHome();
+    homeVersion = -1;
+    if (homePage) { homePage.resetAccount(); }
     flowerState.data = { available: false }; flowerState.version = -1; renderFlowers();
     mmState.data = null; mmState.selected = null;
     ["hb-grid", "mm-matrix", "bl-male", "bl-female", "cl-matrix", "cl-seasonal", "cl-unknown"].forEach(function (id) {
@@ -307,9 +314,9 @@
       eggBoxVersion = payload.egg_box_version;
       if (state.page === "egg-box") { loadEggBoxPage(); }
     }
-    if (payload.home_version !== undefined && payload.home_version !== homeState.version) {
-      homeState.version = payload.home_version;
-      if (state.page === "home") { loadHome(); }
+    if (payload.home_version !== undefined && payload.home_version !== homeVersion) {
+      homeVersion = payload.home_version;
+      if (state.page === "home") { loadHome(true); }
     }
     if (payload.flower_version !== undefined && payload.flower_version !== flowerState.version) {
       flowerState.version = payload.flower_version;
@@ -339,6 +346,7 @@
       var refresh = { pets: loadPets, handbook: loadHandbook, "male-matrix": loadMaleMatrix,
         "breeder-library": loadBreederLibrary, colors: loadColors };
       if (refresh[state.page]) { refresh[state.page](false); }
+      if (state.page === "home") { loadHome(false); }
     }
   }
 
@@ -962,58 +970,25 @@
     });
   }
 
-  /* ---------- 我的家园 ---------- */
-  var homeState = { data: null, version: -1 };
-
-  function loadHome() {
-    return accountRequests.request("home", "/api/home").then(function (payload) {
-      if (!payload) { return; }
-      homeState.data = payload;
-      homeState.version = payload.version || 0;
-      renderHome();
-    }).catch(function (err) { toast("家园加载失败：" + err.message, true); });
-  }
-
-  function renderHome() {
-    var payload = homeState.data;
-    if (!payload) { return; }
-    $("home-deltas").hidden = !(payload.pending_deltas > 0);
-    if (!payload.available) {
-      $("home-meta").textContent = "等待家园快照（进入家园后自动更新）";
-      $("home-resident-count").textContent = "—"; $("home-nest-count").textContent = "—";
-      $("home-residents").innerHTML = "";
-      $("home-residents-empty").hidden = false;
-      $("home-nests").innerHTML = "";
-      $("home-nests-empty").hidden = false;
-      $("home-furniture-line").textContent = "—";
-      return;
-    }
-    $("home-meta").textContent = "房间等级 " + payload.room_level + " · 观察快照 #" + payload.version + "（完整性未确认）";
-    var residents = payload.residents || [];
-    $("home-resident-count").textContent = residents.length + " 只";
-    $("home-residents").innerHTML = residents.map(function (r) {
-      var gender = r.gender === 2 ? '<span class="female-mark"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/static/icons/sprite.svg#gender-female"></use></svg></span>'
-        : (r.gender === 1 ? '<span class="male-mark"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/static/icons/sprite.svg#gender-male"></use></svg></span>' : "");
-      var img = r.icon_url
-        ? '<img src="' + esc(r.icon_url) + '" alt="" loading="lazy" onerror="this.remove()">'
-        : "";
-      return '<div class="home-resident">'
-        + '<span class="pc-avatar">' + esc((r.name || "?").slice(0, 1)) + img + "</span>"
-        + '<div><b>' + esc(r.name) + "</b>" + gender
-        + '<small>' + (r.level ? "Lv" + r.level : "") + (r.species_name ? " · " + esc(r.species_name) : "") + "</small></div>"
-        + '<span class="muted home-pos">坐标 ' + r.position.join(", ") + "</span></div>";
-    }).join("");
-    $("home-residents-empty").hidden = residents.length > 0;
-    var nests = payload.nests || [];
-    $("home-nest-count").textContent = nests.length + " 个";
-    $("home-nests").innerHTML = nests.map(function (nest) {
-      return '<div class="home-nest"><div><b>' + esc(nest.name) + "</b>"
-        + '<small>配置 #' + nest.config_id + " · 坐标 " + nest.position.join(", ") + "</small></div>"
-        + '<span class="status-pill">产蛋窝</span></div>';
-    }).join("");
-    $("home-nests-empty").hidden = nests.length > 0;
-    var furniture = payload.furniture || [];
-    $("home-furniture-line").textContent = "共 " + furniture.length + " 件（含窝 " + nests.length + "）";
+  /* ---------- Vue 家园页：账号请求仍由应用壳做 UID/version 校验 ---------- */
+  function loadHome(reuse) {
+    if (homePage) { return reuse ? homePage.resume(homeVersion) : homePage.load(); }
+    var current = ++homePageGeneration;
+    var root = $("home-root");
+    root.textContent = "正在加载家园页面…";
+    return import("/static/vue/entry.js").then(function (page) {
+      if (current !== homePageGeneration || state.page !== "home") { return; }
+      homePage = page.mountHome(root, {
+        load: function () { return accountRequests.request("home", "/api/home"); },
+        cancel: function () { accountRequests.cancel("home"); },
+        versionChanged: function (version) { homeVersion = version; }
+      });
+      return homePage.load();
+    }).catch(function (err) {
+      if (current !== homePageGeneration || state.page !== "home") { return; }
+      root.textContent = "家园页面启动失败，请切页重试：" + err.message;
+      toast("家园页面启动失败：" + err.message, true);
+    });
   }
 
   /* ---------- 种公母库（性别分组的配种宠物库） ---------- */

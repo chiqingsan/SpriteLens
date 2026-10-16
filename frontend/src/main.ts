@@ -5,6 +5,7 @@ import { createApiClient } from './api/client'
 import EggBoxPage from './pages/EggBoxPage.vue'
 import type { EggBoxHost } from './composables/useEggBox'
 import EggDexPage from './pages/EggDexPage.vue'
+export { mountHome } from './homeBridge'
 export { mountPetFilters } from './petFilterBridge'
 export { mountPetInventory } from './petInventoryBridge'
 

@@ -54,6 +54,25 @@ def validate_shortcuts(raw: object) -> list:
     return result
 
 
+def validate_home_orders(raw: object) -> dict[str, list[str]]:
+    if not isinstance(raw, dict) or len(raw) > 64:
+        raise ValueError("家园排序账号数量无效")
+    result: dict[str, list[str]] = {}
+    for uid, actor_ids in raw.items():
+        if (not isinstance(uid, str) or not uid.isascii() or not uid.isdecimal()
+                or not 0 < int(uid) < 1 << 64 or str(int(uid)) != uid):
+            raise ValueError("家园排序账号编号无效")
+        if not isinstance(actor_ids, list) or len(actor_ids) > 2000:
+            raise ValueError("家园排序列表无效")
+        if any(not isinstance(actor_id, str) or not actor_id.isascii() or not actor_id.isdecimal()
+               or not 0 < int(actor_id) < 1 << 64 or str(int(actor_id)) != actor_id for actor_id in actor_ids):
+            raise ValueError("家园排序居民编号无效")
+        if len(set(actor_ids)) != len(actor_ids):
+            raise ValueError("家园排序居民编号重复")
+        result[uid] = list(actor_ids)
+    return result
+
+
 def normalize_preferences(raw: object) -> dict:
     raw = raw if isinstance(raw, dict) else {}
     fields = raw.get("fields") if isinstance(raw.get("fields"), dict) else {}
@@ -65,6 +84,10 @@ def normalize_preferences(raw: object) -> dict:
         shortcuts = validate_shortcuts(saved)
     except ValueError:
         shortcuts = []
+    try:
+        home_orders = validate_home_orders(raw.get("home_orders", {}))
+    except ValueError:
+        home_orders = {}
     if not raw.get("shortcuts_initialized"):
         # 旧版四个预设在界面写死；迁移为完整快捷列表，空列表也可明确保存。
         shortcuts = [{"name": name, "filters": {"marks": [name]}}
@@ -73,7 +96,8 @@ def normalize_preferences(raw: object) -> dict:
             "pet_view": raw.get("pet_view") if isinstance(raw.get("pet_view"), str) and raw.get("pet_view") in VIEWS else "point",
             "pet_image": raw.get("pet_image") if isinstance(raw.get("pet_image"), str) and raw["pet_image"] in IMAGE_MODES else "portrait",
             "fields": {key: fields[key] if isinstance(fields.get(key), bool) else key != "positions" for key in FIELDS},
-            "shortcuts": shortcuts}
+            "shortcuts": shortcuts,
+            "home_orders": home_orders}
 
 
 class UIPreferencesViewModel:
@@ -84,7 +108,7 @@ class UIPreferencesViewModel:
         return normalize_preferences(self._settings.get_value("ui.preferences", {}))
 
     def update(self, changes: object) -> dict:
-        if not isinstance(changes, dict) or set(changes) - {"theme", "pet_view", "pet_image", "fields", "shortcuts"}:
+        if not isinstance(changes, dict) or set(changes) - {"theme", "pet_view", "pet_image", "fields", "shortcuts", "home_orders"}:
             raise ValueError("只允许界面偏好与快捷条件定义")
         if "theme" in changes and (not isinstance(changes["theme"], str) or changes["theme"] not in THEMES):
             raise ValueError("未知主题")
@@ -96,12 +120,15 @@ class UIPreferencesViewModel:
         if not isinstance(fields, dict) or set(fields) - set(FIELDS) or any(not isinstance(v, bool) for v in fields.values()):
             raise ValueError("显示字段必须是允许的布尔值")
         shortcuts = validate_shortcuts(changes["shortcuts"]) if "shortcuts" in changes else None
+        home_orders = validate_home_orders(changes["home_orders"]) if "home_orders" in changes else None
         def merge(previous):
             value = normalize_preferences(previous)
             value.update({key: changes[key] for key in ("theme", "pet_view", "pet_image") if key in changes})
             value["fields"].update(fields)
             if shortcuts is not None:
                 value["shortcuts"] = shortcuts
+            if home_orders is not None:
+                value["home_orders"] = home_orders
             value["shortcuts_initialized"] = True
             return value
         return normalize_preferences(self._settings.update_checked("ui.preferences", merge))

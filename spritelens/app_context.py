@@ -29,6 +29,7 @@ from spritelens.protocol.opcodes import OpcodeCatalog
 from spritelens.protocol.schema import load_library
 from spritelens.repositories.database import Database
 from spritelens.repositories.egg_store import EggStore
+from spritelens.repositories.home_store import HomeStore
 from spritelens.repositories.pet_store import PetStore
 from spritelens.repositories.settings import DEFAULT_CAPTURE_PORT, SettingsRepository
 from spritelens.services.egg_repository import EggBoxRepository
@@ -62,6 +63,7 @@ class AppContext:
     egg_catalog: EggCatalog | None = None  # 蛋目录（缺失时蛋相关页面降级）
     color_catalog: ColorCatalog | None = None  # 色卡目录（缺失时色卡页降级）
     egg_store: EggStore | None = None
+    home_store: HomeStore | None = None
     egg_box: EggBoxRepository | None = None  # 蛋仓聚合（缺失时蛋仓页面空态）
     home_repo: HomeRepository | None = None  # 家园快照（缺失时家园页空态）
     flower_repo: FlowerRepository | None = None  # 花田快照（缺失时花种页空态）
@@ -72,7 +74,7 @@ class AppContext:
     def close(self) -> None:
         """停监听、排空异步写入并按逆序释放资源（幂等；退出路径唯一）。
 
-        先停采集，再关闭事件日志、两个 Store 与 KeyStore，最后关闭
+        先停采集，再关闭事件日志、各 Store 与 KeyStore，最后关闭
         Database。任何持久化 worker 未确认退出或仍有待写数据时，保留
         其下游资源和可重试的关闭所有权。
         """
@@ -115,6 +117,12 @@ class AppContext:
             except Exception as exc:  # noqa: BLE001 - 失败时仍保留 Database
                 store_failures.append(("蛋仓仓库", exc))
                 logger.warning("关闭蛋仓仓库失败: %s", exc)
+        if self.home_store is not None:
+            try:
+                self.home_store.close()
+            except Exception as exc:  # noqa: BLE001 - 失败时仍保留 Database
+                store_failures.append(("家园仓库", exc))
+                logger.warning("关闭家园仓库失败: %s", exc)
         if store_failures:
             label, exc = store_failures[0]
             raise RuntimeError(f"关闭 {label} 失败: {exc}") from exc
@@ -199,9 +207,14 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
     _created(event_log.close)  # 构造即启动 worker：失败必须回收线程
     monitor.add_packet_listener(event_log.handle_packet)
 
-    # 家园快照聚合（0x014A 全量 + 增量版本提示）
-    home_repo = HomeRepository()
+    # 家园快照聚合（0x014A 全量 + 增量合并 + 本地历史快照）
+    home_store = HomeStore(database)
+    _created(home_store.close)
+    home_repo = HomeRepository(store=home_store)
     monitor.add_packet_listener(home_repo.handle_packet)
+    restored_home = home_repo.load_account(display_uid) if display_uid else False
+    if restored_home:
+        logger.info("已载入历史家园快照（账号 %s）", display_uid)
 
     # 花田快照聚合（0x0375）
     flower_repo = FlowerRepository()
@@ -245,6 +258,7 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
         egg_catalog=egg_catalog,
         color_catalog=color_catalog,
         egg_store=egg_store,
+        home_store=home_store,
         home_repo=home_repo,
         flower_repo=flower_repo,
         database=database,

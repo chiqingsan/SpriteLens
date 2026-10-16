@@ -1,0 +1,97 @@
+{
+  "status": "diagnostic sample; not SLA",
+  "syntheticPets": 2000,
+  "cssPageAnimationMs": 280,
+  "measurement": "Read from injected DOM log; two rAF callbacks are a sampling point, not a precise paint or interactive metric.",
+  "samples": [
+    {
+      "page": "pets",
+      "visit": "first",
+      "clickToFrameMs": 55.8,
+      "requestThroughJsonMs": 90.7,
+      "requestStartToTwoFramesMs": 115.1,
+      "clickToAnimationEndMs": 343.2,
+      "longTasksMs": [
+        55
+      ]
+    },
+    {
+      "page": "egg-box",
+      "visit": "first",
+      "clickToFrameMs": 16.6,
+      "requestThroughJsonMs": 28.2,
+      "requestStartToTwoFramesMs": 134.4,
+      "clickToAnimationEndMs": 303.5,
+      "longTasksMs": [
+        90
+      ],
+      "articleCount": 10
+    },
+    {
+      "page": "egg-dex",
+      "visit": "first",
+      "clickToFrameMs": 5,
+      "requestThroughJsonMs": 19.7,
+      "requestStartToTwoFramesMs": 374.5,
+      "clickToAnimationEndMs": 409.1,
+      "longTasksMs": [
+        59,
+        281
+      ],
+      "articleCount": 224
+    },
+    {
+      "page": "overview",
+      "visit": "return",
+      "clickToFrameMs": 21.5,
+      "requestThroughJsonMs": 94.3,
+      "requestStartToTwoFramesMs": 97.6,
+      "clickToAnimationEndMs": 309,
+      "longTasksMs": []
+    },
+    {
+      "page": "egg-dex",
+      "visit": "return",
+      "clickToFrameMs": 3.7,
+      "requestThroughJsonMs": 15,
+      "requestStartToTwoFramesMs": 167.1,
+      "clickToAnimationEndMs": 322.5,
+      "longTasksMs": [
+        69,
+        99
+      ],
+      "articleCount": 224
+    },
+    {
+      "page": "handbook",
+      "visit": "first",
+      "clickToFrameMs": 16.8,
+      "requestThroughJsonMs": 38.9,
+      "requestStartToTwoFramesMs": 129.6,
+      "clickToAnimationEndMs": 303,
+      "longTasksMs": [
+        71
+      ],
+      "articleCount": 120
+    },
+    {
+      "page": "pets",
+      "visit": "return",
+      "clickToFrameMs": 17.4,
+      "requestThroughJsonMs": 111.1,
+      "requestStartToTwoFramesMs": 132,
+      "clickToAnimationEndMs": 309.5,
+      "longTasksMs": []
+    },
+    {
+      "page": "egg-box",
+      "visit": "return",
+      "clickToFrameMs": 10.8,
+      "requestThroughJsonMs": 76.4,
+      "requestStartToTwoFramesMs": 96.7,
+      "clickToAnimationEndMs": 317.1,
+      "longTasksMs": [],
+      "articleCount": 10
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{"probe":"inventory","pets":100,"state_ms":0.12,"payload_ms":1.78,"json_ms":0.64,"utf8_bytes":71745}
+{"probe":"inventory","pets":1107,"state_ms":1.24,"payload_ms":15.12,"json_ms":6.47,"utf8_bytes":713378}
+{"probe":"inventory","pets":2000,"state_ms":2.51,"payload_ms":27.26,"json_ms":10.52,"utf8_bytes":1290729}
+{"probe":"event_drain","events":100,"fields_per_event":1000,"elapsed_ms":0.6}
+{"probe":"event_drain","events":500,"fields_per_event":1000,"elapsed_ms":1.78}
+{"probe":"event_drain","events":2000,"fields_per_event":1000,"elapsed_ms":7.3}
+{"probe":"read_waits_inflight_flush","store":"pet","blocked_until_commit":true,"found":[true]}
+{"probe":"read_waits_inflight_flush","store":"egg","blocked_until_commit":true,"found":[true]}
+{"probe":"lazy_event_detail","format_calls_after_drain":0,"format_calls_after_two_reads":1,"same_detail":true,"retained":200,"evicted_text":"(详情已随滚动淘汰)"}
+{"probe":"recorder_slow_disk","append_total_ms":0.03,"chunks":20,"dropped":0}
+{"probe":"checkpoint_coalesces_versions","written_sequences":[10,12],"writer_alive":false}

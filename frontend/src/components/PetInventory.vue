@@ -21,6 +21,13 @@ const emptyText = computed(() => view.value === 'point'
   ? teams.value ? '尚未采集出战队伍，登录游戏后同步。' : data.value?.backpack.boxes.length ? '已采集的箱子均为空箱，可切换出战背包查看队伍。' : '尚未采集游戏箱表。登录游戏后同步，可切换自定义排序查看已采集精灵。'
   : data.value?.total ? '没有符合筛选条件的精灵，可清除筛选后查看全部。' : '暂无精灵数据：开始采集后登录游戏，等待数据同步。')
 function select(gid: number, element: HTMLElement | null) { selected.value = gid; trigger.value = element; detailOpen.value = true; if (element) emit('select', gid, element) }
+function selectGid(gid: number) {
+  if (!model.find(gid)) return false
+  selected.value = gid
+  trigger.value = null
+  detailOpen.value = true
+  return true
+}
 function closeDetail(preserve = false) { detailOpen.value = false; if (!preserve) selected.value = null }
 async function setBox(id: number) {
   closeDetail(true); emit('close', true); model.setBox(id)
@@ -34,6 +41,7 @@ function setPage(value: number) { closeDetail(); emit('close'); page.value = val
 function openTeams() { closeDetail(); emit('close'); model.setView('point'); emit('view', 'point'); void setBox(0) }
 function locate(id: number) { model.setView('point'); emit('view', 'point'); void setBox(id) }
 defineExpose({ setBox, closeDetail, openDetail: () => { if (selected.value !== null) detailOpen.value = true },
+  selectGid,
   saveScroll: () => { scrollTop = wrap.value!.scrollTop; scrollLeft = wrap.value!.scrollLeft },
   restoreScroll: () => { wrap.value!.scrollTop = scrollTop; wrap.value!.scrollLeft = scrollLeft } })
 </script>

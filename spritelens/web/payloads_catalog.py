@@ -6,10 +6,15 @@ payloads.py 保留兼容重导出。本模块不依赖 aiohttp 与 pywebview。
 
 from __future__ import annotations
 
+from dataclasses import replace
+from math import trunc
+
 from spritelens.domain.static_data import StaticData
 from spritelens.domain.display import TYPE_COLORS
 from spritelens.domain.egg_box import EGG_KIND_LABELS, egg_kind
+from spritelens.domain.home_breeding import HomeBreedingProfile, infer_range_couples
 from spritelens.domain.measurements import range_position, range_text
+from spritelens.domain.pet_marks import pet_marks
 from spritelens.web.pet_media import pet_images
 from spritelens.services.egg_repository import EggBoxSnapshot
 from spritelens.services.home_repository import HomeRepoSnapshot
@@ -272,45 +277,170 @@ def colors_payload(pet_repository, catalog, static: StaticData | None) -> dict:
         "card_total": len(cards),
         "pet_total": total,
     }
-def home_payload(home_repo, static: StaticData | None) -> dict:
-    """我的家园载荷：居民（联查物种图标）/ 家具 / 产蛋窝 / 增量提示。"""
+def home_payload(home_repo, static: StaticData | None, pet_repository=None, egg_catalog=None) -> dict:
+    """我的家园载荷：居民 / 已识别小窝 / 配对与增量状态。"""
     view = home_repo.consistent_snapshot() if home_repo is not None else HomeRepoSnapshot(None, 0, 0, 0)
     snap = view.data
     metadata = {"uid": view.uid, "version": view.version, "pending_deltas": view.pending_deltas,
-                "complete": None, "source": "stale" if snap and view.pending_deltas else "observed" if snap else "unknown"}
+                  "complete": None, "source": view.source}
     if snap is None:
-        return {"available": False, "residents": [], "furniture": [], "nests": [],
+        return {"available": False, "residents": [], "nests": [],
+                "couples": [], "inferred_couples": [], "scene_eggs": [], "couples_stale": False,
                 "room_level": 0, **metadata}
+    couples_stale = snap.couples_stale or view.pending_deltas > 0
+    pet_view = pet_repository.consistent_snapshot() if pet_repository is not None else None
+    pets_by_gid = (
+        {pet.gid: pet for pet in pet_view.pets}
+        if pet_view is not None and pet_view.uid == view.uid else {}
+    )
+    voice_overrides = (
+        pet_repository.voice_overrides(view.uid)
+        if pet_repository is not None and pet_view is not None and pet_view.uid == view.uid
+        else {}
+    )
     residents = []
+    breeding_profiles = {}
     for r in snap.residents:
-        species = static.species(r.actor_id & 0xFFFF) if static is not None else None
+        pet = pets_by_gid.get(r.instance_id) if r.instance_id else None
+        base_conf_id = r.base_conf_id or (pet.base_conf_id if pet else 0)
+        species = static.species(base_conf_id) if static is not None and base_conf_id else None
+        gender = r.gender or (pet.gender if pet else 0)
+        nature_name = static.nature_name(pet.nature) if static is not None and pet and pet.nature else ""
+        voice = (voice_overrides[pet.gid] if pet and pet.gid in voice_overrides
+                 else pet.voice if pet and pet.voice != 0 else None)
+        effective_pet = replace(pet, voice=voice) if pet is not None and voice is not None else pet
+        height_position = range_position(pet.height, species.height_range) if pet and species else {"ratio": None}
+        weight_position = range_position(pet.weight, species.weight_range) if pet and species else {"ratio": None}
+        egg = egg_catalog.egg_by_base_id(base_conf_id) if egg_catalog is not None and base_conf_id else None
+        if r.actor_id:
+            breeding_profiles[r.actor_id] = HomeBreedingProfile(
+                gender=gender,
+                egg_groups=tuple(species.egg_groups) if species is not None else (),
+            )
         residents.append({
             # uint64 必须在 JSON 序列化之前转字符串，JS Number 无法区分相邻 ID。
             "actor_id": str(r.actor_id),
-            "name": r.name,
-            "gender": r.gender,
-            "level": r.level,
-            "position": list(r.position),
-            "icon_url": species_icon_url(species.base_conf_id if species else 0),
+            "instance_id": str(r.instance_id),
+            "base_conf_id": base_conf_id,
+            "nest_guid": r.nest_guid,
+            "name": r.name or (pet.name if pet else ""),
+            "gender": gender,
+            "is_shiny": bool(pet and pet.mutation_type & 1),
+            "is_colorful": bool(pet and pet.mutation_type & 8),
+            "level": r.level or (pet.level if pet else 0),
+            "nature_name": nature_name,
+            "voice": voice,
+            "height_text": f"{pet.height / 100:.2f} m" if pet and pet.height else "",
+            "weight_text": f"{pet.weight / 1000:.2f} kg" if pet and pet.weight else "",
+            "height_pct": height_position["ratio"],
+            "weight_pct": weight_position["ratio"],
+            "medals": pet_marks(effective_pet, species.weight_range if species else (0, 0)) if effective_pet else [],
+            "egg_name": egg.egg_name if egg is not None else "",
+            "egg_icon_url": f"/static/egg-icons/{egg.egg_item_id}.png" if egg and egg.egg_item_id else "",
+            "egg_weight_range": {"min": egg.weight_low, "max": egg.weight_high}
+            if egg is not None and egg.weight_high > egg.weight_low else None,
+            "egg_groups": list(species.egg_groups) if species is not None else [],
+            "icon_url": species_icon_url(base_conf_id),
             "species_name": species.name if species else "",
         })
-    furniture = [
+    nests = [
         {
             "config_id": f.config_id,
             "guid": f.guid,
             "kind": f.kind,
             "name": f.name,
-            "position": list(f.position),
+            "resident_ids": [str(actor_id) for actor_id in f.resident_ids],
         }
-        for f in snap.furniture
+        for f in snap.nests
     ]
-    nests = [f for f in furniture if f["kind"] != "furniture"]
+    resident_by_actor = {str(row["actor_id"]): row for row in residents}
+    academy_nests = {str(row["guid"]) for row in nests if row["kind"] == "academy"}
+
+    def parent(actor_id: int) -> dict:
+        row = resident_by_actor.get(str(actor_id))
+        if row is None:
+            return {"actor_id": str(actor_id), "name": "资料缺失", "nature": None,
+                    "voice": None, "academy": False, "missing": True}
+        return {"actor_id": str(actor_id), "name": row["name"] or "资料缺失",
+                "nature": row["nature_name"] or None, "voice": row["voice"],
+                "academy": row["nest_guid"] in academy_nests, "missing": False}
+
+    def nature_prediction(mother: dict, fathers: list[dict]) -> dict:
+        distribution: dict[str, float] = {}
+        random_percent = 0.0
+        unknown_percent = 0.0
+
+        def add(nature: str | None, percent: float) -> None:
+            nonlocal unknown_percent
+            if nature:
+                distribution[nature] = distribution.get(nature, 0.0) + percent
+            else:
+                unknown_percent += percent
+
+        if mother["missing"] or not fathers:
+            return {"distribution": {}, "random_percent": 0.0, "unknown_percent": 100.0,
+                    "assumption": "equal-father-probability"}
+        weight = 1 / len(fathers)
+        for father in fathers:
+            if father["missing"]:
+                unknown_percent += 100 * weight
+            elif mother["academy"] and father["academy"]:
+                add(mother["nature"] if mother["nature"] == father["nature"] else None, 100 * weight)
+            elif mother["academy"]:
+                add(mother["nature"], 100 * weight)
+            elif father["academy"]:
+                add(father["nature"], 100 * weight)
+            else:
+                add(mother["nature"], 30 * weight)
+                add(father["nature"], 30 * weight)
+                random_percent += 40 * weight
+        return {"distribution": {name: round(percent, 2) for name, percent in distribution.items()},
+                "random_percent": round(random_percent, 2), "unknown_percent": round(unknown_percent, 2),
+                "assumption": "equal-father-probability"}
+
+    def couple_payload(couple, pairing_basis: str) -> dict:
+        mother = parent(couple.female_actor_id)
+        fathers = [parent(actor_id) for actor_id in couple.male_actor_ids]
+        return {
+            "female_actor_id": str(couple.female_actor_id),
+            "female_name": mother["name"],
+            "female_nature": mother["nature"],
+            "female_is_academy": mother["academy"],
+            "male_actor_ids": [str(actor_id) for actor_id in couple.male_actor_ids],
+            "male_names": [father["name"] for father in fathers],
+            "male_natures": [father["nature"] for father in fathers],
+            "male_is_academy": [father["academy"] for father in fathers],
+            "voice_predictions": [
+                {"father_actor_id": str(actor_id), "father_name": father["name"],
+                 "voice": trunc((mother["voice"] + father["voice"]) / 2)
+                 if mother["voice"] is not None and father["voice"] is not None else None}
+                for actor_id, father in zip(couple.male_actor_ids, fathers)
+            ],
+            "mode": "academy-mother" if mother["academy"] else
+                    "academy-father" if any(father["academy"] for father in fathers)
+                    else "ordinary",
+            "pairing_basis": pairing_basis,
+            "nature_prediction": nature_prediction(mother, fathers),
+        }
+
+    couples = [couple_payload(couple, "scene") for couple in snap.couples]
+    inferred_couples = [
+        couple_payload(couple, "nest-range")
+        for couple in infer_range_couples(snap.residents, snap.nests, breeding_profiles)
+    ] if couples_stale else []
     return {
         "available": True,
         "room_level": snap.room_level,
         "residents": residents,
-        "furniture": furniture,
         "nests": nests,
+        "couples": couples,
+        "inferred_couples": inferred_couples,
+        "scene_eggs": [
+            {"actor_id": str(egg.actor_id), "furniture_guid": egg.furniture_guid,
+             "npc_config_id": egg.npc_config_id}
+            for egg in snap.scene_eggs
+        ],
+        "couples_stale": couples_stale,
         **metadata,
     }
 def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_options=()) -> dict:

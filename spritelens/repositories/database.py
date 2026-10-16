@@ -190,6 +190,13 @@ _MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
         "ELSE voice_medal END",
     )),
     (14, ("ALTER TABLE egg_annotations ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0",)),
+    (15, ("""
+        CREATE TABLE IF NOT EXISTS home_snapshots (
+            uid          INTEGER PRIMARY KEY,
+            snapshot_json TEXT NOT NULL,
+            updated_at   REAL NOT NULL
+        )
+    """,)),
 )
 
 

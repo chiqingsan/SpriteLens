@@ -729,7 +729,8 @@ class LocalServer(CaptureRoutesMixin):
 
     async def _api_home(self, request: web.Request) -> web.Response:
         return web.json_response(
-            home_payload(self._context.home_repo, self._context.static_data)
+            home_payload(self._context.home_repo, self._context.static_data,
+                         self._context.pet_repository, self._context.egg_catalog)
         )
 
     async def _api_flowers(self, request: web.Request) -> web.Response:

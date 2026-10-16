@@ -154,6 +154,19 @@ SELECT event_id,payload,attempts FROM outbox WHERE next_attempt_at<=? ORDER BY r
 
 **（7）设备排序智能**：`active_network_descriptions()` 调 `subprocess` 查当前活跃网卡，`network_device_rank` 给它们排优先级，默认选中活跃网卡而非第一个。
 
+### 3.3 家园数据：完整快照与增量合并
+
+对蛋神 v1.2.0 解包出的 `home_scene.pyc` 反汇编后，家园不是只靠重新进场景刷新：
+
+- `0x014A` 完整快照：顶层 field22 提供房间/家园元数据，field7 是场景实体。居民记录同时带 `instanceId`、`baseId`、`actorId`、坐标和窝位引用；`instanceId` 可与宠物库个体关联，`baseId` 才能查物种资料。
+- 家具按房间 → 楼层/平面 → 实体嵌套；家园元数据中的配对记录给出母本 `femaleActorId` 与父本 `maleActorIds`。场景蛋也在场景实体流里，通过 NPC 类型和窝位附件识别。
+- `0x0413/0x0414` 是可合并的变化帧：包含新增/更新实体和离开 actor ID。合并后居民与场景蛋即时更新；配对关系标为待下一份完整快照确认。
+- `feature-pages.js` 轮询的 `/api/home/info?gameId=...` 是蛋神本地路由。继续反汇编 `CollectorService.home_info` 后确认：采集运行时直接返回 `home-capture:<gameId>` 缓存；停止采集后才会在会话/订阅条件满足时使用云端 `/desktop/home/info`。返回字段 `remote` 也可以装本地采集结果，不能将它解释为必须补充的外部 API 数据。前端按 `resident/isHomeResident` 筛居民、过滤守护宠物，再按 instance/gid 合并本地资料。
+- `home_breeding_range.pyc` 与 `webui/home-breeding.js` 按楼层、巢穴边缘距离和已知性别/蛋组交集筛候选；但家园主关系面板的 `homePairingModel` 调用没有开启 `allowRangeInference`，优先读取场景配对。范围逻辑也用于学院窝参与标识，不能把候选当成有效场景配对。
+- `webui/home-breeding.js` 明确了性格分布：普通窝父母各占 30%、随机 40%；学院窝规则按参与父母的窝型分支；多父本按等概率分摊。声音预测取父母声音均值并向 0 截断。缺少父母资料时保留未知比例。
+
+2026-10-16 进一步复核纠正了“兼容两种家园布局”和“缺少接口数据”的旧判断：SpriteLens 的旧路径把首个场景 actor 的类型 10 当作房间等级，不能作为另一种有效家园布局保留。当前工作树的嵌套路径已经能从本机真实字段树读出房间等级 5、11 居民、11 窝和6条母本配对，11个实例均匹配本地宠物库；核心数据已经具备。当前仍缺主人 UID、活动场景/会话过滤，普通场景和蛋神排除的30002场景会覆盖快照，通用变化帧也可能污染 pending 计数。编码按 [家园开发计划](HOME_IMPLEMENTATION_PLAN.md) 推进；持续状态只维护 ROADMAP 的 F04-U2。JSONL 字节字段有损，真实增量字节变体、运行进程是否加载新代码和游戏繁育效果仍未验证。
+
 ---
 
 ## 4. Web 架构（最值得借鉴的部分）

@@ -1,0 +1,1191 @@
+
+FUNCTION CollectorService.cached_home_info SOURCE_LINE 1479
+1479           0 RESUME                   0
+
+1480           2 LOAD_FAST                0 (self)
+               4 LOAD_ATTR                1 (NULL|self + capture_status)
+              24 CALL                     0
+              32 LOAD_CONST               1 ('running')
+              34 BINARY_SUBSCR
+              38 STORE_FAST               2 (capture)
+
+1481          40 LOAD_CONST               0 (None)
+              42 STORE_FAST               3 (data)
+
+1482          44 BUILD_LIST               0
+              46 STORE_FAST               4 (candidates)
+
+1483          48 LOAD_FAST                2 (capture)
+              50 POP_JUMP_IF_FALSE        6 (to 64)
+              52 LOAD_CONST               2 ('home-capture:')
+              54 LOAD_FAST                1 (game_id)
+              56 FORMAT_VALUE             0
+              58 BUILD_STRING             2
+              60 BUILD_TUPLE              1
+              62 JUMP_FORWARD             9 (to 82)
+         >>   64 LOAD_CONST               2 ('home-capture:')
+              66 LOAD_FAST                1 (game_id)
+              68 FORMAT_VALUE             0
+              70 BUILD_STRING             2
+              72 LOAD_CONST               3 ('home-remote:')
+              74 LOAD_FAST                1 (game_id)
+              76 FORMAT_VALUE             0
+              78 BUILD_STRING             2
+              80 BUILD_TUPLE              2
+         >>   82 GET_ITER
+         >>   84 FOR_ITER               112 (to 312)
+              88 STORE_FAST               5 (key)
+
+1484          90 NOP
+
+1485          92 LOAD_GLOBAL              3 (NULL + json)
+             102 LOAD_ATTR                4 (loads)
+             122 LOAD_FAST                0 (self)
+             124 LOAD_ATTR                6 (state_store)
+             144 LOAD_ATTR                9 (NULL|self + preference)
+             164 LOAD_FAST                5 (key)
+             166 LOAD_CONST               4 ('null')
+             168 CALL                     2
+             176 CALL                     1
+             184 STORE_FAST               6 (value)
+
+1486         186 LOAD_GLOBAL             11 (NULL + isinstance)
+             196 LOAD_FAST                6 (value)
+             198 LOAD_GLOBAL             12 (dict)
+             208 CALL                     2
+             216 POP_JUMP_IF_FALSE       46 (to 310)
+             218 LOAD_GLOBAL             15 (NULL + str)
+             228 LOAD_FAST                6 (value)
+             230 LOAD_ATTR               17 (NULL|self + get)
+             250 LOAD_CONST               5 ('gameId')
+             252 CALL                     1
+             260 CALL                     1
+             268 LOAD_FAST                1 (game_id)
+             270 COMPARE_OP              40 (==)
+             274 POP_JUMP_IF_FALSE       17 (to 310)
+
+1487         276 LOAD_FAST                4 (candidates)
+             278 LOAD_ATTR               19 (NULL|self + append)
+             298 LOAD_FAST                6 (value)
+             300 CALL                     1
+             308 POP_TOP
+         >>  310 JUMP_BACKWARD          114 (to 84)
+
+1483     >>  312 END_FOR
+
+1490         314 LOAD_FAST                4 (candidates)
+             316 POP_JUMP_IF_FALSE       14 (to 346)
+             318 LOAD_GLOBAL             25 (NULL + max)
+             328 LOAD_FAST                4 (candidates)
+             330 LOAD_CONST               6 (<code object <lambda> at 0x0000000001574E30, file "web_runtime.py", line 1490>)
+             332 MAKE_FUNCTION            0
+             334 KW_NAMES                 7 (('key',))
+             336 CALL                     2
+             344 JUMP_FORWARD             1 (to 348)
+         >>  346 LOAD_CONST               0 (None)
+         >>  348 STORE_FAST               3 (data)
+
+1491         350 LOAD_FAST                3 (data)
+             352 EXTENDED_ARG             1
+             354 POP_JUMP_IF_FALSE      433 (to 1222)
+
+1494         356 LOAD_FAST                3 (data)
+             358 LOAD_ATTR               17 (NULL|self + get)
+             378 LOAD_CONST               8 ('residents')
+             380 BUILD_LIST               0
+             382 CALL                     2
+             390 GET_ITER
+             392 LOAD_FAST_AND_CLEAR      7 (row)
+             394 SWAP                     2
+             396 BUILD_LIST               0
+             398 SWAP                     2
+         >>  400 FOR_ITER                51 (to 506)
+             404 STORE_FAST               7 (row)
+             406 LOAD_GLOBAL             15 (NULL + str)
+             416 LOAD_FAST                7 (row)
+             418 LOAD_ATTR               17 (NULL|self + get)
+             438 LOAD_CONST               9 ('instanceId')
+             440 CALL                     1
+             448 COPY                     1
+             450 POP_JUMP_IF_TRUE        21 (to 494)
+             452 POP_TOP
+             454 LOAD_FAST                7 (row)
+             456 LOAD_ATTR               17 (NULL|self + get)
+             476 LOAD_CONST              10 ('gid')
+             478 CALL                     1
+             486 COPY                     1
+             488 POP_JUMP_IF_TRUE         2 (to 494)
+             490 POP_TOP
+             492 LOAD_CONST              11 ('')
+         >>  494 CALL                     1
+             502 LIST_APPEND              2
+             504 JUMP_BACKWARD           53 (to 400)
+         >>  506 END_FOR
+             508 STORE_FAST               8 (ids)
+             510 STORE_FAST               7 (row)
+
+1495         512 LOAD_FAST                0 (self)
+             514 LOAD_ATTR                6 (state_store)
+             534 LOAD_ATTR               26 (lock)
+             554 BEFORE_WITH
+             556 POP_TOP
+
+1497         558 LOAD_FAST                8 (ids)
+             560 POP_JUMP_IF_FALSE      124 (to 810)
+
+1496         562 LOAD_FAST                0 (self)
+             564 LOAD_ATTR                6 (state_store)
+             584 LOAD_ATTR               28 (db)
+             604 LOAD_ATTR               31 (NULL|self + execute)
+
+1497         624 LOAD_CONST              12 ('SELECT * FROM pets WHERE game_id=? AND instance_id IN (')
+             626 LOAD_CONST              13 (',')
+             628 LOAD_ATTR               33 (NULL|self + join)
+             648 LOAD_CONST              14 (<code object <genexpr> at 0x0000000001557590, file "web_runtime.py", line 1497>)
+             650 MAKE_FUNCTION            0
+             652 LOAD_FAST                8 (ids)
+             654 GET_ITER
+             656 CALL                     0
+             664 CALL                     1
+             672 FORMAT_VALUE             0
+             674 LOAD_CONST              15 (')')
+             676 BUILD_STRING             3
+             678 LOAD_FAST                1 (game_id)
+             680 BUILD_LIST               1
+             682 LOAD_FAST                8 (ids)
+             684 LIST_EXTEND              1
+             686 CALL_INTRINSIC_1         6 (INTRINSIC_LIST_TO_TUPLE)
+
+1496         688 CALL                     2
+
+1497         696 LOAD_ATTR               35 (NULL|self + fetchall)
+             716 CALL                     0
+
+1496         724 GET_ITER
+             726 LOAD_FAST_AND_CLEAR      7 (row)
+             728 SWAP                     2
+             730 BUILD_MAP                0
+             732 SWAP                     2
+         >>  734 FOR_ITER                32 (to 802)
+             738 STORE_FAST               7 (row)
+             740 LOAD_GLOBAL             15 (NULL + str)
+             750 LOAD_FAST                7 (row)
+             752 LOAD_CONST              16 ('instance_id')
+             754 BINARY_SUBSCR
+             758 CALL                     1
+             766 LOAD_FAST                0 (self)
+             768 LOAD_ATTR               37 (NULL|self + _pet)
+             788 LOAD_FAST                7 (row)
+             790 CALL                     1
+             798 MAP_ADD                  2
+             800 JUMP_BACKWARD           34 (to 734)
+         >>  802 END_FOR
+             804 SWAP                     2
+             806 STORE_FAST               7 (row)
+             808 JUMP_FORWARD             1 (to 812)
+
+1497     >>  810 BUILD_MAP                0
+
+1496     >>  812 STORE_FAST               9 (known)
+
+1495         814 LOAD_CONST               0 (None)
+             816 LOAD_CONST               0 (None)
+             818 LOAD_CONST               0 (None)
+             820 CALL                     2
+             828 POP_TOP
+
+1498     >>  830 BUILD_MAP                0
+             832 LOAD_FAST                3 (data)
+             834 DICT_UPDATE              1
+             836 LOAD_CONST               8 ('residents')
+
+1501         838 LOAD_FAST                3 (data)
+             840 LOAD_ATTR               17 (NULL|self + get)
+             860 LOAD_CONST               8 ('residents')
+             862 BUILD_LIST               0
+             864 CALL                     2
+             872 GET_ITER
+
+1498         874 LOAD_FAST_AND_CLEAR      7 (row)
+             876 SWAP                     2
+             878 BUILD_LIST               0
+             880 SWAP                     2
+
+1501     >>  882 FOR_ITER               148 (to 1182)
+             886 STORE_FAST               7 (row)
+
+1498         888 BUILD_MAP                0
+             890 LOAD_FAST_CHECK          9 (known)
+             892 LOAD_ATTR               17 (NULL|self + get)
+             912 LOAD_GLOBAL             15 (NULL + str)
+             922 LOAD_FAST                7 (row)
+             924 LOAD_ATTR               17 (NULL|self + get)
+             944 LOAD_CONST               9 ('instanceId')
+             946 CALL                     1
+             954 CALL                     1
+             962 BUILD_MAP                0
+             964 CALL                     2
+             972 DICT_UPDATE              1
+             974 LOAD_FAST                7 (row)
+             976 DICT_UPDATE              1
+
+1499         978 LOAD_CONST              17 ('gender')
+             980 LOAD_GLOBAL             39 (NULL + _pet_gender)
+             990 LOAD_FAST                7 (row)
+             992 LOAD_ATTR               17 (NULL|self + get)
+            1012 LOAD_CONST              17 ('gender')
+            1014 CALL                     1
+            1022 LOAD_FAST                7 (row)
+            1024 LOAD_ATTR               17 (NULL|self + get)
+            1044 LOAD_CONST              18 ('genderCode')
+            1046 CALL                     1
+
+1500        1054 LOAD_FAST                9 (known)
+            1056 LOAD_ATTR               17 (NULL|self + get)
+            1076 LOAD_GLOBAL             15 (NULL + str)
+            1086 LOAD_FAST                7 (row)
+            1088 LOAD_ATTR               17 (NULL|self + get)
+            1108 LOAD_CONST               9 ('instanceId')
+            1110 CALL                     1
+            1118 CALL                     1
+            1126 BUILD_MAP                0
+            1128 CALL                     2
+            1136 LOAD_ATTR               17 (NULL|self + get)
+            1156 LOAD_CONST              17 ('gender')
+            1158 CALL                     1
+
+1499        1166 CALL                     3
+
+1498        1174 BUILD_MAP                1
+            1176 DICT_UPDATE              1
+            1178 LIST_APPEND              2
+            1180 JUMP_BACKWARD          150 (to 882)
+
+1501     >> 1182 END_FOR
+
+1498        1184 SWAP                     2
+            1186 STORE_FAST               7 (row)
+            1188 BUILD_MAP                1
+            1190 DICT_UPDATE              1
+            1192 STORE_FAST               3 (data)
+
+1502        1194 LOAD_CONST              19 (0)
+            1196 LOAD_CONST              20 (('decorate_home',))
+            1198 IMPORT_NAME             20 (home_scene)
+            1200 IMPORT_FROM             21 (decorate_home)
+            1202 STORE_FAST              10 (decorate_home)
+            1204 POP_TOP
+
+1503        1206 PUSH_NULL
+            1208 LOAD_FAST               10 (decorate_home)
+            1210 LOAD_FAST                3 (data)
+            1212 CALL                     1
+            1220 STORE_FAST               3 (data)
+
+1504     >> 1222 LOAD_CONST              21 (True)
+            1224 LOAD_FAST                1 (game_id)
+            1226 LOAD_FAST                2 (capture)
+            1228 POP_JUMP_IF_FALSE        5 (to 1240)
+            1230 LOAD_CONST              22 ('capture')
+            1232 LOAD_FAST                3 (data)
+            1234 LOAD_CONST              24 (('ok', 'gameId', 'source', 'remote'))
+            1236 BUILD_CONST_KEY_MAP      4
+            1238 RETURN_VALUE
+         >> 1240 LOAD_CONST              23 ('cache')
+            1242 LOAD_FAST                3 (data)
+            1244 LOAD_CONST              24 (('ok', 'gameId', 'source', 'remote'))
+            1246 BUILD_CONST_KEY_MAP      4
+            1248 RETURN_VALUE
+         >> 1250 PUSH_EXC_INFO
+
+1488        1252 LOAD_GLOBAL             20 (ValueError)
+            1262 LOAD_GLOBAL             22 (TypeError)
+            1272 BUILD_TUPLE              2
+            1274 CHECK_EXC_MATCH
+            1276 POP_JUMP_IF_FALSE        4 (to 1286)
+            1278 POP_TOP
+
+1489        1280 POP_EXCEPT
+            1282 EXTENDED_ARG             2
+            1284 JUMP_BACKWARD          601 (to 84)
+
+1488     >> 1286 RERAISE                  0
+         >> 1288 COPY                     3
+            1290 POP_EXCEPT
+            1292 RERAISE                  1
+         >> 1294 SWAP                     2
+            1296 POP_TOP
+
+1494        1298 SWAP                     2
+            1300 STORE_FAST               7 (row)
+            1302 RERAISE                  0
+         >> 1304 SWAP                     2
+            1306 POP_TOP
+
+1496        1308 SWAP                     2
+            1310 STORE_FAST               7 (row)
+            1312 RERAISE                  0
+
+1495     >> 1314 PUSH_EXC_INFO
+            1316 WITH_EXCEPT_START
+            1318 POP_JUMP_IF_TRUE         1 (to 1322)
+            1320 RERAISE                  2
+         >> 1322 POP_TOP
+            1324 POP_EXCEPT
+            1326 POP_TOP
+            1328 POP_TOP
+            1330 JUMP_BACKWARD          251 (to 830)
+         >> 1332 COPY                     3
+            1334 POP_EXCEPT
+            1336 RERAISE                  1
+         >> 1338 SWAP                     2
+            1340 POP_TOP
+
+1498        1342 SWAP                     2
+            1344 STORE_FAST               7 (row)
+            1346 RERAISE                  0
+ExceptionTable:
+  92 to 308 -> 1250 [1]
+  396 to 506 -> 1294 [2]
+  556 to 728 -> 1314 [1] lasti
+  730 to 802 -> 1304 [3]
+  804 to 812 -> 1314 [1] lasti
+  878 to 1182 -> 1338 [4]
+  1250 to 1278 -> 1288 [2] lasti
+  1286 to 1286 -> 1288 [2] lasti
+  1304 to 1312 -> 1314 [1] lasti
+  1314 to 1322 -> 1332 [3] lasti
+
+FUNCTION CollectorService.home_info SOURCE_LINE 1506
+1506           0 RESUME                   0
+
+1507           2 LOAD_GLOBAL              1 (NULL + str)
+              12 LOAD_FAST                1 (game_id)
+              14 COPY                     1
+              16 POP_JUMP_IF_TRUE        54 (to 126)
+              18 POP_TOP
+              20 LOAD_FAST                0 (self)
+              22 LOAD_ATTR                2 (state_store)
+              42 LOAD_ATTR                4 (active_game_id)
+              62 COPY                     1
+              64 POP_JUMP_IF_TRUE        30 (to 126)
+              66 POP_TOP
+              68 LOAD_FAST                0 (self)
+              70 LOAD_ATTR                2 (state_store)
+              90 LOAD_ATTR                7 (NULL|self + latest_game_id)
+             110 CALL                     0
+             118 COPY                     1
+             120 POP_JUMP_IF_TRUE         2 (to 126)
+             122 POP_TOP
+             124 LOAD_CONST               1 ('')
+         >>  126 CALL                     1
+             134 LOAD_ATTR                9 (NULL|self + strip)
+             154 CALL                     0
+             162 STORE_FAST               1 (game_id)
+
+1508         164 LOAD_FAST                0 (self)
+             166 LOAD_ATTR               11 (NULL|self + cached_home_info)
+             186 LOAD_FAST                1 (game_id)
+             188 CALL                     1
+             196 STORE_FAST               3 (result)
+
+1509         198 LOAD_FAST                0 (self)
+             200 LOAD_ATTR               13 (NULL|self + capture_status)
+             220 CALL                     0
+             228 LOAD_CONST               2 ('running')
+             230 BINARY_SUBSCR
+             234 POP_JUMP_IF_FALSE       14 (to 264)
+
+1510         236 LOAD_FAST                3 (result)
+             238 LOAD_CONST               3 ('remote')
+             240 BINARY_SUBSCR
+             244 POP_JUMP_IF_FALSE        2 (to 250)
+             246 LOAD_CONST               4 ('采集中：进入自己的家园即可更新入住精灵；当前显示已采集缓存')
+             248 JUMP_FORWARD             1 (to 252)
+         >>  250 LOAD_CONST               5 ('采集中：请进入自己的家园，等待读取入住精灵')
+         >>  252 LOAD_FAST                3 (result)
+             254 LOAD_CONST               6 ('warning')
+             256 STORE_SUBSCR
+
+1511         260 LOAD_FAST                3 (result)
+             262 RETURN_VALUE
+
+1512     >>  264 LOAD_GLOBAL             15 (NULL + _valid_capture_uid)
+             274 LOAD_FAST                1 (game_id)
+             276 CALL                     1
+             284 POP_JUMP_IF_FALSE       12 (to 310)
+             286 LOAD_FAST                0 (self)
+             288 LOAD_ATTR               16 (desktop_session)
+             308 POP_JUMP_IF_TRUE         7 (to 324)
+
+1513     >>  310 LOAD_CONST               7 ('登录游戏并开启采集可更新家园；付费用户绑定账号后也可在线更新')
+             312 LOAD_FAST                3 (result)
+             314 LOAD_CONST               6 ('warning')
+             316 STORE_SUBSCR
+
+1514         320 LOAD_FAST                3 (result)
+             322 RETURN_VALUE
+
+1515     >>  324 NOP
+
+1516         326 LOAD_FAST                0 (self)
+             328 LOAD_ATTR               19 (NULL|self + _desktop_account_request)
+             348 LOAD_CONST               8 ('/desktop/subscription/status?')
+             350 LOAD_GLOBAL             20 (urllib)
+             360 LOAD_ATTR               22 (parse)
+             380 LOAD_ATTR               25 (NULL|self + urlencode)
+             400 LOAD_CONST               9 ('gameId')
+             402 LOAD_FAST                1 (game_id)
+             404 BUILD_MAP                1
+             406 CALL                     1
+             414 FORMAT_VALUE             0
+             416 BUILD_STRING             2
+             418 CALL                     1
+             426 STORE_FAST               4 (status)
+
+1517         428 LOAD_FAST                4 (status)
+             430 LOAD_ATTR               27 (NULL|self + get)
+             450 LOAD_CONST              10 ('entitlement')
+             452 CALL                     1
+             460 COPY                     1
+             462 POP_JUMP_IF_TRUE         2 (to 468)
+             464 POP_TOP
+             466 BUILD_MAP                0
+         >>  468 LOAD_ATTR               27 (NULL|self + get)
+             488 LOAD_CONST              11 ('active')
+             490 CALL                     1
+             498 LOAD_CONST              12 (True)
+             500 IS_OP                    1
+             502 POP_JUMP_IF_FALSE       14 (to 532)
+
+1518         504 LOAD_FAST                3 (result)
+             506 LOAD_CONST               3 ('remote')
+             508 BINARY_SUBSCR
+             512 POP_JUMP_IF_FALSE        2 (to 518)
+             514 LOAD_CONST              13 ('当前显示本地缓存。请登录游戏并开启采集，或开通付费服务在线更新家园')
+             516 JUMP_FORWARD             1 (to 520)
+         >>  518 LOAD_CONST              14 ('请登录游戏并开启采集，或开通付费服务在线更新家园')
+         >>  520 LOAD_FAST                3 (result)
+             522 LOAD_CONST               6 ('warning')
+             524 STORE_SUBSCR
+
+1519         528 LOAD_FAST                3 (result)
+             530 RETURN_VALUE
+
+1520     >>  532 LOAD_FAST                0 (self)
+             534 LOAD_ATTR               13 (NULL|self + capture_status)
+             554 CALL                     0
+             562 LOAD_CONST               2 ('running')
+             564 BINARY_SUBSCR
+             568 POP_JUMP_IF_FALSE       17 (to 604)
+
+1521         570 LOAD_FAST                0 (self)
+             572 LOAD_ATTR               11 (NULL|self + cached_home_info)
+             592 LOAD_FAST                1 (game_id)
+             594 CALL                     1
+             602 RETURN_VALUE
+
+1522     >>  604 LOAD_FAST                0 (self)
+             606 LOAD_ATTR               19 (NULL|self + _desktop_account_request)
+
+1523         626 LOAD_CONST              15 ('/desktop/home/info')
+             628 LOAD_CONST              16 ('POST')
+
+1524         630 LOAD_CONST               9 ('gameId')
+             632 LOAD_FAST                1 (game_id)
+             634 BUILD_MAP                1
+             636 LOAD_FAST                2 (sync_task)
+             638 POP_JUMP_IF_NONE         4 (to 648)
+             640 LOAD_CONST              17 ('syncTask')
+             642 LOAD_FAST                2 (sync_task)
+             644 BUILD_MAP                1
+             646 JUMP_FORWARD             1 (to 650)
+         >>  648 BUILD_MAP                0
+         >>  650 DICT_UPDATE              1
+
+1525         652 LOAD_CONST              18 ('家园位置')
+             654 LOAD_CONST              19 (24)
+             656 LOAD_CONST              20 ('home-info:')
+             658 LOAD_FAST                1 (game_id)
+             660 FORMAT_VALUE             0
+             662 BUILD_STRING             2
+             664 LOAD_CONST              21 (0)
+
+1522         666 KW_NAMES                22 (('method', 'payload', 'label', 'timeout', 'cache_key', 'cache_seconds'))
+             668 CALL                     7
+             676 STORE_FAST               5 (remote)
+
+1526         678 LOAD_FAST                0 (self)
+             680 LOAD_ATTR               13 (NULL|self + capture_status)
+             700 CALL                     0
+             708 LOAD_CONST               2 ('running')
+             710 BINARY_SUBSCR
+             714 POP_JUMP_IF_FALSE       17 (to 750)
+
+1527         716 LOAD_FAST                0 (self)
+             718 LOAD_ATTR               11 (NULL|self + cached_home_info)
+             738 LOAD_FAST                1 (game_id)
+             740 CALL                     1
+             748 RETURN_VALUE
+
+1528     >>  750 LOAD_FAST                5 (remote)
+             752 LOAD_ATTR               27 (NULL|self + get)
+             772 LOAD_CONST              23 ('ok')
+             774 CALL                     1
+             782 LOAD_CONST              24 (False)
+             784 IS_OP                    0
+             786 POP_JUMP_IF_FALSE       35 (to 858)
+
+1529         788 LOAD_GLOBAL              1 (NULL + str)
+             798 LOAD_FAST                5 (remote)
+             800 LOAD_ATTR               27 (NULL|self + get)
+             820 LOAD_CONST              25 ('message')
+             822 CALL                     1
+             830 COPY                     1
+             832 POP_JUMP_IF_TRUE         2 (to 838)
+             834 POP_TOP
+             836 LOAD_CONST              26 ('家园数据暂未取得，请重试')
+         >>  838 CALL                     1
+             846 LOAD_FAST                3 (result)
+             848 LOAD_CONST               6 ('warning')
+             850 STORE_SUBSCR
+
+1530         854 LOAD_FAST                3 (result)
+             856 RETURN_VALUE
+
+1531     >>  858 LOAD_FAST                3 (result)
+             860 LOAD_ATTR               29 (NULL|self + update)
+             880 LOAD_CONST               3 ('remote')
+             882 LOAD_CONST              27 ('洛克魔法书')
+             884 LOAD_FAST                5 (remote)
+             886 LOAD_CONST              28 (('source', 'provider', 'remote'))
+             888 BUILD_CONST_KEY_MAP      3
+             890 CALL                     1
+             898 POP_TOP
+
+1532         900 LOAD_FAST                5 (remote)
+             902 LOAD_ATTR               27 (NULL|self + get)
+             922 LOAD_CONST              29 ('pending')
+             924 CALL                     1
+             932 LOAD_CONST              12 (True)
+             934 IS_OP                    1
+             936 POP_JUMP_IF_FALSE       78 (to 1094)
+
+1533         938 LOAD_FAST                0 (self)
+             940 LOAD_ATTR                2 (state_store)
+             960 LOAD_ATTR               31 (NULL|self + set_preference)
+             980 LOAD_CONST              30 ('home-remote:')
+             982 LOAD_FAST                1 (game_id)
+             984 FORMAT_VALUE             0
+             986 BUILD_STRING             2
+             988 LOAD_GLOBAL             33 (NULL + json)
+             998 LOAD_ATTR               34 (dumps)
+            1018 BUILD_MAP                0
+            1020 LOAD_FAST                5 (remote)
+            1022 DICT_UPDATE              1
+            1024 LOAD_FAST                1 (game_id)
+            1026 LOAD_GLOBAL             37 (NULL + time)
+            1036 LOAD_ATTR               38 (strftime)
+            1056 LOAD_CONST              31 ('%Y-%m-%dT%H:%M:%S%z')
+            1058 CALL                     1
+            1066 LOAD_CONST              32 (('gameId', 'updatedAt'))
+            1068 BUILD_CONST_KEY_MAP      2
+            1070 DICT_UPDATE              1
+            1072 LOAD_CONST              24 (False)
+            1074 KW_NAMES                33 (('ensure_ascii',))
+            1076 CALL                     2
+            1084 CALL                     2
+            1092 POP_TOP
+
+1536     >> 1094 LOAD_FAST                3 (result)
+            1096 RETURN_VALUE
+         >> 1098 PUSH_EXC_INFO
+
+1534        1100 LOAD_GLOBAL             40 (Exception)
+            1110 CHECK_EXC_MATCH
+            1112 POP_JUMP_IF_FALSE       25 (to 1164)
+            1114 STORE_FAST               6 (exc)
+
+1535        1116 LOAD_GLOBAL              1 (NULL + str)
+            1126 LOAD_FAST                6 (exc)
+            1128 CALL                     1
+            1136 LOAD_FAST                3 (result)
+            1138 LOAD_CONST               6 ('warning')
+            1140 STORE_SUBSCR
+            1144 POP_EXCEPT
+            1146 LOAD_CONST               0 (None)
+            1148 STORE_FAST               6 (exc)
+            1150 DELETE_FAST              6 (exc)
+
+1536        1152 LOAD_FAST                3 (result)
+            1154 RETURN_VALUE
+         >> 1156 LOAD_CONST               0 (None)
+            1158 STORE_FAST               6 (exc)
+            1160 DELETE_FAST              6 (exc)
+            1162 RERAISE                  1
+
+1534     >> 1164 RERAISE                  0
+         >> 1166 COPY                     3
+            1168 POP_EXCEPT
+            1170 RERAISE                  1
+ExceptionTable:
+  326 to 528 -> 1098 [0]
+  532 to 600 -> 1098 [0]
+  604 to 746 -> 1098 [0]
+  750 to 854 -> 1098 [0]
+  858 to 1092 -> 1098 [0]
+  1098 to 1114 -> 1166 [1] lasti
+  1116 to 1142 -> 1156 [1] lasti
+  1156 to 1164 -> 1166 [1] lasti
+
+FUNCTION CollectorService._upload_pets_with_home SOURCE_LINE 3446
+               0 MAKE_CELL               17 (datetime)
+               2 MAKE_CELL               18 (timezone)
+
+3446           4 RESUME                   0
+
+3447           6 NOP
+
+3448           8 LOAD_FAST                1 (pets)
+              10 GET_ITER
+              12 LOAD_FAST_AND_CLEAR      4 (row)
+              14 SWAP                     2
+              16 BUILD_MAP                0
+              18 SWAP                     2
+         >>   20 FOR_ITER                17 (to 58)
+              24 STORE_FAST               4 (row)
+              26 LOAD_GLOBAL              1 (NULL + str)
+              36 LOAD_FAST                4 (row)
+              38 LOAD_CONST               1 ('instance_id')
+              40 BINARY_SUBSCR
+              44 CALL                     1
+              52 LOAD_FAST                4 (row)
+              54 MAP_ADD                  2
+              56 JUMP_BACKWARD           19 (to 20)
+         >>   58 END_FOR
+              60 STORE_FAST               5 (by_id)
+              62 STORE_FAST               4 (row)
+
+3449          64 LOAD_GLOBAL              3 (NULL + json)
+              74 LOAD_ATTR                4 (loads)
+              94 LOAD_FAST                0 (self)
+              96 LOAD_ATTR                6 (state_store)
+             116 LOAD_ATTR                9 (NULL|self + preference)
+             136 LOAD_CONST               2 ('pet-inventory-extras:')
+             138 LOAD_FAST                3 (game_id)
+             140 FORMAT_VALUE             0
+             142 BUILD_STRING             2
+             144 LOAD_CONST               3 ('[]')
+             146 CALL                     2
+             154 CALL                     1
+             162 STORE_FAST               6 (extras)
+
+3450         164 LOAD_GLOBAL             11 (NULL + isinstance)
+             174 LOAD_FAST                6 (extras)
+             176 LOAD_GLOBAL             12 (list)
+             186 CALL                     2
+             194 POP_JUMP_IF_FALSE       25 (to 246)
+             196 LOAD_FAST                6 (extras)
+             198 GET_ITER
+             200 LOAD_FAST_AND_CLEAR      7 (gid)
+             202 SWAP                     2
+             204 BUILD_SET                0
+             206 SWAP                     2
+         >>  208 FOR_ITER                13 (to 238)
+             212 STORE_FAST               7 (gid)
+             214 LOAD_GLOBAL              1 (NULL + str)
+             224 LOAD_FAST                7 (gid)
+             226 CALL                     1
+             234 SET_ADD                  2
+             236 JUMP_BACKWARD           15 (to 208)
+         >>  238 END_FOR
+             240 SWAP                     2
+             242 STORE_FAST               7 (gid)
+             244 JUMP_FORWARD             9 (to 264)
+         >>  246 LOAD_GLOBAL             15 (NULL + set)
+             256 CALL                     0
+         >>  264 STORE_FAST               8 (ids)
+
+3451         266 LOAD_GLOBAL             11 (NULL + isinstance)
+             276 LOAD_FAST                2 (home)
+             278 LOAD_GLOBAL             16 (dict)
+             288 CALL                     2
+             296 EXTENDED_ARG             1
+             298 POP_JUMP_IF_FALSE      335 (to 970)
+             300 LOAD_GLOBAL              1 (NULL + str)
+             310 LOAD_FAST                2 (home)
+             312 LOAD_ATTR               19 (NULL|self + get)
+             332 LOAD_CONST               4 ('gameId')
+             334 CALL                     1
+             342 CALL                     1
+             350 LOAD_GLOBAL              1 (NULL + str)
+             360 LOAD_FAST                3 (game_id)
+             362 CALL                     1
+             370 COMPARE_OP              40 (==)
+             374 EXTENDED_ARG             1
+             376 POP_JUMP_IF_FALSE      296 (to 970)
+
+3453         378 LOAD_FAST                2 (home)
+             380 LOAD_ATTR               19 (NULL|self + get)
+             400 LOAD_CONST               5 ('residents')
+             402 BUILD_LIST               0
+             404 CALL                     2
+             412 GET_ITER
+
+3452         414 LOAD_FAST_AND_CLEAR      4 (row)
+             416 SWAP                     2
+             418 BUILD_SET                0
+             420 SWAP                     2
+
+3453     >>  422 FOR_ITER                67 (to 560)
+             426 STORE_FAST               4 (row)
+             428 LOAD_GLOBAL             11 (NULL + isinstance)
+             438 LOAD_FAST                4 (row)
+             440 LOAD_GLOBAL             16 (dict)
+             450 CALL                     2
+             458 POP_JUMP_IF_FALSE       49 (to 558)
+
+3452         460 LOAD_GLOBAL              1 (NULL + str)
+             470 LOAD_FAST                4 (row)
+             472 LOAD_ATTR               19 (NULL|self + get)
+             492 LOAD_CONST               6 ('instanceId')
+             494 CALL                     1
+             502 COPY                     1
+             504 POP_JUMP_IF_TRUE        21 (to 548)
+             506 POP_TOP
+             508 LOAD_FAST                4 (row)
+             510 LOAD_ATTR               19 (NULL|self + get)
+             530 LOAD_CONST               7 ('gid')
+             532 CALL                     1
+             540 COPY                     1
+             542 POP_JUMP_IF_TRUE         2 (to 548)
+             544 POP_TOP
+             546 LOAD_CONST               8 ('')
+         >>  548 CALL                     1
+             556 SET_ADD                  2
+         >>  558 JUMP_BACKWARD           69 (to 422)
+
+3453     >>  560 END_FOR
+
+3452         562 STORE_FAST               9 (home_ids)
+             564 STORE_FAST               4 (row)
+
+3454         566 LOAD_GLOBAL              3 (NULL + json)
+             576 LOAD_ATTR                4 (loads)
+             596 LOAD_FAST                0 (self)
+             598 LOAD_ATTR                6 (state_store)
+             618 LOAD_ATTR                9 (NULL|self + preference)
+             638 LOAD_CONST               9 ('pet-inventory-members:')
+             640 LOAD_FAST                3 (game_id)
+             642 FORMAT_VALUE             0
+             644 BUILD_STRING             2
+             646 LOAD_CONST              10 ('{}')
+             648 CALL                     2
+             656 CALL                     1
+             664 STORE_FAST              10 (members)
+
+3455         666 LOAD_GLOBAL             11 (NULL + isinstance)
+             676 LOAD_FAST               10 (members)
+             678 LOAD_GLOBAL             16 (dict)
+             688 CALL                     2
+             696 POP_JUMP_IF_FALSE      119 (to 936)
+             698 LOAD_GLOBAL             11 (NULL + isinstance)
+             708 LOAD_FAST               10 (members)
+             710 LOAD_ATTR               19 (NULL|self + get)
+             730 LOAD_CONST              11 ('instanceIds')
+             732 CALL                     1
+             740 LOAD_GLOBAL             12 (list)
+             750 CALL                     2
+             758 POP_JUMP_IF_FALSE       88 (to 936)
+
+3456         760 LOAD_CONST              12 (0)
+             762 LOAD_CONST              13 (('datetime', 'timezone'))
+             764 IMPORT_NAME             10 (datetime)
+             766 IMPORT_FROM             10 (datetime)
+             768 STORE_DEREF             17 (datetime)
+             770 IMPORT_FROM             11 (timezone)
+             772 STORE_DEREF             18 (timezone)
+             774 POP_TOP
+
+3457         776 LOAD_CLOSURE            17 (datetime)
+             778 LOAD_CLOSURE            18 (timezone)
+             780 BUILD_TUPLE              2
+             782 LOAD_CONST              14 (<code object observed at 0x00000000015457C0, file "web_runtime.py", line 3457>)
+             784 MAKE_FUNCTION            8 (closure)
+             786 STORE_FAST              11 (observed)
+
+3463         788 PUSH_NULL
+             790 LOAD_FAST               11 (observed)
+             792 LOAD_FAST               10 (members)
+             794 LOAD_ATTR               19 (NULL|self + get)
+             814 LOAD_CONST              15 ('updatedAt')
+             816 CALL                     1
+             824 CALL                     1
+             832 PUSH_NULL
+             834 LOAD_FAST               11 (observed)
+             836 LOAD_FAST                2 (home)
+             838 LOAD_ATTR               19 (NULL|self + get)
+             858 LOAD_CONST              15 ('updatedAt')
+             860 CALL                     1
+             868 CALL                     1
+             876 COMPARE_OP              92 (>=)
+             880 POP_JUMP_IF_FALSE       27 (to 936)
+
+3464         882 LOAD_FAST                9 (home_ids)
+             884 LOAD_ATTR               25 (NULL|self + intersection_update)
+             904 LOAD_CONST              16 (<code object <genexpr> at 0x0000000001575E30, file "web_runtime.py", line 3464>)
+             906 MAKE_FUNCTION            0
+             908 LOAD_FAST               10 (members)
+             910 LOAD_CONST              11 ('instanceIds')
+             912 BINARY_SUBSCR
+             916 GET_ITER
+             918 CALL                     0
+             926 CALL                     1
+             934 POP_TOP
+
+3465     >>  936 LOAD_FAST                8 (ids)
+             938 LOAD_ATTR               27 (NULL|self + update)
+             958 LOAD_FAST                9 (home_ids)
+             960 CALL                     1
+             968 POP_TOP
+
+3466     >>  970 LOAD_FAST                8 (ids)
+             972 LOAD_GLOBAL             15 (NULL + set)
+             982 LOAD_FAST                5 (by_id)
+             984 CALL                     1
+             992 LOAD_CONST               8 ('')
+             994 BUILD_SET                1
+             996 BINARY_OP                7 (|)
+            1000 BINARY_OP               23 (-=)
+            1004 STORE_FAST               8 (ids)
+
+3467        1006 LOAD_GLOBAL             29 (NULL + sorted)
+            1016 LOAD_FAST                8 (ids)
+            1018 CALL                     1
+            1026 GET_ITER
+         >> 1028 FOR_ITER               194 (to 1420)
+            1032 STORE_FAST               7 (gid)
+
+3468        1034 LOAD_FAST                0 (self)
+            1036 LOAD_ATTR                6 (state_store)
+            1056 LOAD_ATTR               30 (db)
+            1076 LOAD_ATTR               33 (NULL|self + execute)
+
+3469        1096 LOAD_CONST              17 ('SELECT * FROM pets WHERE game_id=? AND instance_id=?')
+            1098 LOAD_GLOBAL              1 (NULL + str)
+            1108 LOAD_FAST                3 (game_id)
+            1110 CALL                     1
+            1118 LOAD_FAST                7 (gid)
+            1120 BUILD_TUPLE              2
+
+3468        1122 CALL                     2
+
+3469        1130 LOAD_ATTR               35 (NULL|self + fetchone)
+            1150 CALL                     0
+
+3468        1158 STORE_FAST               4 (row)
+
+3470        1160 LOAD_FAST                4 (row)
+            1162 POP_JUMP_IF_NOT_NONE     1 (to 1166)
+
+3471        1164 JUMP_BACKWARD           69 (to 1028)
+
+3472     >> 1166 NOP
+
+3473        1168 LOAD_GLOBAL              3 (NULL + json)
+            1178 LOAD_ATTR                4 (loads)
+            1198 LOAD_FAST                4 (row)
+            1200 LOAD_CONST              18 ('payload')
+            1202 BINARY_SUBSCR
+            1206 COPY                     1
+            1208 POP_JUMP_IF_TRUE         2 (to 1214)
+            1210 POP_TOP
+            1212 LOAD_CONST              10 ('{}')
+         >> 1214 CALL                     1
+            1222 STORE_FAST              12 (payload)
+
+3474        1224 LOAD_GLOBAL             37 (NULL + int)
+            1234 LOAD_GLOBAL             39 (NULL + first)
+            1244 LOAD_FAST               12 (payload)
+            1246 LOAD_CONST              19 ('base_conf_id')
+            1248 LOAD_CONST              20 ('baseConfId')
+            1250 LOAD_CONST              21 ('baseId')
+            1252 LOAD_CONST              22 ('conf_id')
+            1254 LOAD_CONST              23 ('confId')
+            1256 LOAD_CONST              24 ('petConfId')
+            1258 LOAD_CONST              12 (0)
+            1260 KW_NAMES                25 (('fallback',))
+            1262 CALL                     8
+            1270 COPY                     1
+            1272 POP_JUMP_IF_TRUE         2 (to 1278)
+            1274 POP_TOP
+            1276 LOAD_CONST              12 (0)
+         >> 1278 CALL                     1
+            1286 STORE_FAST              13 (base)
+
+3475        1288 LOAD_GLOBAL             39 (NULL + first)
+            1298 LOAD_FAST               12 (payload)
+            1300 LOAD_CONST              26 ('level')
+            1302 LOAD_CONST              27 ('rawLevel')
+            1304 LOAD_CONST              28 ('raw_level')
+            1306 CALL                     4
+            1314 STORE_FAST              14 (level)
+
+3476        1316 LOAD_FAST               13 (base)
+            1318 LOAD_CONST              12 (0)
+            1320 COMPARE_OP              68 (>)
+            1324 COPY                     1
+            1326 POP_JUMP_IF_FALSE       20 (to 1368)
+            1328 POP_TOP
+            1330 LOAD_FAST               14 (level)
+            1332 LOAD_CONST               0 (None)
+            1334 IS_OP                    1
+            1336 COPY                     1
+            1338 POP_JUMP_IF_FALSE       14 (to 1368)
+            1340 POP_TOP
+            1342 LOAD_GLOBAL             37 (NULL + int)
+            1352 LOAD_FAST               14 (level)
+            1354 CALL                     1
+            1362 LOAD_CONST              12 (0)
+            1364 COMPARE_OP              92 (>=)
+         >> 1368 STORE_FAST              15 (complete)
+
+3479        1370 LOAD_FAST               15 (complete)
+            1372 POP_JUMP_IF_TRUE         1 (to 1376)
+            1374 JUMP_BACKWARD          174 (to 1028)
+
+3482     >> 1376 BUILD_MAP                0
+            1378 LOAD_GLOBAL             17 (NULL + dict)
+            1388 LOAD_FAST                4 (row)
+            1390 CALL                     1
+            1398 DICT_UPDATE              1
+            1400 LOAD_CONST               0 (None)
+            1402 LOAD_CONST               0 (None)
+            1404 LOAD_CONST              29 (('box_no', 'slot_no'))
+            1406 BUILD_CONST_KEY_MAP      2
+            1408 DICT_UPDATE              1
+            1410 LOAD_FAST                5 (by_id)
+            1412 LOAD_FAST                7 (gid)
+            1414 STORE_SUBSCR
+            1418 JUMP_BACKWARD          196 (to 1028)
+
+3467     >> 1420 END_FOR
+
+3483        1422 LOAD_FAST                0 (self)
+            1424 LOAD_ATTR                6 (state_store)
+            1444 LOAD_ATTR               45 (NULL|self + released_pet_ids)
+            1464 LOAD_FAST                3 (game_id)
+            1466 CALL                     1
+            1474 STORE_FAST              16 (released)
+
+3484        1476 LOAD_FAST                5 (by_id)
+            1478 LOAD_ATTR               47 (NULL|self + items)
+            1498 CALL                     0
+            1506 GET_ITER
+            1508 LOAD_FAST_AND_CLEAR      7 (gid)
+            1510 LOAD_FAST_AND_CLEAR      4 (row)
+            1512 SWAP                     3
+            1514 BUILD_LIST               0
+            1516 SWAP                     2
+         >> 1518 FOR_ITER                12 (to 1546)
+            1522 UNPACK_SEQUENCE          2
+            1526 STORE_FAST               7 (gid)
+            1528 STORE_FAST               4 (row)
+            1530 LOAD_FAST                7 (gid)
+            1532 LOAD_FAST               16 (released)
+            1534 CONTAINS_OP              1
+            1536 POP_JUMP_IF_TRUE         1 (to 1540)
+            1538 JUMP_BACKWARD           11 (to 1518)
+         >> 1540 LOAD_FAST                4 (row)
+            1542 LIST_APPEND              2
+            1544 JUMP_BACKWARD           14 (to 1518)
+         >> 1546 END_FOR
+            1548 SWAP                     3
+            1550 STORE_FAST               4 (row)
+            1552 STORE_FAST               7 (gid)
+            1554 RETURN_VALUE
+         >> 1556 SWAP                     2
+            1558 POP_TOP
+
+3448        1560 SWAP                     2
+            1562 STORE_FAST               4 (row)
+            1564 RERAISE                  0
+         >> 1566 SWAP                     2
+            1568 POP_TOP
+
+3450        1570 SWAP                     2
+            1572 STORE_FAST               7 (gid)
+            1574 RERAISE                  0
+         >> 1576 SWAP                     2
+            1578 POP_TOP
+
+3452        1580 SWAP                     2
+            1582 STORE_FAST               4 (row)
+            1584 RERAISE                  0
+         >> 1586 PUSH_EXC_INFO
+
+3477        1588 LOAD_GLOBAL             40 (ValueError)
+            1598 LOAD_GLOBAL             42 (TypeError)
+            1608 BUILD_TUPLE              2
+            1610 CHECK_EXC_MATCH
+            1612 POP_JUMP_IF_FALSE        4 (to 1622)
+            1614 POP_TOP
+
+3478        1616 POP_EXCEPT
+            1618 EXTENDED_ARG             1
+            1620 JUMP_BACKWARD          297 (to 1028)
+
+3477     >> 1622 RERAISE                  0
+         >> 1624 COPY                     3
+            1626 POP_EXCEPT
+            1628 RERAISE                  1
+         >> 1630 SWAP                     2
+            1632 POP_TOP
+
+3484        1634 SWAP                     3
+            1636 STORE_FAST               4 (row)
+            1638 STORE_FAST               7 (gid)
+            1640 RERAISE                  0
+ExceptionTable:
+  16 to 58 -> 1556 [2]
+  204 to 238 -> 1566 [2]
+  418 to 560 -> 1576 [2]
+  1168 to 1368 -> 1586 [1]
+  1514 to 1536 -> 1630 [3]
+  1540 to 1546 -> 1630 [3]
+  1586 to 1614 -> 1624 [2] lasti
+  1622 to 1622 -> 1624 [2] lasti
+
+FUNCTION LocalWebServer._home_info SOURCE_LINE 4000
+4000           0 RETURN_GENERATOR
+               2 POP_TOP
+               4 RESUME                   0
+
+4001           6 LOAD_FAST                0 (self)
+               8 LOAD_ATTR                1 (NULL|self + _require)
+              28 LOAD_FAST                1 (request)
+              30 CALL                     1
+              38 POP_TOP
+
+4002          40 NOP
+
+4003          42 LOAD_FAST                1 (request)
+              44 LOAD_ATTR                2 (method)
+              64 LOAD_CONST               1 ('POST')
+              66 COMPARE_OP              40 (==)
+              70 POP_JUMP_IF_FALSE       24 (to 120)
+              72 LOAD_FAST                1 (request)
+              74 LOAD_ATTR                5 (NULL|self + json)
+              94 CALL                     0
+             102 GET_AWAITABLE            0
+             104 LOAD_CONST               0 (None)
+         >>  106 SEND                     3 (to 116)
+             110 YIELD_VALUE              3
+             112 RESUME                   3
+             114 JUMP_BACKWARD_NO_INTERRUPT     5 (to 106)
+         >>  116 END_SEND
+             118 JUMP_FORWARD             1 (to 122)
+         >>  120 BUILD_MAP                0
+         >>  122 STORE_FAST               2 (body)
+
+4004         124 LOAD_GLOBAL              7 (NULL + asyncio)
+             134 LOAD_ATTR                8 (to_thread)
+
+4005         154 LOAD_FAST                0 (self)
+             156 LOAD_ATTR               10 (service)
+             176 LOAD_ATTR               12 (home_info)
+
+4006         196 LOAD_GLOBAL             15 (NULL + str)
+             206 LOAD_FAST                1 (request)
+             208 LOAD_ATTR               16 (query)
+             228 LOAD_ATTR               19 (NULL|self + get)
+             248 LOAD_CONST               2 ('gameId')
+             250 CALL                     1
+             258 COPY                     1
+             260 POP_JUMP_IF_TRUE         2 (to 266)
+             262 POP_TOP
+             264 LOAD_CONST               3 ('')
+         >>  266 CALL                     1
+
+4007         274 LOAD_FAST                2 (body)
+             276 LOAD_ATTR               19 (NULL|self + get)
+             296 LOAD_CONST               4 ('syncTask')
+             298 CALL                     1
+
+4004         306 CALL                     3
+             314 GET_AWAITABLE            0
+             316 LOAD_CONST               0 (None)
+         >>  318 SEND                     3 (to 328)
+             322 YIELD_VALUE              3
+             324 RESUME                   3
+             326 JUMP_BACKWARD_NO_INTERRUPT     5 (to 318)
+         >>  328 END_SEND
+             330 STORE_FAST               3 (result)
+
+4009         332 LOAD_FAST                0 (self)
+             334 LOAD_ATTR               21 (NULL|self + _headers)
+             354 LOAD_GLOBAL             23 (NULL + web)
+             364 LOAD_ATTR               24 (json_response)
+             384 LOAD_FAST                3 (result)
+             386 CALL                     1
+             394 CALL                     1
+             402 RETURN_VALUE
+
+4003     >>  404 CLEANUP_THROW
+             406 JUMP_BACKWARD          146 (to 116)
+
+4004     >>  408 CLEANUP_THROW
+             410 JUMP_BACKWARD           42 (to 328)
+         >>  412 PUSH_EXC_INFO
+
+4010         414 LOAD_GLOBAL             26 (Exception)
+             424 CHECK_EXC_MATCH
+             426 POP_JUMP_IF_FALSE       59 (to 546)
+             428 STORE_FAST               4 (exc)
+
+4011         430 LOAD_FAST                0 (self)
+             432 LOAD_ATTR               21 (NULL|self + _headers)
+             452 LOAD_GLOBAL             23 (NULL + web)
+             462 LOAD_ATTR               24 (json_response)
+             482 LOAD_CONST               5 ('error')
+             484 LOAD_GLOBAL             15 (NULL + str)
+             494 LOAD_FAST                4 (exc)
+             496 CALL                     1
+             504 BUILD_MAP                1
+             506 LOAD_CONST               6 (502)
+             508 KW_NAMES                 7 (('status',))
+             510 CALL                     2
+             518 CALL                     1
+             526 SWAP                     2
+             528 POP_EXCEPT
+             530 LOAD_CONST               0 (None)
+             532 STORE_FAST               4 (exc)
+             534 DELETE_FAST              4 (exc)
+             536 RETURN_VALUE
+         >>  538 LOAD_CONST               0 (None)
+             540 STORE_FAST               4 (exc)
+             542 DELETE_FAST              4 (exc)
+             544 RERAISE                  1
+
+4010     >>  546 RERAISE                  0
+         >>  548 COPY                     3
+             550 POP_EXCEPT
+             552 RERAISE                  1
+         >>  554 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             556 RERAISE                  1
+ExceptionTable:
+  4 to 38 -> 554 [0] lasti
+  42 to 108 -> 412 [0]
+  110 to 110 -> 404 [2]
+  112 to 320 -> 412 [0]
+  322 to 322 -> 408 [2]
+  324 to 400 -> 412 [0]
+  402 to 402 -> 554 [0] lasti
+  404 to 404 -> 412 [0]
+  408 to 408 -> 412 [0]
+  412 to 428 -> 548 [1] lasti
+  430 to 524 -> 538 [1] lasti
+  526 to 526 -> 548 [1] lasti
+  528 to 536 -> 554 [0] lasti
+  538 to 546 -> 548 [1] lasti
+  548 to 552 -> 554 [0] lasti

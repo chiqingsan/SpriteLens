@@ -20,6 +20,7 @@ export function mountPetInventory(root: HTMLElement, token: string, host: PetInv
   const stop = watch(model.view, value => host.fixed(value === 'point'), { immediate: true, flush: 'sync' })
   return { load: model.load, resume: model.resume, seed: model.accept, find: model.find, payload: () => model.data.value,
     selected: () => model.selected.value, isBusy: () => model.busy.value,
+    selectGid: (gid: number) => inventory.value!.selectGid(gid),
     closeDetail: (preserve = false) => inventory.value!.closeDetail(preserve), openDetail: () => inventory.value!.openDetail(),
     setView: model.setView, setBox: (id: number) => inventory.value!.setBox(id), invalidate: model.invalidate,
     resetAccount: model.resetAccount, activate: model.activate, pause: () => { inventory.value!.saveScroll(); model.pause() },

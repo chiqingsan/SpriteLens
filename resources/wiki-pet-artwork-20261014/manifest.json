@@ -1,0 +1,1302 @@
+{
+  "source": "https://wiki.biligame.com/rocom/",
+  "converted_on": "2026-10-14",
+  "conversion": "512x512 RGBA WebP, quality 90, no crop or padding",
+  "duplicate_filter": "excluded files matching existing pet-media artwork in duplicate-report.csv",
+  "runtime_mapping": "not added; candidate file titles can cover multiple species/forms and require explicit ID verification",
+  "assets": [
+    {
+      "file": "JL banbanke.webp",
+      "source_file": "JL banbanke.png",
+      "source_pages": [
+        "咔咔壳",
+        "板板壳",
+        "水泡壳"
+      ],
+      "species_ids": [
+        "3055",
+        "3056",
+        "3057",
+        "3516",
+        "3517",
+        "3518"
+      ],
+      "dex_numbers": [
+        12,
+        13,
+        14
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/f/fd/tmjxdye6nimo0sd6kbz25r9angaffl5.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_banbanke.png"
+      ],
+      "sha256": "14130c3079432b5dda0ecd428ce6e9ff52f608bc81e8e9488f3c6e0cfbaccf72",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL bengbengcao caiyuqiu.webp",
+      "source_file": "JL bengbengcao caiyuqiu.png",
+      "source_pages": [
+        "蹦蹦果"
+      ],
+      "species_ids": [
+        "4019"
+      ],
+      "dex_numbers": [
+        65
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/7/74/25kfruuuq2bczrfy13lh9dzcm17bwy0.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_bengbengcao_caiyuqiu.png"
+      ],
+      "sha256": "cd51121c29400b74f75050cd7d5270d4b160065b993f93a3cb936c17612fd62c",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL bengbenghua caiyuqiu.webp",
+      "source_file": "JL bengbenghua caiyuqiu.png",
+      "source_pages": [
+        "蹦蹦果"
+      ],
+      "species_ids": [
+        "4019"
+      ],
+      "dex_numbers": [
+        65
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/1/1d/4lh1nuybf3uii4rm04i2mxwol9d8379.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_bengbenghua_caiyuqiu.png"
+      ],
+      "sha256": "0aa059665037427de709156834ed657d26ea9643657e3021ec757de282e9c1b9",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL bengbengzhongzi caiyuqiu.webp",
+      "source_file": "JL bengbengzhongzi caiyuqiu.png",
+      "source_pages": [
+        "蹦蹦果"
+      ],
+      "species_ids": [
+        "4019"
+      ],
+      "dex_numbers": [
+        65
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/0/03/ad5iwxxrvuv6dl297q8vctuqlx9jpqc.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_bengbengzhongzi_caiyuqiu.png"
+      ],
+      "sha256": "18befe8d841263795491773fe565bc586137388366fac9ff9459081d7359a0ad",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL cikuichong yise.webp",
+      "source_file": "JL cikuichong yise.png",
+      "source_pages": [
+        "刺盔虫"
+      ],
+      "species_ids": [
+        "3331",
+        "3476"
+      ],
+      "dex_numbers": [
+        77
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/4/42/5hlkisi0t294j6lqqsd2c47it3lkamf.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_cikuichong_yise.png"
+      ],
+      "sha256": "cc6e779d03a01fb9b22d79b84f3dbb746e0ca85d1165e92b0daafa406125f714",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL cikuichong.webp",
+      "source_file": "JL cikuichong.png",
+      "source_pages": [
+        "刺盔虫",
+        "千棘海针",
+        "千棘盔",
+        "海盔虫"
+      ],
+      "species_ids": [
+        "3330",
+        "3331",
+        "3332",
+        "3475",
+        "3476",
+        "3477",
+        "4020"
+      ],
+      "dex_numbers": [
+        76,
+        77,
+        78
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/6/63/elmhi8hbg54kb64cdo2hevdslmcmnwf.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_cikuichong.png"
+      ],
+      "sha256": "58cf00ef3edd3434104ca420341f30e279946928925b5c131356a7ae1f1bd791",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL conglinluxiyi.webp",
+      "source_file": "JL conglinluxiyi.png",
+      "source_pages": [
+        "石冠王蜥",
+        "石刺蜥",
+        "石肤蜥"
+      ],
+      "species_ids": [
+        "3106",
+        "3107",
+        "3108",
+        "3500",
+        "3501",
+        "3502"
+      ],
+      "dex_numbers": [
+        24,
+        25,
+        26
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/6/60/46ooanym87q4nh7ip8y2rbyp069btyc.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_conglinluxiyi.png"
+      ],
+      "sha256": "ad0d1ec1bba56749feb17d50b9e03d5eefb1a57aadd4c9d4d788ca6db93167ee",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL dishu yise.webp",
+      "source_file": "JL dishu yise.png",
+      "source_pages": [
+        "地鼠"
+      ],
+      "species_ids": [
+        "3020",
+        "3454"
+      ],
+      "dex_numbers": [
+        277
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/9/9b/791glazi326lgs7mpljn6xcjqehe5iq.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_dishu_yise.png"
+      ],
+      "sha256": "606b7a5d74c963a6e6cf3742a8059737f70c78dadb29c64c99daaf399d10b0e5",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL dishu.webp",
+      "source_file": "JL dishu.png",
+      "source_pages": [
+        "地鼠"
+      ],
+      "species_ids": [
+        "3020",
+        "3454"
+      ],
+      "dex_numbers": [
+        277
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/b/b4/idyb58forcmd0yzckcc4j6rdmk36zpq.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_dishu.png"
+      ],
+      "sha256": "18aba2376296f3ed4b92fc37d57c4dcc16b36842c61ab8cb467c893c018cee65",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL dongyuque.webp",
+      "source_file": "JL dongyuque.png",
+      "source_pages": [
+        "冬羽雀",
+        "岚鸟",
+        "雪绒鸟",
+        "霜翼领主"
+      ],
+      "species_ids": [
+        "3028",
+        "3037",
+        "3279",
+        "3280",
+        "3281",
+        "3282",
+        "3283",
+        "3284",
+        "3285",
+        "3286",
+        "3287",
+        "3533",
+        "4074"
+      ],
+      "dex_numbers": [
+        18,
+        19,
+        20
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/b/bd/cotkz4s2l6hof0jjo412fg2q36mclgc.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_dongyuque.png"
+      ],
+      "sha256": "1fd510d4573d4375a799aa423bd03aaff7ebf3916c310b2cb323493a6511f80d",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL dundishu.webp",
+      "source_file": "JL dundishu.png",
+      "source_pages": [
+        "地鼠"
+      ],
+      "species_ids": [
+        "3020",
+        "3454"
+      ],
+      "dex_numbers": [
+        277
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/7/78/7v0gek5nbyae4bpzt5by7klm2270dnu.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_dundishu.png"
+      ],
+      "sha256": "3bdd6608d0dbc8a5dc0b42f45fc5a5e93fd45ec99e14b8c822d08931a6d769f8",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL dunshu.webp",
+      "source_file": "JL dunshu.png",
+      "source_pages": [
+        "地鼠"
+      ],
+      "species_ids": [
+        "3020",
+        "3454"
+      ],
+      "dex_numbers": [
+        277
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/b/ba/dfww1rsfrj64x7l1etve2rzksjgwxzk.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_dunshu.png"
+      ],
+      "sha256": "33a793f15a105d9774cb51c66ed9082dcb1b22a80f98a1769b638a7b40f9feeb",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL emolang shouling yise.webp",
+      "source_file": "JL emolang shouling yise.png",
+      "source_pages": [
+        "恶魔狼王"
+      ],
+      "species_ids": [
+        "4011"
+      ],
+      "dex_numbers": [
+        131
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/d/da/97zq4b5s03yztx3tzvbkfwnvhldw637.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_emolang_shouling_yise.png"
+      ],
+      "sha256": "6a975376dbf363f64077af10c7f3c75ed524c7c4c7bbd667b30edaf115a8ff2f",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL fengguanmuchong yidi.webp",
+      "source_file": "JL fengguanmuchong yidi.png",
+      "source_pages": [
+        "暮风隐者（枯叶的样子）"
+      ],
+      "species_ids": [
+        "5062"
+      ],
+      "dex_numbers": [
+        120
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/0/03/euosawzqxqsd9o3eonundx3fikd1qo2.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_fengguanmuchong_yidi.png"
+      ],
+      "sha256": "5b25a3a97badf838dace3c4baa49eaedc562b6a439a8ec066a7e8df7bb136d9a",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL fenggunmuchong shouling.webp",
+      "source_file": "JL fenggunmuchong shouling.png",
+      "source_pages": [
+        "暮风隐者（枯叶的样子）",
+        "暮风隐者（金黄的样子）"
+      ],
+      "species_ids": [
+        "5056",
+        "5062"
+      ],
+      "dex_numbers": [
+        120
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/d/da/0jr3hj3nslqtjvkemzeruw3glg0g3j5.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_fenggunmuchong_shouling.png"
+      ],
+      "sha256": "e89a45ab4d9a9140885a9919c70e6a4f83f92e894ba4c9d43143c85f6dc3db5f",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL fenggunmuchong.webp",
+      "source_file": "JL fenggunmuchong.png",
+      "source_pages": [
+        "暮风隐者（金黄的样子）"
+      ],
+      "species_ids": [
+        "5056"
+      ],
+      "dex_numbers": [
+        120
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/9/9a/ci17uu17g1weeaevc442zrx578epzit.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_fenggunmuchong.png"
+      ],
+      "sha256": "2d0f8e20d13239b2b5b8677d9a7c8a9c77cfef21e07fb339814f107f6b34e40a",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL gaomaoyuzhe yise.webp",
+      "source_file": "JL gaomaoyuzhe yise.png",
+      "source_pages": [
+        "高帽鹬者"
+      ],
+      "species_ids": [
+        "13000170"
+      ],
+      "dex_numbers": [
+        233
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/a/ab/8rjyhvusiczp1aznxv3o4itbqnuajek.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_gaomaoyuzhe_yise.png"
+      ],
+      "sha256": "9622f7809e1d7a47abdadd28ea656b327afa293557870afbc77d5c5f9ca0ac2d",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL haikuichong yise.webp",
+      "source_file": "JL haikuichong yise.png",
+      "source_pages": [
+        "海盔虫"
+      ],
+      "species_ids": [
+        "3330",
+        "3475"
+      ],
+      "dex_numbers": [
+        76
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/1/1e/hfb9ziuiwg52p8hudcxr5rbqjbti250.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_haikuichong_yise.png"
+      ],
+      "sha256": "baa430dec204b7094d0e10280f13d425415dd8224ce6e2d5233535aaab37c8d1",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL haikuichong.webp",
+      "source_file": "JL haikuichong.png",
+      "source_pages": [
+        "刺盔虫",
+        "千棘海针",
+        "千棘盔",
+        "海盔虫"
+      ],
+      "species_ids": [
+        "3330",
+        "3331",
+        "3332",
+        "3475",
+        "3476",
+        "3477",
+        "4020"
+      ],
+      "dex_numbers": [
+        76,
+        77,
+        78
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/7/74/k1xrtaw9trebnthviohuao46gex9nbr.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_haikuichong.png"
+      ],
+      "sha256": "c0b98cf3c3aaeca95003f0bfd2f77d52bf97239b7d3a0f4b39ef09f393660135",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL huociyanxiyi.webp",
+      "source_file": "JL huociyanxiyi.png",
+      "source_pages": [
+        "石冠王蜥",
+        "石刺蜥",
+        "石肤蜥"
+      ],
+      "species_ids": [
+        "3106",
+        "3107",
+        "3108",
+        "3500",
+        "3501",
+        "3502"
+      ],
+      "dex_numbers": [
+        24,
+        25,
+        26
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/5/54/l86kpkxjpuxm7jxttcodwe5vlwqf68r.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_huociyanxiyi.png"
+      ],
+      "sha256": "22c82b972850cf8d1dd8bd2c00d484b3fef239c21bd354415429b25ca747877d",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL jingshiwo yidi5.webp",
+      "source_file": "JL jingshiwo yidi5.png",
+      "source_pages": [
+        "钻石蜗"
+      ],
+      "species_ids": [
+        "4079"
+      ],
+      "dex_numbers": [
+        40
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/7/7e/4r0fp6dkzxf8bp08t0k70axpbiqkzwn.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_jingshiwo_yidi5.png"
+      ],
+      "sha256": "db5f0f1702eab97100268c88edd089f782715036912d8113904efafebdd32e03",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL kakake.webp",
+      "source_file": "JL kakake.png",
+      "source_pages": [
+        "咔咔壳",
+        "板板壳",
+        "水泡壳"
+      ],
+      "species_ids": [
+        "3055",
+        "3056",
+        "3057",
+        "3516",
+        "3517",
+        "3518"
+      ],
+      "dex_numbers": [
+        12,
+        13,
+        14
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/4/41/4x85yk5hmmmurrdo2xc1jfeou1yoc0w.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_kakake.png"
+      ],
+      "sha256": "586e3b56091aeb9f55e7f0406bf386aed8a66aff1bbc3926a4fabab143ecd0d1",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL lanniao.webp",
+      "source_file": "JL lanniao.png",
+      "source_pages": [
+        "冬羽雀",
+        "岚鸟",
+        "雪绒鸟",
+        "霜翼领主"
+      ],
+      "species_ids": [
+        "3028",
+        "3037",
+        "3279",
+        "3280",
+        "3281",
+        "3282",
+        "3283",
+        "3284",
+        "3285",
+        "3286",
+        "3287",
+        "3533",
+        "4074"
+      ],
+      "dex_numbers": [
+        18,
+        19,
+        20
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/1/1a/5xuyo3ofwb0mkyyymemml760smoob0k.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_lanniao.png"
+      ],
+      "sha256": "d2e5c00bda235b0b2e80060c54910a8985a70f846b5e952a35c6a79291b3daae",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL maodouwawa.webp",
+      "source_file": "JL maodouwawa.png",
+      "source_pages": [
+        "雪影冰灵"
+      ],
+      "species_ids": [
+        "4085"
+      ],
+      "dex_numbers": [
+        144
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/9/98/qzj02vvv7bcznoinf5vlpupf5ayj2cf.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_maodouwawa.png"
+      ],
+      "sha256": "48a0ee9027e6fe8ca15c377ee2b51c688af3c9431e6bc401fa99d81bccb38139",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL pengyechong yidi.webp",
+      "source_file": "JL pengyechong yidi.png",
+      "source_pages": [
+        "暮风隐者（枯叶的样子）"
+      ],
+      "species_ids": [
+        "5062"
+      ],
+      "dex_numbers": [
+        120
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/4/40/gqzxr34bbw8uz2xevc3fwg6mvvllf53.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_pengyechong_yidi.png"
+      ],
+      "sha256": "b2ff7cbc4244951159067454e1fe16fd39d6589ec8c12ba086a3f383680302c6",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL pengyechong.webp",
+      "source_file": "JL pengyechong.png",
+      "source_pages": [
+        "暮风隐者（金黄的样子）"
+      ],
+      "species_ids": [
+        "5056"
+      ],
+      "dex_numbers": [
+        120
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/a/a2/06kxgqnp0c110mjtoyx4lgszhnmw7a6.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_pengyechong.png"
+      ],
+      "sha256": "f4886b5aa471228dc4ccd814069a35af9680daad6494c0ded791fd909a03717b",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL qianjikui shouling yise.webp",
+      "source_file": "JL qianjikui shouling yise.png",
+      "source_pages": [
+        "千棘海针"
+      ],
+      "species_ids": [
+        "4020"
+      ],
+      "dex_numbers": [
+        78
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/e/e9/nc5zpu86nif9qr01e981dhxpfcgbt5n.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_qianjikui_shouling_yise.png"
+      ],
+      "sha256": "ee071125f74b760de18379f2f886fd3bfe7a6e7ee63f0fbfecd66d91a8bd6040",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL qianjikui yise.webp",
+      "source_file": "JL qianjikui yise.png",
+      "source_pages": [
+        "千棘盔"
+      ],
+      "species_ids": [
+        "3332",
+        "3477"
+      ],
+      "dex_numbers": [
+        78
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/0/0b/27zl95i5sopr5prhw98m0at136qbpwb.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_qianjikui_yise.png"
+      ],
+      "sha256": "8621aad8fae391ec8a543ec3c43a74c672dcbd3f3cc3b4969c01d3bb8178cb22",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL qianjikui.webp",
+      "source_file": "JL qianjikui.png",
+      "source_pages": [
+        "刺盔虫",
+        "千棘海针",
+        "千棘盔",
+        "海盔虫"
+      ],
+      "species_ids": [
+        "3330",
+        "3331",
+        "3332",
+        "3475",
+        "3476",
+        "3477",
+        "4020"
+      ],
+      "dex_numbers": [
+        76,
+        77,
+        78
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/7/70/4jj6f2sn5j3nie33npav7uxhka8ivo1.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_qianjikui.png"
+      ],
+      "sha256": "4266fb58b3827cafd18c71425c1a2baafebdf188f637f72fc8e538ba4c04eb48",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL qilihua boss yise.webp",
+      "source_file": "JL qilihua boss yise.png",
+      "source_pages": [
+        "奇丽果"
+      ],
+      "species_ids": [
+        "4022"
+      ],
+      "dex_numbers": [
+        43
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/6/6d/g69pvxsq10mnmuct495hmuwwl3thttu.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_qilihua_boss_yise.png"
+      ],
+      "sha256": "1876cd557a1c7a8303465ebefcc33aa44560e813413908349c9f6c4edce076bf",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL qimengmi.webp",
+      "source_file": "JL qimengmi.png",
+      "source_pages": [
+        "奇梦咪"
+      ],
+      "species_ids": [
+        "4087"
+      ],
+      "dex_numbers": [
+        200
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/3/34/93cyjy4vtse28htwmc1qm4zq908iuh3.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_qimengmi.png"
+      ],
+      "sha256": "0e3f72bc1e917119ee7943bc0207cdd80c2e6a42b725f1712af08377f063c420",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL qiqi.webp",
+      "source_file": "JL qiqi.png",
+      "source_pages": [
+        "棋契陛下"
+      ],
+      "species_ids": [
+        "4086"
+      ],
+      "dex_numbers": [
+        189
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/6/60/2xpon1zoetbaadaex87r3faxk77dv5o.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_qiqi.png"
+      ],
+      "sha256": "2952b8cc45836593bb95e7b706e45e35de05363acb1b3599ad4a4c75c9037caf",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL qiqidu.webp",
+      "source_file": "JL qiqidu.png",
+      "source_pages": [
+        "棋契陛下"
+      ],
+      "species_ids": [
+        "4086"
+      ],
+      "dex_numbers": [
+        189
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/7/7f/hnb97lbr5xx92t4lukk4nrv4awbdxdk.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_qiqidu.png"
+      ],
+      "sha256": "4865e105e8908d87ab8fd7a3daa3c7cce987bd08f0dd467c2a6507ad1d1011b5",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL shihuacixiyi.webp",
+      "source_file": "JL shihuacixiyi.png",
+      "source_pages": [
+        "石冠王蜥",
+        "石刺蜥",
+        "石肤蜥"
+      ],
+      "species_ids": [
+        "3106",
+        "3107",
+        "3108",
+        "3500",
+        "3501",
+        "3502"
+      ],
+      "dex_numbers": [
+        24,
+        25,
+        26
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/5/53/esnwkgw4bgxr7nya21trpzpwldhtqd2.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_shihuacixiyi.png"
+      ],
+      "sha256": "bd807d9a1d417ed3405f4adabaecdeab5687b02c4e9f5a81a6ea176ee8c5ea41",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL shuangqiudingding yingtaocaomei.webp",
+      "source_file": "JL shuangqiudingding yingtaocaomei.png",
+      "source_pages": [
+        "香草甜甜"
+      ],
+      "species_ids": [
+        "3478",
+        "3479"
+      ],
+      "dex_numbers": [
+        235
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/6/61/37zkmvffih3pcac4u2t8n4slud20n85.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_shuangqiudingding_yingtaocaomei.png"
+      ],
+      "sha256": "08ee9bc5123d2627f93f0b605af68b97db7818367afb1f047ac9e97f9a9a5a8c",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL shuangqiudingding yingtaomocha.webp",
+      "source_file": "JL shuangqiudingding yingtaomocha.png",
+      "source_pages": [
+        "香草甜甜"
+      ],
+      "species_ids": [
+        "3478",
+        "3479"
+      ],
+      "dex_numbers": [
+        235
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/0/06/8ar4o3byzrvg0hokzi47xqckv5xosjh.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_shuangqiudingding_yingtaomocha.png"
+      ],
+      "sha256": "03779583c34c5c17274ad0ad5ee46b0dd40a912c829bf5591b03235977488980",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL shuipaoke.webp",
+      "source_file": "JL shuipaoke.png",
+      "source_pages": [
+        "咔咔壳",
+        "板板壳",
+        "水泡壳"
+      ],
+      "species_ids": [
+        "3055",
+        "3056",
+        "3057",
+        "3516",
+        "3517",
+        "3518"
+      ],
+      "dex_numbers": [
+        12,
+        13,
+        14
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/3/30/1hajijlejjmw2valjmlx4f96svrxdwt.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_shuipaoke.png"
+      ],
+      "sha256": "feef0d4c35bede75f80e48e735866012a639c1d3064347181b589eb0dd5a89c3",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL xuanyanchong.webp",
+      "source_file": "JL xuanyanchong.png",
+      "source_pages": [
+        "暮风隐者（金黄的样子）"
+      ],
+      "species_ids": [
+        "5056"
+      ],
+      "dex_numbers": [
+        120
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/2/2c/0jtyv74wjkxa96zy336x469hstmmjyp.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_xuanyanchong.png"
+      ],
+      "sha256": "a974e311f4e8fc66e7db9e7ca2f0ea73dcb99861a2ef20149fafed183502d3a1",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL xuanyechong yidi.webp",
+      "source_file": "JL xuanyechong yidi.png",
+      "source_pages": [
+        "暮风隐者（枯叶的样子）"
+      ],
+      "species_ids": [
+        "5062"
+      ],
+      "dex_numbers": [
+        120
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/3/34/4yvnqhjk726hwgsqevgtmnbr35sc9bt.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_xuanyechong_yidi.png"
+      ],
+      "sha256": "28c6df19a87ed837cc3b1e1de21317ad550682edb85297121d388165d1e308e1",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL xuerongniao dong.webp",
+      "source_file": "JL xuerongniao dong.png",
+      "source_pages": [
+        "冬羽雀",
+        "岚鸟",
+        "雪绒鸟",
+        "霜翼领主"
+      ],
+      "species_ids": [
+        "3028",
+        "3037",
+        "3279",
+        "3280",
+        "3281",
+        "3282",
+        "3283",
+        "3284",
+        "3285",
+        "3286",
+        "3287",
+        "3533",
+        "4074"
+      ],
+      "dex_numbers": [
+        18,
+        19,
+        20
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/1/1c/n7dh8n56ty0dxekm2d8wggqsh1e0ysr.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_xuerongniao_dong.png"
+      ],
+      "sha256": "7d576940fc67eba73dc494cffd20f704830bc27bc42239dbf85c1a7066bbcb4c",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL xueyingwawa shouling yise.webp",
+      "source_file": "JL xueyingwawa shouling yise.png",
+      "source_pages": [
+        "雪影冰灵"
+      ],
+      "species_ids": [
+        "4085"
+      ],
+      "dex_numbers": [
+        144
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/1/16/k2e4hc6wgrft9qa6ahs42gxh8gt0hsv.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_xueyingwawa_shouling_yise.png"
+      ],
+      "sha256": "81faa231676b06ccc464c325afeae7009ebd946413f3b4b646a712c72333542d",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL xueyingwawa.webp",
+      "source_file": "JL xueyingwawa.png",
+      "source_pages": [
+        "雪影冰灵"
+      ],
+      "species_ids": [
+        "4085"
+      ],
+      "dex_numbers": [
+        144
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/4/4c/lmc3s1kouusumtbveogttnow6qh5z7d.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_xueyingwawa.png"
+      ],
+      "sha256": "40086909923c336c453c538f43d2c0cfe832c1cb4756c2d6cf9499114559017b",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL yajiji jijiya.webp",
+      "source_file": "JL yajiji jijiya.png",
+      "source_pages": [
+        "鸭吉吉国王"
+      ],
+      "species_ids": [
+        "4012"
+      ],
+      "dex_numbers": [
+        11
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/2/2e/oixnjxbkax0stq6kums502zxe6p0dai.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_yajiji_jijiya.png"
+      ],
+      "sha256": "703ba1d678934c766fbeb3ad2a952dd8cbe58bd3807d70bdc0d37ce5f9996b3b",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    },
+    {
+      "file": "JL youyingshu shouling yise.webp",
+      "source_file": "JL youyingshu shouling yise.png",
+      "source_pages": [
+        "幻影荆棘"
+      ],
+      "species_ids": [
+        "4064"
+      ],
+      "dex_numbers": [
+        35
+      ],
+      "source_urls": [
+        "https://patchwiki.biligame.com/images/rocom/5/5e/rg1tm7blx6xp0otm86focv7t09iqfdr.png"
+      ],
+      "description_urls": [
+        "https://wiki.biligame.com/rocom/%E6%96%87%E4%BB%B6:JL_youyingshu_shouling_yise.png"
+      ],
+      "sha256": "f792e7e3c47405ce103ec6709498fc4940d865936e91cf2f9b502081bf5991af",
+      "size_px": [
+        512,
+        512
+      ],
+      "format": "WEBP",
+      "alpha": "RGBA"
+    }
+  ]
+}
