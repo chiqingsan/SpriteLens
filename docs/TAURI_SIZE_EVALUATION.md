@@ -42,7 +42,7 @@ Tauri 官方文档明确（已核实 `v2.tauri.app/distribute/windows-installer/
 - **默认模式 `downloadBootstrapper`：额外体积 0 MB**，运行时缺失才下载安装（需联网）。
 - Windows 10（2018 年 4 月后版本）与 Windows 11 **系统自带 WebView2**。
 - 本机实测确认：注册表 `HKLM\...\EdgeUpdate\Clients\{F3017226...}` 存在，
-  版本 **154.0.4258.62**，位置 `C:\Program Files (x86)\Microsoft\EdgeWebView\Application`。
+  版本 **154.0.4258.62**，位置 `系统 Edge WebView2 安装目录（默认路径）`。
   → **目标用户（Win10/11 玩家）几乎 100% 已预装，下 0 字节。**
 
 其他模式的额外体积（仅当要支持无网/特殊环境时才用）：

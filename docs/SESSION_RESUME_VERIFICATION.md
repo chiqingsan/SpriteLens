@@ -25,7 +25,7 @@
 | 全量测试 | 334项，329通过、5项因已有SpriteLens实例运行按原规则跳过 |
 | 启动烟测、JS语法、diff检查 | 通过 |
 
-真实录制只读回放，检查点写临时目录，未更改用户正在运行的实例或密钥。截图：`D:/code/SpriteLens/.guishot/backpack-session-resumed.png`。
+真实录制只读回放，检查点写临时目录，未更改用户正在运行的实例或密钥。截图：本机截图目录 `.guishot/backpack-session-resumed.png`。
 
 ## 同轮背包UI调整
 

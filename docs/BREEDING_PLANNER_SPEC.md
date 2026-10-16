@@ -1,5 +1,7 @@
 # 智能配窝实施规格
 
+> **未实施** —— `spritelens/domain/breeding_planner.py` 与 `spritelens/services/breeding_planner_service.py` 尚不存在，对应页面为占位（`spritelens/web/static/index.html:277`，`docs/ROADMAP.md:151,157` 入口条件未满足）。本文是设计依据，保留。
+
 本轮仅研究；页面继续占位。下一轮先实现离线建议方案，再接真实家园。此文为 SpriteLens 的实现决策，竞品代码证据不等于已验证游戏规则。
 
 ## 1. 已验证的竞品行为

@@ -136,7 +136,8 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `frontend/src/components/DualRangeSlider.vue` | 等级、体型、声音与百分比共用双头滑动条；仅持有拖动量程，筛选状态仍在对应composable |
 | `frontend/src/components/PetDetail.vue`、`PetDetailPanel.vue` | 完整详情、定位、键盘/焦点与窄屏交互；布局按需目视验收 |
 | `frontend/src/composables/usePets.ts`、`types/pets.ts`、`petInventoryBridge.ts` | F03 第二刀：请求与账号票据/DTO、快照/三视图/分页/箱队/选择；账号/偏好与应用壳桥 |
-| `frontend/src/components/PetInventory.vue`、`PetCards.vue`、`PetTable.vue`、`PetSlots.vue`、`PetBoxNavigation.vue` | 三视图、加载/错误重试、真实箱位/队伍、分页、键盘/焦点；Vue 独占节点 |
+| `frontend/src/components/PetInventory.vue`、`PetSlots.vue`、`PetBoxNavigation.vue` | 三视图、加载/错误重试、真实箱位/队伍、分页、键盘/焦点；Vue 独占节点 |
+| `frontend/src/components/EggAvatar.vue`、`EggBoxArtwork.vue`、`EggBoxCard.vue`、`EggBoxDetail.vue`、`EggDetail.vue`、`UiIcon.vue`、`PetPageNavigation.vue` | 蛋图鉴/蛋仓展示组件（蛋头像与立绘、箱卡/箱详情、蛋详情）及通用图标、背包页导航 |
 | `frontend/src/components/PetAvatar.vue`、`PetMarks.vue`、`petDisplay.ts` | 安全模板展示本地头像/立绘、色卡/粒子、稀有/奖牌及 UI 格式；不复制 Python 业务规则 |
 | `frontend/src/petTestData.ts`、`composables/usePets.test.ts` | 合成数据、异步/账号/DTO/槽位回归 |
 | `frontend/src/api/client.ts`、`types/eggDex.ts` | 同源 token/取消/错误归一与页面 DTO 运行校验 |

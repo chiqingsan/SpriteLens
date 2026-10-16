@@ -1,5 +1,7 @@
 # 产线收集实施规格
 
+> **未实施** —— `spritelens/domain/collection_lines.py` 与 `spritelens/services/collection_lines_service.py` 尚不存在，对应页面为占位（`spritelens/web/static/index.html:278`，`docs/DANSHEN_FEATURE_SPEC.md:31` 标为待做）。
+
 本轮仅研究，保留占位页。下一轮以单账号离线收集清单为第一版，复用配窝的静态兼容候选；真实产线关系在协议验证后接入。
 
 ## 1. 已验证的竞品行为

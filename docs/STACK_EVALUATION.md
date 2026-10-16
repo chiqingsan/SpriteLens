@@ -203,3 +203,4 @@ Rust 能把 23.8µs/帧 降到约 1µs/帧（估计）——
 | Rust pcap 在 Windows **不需要 SDK** | 官方 README：运行时解析入口点 | rust-pcap/pcap README |
 | 待重写规模 | protocol+capture 1022 行、测试 785 行 | `wc -l` |
 | 现有测试基线 | 110 项全绿 | `run_build_tests.py` |
+| 勘误（2026-10-15） | `tools/run_build_tests.py` 已移除，现行测试命令为 `python -B -m unittest discover -s tests`（见 `docs/UI_GUIDE.md:178`） | 2026-10-15 补注 |

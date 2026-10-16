@@ -283,7 +283,7 @@ PyQt6 裁剪+打包后约 30–35 MB（`TAURI_SIZE_EVALUATION.md` §4），
 | 2 | DPI 感知 | 全项目 `Dpi/HighDpi` 零命中 | 高分屏渲染只靠 Qt6 默认兜底，无显式声明 | ⛔ 已失效：PyQt 退役后渲染全在 WebView2，pywebview 自带 DPI 处理，应用层无需声明 |
 | 3 | `excepthook` + 启动日志 | 无 `sys.excepthook`/`faulthandler`/`startup-error.log` | `start.bat` 用 pythonw，未捕获异常**静默消失** | ✅ 已实现（2026-10-10）：`logs/spritelens.crash.log` + 启动致命失败弹对话框，`tests/test_crash_log.py` 覆盖 |
 | 4 | `setWindowIcon` | `app.ico` 只被标题栏 logo 用（`widgets.py:705`） | 任务栏图标未设置 | ✅ 已实现（2026-10-10）：`tools/make_icon.py` 生成多尺寸 `resources/app.ico`，接 `webview.start(icon=...)` 与 favicon |
-| 5 | 架构测试 | 文档承诺"业务层无 Qt"但只有手工命令（`TECH_EVALUATION.md` 列为待办） | 竞品的 import 图污染正是缺此测试；建议仿 innovationb1ue `test_architecture.py`，同时把 §2.3 的反向 import 变红灯 | ✅ 已实现（2026-10-10）：`tests/test_architecture.py`，约束改为「业务层无 Web 依赖 + 无反向分层 + protocol 纯函数」 |
+| 5 | 架构测试 | 文档承诺"业务层无 Qt"但只有手工命令（`TECH_EVALUATION.md` 列为待办） | 竞品的 import 图污染正是缺此测试；建议仿 innovationb1ue `test_architecture.py`，同时把 §2.3 的反向 import 变红灯 | ✅ 已实现（2026-10-10）：`tests/test_architecture.py`，约束改为「业务层无 Web 依赖 + 无反向分层 + protocol 纯函数」 勘误（2026-10-15）：`tests/test_architecture.py` 与 `tests/test_smoke_assets.py` 已于 2026-10-15 随提交 `bd6f82e`（取消统一门禁、ESLint 与 Playwright）移除，依赖方向现由改动复核把关（见 `docs/ROADMAP.md:42`）。 |
 | 6 | 本地服务安全组合 | 尚无 HTTP 服务 | 一旦引入：随机端口 + 每次启动随机 token + `compare_digest` + 仅 127.0.0.1（约 30 行） | ✅ 已实现（B1 阶段） |
 
 打包仍剩的实质工作：PyInstaller/Nuitka spec（含 `data/` 与 `resources/` 附带清单）、
@@ -332,7 +332,7 @@ MinGW 编译器，且单次打包约 20 分钟（增量构建快得多）。
 |---|---|---|
 | `Conflict between user and plugin decision for module 'webview.platforms.android'` | Nuitka 4.x 内置 `pywebview` 插件且**强制启用**，自行决定只收 Windows 平台分支；手动 `--enable-plugin=pywebview` 或 `--include-package=webview` 都会与之冲突 | 两者都不加，交给插件自动处理 |
 | exe 里网卡枚举失败：`Module 'scapy.as_resolvers' was actively excluded` | 曾把 `scapy.as_resolvers` 当无用模块排除，实际它在 `scapy.arch.windows` 的调用链上（scapy 动态 import 多，静态排除极易误伤） | **不要排除 scapy 任何子模块** |
-| **exe 能通过 smoke 却启动即崩**：`ValueError: '...\spritelens\web\static' does not exist` | 只把 `data/`、`resources/` 加进 `include_data_dirs`，漏了**包内资源** `spritelens/web/static/`（前端 HTML/CSS/JS/精灵图）。Nuitka 只编译 `.py`，非 Python 文件必须显式附带。而 `--smoke-test`/`--replay` 等非 GUI 路径不加载前端，测不出来 | 把 `spritelens/web/static` 加入 `include_data_dirs`；**并把静态资源检查并入 `--smoke-test`**（缺目录/缺文件直接返回非 0），`tests/test_smoke_assets.py` 锁死 |
+| **exe 能通过 smoke 却启动即崩**：`ValueError: '...\spritelens\web\static' does not exist` | 只把 `data/`、`resources/` 加进 `include_data_dirs`，漏了**包内资源** `spritelens/web/static/`（前端 HTML/CSS/JS/精灵图）。Nuitka 只编译 `.py`，非 Python 文件必须显式附带。而 `--smoke-test`/`--replay` 等非 GUI 路径不加载前端，测不出来 | 把 `spritelens/web/static` 加入 `include_data_dirs`；**并把静态资源检查并入 `--smoke-test`**（缺目录/缺文件直接返回非 0），`tests/test_smoke_assets.py` 锁死 勘误（2026-10-15）：`tests/test_architecture.py` 与 `tests/test_smoke_assets.py` 已于 2026-10-15 随提交 `bd6f82e`（取消统一门禁、ESLint 与 Playwright）移除，依赖方向现由改动复核把关（见 `docs/ROADMAP.md:42`）。 |
 | `Failed to add resources to file ...exe`（重试 5 次后失败） | **杀毒软件实时扫描锁住 Nuitka 后处理写入的临时文件**；本机火绒会报 `build/RCX*.tmp` 为病毒。`RCX*.tmp` 是微软 `rc.exe` 资源编译器的标准临时文件，用于给 exe 写入图标与版本信息——属**误报** | 打包前给项目目录加杀软白名单；或临时关闭实时防护。成品可用 `Start-MpScan` 独立复检：本机 Defender 对产物零检出 |
 
 **打包后必须验的三件事**（按顺序，缺一不可）：

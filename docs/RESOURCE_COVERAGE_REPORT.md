@@ -1,6 +1,16 @@
 # 资源补齐覆盖报告
 
 状态：目录补齐阶段的覆盖与来源快照。物种兜底图和官方头像/立绘是不同口径，不能直接比较覆盖率。
+
+### 现状更新（2026-10-16）
+
+- 生物目录：1060 物种；头像覆盖 `portrait_species` 641 / `without_portrait` 419 / `missing_mirrors` 826；头像覆盖率 **60.5%**，口径为「仅 portrait」，**不含已从仓库删除的 `pets/` 兜底小图**。
+- 因此文中「620 个普通头像」「829 只宠物」「788→829」「829/1060 = 78.2%」「232 个缺图」均为更早口径，保留作历史记录。
+- 前端资源目录现为 **33.60 MiB**（原记 67.76 MiB）；媒体尺寸现为 portrait 256px / artwork 512px（原记 128px）。
+- 另补：`resources/` 下两个 Wiki 候选目录（`resources/wiki-pet-artwork-20261014/` 191 文件、`resources/wiki-pet-portrait-candidates-20261014/` 43 文件）此前未纳入本文台账；其中 187 个 webp 候选图已从仓库移除（约 7.25 MiB），保留 5 个溯源台账文件（`manifest.json`、`nrc-name-artwork-manifest.json`、`page-artwork-manifest.json`、`source-manifest.json`、`fullbody-gap-report.csv`）与 42 张原始候选 PNG（`*-normal-1024-source.png`、`*-normal-portrait-original.png`）。
+
+以下为当时快照。
+
 2026-10-12 当前媒体映射有620个普通头像物种、478个普通立绘物种，前端资源目录为67.76MiB；
 完整实测与资源流水线风险见 [项目审查](reviews/PROJECT_REVIEW_2026-10-12.md)，后续治理见 [路线图](ROADMAP.md)。
 

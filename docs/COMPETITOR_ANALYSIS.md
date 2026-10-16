@@ -8,9 +8,9 @@
 > + 四个同源开源仓库源码通读。所有结论附证据。
 >
 > 素材位置（本机，可能被清理，可重新 clone）：
-> - `C:\Users\chiqingsan\Downloads\roco_helper-v3.9.0.exe`（UPX 加壳发行版）
-> - `C:\Users\chiqingsan\AppData\Local\Temp\roco_helper_unpacked.exe`（已解包）
-> - `C:\Users\chiqingsan\AppData\Roaming\roco_helper\roco_helper.sqlite`（真实运行时数据）
+> - `本机下载的 roco_helper-v3.9.0.exe`（UPX 加壳发行版）
+> - `本机解包目录`（已解包）
+> - `用户数据目录的 roco_helper.sqlite`（真实运行时数据）
 > - `AppData\Local\Temp\roco_research\`（roco-catcher / MITM-Server / Protocol-Parser / rocom-parse / 两个 rocom-helper）
 > - `AppData\Local\Temp\rocom-helper-reference\`（innovationb1ue/rocom-helper，PvP 分析工具）
 

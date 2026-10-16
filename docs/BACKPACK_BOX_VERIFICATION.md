@@ -49,6 +49,7 @@
 | 项目 | 结果 |
 |---|---|
 | 全量测试 `tools/run_build_tests.py` | 325项，320通过、5跳过；已有SpriteLens实例运行，五项Windows单实例测试按原有规则跳过 |
+| 勘误（2026-10-15） | `tools/run_build_tests.py` 已移除，现行测试命令为 `python -B -m unittest discover -s tests`（见 `docs/UI_GUIDE.md:178`） |
 | 新增位置模块相关测试 | 16项通过，覆盖箱/队、空箱、缺资料/未知格、固定匹配状态、切号/重启、历史去重和身份推送 |
 | 启动 `python -X utf8 -B -m spritelens --smoke-test` | 通过，协议/服务导入、配置、网卡枚举及静态资源齐备 |
 | 全部7个前端JS语法 / `git diff --check` | 通过 |
@@ -61,10 +62,10 @@
 
 截图（本地忽略产物）：
 
-- 喵喵箱位：`D:/code/SpriteLens/.guishot/backpack-boxes-1440.png`
-- 喵喵三队：`D:/code/SpriteLens/.guishot/backpack-teams-1440.png`
-- 火花筛选：`D:/code/SpriteLens/.guishot/backpack-fire-1440.png`
-- 水蓝蓝筛选：`D:/code/SpriteLens/.guishot/backpack-blue-1440.png`
+- 喵喵箱位：本机截图目录 `.guishot/` 下的 backpack-boxes-1440.png
+- 喵喵三队：本机截图目录 `.guishot/` 下的 backpack-teams-1440.png
+- 火花筛选：本机截图目录 `.guishot/` 下的 backpack-fire-1440.png
+- 水蓝蓝筛选：本机截图目录 `.guishot/` 下的 backpack-blue-1440.png
 
 ## 剩余边界与下一轮
 

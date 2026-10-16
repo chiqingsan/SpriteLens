@@ -4,6 +4,8 @@
 
 ## 交付
 
+> 布局现状见 `docs/UI_GUIDE.md:197` 的「定稿布局（2026-10-13）」；以下为当时版本的布局记录。
+
 - 首捕统计、过滤、快捷条件、列表列和详情标记全部移除；协议原始字段/数据库列保留兼容。旧固定条件移除该字段，其余条件和名称保留。
 - 背包默认使用头像；外观设置可切全身图，保存到 `ui.preferences.pet_image`。主题、显示字段和后续偏好保存均保留图片模式；非法配置回落头像，非法接口值返回错误。
 - 卡片顶部性别/等级/性格；中段左侧为 72px 头像区域，头像下方放稀有标记与独立色卡，右侧放文字标记/蛋组；姓名独立一行，底部三列仅标 m/kg/db。各区域采用固定行高，头像与标记不叠放。范围位置可独立显示。
@@ -48,6 +50,6 @@
 - 全量 339 项：334 通过、5 因已有程序实例运行而跳过。启动烟测、8 个 JS 语法检查、git diff --check 通过。
 - 新增测试核对真实双色/粒子、特殊卡、未知值、mutation 独立位、所有本地图片映射、默认偏好/重启恢复/非法值、旧快捷条件迁移。
 
-截图为本地忽略的 `.guishot/pet-avatar-real-1440.png`、`pet-artwork-fire-1440.png`、`pet-avatar-blue-1280.png`、`pet-detail-640.png`、`pet-appearance-640.png`、`pet-color-card-matrix.png`。
+截图为本地忽略的 `.guishot/pet-avatar-real-1440.png`、`pet-artwork-fire-1440.png`、`pet-avatar-blue-1280.png`、`pet-detail-640.png`、`pet-appearance-640.png`、`pet-color-card-matrix.png`。（说明：截图为本机生成、不入库，读者不可见。）
 
-本轮修正截图：`.guishot/pet-card-aligned-1440.png`、`pet-card-aligned-640.png`、`pet-card-aligned-artwork.png`。
+本轮修正截图：`.guishot/pet-card-aligned-1440.png`、`pet-card-aligned-640.png`、`pet-card-aligned-artwork.png`。（说明：截图为本机生成、不入库，读者不可见。）

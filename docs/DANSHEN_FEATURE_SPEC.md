@@ -6,7 +6,7 @@
 >
 > 解剖方法：PyInstaller 解包 → Python 3.12 marshal 反汇编（pyc 无源码级
 > 反编译工具，靠字节码 + 常量表还原）→ 前端 JS 通读。
-> 解包产物：`C:\Users\chiqingsan\AppData\Local\Temp\ds\out\…exe_extracted\`。
+> 解包产物：`蛋神助手解包目录`。
 > 研究过程产物（pyc 反汇编 dump 等）在 `.research/`（不入库）。
 > 架构层结论见 [DANSHEN_ASSISTANT_ANALYSIS.md](DANSHEN_ASSISTANT_ANALYSIS.md)（历史文档，仍有效）。
 
@@ -168,6 +168,7 @@ desktopSkillMedalData.json 提供 skills/medals 名称映射（desktop_catalog �
 > 完整规格（帧层 / IV 派生 / 断流恢复 / FlowState 37 字段 / 解码器字段级映射，46KB）
 > 在反汇编研究产物 `.research/danshen-protocol.md`（临时目录，不入库；需要时按
 > DANSHEN_ASSISTANT_ANALYSIS.md §11 的方法重新生成）。
+> 说明：`.research/` 为竞品研究过程产物，按 `.gitignore` 不入库（参见本文档第 10 行的约定），读者需自行生成。
 
 蛋神路由结构 = `_process_frame` 的 if/elif 显式分支（17 个）+ 全扫描解码器（12 个，
 对每帧无条件尝试、结构校验通过即发事件）。与页面直接相关的：

@@ -5,8 +5,8 @@
 
 > 目的：回答"蛋神助手是什么架构、有什么值得学"。
 > 方法：本机安装包静态解剖（PE 头解析 → PyInstaller CArchive 解包 → pyc 反汇编 → 前端源码通读）。
-> 素材：`C:\Users\chiqingsan\Downloads\蛋神助手电脑版-v1.1.6-b49823778e99.exe`（45 MB）
-> 解包产物：`C:\Users\chiqingsan\AppData\Local\Temp\ds\out\...exe_extracted\`（1898 文件 + 754 PYZ 模块）
+> 素材：`本机下载的蛋神助手电脑版-v1.1.6-b49823778e99.exe`（45 MB）
+> 解包产物：`蛋神助手解包目录`（1898 文件 + 754 PYZ 模块）
 
 ---
 
@@ -406,7 +406,7 @@ pip install pyinstxtractor-ng
 python -m pyinstxtractor_ng "蛋神助手电脑版-v1.1.6-b49823778e99.exe"
 
 # 2. 反汇编（需要 Python 3.12，pyc magic = 3531）
-# 环境已有：C:\Users\chiqingsan\AppData\Local\Python\pythoncore-3.12-64\python.exe
+# 环境已有：本机 Python 解释器
 python -c "
 import marshal, dis
 code = marshal.loads(open('app.pyc','rb').read()[16:])   # 跳过 16 字节头

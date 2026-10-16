@@ -7,6 +7,7 @@
 | 检查 | 结果 |
 |---|---|
 | `.venv/Scripts/python.exe -B tools/run_build_tests.py` | 304 项全部通过 |
+| 勘误（2026-10-15） | `tools/run_build_tests.py` 已移除，现行测试命令为 `python -B -m unittest discover -s tests`（见 `docs/UI_GUIDE.md:178`） |
 | `.venv/Scripts/python.exe -B -m spritelens --smoke-test` | 通过；协议、服务、配置、前端及数据资源正常 |
 | 全部前端 JS `node --check` | 通过 |
 | `git diff --check` | 通过 |
@@ -35,7 +36,7 @@
 
 ## 截图
 
-截图目录：`C:/Users/chiqingsan/.codex/visualizations/2026/10/11/01a12b97-ae6a-7731-b896-8e3de64b3f67`。
+截图目录：`本机可视化输出目录`。
 
 - `spritelens-miaomiao.jpg`、`spritelens-huohua.jpg`、`spritelens-shuilanlan.jpg`：相同背包视图的三主题。
 - `spritelens-appearance.jpg`：外观面板。
