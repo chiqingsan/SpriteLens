@@ -7,6 +7,8 @@ import type { EggBoxHost } from './composables/useEggBox'
 import EggDexPage from './pages/EggDexPage.vue'
 export { mountHome } from './homeBridge'
 export { mountCollectionLines } from './collectionLinesBridge'
+export { mountBreederLibrary } from './breederLibraryBridge'
+export { mountBreedingPlanner } from './breedingPlannerBridge'
 export { mountPetFilters } from './petFilterBridge'
 export { mountPetInventory } from './petInventoryBridge'
 

@@ -5,7 +5,7 @@
     var uid = null;
     var versions = {};
     var fields = { overview: "pets_version", pets: "pets_version", handbook: "pets_version",
-      "male-matrix": "pets_version", "breeder-male": "pets_version", "breeder-female": "pets_version",
+      "male-matrix": "pets_version", "breeder-library": "pets_version", planner: "pets_version",
       colors: "pets_version", "collection-lines": "pets_version", "egg-box": "egg_box_version", home: "home_version", flowers: "flower_version" };
     var generation = 0;
     var pending = {};
@@ -32,12 +32,12 @@
       names.forEach(function (name) { versions[name] = state[name]; });
       return { accepted: true, changed: changed };
     }
-    function request(key, path) {
+    function request(key, path, options) {
       cancel(key);
       var ticket = { generation: generation, uid: uid, controller: new AbortController() };
       pending[key] = ticket;
       function current() { return pending[key] === ticket && ticket.generation === generation; }
-      return api(path, { signal: ticket.controller.signal }).then(function (payload) {
+      return api(path, Object.assign({}, options, { signal: ticket.controller.signal })).then(function (payload) {
         if (!current()) { return null; }
         if (!Number.isSafeInteger(payload.uid) || !Number.isSafeInteger(payload.version)) {
           throw new Error("账号载荷缺少有效 uid/version");

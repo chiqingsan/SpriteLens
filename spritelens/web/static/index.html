@@ -261,20 +261,9 @@
           </aside>
         </div>
       </section>
-      <!-- 种公母库：按性别分组的配种宠物库 -->
-      <section id="page-breeder-library" class="page">
-        <div class="stack">
-          <section class="panel">
-            <div class="panel-head"><h2>种公（♂）</h2><span id="bl-male-count" class="muted"></span></div>
-            <div id="bl-male" class="bl-groups"></div>
-          </section>
-          <section class="panel">
-            <div class="panel-head"><h2>种母（♀）</h2><span id="bl-female-count" class="muted"></span></div>
-            <div id="bl-female" class="bl-groups"></div>
-          </section>
-        </div>
-      </section>
-      <section id="page-planner" class="page feature-page"><div class="feature-page-root" data-feature="智能配窝" data-hint="需要家园场景与繁育范围协议帧"></div></section>
+      <!-- 筛选配对由 Vue 独占状态与渲染。 -->
+      <section id="page-breeder-library" class="page"><div id="breeder-library-root"></div></section>
+      <section id="page-planner" class="page"><div id="breeding-planner-root"></div></section>
       <section id="page-collection-lines" class="page"><div id="collection-lines-root"></div></section>
       <!-- 我的家园 -->
       <section id="page-home" class="page">
@@ -459,6 +448,8 @@
   <script src="/static/account-requests.js"></script>
   <script src="/static/account-card.js"></script>
   <script src="/static/collection-lines-page.js"></script>
+  <script src="/static/breeder-library-page.js"></script>
+  <script src="/static/breeding-planner-page.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

@@ -196,9 +196,14 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `tools/sync_ui_icons.py` | 固定官方Git版本的少量SVG导入，无运行时网络依赖 |
 | `tests/test_ui_upgrade.py` | 偏好鉴权/并发/失败、快捷与筛选规则及资源合并回归 |
 | `docs/RESOURCE_COVERAGE_REPORT.md` | 1060物种、646组范围、224蛋、477别名；缺图/缺字段/冲突 |
-| `docs/BREEDING_PLANNER_SPEC.md` / `COLLECTION_LINES_SPEC.md` | 配窝研究规格 / 双牌产线实现与参考规则边界 |
+| `docs/BREEDING_PLANNER_SPEC.md` / `COLLECTION_LINES_SPEC.md` | F04-U5智能配窝规格与当前实现边界（双入口/宽容双牌/联合摆位） / 双牌产线实现与参考规则边界 |
 | `domain/collection_lines.py` / `services/collection_lines_service.py` / `view_models/collection_lines_vm.py` | 产线目录与纯规则、单账号快照、进度统计 |
 | `web/collection_lines.py` / `frontend/src/pages/CollectionLinesPage.vue` | 鉴权产线 API、Vue 产线列表与父母详情 |
+| `domain/breeder_library.py` / `view_models/breeder_library_vm.py` | F04-U4 筛选配对纯规则、当前账号单次库存快照、双向候选与分页；无新增持久化 |
+| `web/breeder_library.py` | `/api/breeder-library` 查询边界、亲本 DTO 与参考预测序列化 |
+| `frontend/src/pages/BreederLibraryPage.vue` / `pages/breeder-library.css` / `components/BreederCard.vue` | 公母双列表、固定筛选／配对右栏、亲本卡及窄窗布局 |
+| `frontend/src/composables/useBreederLibrary.ts` / `types/breederLibrary.ts` / `breederLibraryBridge.ts` / `web/static/breeder-library-page.js` | 筛选与选择唯一状态、请求失效／账号校验、运行时 DTO 和迁移桥 |
+| `tests/test_breeder_library.py` / `frontend/src/composables/useBreederLibrary.test.ts` | 配对正确性、未知值／手动声音、分页、鉴权、乱序／离页／切号与失败重试 |
 
 新增API：鉴权GET/POST `/api/ui/preferences`，bootstrap新增`ui_preferences`。
 `/api/pets`新增egg_groups、egg_mode和height/weight/voice_min/max；原有字段兼容。
@@ -243,3 +248,10 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `spritelens/domain/pet_medals.py` | 登录集合按获得精灵归属；未核验增量失效相关集合 |
 | `spritelens/web/pet_details.py` | 既有宠物与静态资料生成详情DTO，不另读仓库 |
 | `tests/test_pet_detail.py` | 获得/佩戴归属、未知/空集合、合并落库、v9→v10迁移与详情契约 |
+
+| 智能配窝文件 | 职责 |
+| --- | --- |
+| `domain/breeding_planner.py` / `breeding_solver.py` / `breeding_nature.py` | 准入、统一布局评估、有界联合搜索与共用性格参考 |
+| `services/breeding_planner_service.py` / `view_models/breeding_planner_vm.py` / `web/breeding_planner.py` | 一致输入、目录版本、取消、账号草稿、页面DTO及鉴权API |
+| `frontend/src/pages/BreedingPlannerPage.vue` / `components/BreedingCanvas.vue` / `composables/useBreedingPlanner.ts` | 双入口、模拟画布、目标/亲本选择、撤销与旧响应隔离 |
+| `tests/test_breeding_planner.py` / `frontend/src/composables/useBreedingPlanner.test.ts` | 配对/迭代/搜索、共享母本、锁定、声音一致性、鉴权/保存和请求时序回归 |

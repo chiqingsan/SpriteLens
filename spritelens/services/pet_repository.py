@@ -42,7 +42,7 @@ class PetRepository:
     """线程安全的会话内宠物快照；挂在 MonitorService 的事件监听上。"""
 
     def __init__(self, store: PetStore | None = None) -> None:
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._pets: dict[int, Pet] = {}
         self._locations: dict[int, PetLocation] = {}
         self._backpack = Backpack()
@@ -253,8 +253,8 @@ class PetRepository:
         """保存已有宠物的声音修正；返回目标是否属于指定账号。"""
         if self._store is None or not self._store.has_pet(uid, gid):
             return False
-        self._store.set_voice_override(uid, gid, voice)
         with self._lock:
+            self._store.set_voice_override(uid, gid, voice)
             self._version += 1
         return True
 
@@ -263,6 +263,12 @@ class PetRepository:
         if self._store is None or uid <= 0:
             return {}
         return self._store.voice_overrides(uid)
+
+    def breeding_snapshot(self) -> tuple[PetRepoSnapshot, dict[int, int]]:
+        """同一版本的个体与声音修正；避免规划读取期间修正值和版本错位。"""
+        with self._lock:
+            inventory = self.consistent_snapshot()
+            return inventory, self.voice_overrides(inventory.uid)
 
     def load_last_account(self) -> int:
         """载入最近账号的历史宠物；返回补入条数。"""

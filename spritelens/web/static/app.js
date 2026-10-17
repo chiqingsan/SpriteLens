@@ -61,6 +61,19 @@
   var homePage = null;
   var homePageGeneration = 0;
   var homeVersion = -1;
+  var breederLibrary = window.SpriteLensBreederLibrary.create({
+    load: function (params) { return accountRequests.request("breeder-library", "/api/breeder-library" + query(params)); },
+    cancel: function () { accountRequests.cancel("breeder-library"); },
+    context: function () { return accountRequests.petContext(); },
+    openPet: function (gid) { petFilters.reset(); switchPage("pets", gid); }
+  });
+  var breedingPlanner = window.SpriteLensBreedingPlanner.create({
+    request: function (path, body) { return accountRequests.request("planner", "/api/breeding-planner/" + path,
+      body === undefined ? {} : { method: "POST", body: body }); },
+    cancel: function () { accountRequests.cancel("planner"); },
+    context: function () { return accountRequests.petContext(); },
+    openPet: function (gid) { petFilters.reset(); switchPage("pets", gid); }
+  });
   var collectionLines = window.SpriteLensCollectionLines.create({
     load: function (settings) { return accountRequests.request("collection-lines", "/api/collection-lines" + query({
       goal: settings.goal, sound: settings.sound, full_weight: Number(settings.full_weight),
@@ -74,6 +87,8 @@
     eggBoxPageGeneration++;
     homePageGeneration++;
     collectionLines.unmount();
+    breederLibrary.unmount();
+    breedingPlanner.unmount();
     if (eggBoxPage) { eggBoxPage.unmount(); eggBoxPage = null; }
     if (homePage) { homePage.unmount(); homePage = null; }
     if (petInventory) { petInventory.unmount(); }
@@ -150,8 +165,9 @@
     else { accountRequests.cancel(state.page); }
     if (state.page === "home" && name !== "home" && homePage) { homePage.pause(); }
     if (state.page === "collection-lines") { collectionLines.pause(); }
+    if (state.page === "planner") { breedingPlanner.pause(); }
     if (state.page === "breeder-library") {
-      accountRequests.cancel("breeder-male"); accountRequests.cancel("breeder-female");
+      breederLibrary.pause();
     }
     if (state.page === "pets") {
       petInventory.pause(); petFilters.pause();
@@ -179,7 +195,8 @@
     if (name === "male-matrix") { loadMaleMatrix(); }
     if (name === "home") { loadHome(true); }
     if (name === "collection-lines") { collectionLines.load(); }
-    if (name === "breeder-library") { loadBreederLibrary(); }
+    if (name === "breeder-library") { breederLibrary.load(); }
+    if (name === "planner") { breedingPlanner.load(); }
     if (name === "flowers") { loadFlowers(); }
     if (name === "colors") { loadColors(); }
     if (name === "events") { loadEvents(); }
@@ -273,6 +290,8 @@
 
   function resetAccountViews() {
     collectionLines.resetAccount();
+    breederLibrary.resetAccount();
+    breedingPlanner.resetAccount();
     if (state.page !== "egg-dex") { window.SpriteLensUI.closeDetail(false, true); }
     petInventory.resetAccount(); petFilters.resetAccount(); state._petsVersion = -1;
     state.hbData = null; state.hbSpecies = []; state.hbSelected = null;
@@ -361,10 +380,11 @@
     if (version !== undefined && version !== state._petsVersion) {
       state._petsVersion = version;
       var refresh = { pets: loadPets, handbook: loadHandbook, "male-matrix": loadMaleMatrix,
-        "breeder-library": loadBreederLibrary, colors: loadColors };
+        "breeder-library": function () { breederLibrary.load(); }, colors: loadColors };
       if (refresh[state.page]) { refresh[state.page](false); }
       if (state.page === "home") { loadHome(false); }
       if (state.page === "collection-lines") { collectionLines.load(); }
+      if (state.page === "planner") { breedingPlanner.load(); }
     }
   }
 
@@ -964,13 +984,6 @@
       petFilters.search(String(chip.dataset.mm));
       loadPets();
     });
-    document.getElementById("page-breeder-library").addEventListener("click", function (event) {
-      var chip = event.target.closest("[data-mm]");
-      if (!chip) { return; }
-      switchPage("pets");
-      petFilters.search(String(chip.dataset.mm));
-      loadPets();
-    });
     $("mm-matrix").addEventListener("click", function (event) {
       var chip = event.target.closest("[data-mm]");
       if (chip) {
@@ -1007,46 +1020,6 @@
       root.textContent = "家园页面启动失败，请切页重试：" + err.message;
       toast("家园页面启动失败：" + err.message, true);
     });
-  }
-
-  /* ---------- 种公母库（性别分组的配种宠物库） ---------- */
-  function loadBreederLibrary() {
-    Promise.all([
-      accountRequests.request("breeder-male", "/api/male-matrix" + query({ gender: "male" })),
-      accountRequests.request("breeder-female", "/api/male-matrix" + query({ gender: "female" }))
-    ]).then(function (results) {
-      if (!results[0] || !results[1] || results[0].uid !== results[1].uid) { return; }
-      renderBreederSection("bl-male", "bl-male-count", results[0]);
-      renderBreederSection("bl-female", "bl-female-count", results[1]);
-    }).catch(function (err) { toast("种公母库加载失败：" + err.message, true); });
-  }
-
-  function renderBreederSection(listId, countId, payload) {
-    var natures = payload.natures || [];
-    var total = payload.matched || 0;
-    $(countId).textContent = total + " 只（性格组 " + natures.length + "）";
-    $(listId).innerHTML = natures.map(function (nature) {
-      var groups = (payload.groups || []).filter(function (g) {
-        return payload.cells[nature.name + "|" + g];
-      });
-      if (!groups.length) { return ""; }
-      var natureCount = 0;
-      var blocks = groups.map(function (g) {
-        var pets = payload.cells[nature.name + "|" + g] || [];
-        natureCount += pets.length;
-        var chips = pets.map(function (pet) {
-          return petChip(pet);
-        }).join("");
-        return '<div class="bl-group"><b>' + esc(g)
-          + '<span class="muted">' + pets.length + " 只</span></b>"
-          + '<div class="bl-chips">' + chips + "</div></div>";
-      }).join("");
-      return '<details class="bl-nature" open><summary>' + esc(nature.name)
-        + '<span class="count-badge">' + natureCount + "</span>"
-        + '<small>' + (nature.positive ? (STAT_CN[nature.positive] || nature.positive) + "↑ " : "")
-        + (nature.negative ? (STAT_CN[nature.negative] || nature.negative) + "↓" : "") + "</small></summary>"
-        + blocks + "</details>";
-    }).join("") || '<div class="empty-hint">没有符合条件的宠物</div>';
   }
 
   /* ---------- 炫彩花种 ---------- */

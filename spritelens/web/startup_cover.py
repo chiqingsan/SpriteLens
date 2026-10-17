@@ -28,6 +28,8 @@ class StartupCover:
         self._cover = Panel()
         self._cover.Dock = DockStyle.Fill
         self._cover.BackColor = self._window.native.BackColor
+        # 子控件首次 WM_PAINT 完成前会露出默认白色表面；先隐藏窗口，首帧画完再显示。
+        self._window.native.Opacity = 0
         # WinForms 的 DeviceDpi 在这里仍可能为 96；与 WebView2 一样按真实窗口 DPI 缩放。
         get_dpi = ctypes.WinDLL("user32").GetDpiForWindow
         get_dpi.argtypes = [wintypes.HWND]
@@ -75,6 +77,18 @@ class StartupCover:
         self._window.native.Controls.Add(self._cover)
         self._cover.BringToFront()
         self._layout()
+
+    def reveal(self) -> None:
+        """窗口首次显示后同步完成启动面板首帧，再解除不透明度遮罩。"""
+        from System import Action
+
+        def show() -> None:
+            if self._cover.IsDisposed:
+                return
+            self._cover.Refresh()
+            self._window.native.Opacity = 1
+
+        self._window.native.BeginInvoke(Action(show))
 
     def _layout(self, _sender: object = None, _event: object = None) -> None:
         scale = self._scale

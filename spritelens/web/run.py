@@ -210,6 +210,7 @@ def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> None:
     window.expose(startup_cover.startup_ready, startup_cover.startup_failed)
     window.events.before_show += startup_cover.install
     window.events.closing += startup_cover.remove
+    window.events.shown += startup_cover.reveal
     window.events.loaded += startup_cover.keep_on_top
     window.events.loaded += controls.sync_state
     window.events.maximized += controls.sync_state

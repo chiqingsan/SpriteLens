@@ -50,6 +50,8 @@ from spritelens.web.payloads_catalog import (
 from spritelens.web.pet_media_cache import PetMediaCache
 from spritelens.web.routes_capture import CaptureRoutesMixin
 from spritelens.web.collection_lines import register_collection_routes
+from spritelens.web.breeder_library import register_breeder_routes
+from spritelens.web.breeding_planner import register_planner_routes
 
 logger = get_logger("web")
 
@@ -319,6 +321,8 @@ class LocalServer(CaptureRoutesMixin):
         app.router.add_get("/api/male-matrix", self._api_male_matrix)
         app.router.add_get("/api/home", self._api_home)
         register_collection_routes(app, self._context)
+        register_breeder_routes(app, self._context)
+        register_planner_routes(app, self._context)
         app.router.add_get("/api/flowers", self._api_flowers)
         app.router.add_get("/api/colors", self._api_colors)
         app.router.add_get("/api/events", self._api_events)

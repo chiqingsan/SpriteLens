@@ -18,6 +18,8 @@
 - [FRONTEND_DEVELOPMENT.md](FRONTEND_DEVELOPMENT.md) — 前端安装/构建/验收、生成文件与临时桥所有权
 - [HOME_IMPLEMENTATION_PLAN.md](HOME_IMPLEMENTATION_PLAN.md) — Luna6 家园编码交接：场景/账号归属修复、增量合并、资料预测、卡片交互、地图与桌面验收；持续任务状态见 ROADMAP 的 F04-U2
 - [BREEDING_RULES.md](BREEDING_RULES.md) — 配种规则联网核对、玩家教程与跨种配种经验、来源等级及双牌／身高培养参考的区分
+- [BREEDER_LIBRARY_SPEC.md](BREEDER_LIBRARY_SPEC.md) — 筛选配对的当前实现、蛋神功能对照、候选与预测边界；持续状态见 F04-U4
+- [BREEDING_PLANNER_SPEC.md](BREEDING_PLANNER_SPEC.md) — 智能配窝完整设计：双入口、宽容双奖牌、合格/迭代候选区分、声体参考边界、联合摆位和账号存档；本地功能已实现，真实游戏/桌面验收状态见 F04-U5
 - [reviews/EGG_INVENTORY_REPAIR_2026-10-15.md](reviews/EGG_INVENTORY_REPAIR_2026-10-15.md) — 蛋仓两类配置 ID 联查、试炼误识别清理与资源补齐证据
 - [reviews/VUE_EGG_DEX_VERIFICATION_2026-10-13.md](reviews/VUE_EGG_DEX_VERIFICATION_2026-10-13.md) — F00/V01/V02 实施范围与本机验证，WebView2/exe 待验收
 - [reviews/PET_SNAPSHOT_VERIFICATION_2026-10-13.md](reviews/PET_SNAPSHOT_VERIFICATION_2026-10-13.md) — F01 宠物响应/选项/身份同源、bootstrap 单次快照与离线归属
@@ -52,7 +54,7 @@
 - 规划与对照：`BACKPACK_PARITY_PLAN.md`（对标清单与迭代计划）、
   `BACKPACK_UI_COMPARISON.md`（蛋神对照差异）、`PET_CARD_LAYOUT_PLAN.md`（卡片布局细化）
 - `COLLECTION_LINES_SPEC.md` — 双牌产线当前实现、参考规则及待验收边界（F04-U3）
-- 下一轮规格（研究态）：`BREEDING_PLANNER_SPEC.md`（智能配窝）
+- 智能配窝规格与当前实现：见上方 `BREEDING_PLANNER_SPEC.md`，保留蛋神历史评分作参考；实施状态见 F04-U5。
 - 资源台账：`RESOURCE_COVERAGE_REPORT.md`（覆盖/缺口/冲突）
 
 维护约定：用户可见行为变更 → 更新 README；架构/分层变更 → ARCHITECTURE；

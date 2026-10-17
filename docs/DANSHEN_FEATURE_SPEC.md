@@ -218,7 +218,8 @@ handbook、egg.upsert、pet.snapshot、team.snapshot 等——这套"结构准�
 | 活跃网卡排序 | `capture/nic_rank.py` | Get-NetAdapter Status=Up 前置 |
 | 静态目录 | `tools/import_*.py` + `data/static/` | 蛋目录 224 / 图鉴描述 601 / 色卡 44 / 花种等级表 / 奖牌表 |
 | 蛋图鉴 / 蛋蛋仓库 | `domain/eggs.py` / `domain/egg_box.py` + `egg_store` | 蛋目录联查 + 蛋仓快照累积 → SQLite 持久化 + 孵化槽标记 |
-| 种公阵列 / 种公母库 | payloads 种公矩阵 + app.js | 性格×蛋组覆盖矩阵、公母分库（可折叠） |
+| 种公阵列 | payloads 种公矩阵 + app.js | 性格×蛋组覆盖矩阵 |
+| 筛选配对（种公母库） | `domain/breeder_library.py` + `view_models/breeder_library_vm.py` + `web/breeder_library.py` + Vue 页面 | 当前账号公母双列表、共同筛选、双向选配、普通窝参考；边界见 [功能规格](BREEDER_LIBRARY_SPEC.md) |
 | 我的家园 | `domain/home.py` + `domain/home_breeding.py` + `home_repository` + `frontend/src/pages/HomePage.vue` | 0x014A：居民/物种/窝位/场景配对/场景蛋；0x0413/0x0414：居民/场景蛋增量；过期关系按巢穴范围推导候选 |
 | 炫彩色卡 / 炫彩花种 | `domain/color_cards.py` / `domain/flowers.py` | glass→卡号矩阵；0x0375 花田 + 宠物名学习表 |
 | 账号隔离 | `services/account_tracker.py` | 切号清空各域内存快照；同 uid 重复帧不误判 |
@@ -238,7 +239,7 @@ handbook、egg.upsert、pet.snapshot、team.snapshot 等——这套"结构准�
 
 **第三批（需真实帧验证字段映射）**：
 5. 我的家园 🟡 已有居民/窝位/场景配对/场景蛋解析和Vue展示；真实字段树已确认核心数据具备。场景归属、错误旧路径、增量过滤及参考页面交互待按 F04-U2-A 至 F 实施，游戏繁育效果仍待验证。
-6. 智能配窝 ⬜ 待做（nest_egg_inference 推断引擎（§3.4）+ planner UI；页占位已挂）
+6. 智能配窝 ⬜ 待做；2026-10-17已按用户目标蛋/自选精灵双入口完成独立设计，采用宽容双奖牌、多对多及选配/摆位联合搜索，不沿用蛋神固定覆盖权重。完整规格与历史评分见 [智能配窝规格](BREEDING_PLANNER_SPEC.md)，实施状态见ROADMAP F04-U5；蛋神孵蛋推断引擎见§3.4，不等同于本项目待做的规划器。
 7. 炫彩花种 ✅ 已实装（0x0375 快照 + 名字学习表）
 8. 炫彩色卡 ✅ 已实装（glass→卡号→底色×混色矩阵）
 

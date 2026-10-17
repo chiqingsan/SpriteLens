@@ -13,6 +13,7 @@ from spritelens.domain.static_data import StaticData
 from spritelens.domain.display import TYPE_COLORS
 from spritelens.domain.egg_box import EGG_KIND_LABELS, egg_kind
 from spritelens.domain.home_breeding import HomeBreedingProfile, infer_range_couples
+from spritelens.domain.breeding_nature import parent_nature_reference
 from spritelens.domain.measurements import range_position, range_text
 from spritelens.domain.pet_marks import pet_marks
 from spritelens.web.pet_media import pet_images
@@ -370,13 +371,6 @@ def home_payload(home_repo, static: StaticData | None, pet_repository=None, egg_
         random_percent = 0.0
         unknown_percent = 0.0
 
-        def add(nature: str | None, percent: float) -> None:
-            nonlocal unknown_percent
-            if nature:
-                distribution[nature] = distribution.get(nature, 0.0) + percent
-            else:
-                unknown_percent += percent
-
         if mother["missing"] or not fathers:
             return {"distribution": {}, "random_percent": 0.0, "unknown_percent": 100.0,
                     "assumption": "equal-father-probability"}
@@ -384,16 +378,13 @@ def home_payload(home_repo, static: StaticData | None, pet_repository=None, egg_
         for father in fathers:
             if father["missing"]:
                 unknown_percent += 100 * weight
-            elif mother["academy"] and father["academy"]:
-                add(mother["nature"] if mother["nature"] == father["nature"] else None, 100 * weight)
-            elif mother["academy"]:
-                add(mother["nature"], 100 * weight)
-            elif father["academy"]:
-                add(father["nature"], 100 * weight)
             else:
-                add(mother["nature"], 30 * weight)
-                add(father["nature"], 30 * weight)
-                random_percent += 40 * weight
+                reference = parent_nature_reference(father["nature"], mother["nature"],
+                                                     male_academy=father["academy"], female_academy=mother["academy"])
+                for nature, share in reference["known"].items():
+                    distribution[nature] = distribution.get(nature, 0.0) + share * 100 * weight
+                random_percent += reference["random"] * 100 * weight
+                unknown_percent += reference["unknown"] * 100 * weight
         return {"distribution": {name: round(percent, 2) for name, percent in distribution.items()},
                 "random_percent": round(random_percent, 2), "unknown_percent": round(unknown_percent, 2),
                 "assumption": "equal-father-probability"}
