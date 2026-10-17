@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import type { BreederParent } from '../types/breederLibrary'
+import MedalIcon from './MedalIcon.vue'
 import UiIcon from './UiIcon.vue'
 const props = defineProps<{ parent: BreederParent; selected?: boolean; compact?: boolean }>()
 const emit = defineEmits<{ select: [parent: BreederParent]; open: [gid: string] }>()
 const failed = ref(false)
-const markIds: Record<string, number> = { '大块头': 1001, '小不点': 1002, '婉转声': 1026, '粗嗓门': 1025 }
 const percent = (value: number | null) => value === null ? '—' : value < 0 || value > 1 ? '超界' : `${Number((value * 100).toFixed(1))}%`
 watch(() => props.parent.icon_url, () => { failed.value = false })
 </script>
@@ -16,7 +16,7 @@ watch(() => props.parent.icon_url, () => { failed.value = false })
       <span class="breeder-copy">
         <span class="breeder-card-title"><strong :title="parent.name">{{ parent.name }}</strong><small>#{{ parent.dex_no }}</small><UiIcon :name="parent.gender === 1 ? 'gender-male' : 'gender-female'" /></span>
         <span v-if="parent.is_shiny || parent.is_colorful" class="breeder-rarity">{{ parent.is_shiny ? '异色' : '' }}{{ parent.is_colorful ? '炫彩' : '' }}</span>
-        <span class="breeder-traits"><b class="chip">{{ parent.nature || '性格未知' }}</b><img v-for="mark in parent.marks" :key="mark.name" :src="`/static/medal-icons/mark-${markIds[mark.name]}.png`" :alt="mark.name" :title="`${mark.name} · ${mark.source === 'worn' ? '当前佩戴' : '数值参考'}`"></span>
+        <span class="breeder-traits"><b class="chip">{{ parent.nature || '性格未知' }}</b><MedalIcon v-for="mark in parent.marks" :key="mark.name" :name="mark.name" :source="mark.source" /></span>
         <span class="breeder-groups">{{ parent.groups.join(' / ') }}</span>
         <span class="breeder-measures"><span>高 {{ percent(parent.height_ratio) }}</span><span>重 {{ percent(parent.weight_ratio) }}</span><span>{{ parent.voice === null ? '声音 —' : `${parent.voice} dB` }}</span></span>
       </span>

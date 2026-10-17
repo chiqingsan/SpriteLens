@@ -157,6 +157,33 @@ pywebview 窗口保留 Windows 原生边框样式，通过 `WM_NCCALCSIZE` 隐�
 新页面 HTML 骨架、`switchPage` 分发、`/api/xxx` 路由四步流程见
 `DEVELOPMENT_GUIDE.md`「加页面」。
 
+### Vue 页面组件与状态矩阵（2026-10-18）
+
+Vue 页面沿用同一套 token 与命名：组件先在页面内以类名复用，出现第二个使用方再抽 SFC（见 §4「不为单一使用方预抽象」）。配窝页（F04-U5）的**大体布局冻结**：主画布在左、目标／参与精灵在右、画布右侧为亲本索引，两列（1200px 收窄、960px 上下排列）与各区域先后顺序不变，只改组件内部表达。
+
+| 状态 | 要求 |
+|---|---|
+| Default | 只用 token，不写字面 hex/rgba（1px、`999px`、`50%` 例外） |
+| Hover | 仅指针设备；抬升用 `--motion-lift`，不改变尺寸或相邻项位置 |
+| Active | 按压 `scale(.97)` |
+| Focus-visible | `2px var(--focus-ring)`、offset 2px；不用 `outline:none` 抵消 |
+| Selected | 浅底＋深字＋描边，不抬升；不只靠颜色，配图标或文字 |
+| Disabled | 禁用**不用透明度**：`--surface-2` 底＋`--muted` 字（浅底上约 4.8:1，切主题需复核），语义用原生 `disabled` 或 `aria-disabled` |
+| Loading | 宽度锁定不跳宽；100ms–1s 按钮内 spinner，>1s 给确定性步骤文案 |
+| Error | 就地显示＋可重试操作，`role=alert`；信息与成功用 `role=status` |
+| Empty | 说明为什么空＋下一步；同类空态文案一致 |
+| Overflow | 长名 ellipsis＋`title`；0 项、30 目标、11 窝都不塌陷 |
+
+反馈时间分级：<100ms 不显示；100ms–1s 按钮内 spinner；>1s 显示确定性步骤（配窝求解约 2.5s 属此档，用「搜索候选 → 评估布局 → 整理方案」）；>10s 才是后台任务。
+
+动效统一 `--motion-fast/--motion-base/--motion-ease`（app.css:9-13），过渡只列具体属性、禁止 `transition: all`；`prefers-reduced-motion` 由 app.css:102 全局生效，页面不重复声明。
+
+配窝页组件对应现类名：模式切换 `.planner-tabs`、主操作 `.planner-primary`（每屏至多一个）、次操作 `.ghost-button`、方案 chip `.planner-alternatives .chip`、常驻状态行 `.planner-status`（账号・只数、忙碌/待评、方案状态、目标就绪进度）、画布 `.planner-canvas` 与亲本索引 `.planner-canvas-key`、caption `.planner-canvas-caption`（连线图例与交互提示）、产物卡 `.planner-outcome`、目标卡 `.planner-goal-editor`、迭代卡 `.planner-iteration`、提示条 `.planner-notice`（`.is-error/.is-success/.is-warning`）、空状态 `.planner-empty`。画布内：有效区 0～18 带边界，窝位序号与性别合成角标，学院窝加「学」角标，合格连线实线／干扰虚线，等待重评时隐藏旧线并标注。
+
+共有奖牌统一用 `frontend/src/components/MedalIcon.vue`（配窝选择卡与配窝结果共用；图标缺失时退化为文字，不显示破图）。
+
+实施状态：S 批（动效 token、禁用态、状态行进度、caption 图例）与 M 批（比值 chip、提示条分色、MedalIcon 奖牌图复用、规则与参考边界卡、空态边框统一）2026-10-18 落地；M 批余项（列表项圆角与交互态收敛）与 L 批（画布视口与角标、连线隔离、迭代卡 before/after、对话框焦点）待做。
+
 ## 4. JS 渲染约定
 
 - 每页三件套：`loadXxx()` → `renderXxx()` → `bindXxxFilters()`；模板字符串

@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import BreederCard from '../components/BreederCard.vue'
 import BreedingCanvas from '../components/BreedingCanvas.vue'
+import MedalIcon from '../components/MedalIcon.vue'
 import UiIcon from '../components/UiIcon.vue'
 import { useBreedingPlanner, type PlannerHost } from '../composables/useBreedingPlanner'
 import type { Goal, Placement } from '../types/breedingPlanner'
@@ -11,7 +12,7 @@ import './breeding-planner.css'
 const props = defineProps<{ host: PlannerHost }>()
 const model = useBreedingPlanner(props.host)
 const { context, mode, draft, plan, result, busy, error, errorAction, notice, parents, dirty, unsaved } = model
-const selected = ref(''), picker = ref<HTMLDialogElement | null>(null), pickerKind = ref<'pool' | 'replace' | 'add'>('pool')
+const selected = ref(''), picker = ref<HTMLDialogElement | null>(null), pickerSearch = ref<HTMLInputElement | null>(null), pickerKind = ref<'pool' | 'replace' | 'add'>('pool')
 const search = ref(''), gender = ref(''), nature = ref(''), group = ref(''), medal = ref(''), page = ref(1), eggSearch = ref('')
 const iterationPage = ref(1), unusedPage = ref(1)
 const selectedPage = ref(1)
@@ -55,7 +56,7 @@ const selectedParent = computed(() => parents.value.get(selected.value))
 const selectedPosition = computed(() => draft.value.placements.find(p => p.gid === selected.value))
 const eggName = (key: string | null) => context.value?.eggs.find(e => e.egg_key === key)?.name || '蛋种资料待补'
 const parentName = (gid: string) => parents.value.get(gid)?.name || `个体 ${gid}`
-const markOutcomes = (gid: string) => [...new Set(plan.value?.edges.filter(e => e.female === gid).map(e => e.marks.join('＋') || '无共有奖牌参考') || [])]
+const markOutcomes = (gid: string) => Array.from(new Map((plan.value?.edges.filter(e => e.female === gid) || []).map(edge => [edge.marks.join('＋'), edge.marks] as [string, string[]])).values())
 const percent = (value: number | null | undefined) => value === null || value === undefined ? '未知' : `${Math.round(value * 100)}%`
 const statusName: Record<string, string> = { ready: '规划参考就绪', partial: '部分支持', no_plan: '暂未形成有效配对', invalid: '存在布局冲突' }
 const kindName: Record<string, string> = { exact: '合格组合', iterative: '迭代参考', unknown: '资料待补' }
@@ -92,9 +93,20 @@ function removeGoal(id: string) {
   draft.value.placements.forEach(p => { if (p.primary_goal_id === id) p.primary_goal_id = '' })
   draft.value.approved = draft.value.approved.filter(key => !key.startsWith(`${id}:`))
 }
+let pickerOpener: HTMLElement | null = null
 async function showPicker(kind: 'pool' | 'replace' | 'add') {
   pickerKind.value = kind; page.value = 1
-  await nextTick(); picker.value?.showModal()
+  pickerOpener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  await nextTick()
+  picker.value?.showModal()
+  pickerSearch.value?.focus()
+}
+// 关闭弹层后把焦点还给触发按钮，键盘用户不会掉回页面开头。
+function closePicker() {
+  const opener = pickerOpener
+  picker.value?.close()
+  pickerOpener = null
+  opener?.focus()
 }
 function togglePool(gid: string) {
   if (draft.value.selected.includes(gid) && draft.value.placements.some(p => p.gid === gid && p.lock)) { error.value = '请先解除该亲本的锁定。'; return }
@@ -117,7 +129,7 @@ function choose(gid: string) {
     positions.push({ gid, x, y: 0, kind, lock: '', primary_goal_id: '' })
   }
   if (mode.value === 'selected' && !draft.value.selected.includes(gid)) draft.value.selected.push(gid)
-  selected.value = gid; picker.value?.close(); model.edit(positions)
+  selected.value = gid; closePicker(); model.edit(positions)
 }
 function updatePosition(values: Partial<Placement>) {
   if (!selectedPosition.value) return
@@ -158,7 +170,7 @@ function swap(gid: string) {
 function approve(key: string) {
   draft.value.approved = draft.value.approved.includes(key) ? draft.value.approved.filter(k => k !== key) : [...draft.value.approved, key]
 }
-function pause() { picker.value?.close(); model.pause() }
+function pause() { picker.value?.close(); pickerOpener = null; model.pause() }
 function resetAccount() { pause(); selected.value = ''; model.resetAccount() }
 onBeforeUnmount(pause)
 defineExpose({ load: model.load, pause, resetAccount })
@@ -177,9 +189,9 @@ defineExpose({ load: model.load, pause, resetAccount })
       </div>
     </header>
     <div v-if="error" class="planner-notice is-error" role="alert"><UiIcon name="alert-circle" />{{ error }}<button class="breeder-detail-link" :disabled="!!busy" @click="errorAction === 'save' ? model.save() : model.refresh()">{{ errorAction === 'save' ? '重试保存' : '刷新资料' }}</button></div>
-    <div v-if="notice" class="planner-notice" role="status"><UiIcon name="info-circle" />{{ notice }}</div>
+    <div v-if="notice" class="planner-notice is-info" role="status"><UiIcon name="info-circle" />{{ notice }}</div>
     <main class="planner-main panel">
-      <div class="planner-status" role="status"><span>{{ context?.source === 'history' ? '历史观察背包' : '当前账号已观察背包' }} · {{ context?.pet_count ?? '—' }} 只</span><span v-if="busy">{{ { loading: '正在读取资料', evaluate: '正在重评布局', saving: '正在保存', solve: '正在选择亲本与摆位' }[busy] }}</span><span v-else-if="dirty[mode]" class="planner-warning">待重新评估</span><span v-else>{{ statusName[plan?.status || result?.status || ''] || '尚未生成方案' }}</span></div>
+      <div class="planner-status" role="status"><span>{{ context?.source === 'history' ? '历史观察背包' : '当前账号已观察背包' }} · {{ context?.pet_count ?? '—' }} 只</span><span v-if="busy">{{ { loading: '正在读取资料', evaluate: '正在重评布局', saving: '正在保存', solve: '正在选择亲本与摆位' }[busy] }}</span><button v-else-if="dirty[mode]" class="planner-status-action planner-warning" :disabled="!!busy" @click="model.run('evaluate')">待重新评估 · 点击重评</button><span v-else>{{ statusName[plan?.status || result?.status || ''] || '尚未生成方案' }}</span><span v-if="plan" class="planner-status-progress">{{ mode === 'target' ? `目标就绪 ${plan.goals.filter(g => g.ready).length} / ${draft.goals.length}` : `${plan.edges.length} 组配对` }}</span></div>
       <div class="planner-scroll">
          <div class="planner-layout-heading"><div><strong>小窝布局</strong><small>{{ mode === 'target' ? '按培育条件选择亲本与窝位' : '分析所选精灵的配对关系与产物' }}</small></div><div v-if="draft.placements.length" class="planner-actions"><button class="ghost-button" :disabled="!!busy || !model.canUndo.value" title="撤销上一次窝位调整" @click="model.undo()">撤销</button><button class="ghost-button" :disabled="!!busy || !model.canRedo.value" title="重做被撤销的窝位调整" @click="model.undo(true)">重做</button><button v-if="model.canRestore.value" class="ghost-button" :disabled="!!busy" @click="model.restorePlan">恢复方案</button><button class="ghost-button" :disabled="!!busy" @click="model.run('evaluate')">重评布局</button><button class="ghost-button" :disabled="!context?.available || !!busy || mode === 'target' && !draft.goals.length" @click="showPicker('add')">补充布局亲本</button></div></div>
          <div v-if="plan || draft.placements.length" class="planner-summary" :class="{ 'is-stale': dirty[mode] }" aria-label="当前方案摘要"><div><small>当前入住亲本</small><strong>{{ placementCounts.males }} 父 / {{ placementCounts.females }} 母</strong></div><div><small>有配对的母本</small><strong>{{ plan ? `${plan.metrics.effective_mothers ?? 0} 只` : '待评估' }}</strong></div><div><small>{{ mode === 'target' ? '目标进度' : '配对关系' }}</small><strong>{{ plan ? mode === 'target' ? `${plan.goals.filter(g => g.ready).length} / ${draft.goals.length} 就绪` : `${plan.edges.length} 组` : mode === 'target' ? `${draft.goals.length} 项待评估` : '待评估' }}</strong></div><button v-if="plan" class="breeder-detail-link" @click="outcomes?.scrollIntoView({ block: 'start', behavior: 'smooth' })">{{ dirty[mode] ? '上次结果 · 待更新' : '查看产物详情 ↓' }}</button></div>
@@ -199,16 +211,16 @@ defineExpose({ load: model.load, pause, resetAccount })
             <p v-if="mode === 'target'">在右侧「培育目标」区域点击蛋种添加目标，设置奖牌、性格等条件后，点击「生成方案」自动规划最优配对布局。</p>
             <p v-else>在右侧「参与精灵」区域选择想要配窝的精灵，选择参与方式后，点击「生成方案」自动分析配对关系与产物。</p>
           </div>
-           <div v-if="mode === 'target' && plan?.status === 'no_plan' && draft.goals.some(g => !motherCounts.get(g.egg_key))" class="planner-notice">当前已观察背包中没有对应目标蛋的可繁育母本；请确认目标蛋、账号和背包采集记录。</div>
+           <div v-if="mode === 'target' && plan?.status === 'no_plan' && draft.goals.some(g => !motherCounts.get(g.egg_key))" class="planner-notice is-warning">当前已观察背包中没有对应目标蛋的可繁育母本；请确认目标蛋、账号和背包采集记录。</div>
           <div v-for="goal in plan?.goals || []" :key="goal.goal_id" class="planner-goal-result" :class="{ 'planner-warning': !goal.ready }"><strong>{{ eggName(draft.goals.find(g => g.goal_id === goal.goal_id)?.egg_key || null) }}</strong><span>{{ goal.exact_mothers }} 合格主目标母本 · {{ goal.mother_count - goal.exact_mothers }} 迭代母本<span v-if="goal.shared_mothers"> · 另 {{ goal.shared_mothers }} 只母本可兼顾</span></span><small v-if="goal.reason">{{ goal.reason }}</small></div>
           <article v-for="mother in plan?.mothers || []" :key="mother.gid" class="planner-outcome" :class="mother.references.find(r => r.goal_id === mother.primary_goal_id)?.kind || 'unknown'">
             <header><strong>{{ eggName(mother.egg_key) }}</strong><button class="breeder-detail-link" @click="selected = mother.gid">{{ parentName(mother.gid) }} ♀</button><span class="chip">{{ mode === 'selected' ? '基础配对' : kindName[mother.references.find(r => r.goal_id === mother.primary_goal_id)?.kind || 'unknown'] }}</span></header>
             <p>{{ mother.fathers.length ? `范围内 ${mother.fathers.length} 个父本：${mother.fathers.map(parentName).join('、')}` : '尚无范围内兼容父本；只有蛋种参考' }}</p>
-            <p v-if="mode === 'selected' && mother.fathers.length">共有奖牌参考：{{ markOutcomes(mother.gid).join(' / ') }}</p><div v-for="reference in mother.references" :key="reference.goal_id" class="planner-reference"><span>{{ reference.goal_id === mother.primary_goal_id ? '主目标' : '兼容目标' }} · 合格父本 {{ reference.matching_fathers }}/{{ reference.father_count }}{{ reference.iterative_fathers ? ` · 迭代 ${reference.iterative_fathers}` : '' }}</span><span v-if="draft.goals.find(g => g.goal_id === reference.goal_id)?.nature_id">目标奖牌＋性格已知贡献 {{ percent(reference.nature_contribution) }} · 全父本性格 {{ percent(reference.all_father_nature_contribution) }}</span><small v-if="reference.interference.length" class="planner-warning">迭代或目标干扰父本：{{ reference.interference.map(parentName).join('、') }}</small></div>
+            <p v-if="mode === 'selected' && mother.fathers.length">共有奖牌参考：<template v-for="marks in markOutcomes(mother.gid)" :key="marks.join('＋')"><span v-if="marks.length" class="planner-mark-set"><MedalIcon v-for="mark in marks" :key="mark" :name="mark" /></span><span v-else>无共有奖牌参考</span></template></p><div v-for="reference in mother.references" :key="reference.goal_id" class="planner-reference"><span><strong>{{ reference.goal_id === mother.primary_goal_id ? '主目标' : '兼容目标' }}</strong> · 合格父本 <span class="planner-ratio" :title="`范围内父本共 ${reference.father_count} 个，其中 ${reference.matching_fathers} 个合格`"><strong>{{ reference.matching_fathers }}</strong><small>/{{ reference.father_count }}</small></span>{{ reference.iterative_fathers ? ` · 迭代 ${reference.iterative_fathers}` : '' }}</span><span v-if="draft.goals.find(g => g.goal_id === reference.goal_id)?.nature_id">目标奖牌＋性格已知贡献 <span class="planner-ratio"><strong>{{ percent(reference.nature_contribution) }}</strong></span> · 全父本性格 <span class="planner-ratio"><strong>{{ percent(reference.all_father_nature_contribution) }}</strong></span></span><small v-if="reference.interference.length" class="planner-warning">迭代或目标干扰父本：{{ reference.interference.map(parentName).join('、') }}</small></div>
             <div class="planner-edge-details"><details><summary>逐父本奖牌与性格参考</summary><p v-for="edge in plan?.edges.filter(e => e.female === mother.gid)" :key="edge.male">{{ parentName(edge.male) }}：共有 {{ edge.marks.join('＋') || '无奖牌' }}；<span v-for="(share, name) in edge.nature.known" :key="name">{{ name }} {{ percent(share) }} </span><span v-if="edge.nature.random">随机 {{ percent(edge.nature.random) }} </span><span v-if="edge.nature.unknown">未知 {{ percent(edge.nature.unknown) }}</span></p></details><span>全父本等权参考：<span v-for="(share, name) in mother.nature.known" :key="name">{{ name }} {{ percent(share) }} </span>随机 {{ percent(mother.nature.random) }} · 未知 {{ percent(mother.nature.unknown) }}</span></div>
           </article>
-          <div v-if="plan?.metrics.unused_slots" class="planner-notice">保留 {{ plan.metrics.unused_slots }} 个空窝：{{ mode === 'selected' && draft.selected.length === draft.placements.length ? '所选精灵已全部入住，剩余容量保留空窝。' : '当前有界方案未找到更多目标收益，可调整亲本或布局。' }}</div>
-          <div v-for="issue in issues" :key="issue" class="planner-notice">{{ issue }}</div>
+          <div v-if="plan?.metrics.unused_slots" class="planner-notice is-info">保留 {{ plan.metrics.unused_slots }} 个空窝：{{ mode === 'selected' && draft.selected.length === draft.placements.length ? '所选精灵已全部入住，剩余容量保留空窝。' : '当前有界方案未找到更多目标收益，可调整亲本或布局。' }}</div>
+          <div v-for="issue in issues" :key="issue" class="planner-notice is-warning">{{ issue }}</div>
           <details v-if="plan?.unused_candidates.length"><summary>未采用的自选精灵（{{ plan.unused_candidates.length }}）</summary><p v-for="item in unusedRows" :key="item.gid">{{ parentName(item.gid) }} · …{{ item.gid.slice(-6) }}：{{ item.reason }}</p><div class="planner-actions"><button class="ghost-button" :disabled="currentUnusedPage <= 1" @click="unusedPage = currentUnusedPage - 1">上一页</button><span>{{ currentUnusedPage }} / {{ unusedPages }}</span><button class="ghost-button" :disabled="currentUnusedPage >= unusedPages" @click="unusedPage = currentUnusedPage + 1">下一页</button></div></details>
         </section>
       </div>
@@ -260,13 +272,23 @@ defineExpose({ load: model.load, pause, resetAccount })
           </article>
           <button class="planner-primary" :disabled="!draft.approved.length || !model.canGenerate.value" @click="model.run('solve')">生成迭代方案</button>
         </section>
+        <details class="planner-rules">
+          <summary>规则与参考边界</summary>
+          <ul>
+            <li>摆位是工具草图规则：20×20 格、每窝占 2×2、中心吸附半格，手动坐标限 0～18 格，仅视图居中不改草稿坐标。</li>
+            <li>画布连线表示奖牌支持：实线为合格支持、虚线为干扰；父本 30%＋母本 30%＋随机 40% 是模型参考，不是实测保证。</li>
+            <li>搜索有节点与时间预算，只返回已验证的较优布局，不宣称全局最优。</li>
+            <li>迭代候选只表示方向接近，不代表后代可达；勾选准许后才会纳入求解。</li>
+          </ul>
+          <p>规则 {{ context?.rule_version || '—' }} · 几何 {{ context?.geometry_version || '—' }} · 目录 {{ context?.catalog_version || '—' }}{{ result ? ` · 本次搜索${result.search_status === 'bounded' ? '达预算（bounded）' : '未运行'}` : '' }}</p>
+        </details>
       </div>
     </aside>
-    <dialog ref="picker" class="planner-picker" @click="($event.target === picker) && picker?.close()">
-      <header><strong>{{ pickerKind === 'pool' ? '选择参与配窝的精灵' : pickerKind === 'replace' ? '替换当前亲本' : '添加亲本到布局' }}</strong><button class="ghost-button" aria-label="关闭选择精灵" @click="picker?.close()"><UiIcon name="x" /></button></header>
-      <div class="planner-picker-filters"><input v-model="search" type="search" placeholder="名称、性格、蛋组或个体ID" aria-label="查找候选精灵" @input="page = 1"><select v-model="gender" aria-label="候选性别" @change="page = 1"><option value="">全部性别</option><option value="1">父本</option><option value="2">母本</option></select><select v-model="nature" aria-label="候选性格" @change="page = 1"><option value="">全部性格</option><option v-for="n in context?.natures" :key="n.id">{{ n.name }}</option></select><select v-model="group" aria-label="候选蛋组" @change="page = 1"><option value="">全部蛋组</option><option v-for="name in currentGroups" :key="name">{{ name }}</option></select><select v-model="medal" aria-label="候选奖牌" @change="page = 1"><option value="">全部奖牌</option><option v-for="name in ['大块头', '小不点', '婉转声', '粗嗓门']" :key="name">{{ name }}</option></select></div>
-      <div class="planner-picker-grid"><BreederCard v-for="parent in pickerRows" :key="parent.gid" :parent="parent" :selected="pickerKind === 'pool' && draft.selected.includes(parent.gid)" @select="choose(parent.gid)" @open="picker?.close(); host.openPet($event)" /><div v-if="!pickerRows.length" class="planner-empty">当前观察记录中没有符合筛选的候选。</div></div>
-      <footer><span>已选择 {{ draft.selected.length }} 只 · {{ filtered.length }} 个候选</span><div class="planner-actions"><button class="ghost-button" :disabled="page <= 1" @click="page--">上一页</button><span>{{ page }} / {{ Math.max(1, Math.ceil(filtered.length / 24)) }}</span><button class="ghost-button" :disabled="page * 24 >= filtered.length" @click="page++">下一页</button><button class="planner-primary" @click="picker?.close()">完成</button></div></footer>
+    <dialog ref="picker" class="planner-picker" aria-labelledby="planner-picker-title" aria-modal="true" @click="($event.target === picker) && closePicker()">
+      <header><strong id="planner-picker-title">{{ pickerKind === 'pool' ? '选择参与配窝的精灵' : pickerKind === 'replace' ? '替换当前亲本' : '添加亲本到布局' }}</strong><button class="ghost-button" aria-label="关闭选择精灵" @click="closePicker()"><UiIcon name="x" /></button></header>
+      <div class="planner-picker-filters"><input ref="pickerSearch" v-model="search" type="search" placeholder="名称、性格、蛋组或个体ID" aria-label="查找候选精灵" @input="page = 1"><select v-model="gender" aria-label="候选性别" @change="page = 1"><option value="">全部性别</option><option value="1">父本</option><option value="2">母本</option></select><select v-model="nature" aria-label="候选性格" @change="page = 1"><option value="">全部性格</option><option v-for="n in context?.natures" :key="n.id">{{ n.name }}</option></select><select v-model="group" aria-label="候选蛋组" @change="page = 1"><option value="">全部蛋组</option><option v-for="name in currentGroups" :key="name">{{ name }}</option></select><select v-model="medal" aria-label="候选奖牌" @change="page = 1"><option value="">全部奖牌</option><option v-for="name in ['大块头', '小不点', '婉转声', '粗嗓门']" :key="name">{{ name }}</option></select></div>
+      <div class="planner-picker-grid"><BreederCard v-for="parent in pickerRows" :key="parent.gid" :parent="parent" :selected="pickerKind === 'pool' && draft.selected.includes(parent.gid)" @select="choose(parent.gid)" @open="closePicker(); host.openPet($event)" /><div v-if="!pickerRows.length" class="planner-empty">当前观察记录中没有符合筛选的候选。</div></div>
+      <footer><span>已选择 {{ draft.selected.length }} 只 · {{ filtered.length }} 个候选</span><div class="planner-actions"><button class="ghost-button" :disabled="page <= 1" @click="page--">上一页</button><span>{{ page }} / {{ Math.max(1, Math.ceil(filtered.length / 24)) }}</span><button class="ghost-button" :disabled="page * 24 >= filtered.length" @click="page++">下一页</button><button class="planner-primary" @click="closePicker()">完成</button></div></footer>
     </dialog>
   </div>
 </template>

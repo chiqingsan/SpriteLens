@@ -55,7 +55,11 @@
   background: transparent; 
   font-weight: 600;
   font-size: var(--fs-sm);
-  transition: all 180ms ease;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-base) var(--motion-ease);
 }
 
 .planner-tabs button:hover {
@@ -70,8 +74,17 @@
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 
-.planner-page button, .planner-picker button { cursor: pointer; transition: all 150ms ease; }
-.planner-page button:disabled, .planner-picker button:disabled { cursor: default; opacity: .4; }
+.planner-page button, .planner-picker button { cursor: pointer; }
+/* 禁用态不用透明度：浅底＋次要字保持可读（--muted 在 --surface-2 上约 4.8:1），并去掉抬升与阴影。 */
+.planner-page button:disabled, .planner-picker button:disabled {
+  cursor: default;
+  color: var(--muted);
+  background: var(--surface-2);
+  border-color: var(--line-soft);
+  box-shadow: none;
+  transform: none;
+  opacity: 1;
+}
 
 /* 按钮系统 */
 .planner-page .ghost-button, .planner-picker .ghost-button, .planner-primary { 
@@ -142,6 +155,17 @@
   font-weight: 500;
 }
 
+/* 常驻进度与可点重评：状态行不随内容滚动，关键进度始终可见。 */
+.planner-status-progress { color: var(--ink); font-weight: 500; }
+.planner-status-action {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.planner-status-action:hover:not(:disabled) { transform: none; text-decoration: underline; }
+
 .planner-scroll, .planner-sidebar-scroll { 
   overflow: auto; 
   min-height: 0; 
@@ -173,7 +197,13 @@
   border-radius: var(--radius-md); 
   font: inherit; 
   font-size: var(--fs-sm);
-  transition: all 150ms ease;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease),
+    transform var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-base) var(--motion-ease),
+    opacity var(--motion-fast) var(--motion-ease);
 }
 
 .planner-page input:focus, 
@@ -215,6 +245,50 @@
   color: var(--danger); 
   background: var(--danger-soft);
   border-left-color: var(--danger);
+}
+
+.planner-notice.is-warning {
+  color: var(--amber-ink);
+  background: var(--amber-soft);
+  border-left-color: var(--amber);
+}
+
+.planner-notice.is-info {
+  color: var(--ink-soft);
+  background: var(--surface-2);
+  border-left-color: var(--line);
+}
+
+.planner-notice.is-success {
+  color: var(--positive);
+  background: var(--teal-soft);
+  border-left-color: var(--positive);
+}
+
+/* 比值：等宽数字，避免 1/10 与 1/2 在列表里跳动。 */
+.planner-ratio {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  font-variant-numeric: tabular-nums;
+}
+
+.planner-ratio strong { font-weight: 600; }
+.planner-ratio small { color: var(--muted); font-size: var(--fs-2xs); }
+
+/* 共有奖牌用真实本地图标，避免只给文字串。 */
+.planner-mark-set {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-right: var(--space-2);
+  vertical-align: -3px;
+}
+
+.planner-reference img.medal-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
 }
 
 /* 区块标题 */
@@ -312,7 +386,13 @@
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border: 1.5px solid var(--line);
-  transition: all 150ms ease;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease),
+    transform var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-base) var(--motion-ease),
+    opacity var(--motion-fast) var(--motion-ease);
 }
 
 .planner-alternatives .chip:hover {
@@ -376,11 +456,40 @@
   stroke: var(--teal); 
   stroke-width: 3; 
   opacity: .75;
-  transition: opacity 150ms ease;
+  transition: opacity var(--motion-base) var(--motion-ease), stroke var(--motion-base) var(--motion-ease);
 }
 
 /* 连线只作视觉参考，不能挡住窝位的拖动、点击与键盘焦点。 */
 .planner-canvas-links { pointer-events: none; }
+
+/* 棋盘边界：固定 20×20 的有效落点区域。 */
+.planner-board-border { stroke: var(--line); stroke-width: 2; }
+
+/* 选中亲本时其他连线弱化；干扰线同时用虚线，不只靠颜色。 */
+.planner-edge.dim { opacity: .15; }
+
+/* 窝位角标：学院窝与锁定状态都有文字，不靠颜色单独表达。 */
+.planner-nest-badge circle { fill: var(--surface-1); stroke: var(--line); stroke-width: 1.5; }
+.planner-nest-badge text { fill: var(--ink-soft); font-size: 11px; font-weight: 600; }
+.planner-nest-badge.is-lock circle { fill: var(--amber-soft); stroke: var(--amber-ink); }
+.planner-nest-badge.is-lock text { fill: var(--amber-ink); }
+
+/* caption 行常驻图例：线型语义不靠颜色单独表达。 */
+.planner-canvas-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: var(--space-4);
+  color: var(--muted);
+  font-size: var(--fs-2xs);
+}
+.planner-legend-swatch {
+  display: inline-block;
+  width: 18px;
+  border-top: 3px solid var(--teal);
+  opacity: .75;
+}
+.planner-legend-swatch.is-interference { border-top-style: dashed; border-top-color: var(--amber-ink); opacity: .6; }
 
 .planner-edge.interference { 
   stroke: var(--amber-ink); 
@@ -392,7 +501,13 @@
 .planner-nest { 
   cursor: grab; 
   outline: none;
-  transition: all 150ms ease;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease),
+    transform var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-base) var(--motion-ease),
+    opacity var(--motion-fast) var(--motion-ease);
   touch-action: none;
 }
 
@@ -403,7 +518,7 @@
   fill: var(--surface-1); 
   stroke: var(--line); 
   stroke-width: 2;
-  transition: all 150ms ease;
+  transition: fill var(--motion-fast) var(--motion-ease), stroke var(--motion-fast) var(--motion-ease), stroke-width var(--motion-fast) var(--motion-ease);
 }
 
 .planner-nest:hover rect {
@@ -513,7 +628,13 @@
   background: var(--surface-1); 
   text-align: left; 
   font-size: var(--fs-sm);
-  transition: all 150ms ease;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease),
+    transform var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-base) var(--motion-ease),
+    opacity var(--motion-fast) var(--motion-ease);
 }
 
 .planner-canvas-key button:hover {
@@ -661,7 +782,13 @@
   border: 2px solid var(--line); 
   border-radius: var(--radius-lg); 
   background: var(--surface-1);
-  transition: all 150ms ease;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease),
+    transform var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-base) var(--motion-ease),
+    opacity var(--motion-fast) var(--motion-ease);
 }
 
 .planner-outcome:hover {
@@ -743,7 +870,7 @@
   font-weight: 500;
   padding: var(--space-3);
   border-radius: var(--radius-sm);
-  transition: background 150ms ease;
+  transition: background-color var(--motion-fast) var(--motion-ease);
 }
 
 .planner-page summary:hover {
@@ -854,7 +981,7 @@
 }
 
 .planner-sidebar-empty { 
-  border: 2px dashed var(--line); 
+  border: 1px dashed var(--line); 
   border-radius: var(--radius-md); 
   padding: var(--space-6); 
   color: var(--muted); 
@@ -871,7 +998,13 @@
   padding: var(--space-5); 
   background: var(--surface-2); 
   margin-bottom: var(--space-4);
-  transition: all 150ms ease;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease),
+    transform var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-base) var(--motion-ease),
+    opacity var(--motion-fast) var(--motion-ease);
 }
 
 .planner-goal-editor:hover {
@@ -1027,7 +1160,13 @@
   background: var(--surface-2); 
   color: var(--ink); 
   text-align: left;
-  transition: all 150ms ease;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease),
+    transform var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-base) var(--motion-ease),
+    opacity var(--motion-fast) var(--motion-ease);
 }
 
 .planner-egg-choices button:hover:not(:disabled) {
@@ -1113,7 +1252,13 @@
   background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  transition: all 150ms ease;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease),
+    transform var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-base) var(--motion-ease),
+    opacity var(--motion-fast) var(--motion-ease);
 }
 
 .planner-picked-row:hover {
@@ -1144,6 +1289,37 @@
   padding: var(--space-2);
   min-height: 32px;
   min-width: 32px;
+}
+
+/* 规则与参考边界：常驻说明，避免界面单方面宣称可达性。 */
+.planner-rules {
+  margin-top: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  color: var(--ink-soft);
+  background: var(--surface-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-xs);
+}
+
+.planner-rules summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.planner-rules ul {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+  padding-left: var(--space-6);
+  line-height: 1.6;
+}
+
+.planner-rules p {
+  margin: 0;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 /* 迭代候选 */
@@ -1346,7 +1522,13 @@ dialog.planner-picker[open] {
   font-size: var(--fs-xs); 
   font-weight: 500;
   white-space: nowrap;
-  transition: all 150ms ease;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease),
+    transform var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-base) var(--motion-ease),
+    opacity var(--motion-fast) var(--motion-ease);
 }
 
 .chip:hover:not(:disabled) {
@@ -1378,7 +1560,7 @@ dialog.planner-picker[open] {
   cursor: pointer;
   text-decoration: underline;
   text-decoration-color: transparent;
-  transition: all 150ms ease;
+  transition: text-decoration-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
 }
 
 .breeder-detail-link:hover {

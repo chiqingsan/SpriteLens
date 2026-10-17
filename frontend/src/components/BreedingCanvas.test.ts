@@ -21,9 +21,9 @@ const plan = (): Plan => ({ plan_id: 'plan-1', status: 'ready', issues: [], plac
   goals: [{ goal_id: 'g1', covered: true, exact_mothers: 1, mother_count: 1, shared_mothers: 0, ready: true, reason: '' }],
   metrics: { males: 1, females: 3, effective_mothers: 2, unused_slots: 0 }, unused_candidates: [] })
 
-function canvas(options: { plan?: Plan | null; pending?: boolean; positions?: Placement[] } = {}) {
+function canvas(options: { plan?: Plan | null; pending?: boolean; positions?: Placement[]; selected?: string } = {}) {
   return mount(BreedingCanvas, { props: { positions: options.positions ?? positions, parents, plan: options.plan === undefined ? plan() : options.plan,
-    pending: options.pending ?? false, selected: '' } })
+    pending: options.pending ?? false, selected: options.selected ?? '' } })
 }
 const nests = (wrapper: ReturnType<typeof canvas>) => wrapper.findAll('g.planner-nest')
 
@@ -60,5 +60,25 @@ describe('小窝布局草图', () => {
     expect(wrapper.emitted('move')).toBeUndefined()
     await nests(wrapper)[1]!.trigger('keydown', { key: 'Enter' })
     expect(wrapper.emitted('select')).toEqual([['2']])
+  })
+  it('固定显示整块 20×20 棋盘，只有越界草稿才扩大视图', () => {
+    expect(canvas().get('svg').attributes('viewBox')).toBe('0 0 640 640')
+    expect(canvas().get('rect.planner-board-border').attributes('width')).toBe('640')
+    const legacy = canvas({ positions: [nest('1', 0, 0), nest('2', 40, 0)] })
+    expect(legacy.get('svg').attributes('viewBox')).not.toBe('0 0 640 640')
+    expect(legacy.get('.planner-canvas-outside').text()).toContain('超出 20×20')
+  })
+  it('待重评时隐藏旧连线，选中亲本后只强调相关连线', () => {
+    const pending = canvas({ pending: true })
+    expect(pending.findAll('line.planner-edge')).toHaveLength(0)
+    expect(pending.find('.planner-canvas-legend').exists()).toBe(false)
+    expect(canvas({ selected: '3' }).findAll('line.planner-edge.dim')).toHaveLength(1)
+  })
+  it('学院窝与锁定窝位用文字角标表达，不靠颜色', () => {
+    const badges = canvas({ positions: [nest('1', 0, 0, 'academy'), nest('2', 2, 0, 'normal', 'position')] }).findAll('g.planner-nest-badge')
+    expect(badges).toHaveLength(2)
+    expect(badges[0]!.text()).toContain('学')
+    expect(badges[1]!.text()).toContain('锁')
+    expect(badges[1]!.find('title').text()).toContain('位置锁定')
   })
 })
