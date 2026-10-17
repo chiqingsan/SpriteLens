@@ -178,7 +178,7 @@ Vue 页面沿用同一套 token 与命名：组件先在页面内以类名复用
 
 动效统一 `--motion-fast/--motion-base/--motion-ease`（app.css:9-13），过渡只列具体属性、禁止 `transition: all`；`prefers-reduced-motion` 由 app.css:102 全局生效，页面不重复声明。
 
-配窝页组件对应现类名：模式切换 `.planner-tabs`、主操作 `.planner-primary`（每屏至多一个）、次操作 `.ghost-button`、方案 chip `.planner-alternatives .chip`、常驻状态行 `.planner-status`（账号・只数、忙碌/待评、方案状态、目标就绪进度）、画布 `.planner-canvas` 与亲本索引 `.planner-canvas-key`、caption `.planner-canvas-caption`（连线图例与交互提示）、产物卡 `.planner-outcome`、目标卡 `.planner-goal-editor`、迭代卡 `.planner-iteration`、提示条 `.planner-notice`（`.is-error/.is-success/.is-warning`）、空状态 `.planner-empty`。画布内：窝群始终居中（硬性验收项，贴左上角即不通过），有效区 0～18 带边界，窝位序号与性别合成角标，学院窝加「学」角标，合格连线实线／干扰虚线，等待重评时隐藏旧线并标注。
+配窝页组件对应现类名：模式切换 `.planner-tabs`、主操作 `.planner-primary`（每屏至多一个）、次操作 `.ghost-button`、方案 chip `.planner-alternatives .chip`、常驻状态行 `.planner-status`（账号・只数、忙碌/待评、方案状态、目标就绪进度）、画布 `.planner-canvas` 与亲本索引 `.planner-canvas-key`、caption `.planner-canvas-caption`（连线图例与交互提示）、产物卡 `.planner-outcome`、目标卡 `.planner-goal-editor`、迭代卡 `.planner-iteration`、提示条 `.planner-notice`（`.is-error/.is-success/.is-warning`）、空状态 `.planner-empty`。画布内：窝群始终居中（硬性验收项，贴左上角即不通过），有效区 0～18（拖动与方向键已夹取该范围，网格铺满画布），窝位序号与性别合成角标，学院窝加「学」角标，合格连线实线／干扰虚线，等待重评时隐藏旧线并标注。
 
 共有奖牌统一用 `frontend/src/components/MedalIcon.vue`（配窝选择卡与配窝结果共用；图标缺失时退化为文字，不显示破图）。
 

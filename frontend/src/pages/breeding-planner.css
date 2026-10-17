@@ -462,9 +462,6 @@
 /* 连线只作视觉参考，不能挡住窝位的拖动、点击与键盘焦点。 */
 .planner-canvas-links { pointer-events: none; }
 
-/* 棋盘边界：固定 20×20 的有效落点区域。 */
-.planner-board-border { stroke: var(--line); stroke-width: 2; }
-
 /* 选中亲本时其他连线弱化；干扰线同时用虚线，不只靠颜色。 */
 .planner-edge.dim { opacity: .15; }
 

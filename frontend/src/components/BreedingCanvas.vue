@@ -99,8 +99,7 @@ function key(event: KeyboardEvent, gid: string) {
     <div class="planner-canvas">
       <svg :viewBox="`${boardBounds.x} ${boardBounds.y} ${boardBounds.size} ${boardBounds.size}`" preserveAspectRatio="xMidYMid meet" aria-label="小窝布局草图">
         <defs><pattern id="planner-grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" class="planner-grid-line" fill="none" /></pattern></defs>
-        <rect :x="0" :y="0" :width="boardSize" :height="boardSize" fill="url(#planner-grid)" />
-        <rect :x="0" :y="0" :width="boardSize" :height="boardSize" class="planner-board-border" fill="none" />
+        <rect class="planner-board-grid" :x="boardBounds.x" :y="boardBounds.y" :width="boardBounds.size" :height="boardBounds.size" fill="url(#planner-grid)" />
         <g v-if="!pending" class="planner-canvas-links" aria-hidden="true"><line v-for="link in links" :key="link.key" class="planner-edge" :class="{ interference: link.interference, dim: link.dim }" :x1="link.male.x" :y1="link.male.y" :x2="link.female.x" :y2="link.female.y" /></g>
         <g v-for="(position, index) in positions" :key="position.gid" class="planner-nest" :class="[{ selected: selected === position.gid, academy: position.kind === 'academy', dragging: drag?.gid === position.gid, unrelated: !!plan && !connected.has(position.gid) }, `gender-${parents.get(position.gid)?.gender}`]"
           :transform="`translate(${(drag?.gid === position.gid ? drag.cellX : position.x) * 32 + 32},${(drag?.gid === position.gid ? drag.cellY : position.y) * 32 + 32})`" :data-gid="position.gid" tabindex="0" role="button" :aria-label="`${index + 1}号，${parents.get(position.gid)?.name || '当前记录未找到'}，${parents.get(position.gid)?.gender === 1 ? '父本' : '母本'}${position.lock ? '，已锁定' : ''}，方向键移动，Enter 选择，也可拖动到空位或与另一窝交换位置`"

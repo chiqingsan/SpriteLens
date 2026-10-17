@@ -76,7 +76,8 @@ describe('小窝布局草图', () => {
     expect(corner[1]!).toBeLessThan(0)
   })
   it('格距固定 32px，只有越界草稿才扩大视口', () => {
-    expect(canvas().get('rect.planner-board-border').attributes('width')).toBe('640')
+    const grid = canvas().get('rect.planner-board-grid')
+    expect([grid.attributes('x'), grid.attributes('width')]).toEqual(['-160', '640'])
     const legacy = canvas({ positions: [nest('1', 0, 0), nest('2', 40, 0)] })
     expect(viewBox(legacy)[2]).toBeGreaterThan(640)
     expect(legacy.get('.planner-canvas-outside').text()).toContain('超出 20×20')
