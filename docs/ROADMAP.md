@@ -15,7 +15,7 @@
 后端沿用 Python + aiohttp + pywebview/WebView2 + SQLite。前端已确认采用 **Vue 3 + TypeScript + Vite**，
 当前原生 JS 按页面迁移；配套技术、状态/DOM 归属和构建边界见 [Vue 演进决策](VUE3_MIGRATION.md)。
 下一步补运行时与数据契约缺口、建立前端工程、迁移页面并完善资源流水线；
-智能配窝和产线收集在相关数据足以支持结论后进入实现。
+智能配窝（F04-U5）与双牌产线（F04-U3）已落地本地参考版，下一步转真实游戏与可见 WebView2 验收。
 
 具体实现主要由 GLM 3.8f 承接，Codex 负责架构边界、任务划分、路线与复核。
 每次交接按 [开发指南的任务模板](DEVELOPMENT_GUIDE.md#架构与实现协作) 写明范围、失败分支和验收；

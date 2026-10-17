@@ -79,4 +79,56 @@ describe('配窝请求、恢复和编辑边界', () => {
     expect(model.dirty.target).toBe(false)
     stop()
   })
+  it('保存成功后清除未保存标记，继续修改会重新标记', async () => {
+    const { model, stop } = setup(); await model.load()
+    expect(model.unsaved.value).toBe(false)
+    model.draft.value.capacity = 6
+    expect(model.unsaved.value).toBe(true)
+    await model.save()
+    expect(model.unsaved.value).toBe(false)
+    expect(model.error.value).toBe('')
+    expect(model.errorAction.value).toBe('')
+    model.draft.value.capacity = 7
+    expect(model.unsaved.value).toBe(true)
+    stop()
+  })
+  it('保存失败标为可重试并保留本地编辑，刷新资料不清空草稿', async () => {
+    const { model, host, stop } = setup(); await model.load()
+    model.draft.value.capacity = 6
+    const before = JSON.stringify(model.draft.value)
+    vi.mocked(host.request).mockRejectedValueOnce(new Error('草稿保存失败：磁盘只读'))
+    await model.save()
+    expect(model.errorAction.value).toBe('save')
+    expect(model.error.value).toBe('草稿保存失败：磁盘只读')
+    expect(JSON.stringify(model.draft.value)).toBe(before)
+    expect(model.unsaved.value).toBe(true)
+    vi.mocked(host.request).mockResolvedValueOnce(context())
+    await model.refresh()
+    expect(model.context.value?.uid).toBe(101)
+    expect(JSON.stringify(model.draft.value)).toBe(before)
+    expect(model.unsaved.value).toBe(true)
+    expect(model.error.value).toBe('')
+    stop()
+  })
+  it('撤销与重做在两次窝位调整之间往返', async () => {
+    const { model, host, stop } = setup(); await model.load()
+    vi.mocked(host.request).mockImplementation(async (_path, body) => {
+      const snapshot = body as { revision: number; placements: unknown }
+      const base = result(snapshot.revision)
+      return { ...base, plans: [{ ...base.plans[0]!, placements: snapshot.placements }] }
+    })
+    model.draft.value.goals = [{ goal_id: 'goal-1', egg_key: 'egg-a', size_mark: '', voice_mark: '', nature_id: 0, priority: false }]
+    model.draft.value.placements = positions
+    await model.run('solve')
+    model.edit([{ ...positions[0]!, x: 4 }]); await Promise.resolve(); await Promise.resolve()
+    expect(model.draft.value.placements[0]?.x).toBe(4)
+    expect(model.canUndo.value).toBe(true)
+    model.undo(); await Promise.resolve(); await Promise.resolve()
+    expect(model.draft.value.placements[0]?.x).toBe(0)
+    expect(model.canRedo.value).toBe(true)
+    model.undo(true); await Promise.resolve(); await Promise.resolve()
+    expect(model.draft.value.placements[0]?.x).toBe(4)
+    expect(model.canRedo.value).toBe(false)
+    stop()
+  })
 })

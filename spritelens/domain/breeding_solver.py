@@ -8,8 +8,13 @@ from time import monotonic
 
 from spritelens.domain.breeder_library import can_pair
 from spritelens.domain.breeding_planner import (
-    Placement, Pool, Request, evaluate, overlaps, pair_key, pair_match,
+    BOARD_MAX, Placement, Pool, Request, evaluate, overlaps, pair_key, pair_match,
 )
+
+
+def in_board(x: float, y: float) -> bool:
+    """窝中心是否落在 20×20 草图内；生成的方案不得依赖画布外的坐标。"""
+    return 0 <= x <= BOARD_MAX and 0 <= y <= BOARD_MAX
 
 
 def opportunities(pool: Pool, request: Request, cancel: Event) -> tuple[list[dict], set[str], dict[str, bool | None], list[tuple[str, str]], bool]:
@@ -80,7 +85,8 @@ def solve(pool: Pool, request: Request, cancel: Event, budget: int = 4500) -> di
     base = tuple(replace(p, primary_goal_id="") for p in request.placements if p.lock)
     fixed = [p for p in base if p.lock == "position"]
     anchors = fixed or [Placement("", 2, 2)]
-    start_slots = [(p.x + dx, p.y + dy) for p in anchors for dy in (0, -2, 2, 4) for dx in (0, -2, 2, 4)]
+    start_slots = [(p.x + dx, p.y + dy) for p in anchors for dy in (0, -2, 2, 4) for dx in (0, -2, 2, 4)
+                   if in_board(p.x + dx, p.y + dy)]
     relocated = list(fixed)
     for parent in base:
         if parent.lock == "position":
@@ -129,7 +135,9 @@ def solve(pool: Pool, request: Request, cancel: Event, budget: int = 4500) -> di
     grids = [((2, 2),) + tuple((x, y) for y in (0, 2, 4) for x in (0, 2, 4, 6) if (x, y) != (2, 2)),
              tuple((x, y) for y in (0, 2) for x in (0, 2, 4, 9, 11, 13))]
     if base:
-        grids = [tuple(dict.fromkeys((p.x + dx, p.y + dy) for p in base for dx, dy in ((0, 0), (2, 0), (-2, 0), (0, 2), (0, -2), (2, 2), (-2, -2), (2, -2), (-2, 2), (4, 0), (0, 4), (2.5, 0), (0, 2.5))))]
+        grids = [tuple(dict.fromkeys((p.x + dx, p.y + dy) for p in base
+                                     for dx, dy in ((0, 0), (2, 0), (-2, 0), (0, 2), (0, -2), (2, 2), (-2, -2), (2, -2), (-2, 2), (4, 0), (0, 4), (2.5, 0), (0, 2.5))
+                                     if in_board(p.x + dx, p.y + dy)))]
     seen, best = set(), {}
     previous = tuple(replace(p, primary_goal_id="") for p in request.placements)
     if previous and (request.mode == "target" or {p.gid for p in previous} <= selected):

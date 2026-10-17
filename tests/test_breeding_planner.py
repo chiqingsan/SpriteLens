@@ -170,10 +170,36 @@ class PlannerTests(TestCase):
         value = {**asdict(self.request), "goals": [asdict(self.goal)], "selected": [], "approved": [],
                  "placements": [], "rule_version": "planner-dual-mark-v1", "geometry_version": "community-grid-v1"}
         self.assertEqual(parse_draft(value), self.request)
-        for change in ({"capacity": 11}, {"academy": 1}, {"rule_version": "old"},
+        for change in ({"capacity": 11}, {"academy": 1}, {"rule_version": "old"}, {"approved": ["没有结构"]},
                        {"placements": [{**asdict(Placement("1", 0, 0)), "x": float("nan")}]}):
             with self.subTest(change=change), self.assertRaises(ValueError):
                 parse_draft({**value, **change})
+
+    def test_solver_never_places_nests_outside_the_board(self):
+        # 位置锁在角落、或参与锁残留越界旧坐标时，新生成的方案必须落在 0～18 内。
+        corner = solve(self.pool, replace(self.request, capacity=3, placements=(Placement("1", 18, 18, lock="position"),)), Event())
+        self.assertTrue(corner["plans"], corner["issues"])
+        for plan in corner["plans"]:
+            for placement in plan["placements"]:
+                self.assertTrue(0 <= placement["x"] <= 18 and 0 <= placement["y"] <= 18, placement)
+            self.assertEqual(next(p["x"] for p in plan["placements"] if p["gid"] == "1"), 18)
+        moved = solve(self.pool, replace(self.request, capacity=3, placements=(Placement("1", 900, 900, lock="participation"),)), Event())
+        self.assertTrue(moved["plans"], moved["issues"])
+        for plan in moved["plans"]:
+            for placement in plan["placements"]:
+                self.assertTrue(0 <= placement["x"] <= 18 and 0 <= placement["y"] <= 18, placement)
+            self.assertIn("1", {p["gid"] for p in plan["placements"]})
+
+    def test_out_of_board_legacy_draft_is_reported_as_a_position_issue(self):
+        outside = (Placement("1", 20, 18), Placement("2", 22, 18))
+        result = evaluate(self.pool, self.request, outside)
+        self.assertEqual(result["status"], "invalid")
+        self.assertIn("超出 20×20 草图范围", "".join(result["issues"]))
+        # 越界旧草稿仍可读取和保存：提示由评估给出，解析阶段不拒绝。
+        value = {**asdict(self.request), "goals": [asdict(self.goal)], "selected": [], "approved": [],
+                 "placements": [asdict(p) for p in outside],
+                 "rule_version": "planner-dual-mark-v1", "geometry_version": "community-grid-v1"}
+        self.assertEqual(len(parse_draft(value).placements), 2)
 
     def test_voice_override_and_snapshot_share_one_version(self):
         from types import SimpleNamespace

@@ -46,12 +46,15 @@ def parse_draft(value: dict) -> Request:
     selected = value.get("selected")
     approved = value.get("approved")
     require(isinstance(selected, list) and len(selected) <= 2000 and all(gid(i) for i in selected))
-    require(isinstance(approved, list) and len(approved) <= 720 and all(isinstance(i, str) and len(i) <= 180 for i in approved))
+    require(isinstance(approved, list) and len(approved) <= 720
+            and all(isinstance(i, str) and re.fullmatch(r"[A-Za-z0-9_-]{1,100}:[1-9][0-9]{0,19}:[1-9][0-9]{0,19}", i) is not None
+                    for i in approved), "准许迭代组合格式错误")
     for row in raw_positions:
         require(isinstance(row, dict) and gid(row.get("gid")))
         require(row.get("kind") in ("normal", "academy") and row.get("lock") in ("", "participation", "position"))
         require(isinstance(row.get("primary_goal_id"), str))
-        require(all(type(row.get(k)) in (int, float) and isfinite(row[k]) and abs(row[k]) <= 1000 and row[k] * 2 == int(row[k] * 2) for k in ("x", "y")), "坐标必须在模拟工作面内并吸附半格")
+        require(all(type(row.get(k)) in (int, float) and isfinite(row[k]) and abs(row[k]) <= 1000 and row[k] * 2 == int(row[k] * 2) for k in ("x", "y")),
+                "坐标必须是有限数值并吸附半格")
         primary = aliases.get(row["primary_goal_id"], row["primary_goal_id"])
         placements.append(Placement(**{**{k: row[k] for k in Placement.__dataclass_fields__}, "primary_goal_id": primary}))
         require(not primary or primary in {g.goal_id for g in goals}, "母本主目标不存在，请重新分配")
@@ -81,7 +84,10 @@ def register_planner_routes(app: web.Application, context) -> None:
             if body.get("catalog_version") != service.catalog_version:
                 raise StalePlannerInput("目录版本已变化，请刷新资料后重新评估草稿")
             if request.match_info["action"] == "draft":
-                await asyncio.to_thread(service.save_draft, body["uid"], body["version"], draft.mode, {**body, "schema_version": 1})
+                try:
+                    await asyncio.to_thread(service.save_draft, body["uid"], body["version"], draft.mode, {**body, "schema_version": 1})
+                except OSError as error:
+                    return web.json_response({"error": f"草稿保存失败：{error}"}, status=500)
                 return web.json_response({"uid": body["uid"], "version": body["version"], "saved": True, "revision": body["revision"]})
             if draft.mode == "target" and not draft.goals or draft.mode == "selected" and not draft.selected:
                 raise ValueError("请先添加目标蛋或选择参与精灵")
@@ -95,15 +101,13 @@ def register_planner_routes(app: web.Application, context) -> None:
             return web.json_response({"error": str(error)}, status=409)
         except (ValueError, TypeError) as error:
             return web.json_response({"error": str(error)}, status=400)
-        except OSError as error:
-            return web.json_response({"error": f"草稿保存失败：{error}"}, status=500)
 
     async def get_draft(request):
         mode = request.query.get("mode", "target")
         if mode not in ("target", "selected"):
             return web.json_response({"error": "无效入口"}, status=400)
-        inventory = context.pet_repository.consistent_snapshot()
-        value = service.load_draft(inventory.uid, mode)
+        inventory = await asyncio.to_thread(context.pet_repository.consistent_snapshot)
+        value = await asyncio.to_thread(service.load_draft, inventory.uid, mode)
         try:
             if value is not None:
                 if not isinstance(value, dict) or value.get("schema_version") != 1 or value.get("uid") != inventory.uid or value.get("mode") != mode:

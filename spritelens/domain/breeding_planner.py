@@ -13,6 +13,8 @@ from spritelens.domain.static_data import StaticData
 
 RULE_VERSION = "planner-dual-mark-v1"
 GEOMETRY_VERSION = "community-grid-v1"
+# 20×20 草图内的窝中心坐标上限（2×2 占地、中心吸附半格），与页面画布一致。
+BOARD_MAX = 18
 UNKNOWN_GROUPS = {"未知", "未发现", "暂无蛋组", "暂无", ""}
 INFERTILE_GROUPS = {"无", "无法孵蛋", "无蛋组"}
 
@@ -161,6 +163,8 @@ def evaluate(pool: Pool, request: Request, placements: tuple[Placement, ...]) ->
             issues.append(f"当前记录未找到可繁育个体 {p.gid}")
         if any(overlaps(p, q) for q in placements[:i]):
             issues.append("小窝占地发生重叠")
+        if not (0 <= p.x <= BOARD_MAX and 0 <= p.y <= BOARD_MAX):
+            issues.append("草稿中有窝位超出 20×20 草图范围，请重新规划或调整位置")
     if issues:
         return {"status": "invalid", "issues": issues, "edges": [], "mothers": [], "goals": [], "score": (), "metrics": {}}
     edges, mothers = [], []

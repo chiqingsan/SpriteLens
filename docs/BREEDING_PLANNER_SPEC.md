@@ -8,7 +8,7 @@
 
 ## 当前实现与维护边界（2026-10-17）
 
-两个入口已接入独立 Vue 页面：按目标蛋规划，以及自选精灵的择优/全部参与。普通窝0～10、可选学院窝1个；支持实际亲本选择、全父本连线、逐边奖牌与性格参考、单类缺牌迭代准许、多方案、换窝、参与/位置锁、局部替换与恢复方案。2026-10-17 简化界面：目标蛋改为搜索后直接点选，显示当前已观察母本数；附加奖牌、性格与优先级默认折叠；画布固定20×20格，每窝占2×2，可将窝拖到空白位置或拖到另一窝上交换，不提供平移/缩放，手动坐标限0～18。画布只放序号、性别和头像，姓名放在画布旁（窄窗下方）的索引中；画面将已有窝群居中展示，但不改草稿坐标或配对计算。点选后才突出相关亲本与连线，非相关亲本淡化。旧草稿坐标越界时提示重新规划或调整。保存每账号每入口的一份草稿，恢复保留实际gid与坐标，需用户点击重评。后续章节中无限视口及撤销按钮为早期设计记录，不代表当前界面已提供。
+两个入口已接入独立 Vue 页面：按目标蛋规划，以及自选精灵的择优/全部参与。普通窝0～10、可选学院窝1个；支持实际亲本选择、全父本连线、逐边奖牌与性格参考、单类缺牌迭代准许、多方案、换窝、参与/位置锁、局部替换与恢复方案。2026-10-17 简化界面：目标蛋改为搜索后直接点选，显示当前已观察母本数；附加奖牌、性格与优先级默认折叠；画布固定20×20格，每窝占2×2，可将窝拖到空白位置或拖到另一窝上交换，不提供平移/缩放，手动坐标限0～18。画布只放序号、性别和头像，姓名放在画布旁（窄窗下方）的索引中；画面将已有窝群居中展示，但不改草稿坐标或配对计算。点选后才突出相关亲本与连线，非相关亲本淡化。旧草稿坐标越界时提示重新规划或调整。保存每账号每入口的一份草稿，恢复保留实际gid与坐标，需用户点击重评。后续章节中无限视口为早期设计记录，不代表当前界面已提供；撤销/重做已于2026-10-18补入布局工具条（拖动与方向键调整都可撤销，上限40步）。
 
 实现路径：`domain/breeding_planner.py`（准入/评估）、`domain/breeding_solver.py`（搜索）、`domain/breeding_nature.py`（与家园共用性格分支）、`services/breeding_planner_service.py`（一致快照/取消/原子保存）、`view_models/breeding_planner_vm.py`、`web/breeding_planner.py` 及 Vue 页面/composable。`PetRepository.breeding_snapshot()` 将声音修正与宠物版本放在同一锁边界，声音写入失败不推进版本。
 
@@ -374,6 +374,8 @@
       status(ready/partial/no_plan/invalid), freshness(current/stale),
       searchStatus(exhaustive/bounded/not_run), plans[], issues[]
 ```
+
+当前实现与上述提议的差异（2026-10-18核对）：`searchStatus`只产生`bounded`（达到预算并保留已评估方案）与`not_run`（evaluate分支）；束宽2的剪枝不构成穷尽证明，`exhaustive`与“当前候选空间最优”仍只是设计意图，未实现，前端`parseResult`白名单（`frontend/src/types/breedingPlanner.ts`）同步只接受这两个值，补`exhaustive`需前后端同改。迭代项现用字段为`key/goal_id/male/female/kind/missing_marks/missing_parent/candidate_voice/candidate_weight_ratio/candidate_weight/candidate_species/anchor_voice/gap/approved/has_exact/evidence`；上文`inheritanceReference`、`minimumCandidateVoice`、`minimumCandidateWeight`、`preservedMarks`等遗传范围字段尚未实现。`planKind`与`genomeSurfaces`未实现，评分只输出排序所需的启发式`score`与`metrics`。
 
 目标奖牌匹配用状态/集合，不虚构概率；未知参考用null及reason，不用0代替。没有父本的母本只有物种候选，没有性格/奖牌结果。所有返回保留结构化标记来源与逐边依据，前端不解析解释文字制造标签。
 

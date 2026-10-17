@@ -379,6 +379,9 @@
   transition: opacity 150ms ease;
 }
 
+/* 连线只作视觉参考，不能挡住窝位的拖动、点击与键盘焦点。 */
+.planner-canvas-links { pointer-events: none; }
+
 .planner-edge.interference { 
   stroke: var(--amber-ink); 
   stroke-dasharray: 6 4; 
@@ -1144,6 +1147,25 @@
 }
 
 /* 迭代候选 */
+.planner-iteration-slot {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4em;
+  padding: 0.1em 0.5em;
+  margin-right: var(--space-2);
+  border: 1px dashed var(--amber-ink);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--amber-ink);
+  font-weight: 500;
+}
+
+.planner-iteration-slot small {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
 .planner-iterations {
   margin-top: var(--space-6);
   padding-top: var(--space-6);
@@ -1496,6 +1518,10 @@ dialog.planner-picker[open] {
   max-width: 180px;
 }
 
+.planner-toolbar-actions > .planner-save-hint {
+  max-width: 180px;
+}
+
 .planner-notice {
   margin: 0;
   flex: none;
@@ -1722,6 +1748,10 @@ dialog.planner-picker[open] {
   }
 
   .planner-generate small {
+    display: none;
+  }
+
+  .planner-save-hint {
     display: none;
   }
 
