@@ -8,16 +8,19 @@ const emit = defineEmits<{ select: [gid: string]; move: [gid: string, x: number,
 const drag = ref<{ gid: string; x: number; y: number; moved: boolean; cellX: number; cellY: number } | null>(null)
 const hint = ref('')
 const outside = computed(() => props.positions.some(p => p.x < 0 || p.x > 18 || p.y < 0 || p.y > 18))
-// 硬性规定：配窝预览（窝群）必须显示在画布中间。视口以窝群包围盒中心为中心，
-// 格距固定 32px（一格 1 单位）不缩放；只有整块 20×20 装不下旧草稿的越界坐标时才扩大视口。
+// 硬性规定：配窝预览（窝群）必须显示在画布中间，且不能小到看不清。
+// 视口以窝群包围盒中心为中心、格距固定 32 单位（一格 1 格）；视口越小窝越大，
+// 因此视口按窝群自适应（小窝群也收到 VIEW_MIN），只有越界旧草稿才继续扩大视口。
 const boardSize = 640
+const VIEW_MIN = 400   // 少窝时的最小视口：保证窝不小于画布的 1/7
+const VIEW_PAD = 96    // 窝群四周留白，避免窝位贴着画布边缘
 const boardBounds = computed(() => {
   if (!props.positions.length) return { x: 0, y: 0, size: boardSize }
   const xs = props.positions.map(position => position.x * 32 + 32)
   const ys = props.positions.map(position => position.y * 32 + 32)
   const minX = Math.min(...xs), maxX = Math.max(...xs)
   const minY = Math.min(...ys), maxY = Math.max(...ys)
-  const size = Math.round(Math.max(boardSize, maxX - minX + 64, maxY - minY + 64))
+  const size = Math.round(Math.max(VIEW_MIN, maxX - minX + VIEW_PAD, maxY - minY + VIEW_PAD))
   return { x: Math.round((minX + maxX - size) / 2), y: Math.round((minY + maxY - size) / 2), size }
 })
 // 连线和说明以格子中心为准；拖动中的窝跟随指针位置。

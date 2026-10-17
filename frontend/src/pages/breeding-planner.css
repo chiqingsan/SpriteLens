@@ -584,6 +584,8 @@
 
 .planner-canvas-caption { 
   grid-area: caption; 
+  /* 预留两行：待重评文案长度变化时不能推动下方结果区（规划期间不跳动）。 */
+  min-height: 3em; 
   margin: 0; 
   color: var(--muted); 
   font-size: var(--fs-xs); 
@@ -1693,8 +1695,9 @@ dialog.planner-picker[open] {
   gap: var(--space-3);
 }
 
-.planner-generate small {
-  max-width: 180px;
+/* 主按钮标签会在「生成方案 / 重新规划 / 正在规划…」之间变化，固定最小宽度避免工具条横向跳动。 */
+.planner-toolbar-actions .planner-generate > .planner-primary {
+  min-width: 120px;
 }
 
 .planner-notice {
@@ -1777,9 +1780,10 @@ dialog.planner-picker[open] {
   border-radius: var(--radius-md);
 }
 
+/* 画布元素必须是正方形：viewBox 是正方形，非等比容器会按高度把预览整体缩小。 */
 .planner-canvas {
-  width: min(100%, 600px);
-  aspect-ratio: 50 / 27;
+  width: min(100%, 520px);
+  aspect-ratio: 1;
 }
 
 .planner-canvas-key {
@@ -1920,10 +1924,6 @@ dialog.planner-picker[open] {
 
   .planner-generate {
     margin-left: auto;
-  }
-
-  .planner-generate small {
-    display: none;
   }
 
   .planner-scroll {

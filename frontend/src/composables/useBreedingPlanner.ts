@@ -117,7 +117,8 @@ export function useBreedingPlanner(host: PlannerHost) {
       }
     }
     const snapshot = { ...body(), rule_version: context.value.rule_version, geometry_version: context.value.geometry_version }, ticket = ++generation, entry = mode.value
-    busy.value = action; error.value = ''; notice.value = ''; errorAction.value = ''
+    // 规划期间不动提示条：提示条的出现/消失会把工具条与画布顶下/顶上，属 UI 跳动。
+    busy.value = action; error.value = ''; errorAction.value = ''
     const previous = copy(plan.value)
     const inputKey = JSON.stringify([snapshot.goals, snapshot.capacity, snapshot.academy, snapshot.selected, snapshot.participation])
     try {
