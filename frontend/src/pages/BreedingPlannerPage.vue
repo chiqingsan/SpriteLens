@@ -182,8 +182,7 @@ defineExpose({ load: model.load, pause, resetAccount })
     <header class="planner-toolbar">
       <div class="planner-tabs" role="group" aria-label="配窝模式"><button :class="{ active: mode === 'target' }" :aria-pressed="mode === 'target'" @click="model.changeMode('target')"><UiIcon name="egg" /><span>按目标配窝</span></button><button :class="{ active: mode === 'selected' }" :aria-pressed="mode === 'selected'" @click="model.changeMode('selected')"><UiIcon name="backpack" /><span>自选精灵</span></button></div>
       <div class="planner-toolbar-actions">
-        <button class="ghost-button" :disabled="!!busy || !context?.uid || !unsaved" :title="saveHint" aria-describedby="planner-save-hint" @click="model.save"><span>保存草稿</span></button>
-        <small v-if="saveHint" id="planner-save-hint" class="planner-save-hint" role="status">{{ saveHint }}</small>
+        <button class="ghost-button" :disabled="!!busy || !context?.uid || !unsaved" :title="saveHint" @click="model.save"><span>保存草稿</span></button>
         <div class="planner-generate"><button class="planner-primary primary-button" :disabled="!model.canGenerate.value" @click="model.run('solve')"><UiIcon name="arrows-shuffle" /><span>{{ busy === 'solve' ? '正在规划…' : plan ? '重新规划' : '生成方案' }}</span></button><small v-if="generationHint" id="planner-generate-hint" role="status">{{ generationHint }}</small></div>
         <button class="ghost-button" :disabled="!!busy || !draft.placements.length" @click="model.clearPlan"><UiIcon name="trash" /><span>清除方案</span></button>
       </div>

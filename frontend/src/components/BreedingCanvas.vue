@@ -8,17 +8,17 @@ const emit = defineEmits<{ select: [gid: string]; move: [gid: string, x: number,
 const drag = ref<{ gid: string; x: number; y: number; moved: boolean; cellX: number; cellY: number } | null>(null)
 const hint = ref('')
 const outside = computed(() => props.positions.some(p => p.x < 0 || p.x > 18 || p.y < 0 || p.y > 18))
-// 固定显示整块 20×20 棋盘（20 格 × 32px）：不随内容平移或缩放；
-// 只有旧草稿带越界坐标时才扩大到包住内容，避免窝位被裁掉。
+// 硬性规定：配窝预览（窝群）必须显示在画布中间。视口以窝群包围盒中心为中心，
+// 格距固定 32px（一格 1 单位）不缩放；只有整块 20×20 装不下旧草稿的越界坐标时才扩大视口。
 const boardSize = 640
 const boardBounds = computed(() => {
-  if (!outside.value) return { x: 0, y: 0, size: boardSize }
+  if (!props.positions.length) return { x: 0, y: 0, size: boardSize }
   const xs = props.positions.map(position => position.x * 32 + 32)
   const ys = props.positions.map(position => position.y * 32 + 32)
-  const minX = Math.min(0, ...xs), maxX = Math.max(boardSize - 32, ...xs)
-  const minY = Math.min(0, ...ys), maxY = Math.max(boardSize - 32, ...ys)
-  const size = Math.max(boardSize, maxX - minX + 128, maxY - minY + 128)
-  return { x: (minX + maxX - size) / 2, y: (minY + maxY - size) / 2, size }
+  const minX = Math.min(...xs), maxX = Math.max(...xs)
+  const minY = Math.min(...ys), maxY = Math.max(...ys)
+  const size = Math.round(Math.max(boardSize, maxX - minX + 64, maxY - minY + 64))
+  return { x: Math.round((minX + maxX - size) / 2), y: Math.round((minY + maxY - size) / 2), size }
 })
 // 连线和说明以格子中心为准；拖动中的窝跟随指针位置。
 function center(gid: string) {
@@ -99,7 +99,7 @@ function key(event: KeyboardEvent, gid: string) {
     <div class="planner-canvas">
       <svg :viewBox="`${boardBounds.x} ${boardBounds.y} ${boardBounds.size} ${boardBounds.size}`" preserveAspectRatio="xMidYMid meet" aria-label="小窝布局草图">
         <defs><pattern id="planner-grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" class="planner-grid-line" fill="none" /></pattern></defs>
-        <rect :x="boardBounds.x" :y="boardBounds.y" :width="boardBounds.size" :height="boardBounds.size" fill="url(#planner-grid)" />
+        <rect :x="0" :y="0" :width="boardSize" :height="boardSize" fill="url(#planner-grid)" />
         <rect :x="0" :y="0" :width="boardSize" :height="boardSize" class="planner-board-border" fill="none" />
         <g v-if="!pending" class="planner-canvas-links" aria-hidden="true"><line v-for="link in links" :key="link.key" class="planner-edge" :class="{ interference: link.interference, dim: link.dim }" :x1="link.male.x" :y1="link.male.y" :x2="link.female.x" :y2="link.female.y" /></g>
         <g v-for="(position, index) in positions" :key="position.gid" class="planner-nest" :class="[{ selected: selected === position.gid, academy: position.kind === 'academy', dragging: drag?.gid === position.gid, unrelated: !!plan && !connected.has(position.gid) }, `gender-${parents.get(position.gid)?.gender}`]"

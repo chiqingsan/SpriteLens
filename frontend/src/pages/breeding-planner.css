@@ -1700,10 +1700,6 @@ dialog.planner-picker[open] {
   max-width: 180px;
 }
 
-.planner-toolbar-actions > .planner-save-hint {
-  max-width: 180px;
-}
-
 .planner-notice {
   margin: 0;
   flex: none;
@@ -1930,10 +1926,6 @@ dialog.planner-picker[open] {
   }
 
   .planner-generate small {
-    display: none;
-  }
-
-  .planner-save-hint {
     display: none;
   }
 

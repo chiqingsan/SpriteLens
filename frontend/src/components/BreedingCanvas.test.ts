@@ -25,6 +25,8 @@ function canvas(options: { plan?: Plan | null; pending?: boolean; positions?: Pl
   return mount(BreedingCanvas, { props: { positions: options.positions ?? positions, parents, plan: options.plan === undefined ? plan() : options.plan,
     pending: options.pending ?? false, selected: options.selected ?? '' } })
 }
+
+function viewBox(wrapper: ReturnType<typeof canvas>) { return (wrapper.get('svg').attributes('viewBox') ?? '').split(' ').map(Number) }
 const nests = (wrapper: ReturnType<typeof canvas>) => wrapper.findAll('g.planner-nest')
 
 describe('小窝布局草图', () => {
@@ -61,11 +63,22 @@ describe('小窝布局草图', () => {
     await nests(wrapper)[1]!.trigger('keydown', { key: 'Enter' })
     expect(wrapper.emitted('select')).toEqual([['2']])
   })
-  it('固定显示整块 20×20 棋盘，只有越界草稿才扩大视图', () => {
-    expect(canvas().get('svg').attributes('viewBox')).toBe('0 0 640 640')
+  it('窝群始终在画布中间，不贴左上角（验收项）', () => {
+    const [x, y, size] = viewBox(canvas())
+    expect(size).toBe(640)
+    expect(x! + size! / 2).toBe(160)
+    expect(y! + size! / 2).toBe(32)
+    // 贴着坐标原点的草稿同样必须居中：不能把 (0,0) 固定成画布左上角
+    const corner = viewBox(canvas({ positions: [nest('1', 0, 0), nest('2', 2, 0), nest('3', 0, 2), nest('4', 2, 2)] }))
+    expect(corner[0]! + corner[2]! / 2).toBe(64)
+    expect(corner[1]! + corner[2]! / 2).toBe(64)
+    expect(corner[0]!).toBeLessThan(0)
+    expect(corner[1]!).toBeLessThan(0)
+  })
+  it('格距固定 32px，只有越界草稿才扩大视口', () => {
     expect(canvas().get('rect.planner-board-border').attributes('width')).toBe('640')
     const legacy = canvas({ positions: [nest('1', 0, 0), nest('2', 40, 0)] })
-    expect(legacy.get('svg').attributes('viewBox')).not.toBe('0 0 640 640')
+    expect(viewBox(legacy)[2]).toBeGreaterThan(640)
     expect(legacy.get('.planner-canvas-outside').text()).toContain('超出 20×20')
   })
   it('待重评时隐藏旧连线，选中亲本后只强调相关连线', () => {
