@@ -173,8 +173,16 @@ function approve(key: string) {
   draft.value.approved = draft.value.approved.includes(key) ? draft.value.approved.filter(k => k !== key) : [...draft.value.approved, key]
 }
 function pause() { picker.value?.close(); pickerOpener = null; model.pause() }
+// 提示条是浮层（见 breeding-planner.css 的 .planner-notice.is-toast）：出现与消失都不占流内高度，
+// 所以必须自己退场，否则会一直盖在画布区左下角。
+let noticeTimer: ReturnType<typeof setTimeout> | null = null
+watch(notice, text => {
+  if (noticeTimer) { clearTimeout(noticeTimer); noticeTimer = null }
+  if (!text) return
+  noticeTimer = setTimeout(() => { notice.value = '' }, 6000)
+})
 function resetAccount() { pause(); selected.value = ''; model.resetAccount() }
-onBeforeUnmount(pause)
+onBeforeUnmount(() => { pause(); if (noticeTimer) clearTimeout(noticeTimer) })
 defineExpose({ load: model.load, pause, resetAccount })
 </script>
 
@@ -185,12 +193,12 @@ defineExpose({ load: model.load, pause, resetAccount })
       <div class="planner-tabs" role="group" aria-label="配窝模式"><button :class="{ active: mode === 'target' }" :aria-pressed="mode === 'target'" @click="model.changeMode('target')"><UiIcon name="egg" /><span>按目标配窝</span></button><button :class="{ active: mode === 'selected' }" :aria-pressed="mode === 'selected'" @click="model.changeMode('selected')"><UiIcon name="backpack" /><span>自选精灵</span></button></div>
       <div class="planner-toolbar-actions">
         <button class="ghost-button" :disabled="!!busy || !context?.uid || !unsaved" :title="saveHint" @click="model.save"><span>保存草稿</span></button>
-        <div class="planner-generate"><button class="planner-primary primary-button" :disabled="!model.canGenerate.value" :title="generationHint" @click="model.run('solve')"><UiIcon name="arrows-shuffle" /><span>{{ busy === 'solve' ? '正在规划…' : plan ? '重新规划' : '生成方案' }}</span></button></div>
+        <div class="planner-generate"><button class="planner-primary primary-button" :disabled="!model.canGenerate.value" :title="generationHint" @click="model.run('solve')"><UiIcon name="arrows-shuffle" /><span>{{ busy === 'solve' ? '正在规划' : plan ? '重新规划' : '生成方案' }}</span></button></div>
         <button class="ghost-button" :disabled="!!busy || !draft.placements.length" @click="model.clearPlan"><UiIcon name="trash" /><span>清除方案</span></button>
       </div>
     </header>
     <div v-if="error" class="planner-notice is-error" role="alert"><UiIcon name="alert-circle" />{{ error }}<button class="breeder-detail-link" :disabled="!!busy" @click="errorAction === 'save' ? model.save() : model.refresh()">{{ errorAction === 'save' ? '重试保存' : '刷新资料' }}</button></div>
-    <div v-if="notice" class="planner-notice is-info" role="status"><UiIcon name="info-circle" />{{ notice }}</div>
+    <div v-if="notice" class="planner-notice is-info is-toast" role="status"><UiIcon name="info-circle" />{{ notice }}</div>
     <main class="planner-main panel">
       <div class="planner-status" role="status"><span>{{ context?.source === 'history' ? '历史观察背包' : '当前账号已观察背包' }} · {{ context?.pet_count ?? '—' }} 只</span><span v-if="busy">{{ { loading: '正在读取资料', evaluate: '正在重评布局', saving: '正在保存', solve: '正在选择亲本与摆位' }[busy] }}</span><button v-else-if="dirty[mode]" class="planner-status-action planner-warning" :disabled="!!busy" @click="model.run('evaluate')">待重新评估 · 点击重评</button><span v-else>{{ statusName[plan?.status || result?.status || ''] || '尚未生成方案' }}</span><span v-if="plan" class="planner-status-progress">{{ mode === 'target' ? `目标就绪 ${plan.goals.filter(g => g.ready).length} / ${draft.goals.length}` : `${plan.edges.length} 组配对` }}</span></div>
       <div class="planner-scroll">

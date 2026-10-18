@@ -171,6 +171,7 @@
   min-height: 0; 
   flex: 1; 
   overscroll-behavior: contain; 
+  scrollbar-gutter: stable; /* 结果出现/消失时滚动条不再挤压内容宽度，避免画布重新缩放 */
 }
 
 .planner-scroll { 
@@ -1618,6 +1619,18 @@ dialog.planner-picker[open] {
   gap: var(--space-3);
   min-width: 0;
   min-height: 0;
+  position: relative; /* 浮层提示的定位基准 */
+}
+
+/* 信息提示改为浮层：出现与消失都不占流内高度，不会把画布与产物区顶下去。 */
+.planner-notice.is-toast {
+  position: absolute;
+  left: var(--space-5);
+  bottom: var(--space-5);
+  z-index: 3;
+  margin: 0;
+  max-width: min(420px, calc(100% - var(--space-6) * 2));
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
 }
 
 .planner-toolbar {
@@ -1695,9 +1708,16 @@ dialog.planner-picker[open] {
   gap: var(--space-3);
 }
 
-/* 主按钮标签会在「生成方案 / 重新规划 / 正在规划…」之间变化，固定最小宽度避免工具条横向跳动。 */
+/* 主按钮标签会在「生成方案 / 重新规划 / 正在规划」之间变化：固定宽度并禁止换行，
+   标签字宽变化不再撑开按钮（硬性规定：规划期间不得出现 UI 跳动）。 */
 .planner-toolbar-actions .planner-generate > .planner-primary {
-  min-width: 120px;
+  width: 128px;
+  min-width: 128px;
+  max-width: 128px;
+}
+
+.planner-toolbar-actions .planner-generate > .planner-primary > span {
+  white-space: nowrap;
 }
 
 .planner-notice {
