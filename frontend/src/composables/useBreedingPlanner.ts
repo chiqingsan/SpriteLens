@@ -1,4 +1,4 @@
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onScopeDispose, reactive, ref, watch } from 'vue'
 import { parseContext, parseResult, parseSaved, type Draft, type Mode, type Placement, type Plan, type PlannerContext, type Result } from '../types/breedingPlanner'
 
 export interface PlannerHost {
@@ -16,6 +16,9 @@ function snapshotKey(value: Draft) {
     [...value.placements].sort((a, b) => a.gid.localeCompare(b.gid)).map(p => [p.gid, p.x, p.y, p.kind, p.lock, p.primary_goal_id])])
 }
 
+// 草稿改动后静默落盘的防抖间隔；取小值，避免「改完立刻关掉软件」时最后一次改动丢失。
+const AUTOSAVE_DELAY = 400
+
 export function useBreedingPlanner(host: PlannerHost) {
   const context = ref<PlannerContext | null>(null), mode = ref<Mode>('target')
   const drafts = reactive({ target: empty('target'), selected: empty('selected') })
@@ -29,6 +32,7 @@ export function useBreedingPlanner(host: PlannerHost) {
   const historyRevision = ref(0), busy = ref(''), error = ref(''), notice = ref(''), revision = ref(0), errorAction = ref<'' | 'save' | 'load'>('')
   const savedKeys = reactive<Record<Mode, string>>({ target: '', selected: '' })
   let generation = 0, loadedUid: number | null = null, suppress = false
+  let autoTimer: ReturnType<typeof setTimeout> | null = null, autoSaving = false, autoPending = false
   const draft = computed(() => drafts[mode.value]), result = computed(() => results[mode.value])
   const plan = computed(() => result.value?.plans[active[mode.value]] || null)
   const parents = computed(() => new Map(context.value?.parents.map(p => [p.gid, p]) || []))
@@ -42,6 +46,7 @@ export function useBreedingPlanner(host: PlannerHost) {
     restored[mode.value] = true
     revision.value++; dirty[mode.value] = true; notice.value = ''
     generation++; host.cancel(); busy.value = ''
+    scheduleAutosave()
   }, { deep: true, flush: 'sync' })
 
   function body() { return { ...copy(draft.value), uid: context.value?.uid, version: context.value?.version,
@@ -75,7 +80,12 @@ export function useBreedingPlanner(host: PlannerHost) {
           restored[entry] = true
           savedKeys[entry] = snapshotKey(drafts[entry])
         }
-        notice.value = draft.value.placements.length ? '已恢复原亲本和布局，点击「重评布局」按当前目录与规则核对记录。' : ''
+        // 恢复提示要覆盖「只有目标、没有窝位」的草稿：否则目标卡会凭空出现、没有任何解释。
+        notice.value = draft.value.placements.length
+          ? '已恢复原亲本和布局，点击「重评布局」按当前目录与规则核对记录。'
+          : draft.value.goals.length
+            ? `已恢复上次保存的 ${draft.value.goals.length} 个培育目标；如需从空白开始，移除目标后点「保存草稿」。`
+            : ''
         if (draft.value.rule_version !== data.rule_version || draft.value.geometry_version !== data.geometry_version) notice.value = '规则版本已变化，原亲本和坐标保留；点击重评后按当前模拟规则重新分析。'
       } else {
         dirty.target = true; dirty.selected = true
@@ -148,7 +158,7 @@ export function useBreedingPlanner(host: PlannerHost) {
       dirty[entry] = false; edited[entry] = action === 'evaluate'
       if (action === 'solve') { originals[entry] = copy(data.plans); solvedInputs[entry] = inputKey; history[entry] = []; future[entry] = []; historyRevision.value++ }
     } catch (e) { if (ticket === generation) error.value = (e as Error).message }
-    finally { if (ticket === generation) busy.value = '' }
+    finally { if (ticket === generation) { busy.value = ''; if (unsaved.value) scheduleAutosave() } }
   }
   async function save() {
     const snapshot = body(), ticket = ++generation, entry = mode.value
@@ -159,8 +169,40 @@ export function useBreedingPlanner(host: PlannerHost) {
     } catch (e) { if (ticket === generation) { error.value = (e as Error).message; errorAction.value = 'save' } }
     finally { if (ticket === generation) busy.value = '' }
   }
+  /**
+   * 草稿改动后自动落盘：静默（不占 busy、不写提示条），
+   * 否则「移除目标 / 加目标」这类改动只在内存里，关掉软件再进来又变回原样。
+   */
+  function scheduleAutosave() {
+    if (autoTimer !== null) clearTimeout(autoTimer)
+    autoTimer = setTimeout(() => { autoTimer = null; void autosave() }, AUTOSAVE_DELAY)
+  }
+  async function autosave() {
+    if (autoSaving) { autoPending = true; return }
+    autoSaving = true
+    try {
+      do {
+        autoPending = false
+        if (busy.value || !context.value?.uid || !unsaved.value) return
+        const snapshot = body(), entry = mode.value, uid = context.value.uid
+        const response = await host.request('draft', snapshot)
+        // 被取消（切页/切号）或空响应不算已保存；期间 uid 变了也放弃这次结果。
+        if (!response || context.value?.uid !== uid) return
+        savedKeys[entry] = snapshotKey(snapshot)
+      } while (autoPending)
+    } catch (e) { error.value = (e as Error).message; errorAction.value = 'save' }
+    finally { autoSaving = false }
+  }
+  onScopeDispose(() => {
+    if (autoTimer === null) return
+    clearTimeout(autoTimer); autoTimer = null; void autosave()
+  })
   function changeMode(value: Mode) { pause(); mode.value = value; error.value = ''; notice.value = ''; void load() }
-  function pause() { generation++; host.cancel(); busy.value = '' }
+  function pause() {
+    generation++; host.cancel(); busy.value = ''
+    // 离开页面或切号前把待写的自动保存补一次。
+    if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null; void autosave() }
+  }
   function resetAccount() {
     pause(); suppress = true
     for (const entry of ['target', 'selected'] as const) {

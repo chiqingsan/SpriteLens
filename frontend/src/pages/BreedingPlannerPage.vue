@@ -27,7 +27,7 @@ const generationHint = computed(() => {
 const saveHint = computed(() => {
   if (!context.value?.uid) return '请先采集当前账号的背包资料'
   if (busy.value === 'saving') return '正在保存当前入口草稿…'
-  return unsaved.value ? '有未保存的修改' : ''
+  return unsaved.value ? '有未保存的修改，正在自动保存；也可点这里立即保存' : '当前入口草稿已保存'
 })
 const placedIds = computed(() => new Set(draft.value.placements.map(p => p.gid)))
 const selectedInPlan = computed(() => draft.value.selected.filter(gid => placedIds.value.has(gid)).length)

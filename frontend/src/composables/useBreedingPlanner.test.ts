@@ -17,6 +17,9 @@ function setup() {
   const scope = effectScope(), model = scope.run(() => useBreedingPlanner(host))!
   return { model, host, stop: () => scope.stop(), switchUid: () => { uid = 202 } }
 }
+// 自动保存是 400ms 防抖，测试等它落地；比防抖间隔留出余量。
+const AUTOSAVE_WAIT = 500
+const settle = (ms = AUTOSAVE_WAIT) => new Promise(resolve => setTimeout(resolve, ms))
 describe('配窝请求、恢复和编辑边界', () => {
   it('输入变化和切号使在途求解失效', async () => {
     const { model, host, stop, switchUid } = setup()
@@ -40,6 +43,46 @@ describe('配窝请求、恢复和编辑边界', () => {
     expect(model.draft.value.placements[0]?.gid).toBe('9223372036854775809')
     expect(model.dirty.target).toBe(true)
     expect(vi.mocked(host.request).mock.calls.map(c => c[0])).toEqual(['context', 'draft?mode=target', 'draft?mode=selected'])
+    stop()
+  })
+  it('恢复只有目标、没有窝位的草稿时也给出可见提示', async () => {
+    const { model, host, stop } = setup()
+    const draft = { ...model.draft.value, placements: [],
+      goals: [{ goal_id: 'goal-1', egg_key: '大耳帽兜#3121001', size_mark: '', voice_mark: '', nature_id: 0, priority: 0 }] }
+    vi.mocked(host.request).mockResolvedValueOnce(context()).mockResolvedValueOnce({ draft }).mockResolvedValueOnce({ draft: null })
+    await model.load()
+    expect(model.draft.value.goals.length).toBe(1)
+    expect(model.notice.value).toContain('已恢复上次保存的 1 个培育目标')
+    stop()
+  })
+  it('移除目标后自动落盘，不需要手动点保存草稿', async () => {
+    const { model, host, stop } = setup()
+    const draft = { ...model.draft.value, placements: [],
+      goals: [{ goal_id: 'goal-1', egg_key: '大耳帽兜#3121001', size_mark: '', voice_mark: '', nature_id: 0, priority: 0 }] }
+    vi.mocked(host.request).mockResolvedValueOnce(context()).mockResolvedValueOnce({ draft }).mockResolvedValueOnce({ draft: null })
+    await model.load()
+    expect(model.unsaved.value).toBe(false)
+    vi.mocked(host.request).mockClear()
+    model.draft.value.goals = []
+    expect(model.unsaved.value).toBe(true)
+    await settle()
+    const saved = vi.mocked(host.request).mock.calls.find(call => call[0] === 'draft')
+    expect(saved, '草稿改动后应自动写回').toBeTruthy()
+    expect((saved![1] as { goals: unknown[] }).goals).toEqual([])
+    expect(model.unsaved.value).toBe(false)
+    expect(model.notice.value).not.toContain('已保存')
+    expect(model.busy.value).toBe('')
+    stop()
+  })
+  it('自动保存失败时保留草稿并给出可重试的错误', async () => {
+    const { model, host, stop } = setup()
+    await model.load()
+    vi.mocked(host.request).mockRejectedValueOnce(new Error('磁盘只读'))
+    model.draft.value.capacity = 8
+    await settle()
+    expect(model.error.value).toBe('磁盘只读')
+    expect(model.errorAction.value).toBe('save')
+    expect(model.draft.value.capacity).toBe(8)
     stop()
   })
   it('重评保留备选和身份，撤销恢复坐标，保存失败保留草稿', async () => {
