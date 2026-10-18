@@ -1619,18 +1619,6 @@ dialog.planner-picker[open] {
   gap: var(--space-3);
   min-width: 0;
   min-height: 0;
-  position: relative; /* 浮层提示的定位基准 */
-}
-
-/* 信息提示改为浮层：出现与消失都不占流内高度，不会把画布与产物区顶下去。 */
-.planner-notice.is-toast {
-  position: absolute;
-  left: var(--space-5);
-  bottom: var(--space-5);
-  z-index: 3;
-  margin: 0;
-  max-width: min(420px, calc(100% - var(--space-6) * 2));
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
 }
 
 .planner-toolbar {

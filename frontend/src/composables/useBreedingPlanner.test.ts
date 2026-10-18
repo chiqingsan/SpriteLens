@@ -17,7 +17,7 @@ function setup() {
   const scope = effectScope(), model = scope.run(() => useBreedingPlanner(host))!
   return { model, host, stop: () => scope.stop(), switchUid: () => { uid = 202 } }
 }
-// 自动保存是 400ms 防抖，测试等它落地；比防抖间隔留出余量。
+// 自动保存是 150ms 防抖（失败重试会再等一轮），测试等它落地。
 const AUTOSAVE_WAIT = 500
 const settle = (ms = AUTOSAVE_WAIT) => new Promise(resolve => setTimeout(resolve, ms))
 describe('配窝请求、恢复和编辑边界', () => {
@@ -83,6 +83,32 @@ describe('配窝请求、恢复和编辑边界', () => {
     expect(model.error.value).toBe('磁盘只读')
     expect(model.errorAction.value).toBe('save')
     expect(model.draft.value.capacity).toBe(8)
+    stop()
+  })
+  it('自动保存请求被取消时重试，不把改动静默丢掉', async () => {
+    const { model, host, stop } = setup()
+    const draft = { ...model.draft.value, placements: [],
+      goals: [{ goal_id: 'goal-1', egg_key: '大耳帽兜#3121001', size_mark: '', voice_mark: '', nature_id: 0, priority: 0 }] }
+    vi.mocked(host.request).mockResolvedValueOnce(context()).mockResolvedValueOnce({ draft }).mockResolvedValueOnce({ draft: null })
+    await model.load()
+    vi.mocked(host.request).mockClear()
+    // host.cancel() 打断在途请求时的既有语义：request 解析为 null。
+    vi.mocked(host.request).mockResolvedValueOnce(null)
+    model.draft.value.goals = []
+    await settle()
+    const attempts = vi.mocked(host.request).mock.calls.filter(call => call[0] === 'draft')
+    expect(attempts.length, '被取消的自动保存必须重试，不能当作已保存').toBeGreaterThan(1)
+    expect(model.unsaved.value).toBe(false)
+    stop()
+  })
+  it('关窗（pagehide）时用 keepalive 请求兜底落盘', async () => {
+    const { model, host, stop } = setup()
+    await model.load()
+    const flush = vi.fn(() => true); host.flush = flush
+    model.draft.value.capacity = 9
+    window.dispatchEvent(new Event('pagehide'))
+    expect(flush).toHaveBeenCalledWith('draft', expect.objectContaining({ capacity: 9 }))
+    expect(model.unsaved.value).toBe(false)
     stop()
   })
   it('重评保留备选和身份，撤销恢复坐标，保存失败保留草稿', async () => {

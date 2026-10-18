@@ -4,6 +4,8 @@ import { parseContext, parseResult, parseSaved, type Draft, type Mode, type Plac
 export interface PlannerHost {
   request(path: string, body?: unknown): Promise<unknown | null>
   cancel(): void; context(): { uid: number | null; version: number; generation: number }; openPet(gid: string): void
+  /** 关窗兜底落盘：异步请求会随 WebView 关闭被丢弃，故用 keepalive 请求同步送出；返回是否已交给浏览器。 */
+  flush?(path: string, body: unknown): boolean
 }
 function empty(mode: Mode): Draft {
   return { mode, goals: [], selected: [], participation: 'best', capacity: 10, academy: false, placements: [], approved: [],
@@ -17,7 +19,10 @@ function snapshotKey(value: Draft) {
 }
 
 // 草稿改动后静默落盘的防抖间隔；取小值，避免「改完立刻关掉软件」时最后一次改动丢失。
-const AUTOSAVE_DELAY = 400
+const AUTOSAVE_DELAY = 150
+// 自动保存请求被取消时的有界重试次数。每次草稿改动都会 host.cancel() 在途请求，
+// 若把空响应当作「已保存」直接返回，改动会静默丢失（关掉软件再打开又变回原样）。
+const AUTOSAVE_RETRIES = 3
 
 export function useBreedingPlanner(host: PlannerHost) {
   const context = ref<PlannerContext | null>(null), mode = ref<Mode>('target')
@@ -32,7 +37,7 @@ export function useBreedingPlanner(host: PlannerHost) {
   const historyRevision = ref(0), busy = ref(''), error = ref(''), notice = ref(''), revision = ref(0), errorAction = ref<'' | 'save' | 'load'>('')
   const savedKeys = reactive<Record<Mode, string>>({ target: '', selected: '' })
   let generation = 0, loadedUid: number | null = null, suppress = false
-  let autoTimer: ReturnType<typeof setTimeout> | null = null, autoSaving = false, autoPending = false
+  let autoTimer: ReturnType<typeof setTimeout> | null = null, autoSaving = false, autoPending = false, autoRetry = 0
   const draft = computed(() => drafts[mode.value]), result = computed(() => results[mode.value])
   const plan = computed(() => result.value?.plans[active[mode.value]] || null)
   const parents = computed(() => new Map(context.value?.parents.map(p => [p.gid, p]) || []))
@@ -174,6 +179,7 @@ export function useBreedingPlanner(host: PlannerHost) {
    * 否则「移除目标 / 加目标」这类改动只在内存里，关掉软件再进来又变回原样。
    */
   function scheduleAutosave() {
+    autoRetry = 0
     if (autoTimer !== null) clearTimeout(autoTimer)
     autoTimer = setTimeout(() => { autoTimer = null; void autosave() }, AUTOSAVE_DELAY)
   }
@@ -186,16 +192,38 @@ export function useBreedingPlanner(host: PlannerHost) {
         if (busy.value || !context.value?.uid || !unsaved.value) return
         const snapshot = body(), entry = mode.value, uid = context.value.uid
         const response = await host.request('draft', snapshot)
-        // 被取消（切页/切号）或空响应不算已保存；期间 uid 变了也放弃这次结果。
-        if (!response || context.value?.uid !== uid) return
+        // 切号后放弃这次结果。
+        if (context.value?.uid !== uid) return
+        // 空响应＝请求被 host.cancel() 取消（草稿每次改动都会取消在途请求）。
+        // 不能就此当作已保存：有界重试，仍失败才提示手动保存，否则改动会静默丢失。
+        if (!response) {
+          if (autoRetry < AUTOSAVE_RETRIES) {
+            autoRetry++
+            if (autoTimer !== null) clearTimeout(autoTimer)
+            autoTimer = setTimeout(() => { autoTimer = null; void autosave() }, AUTOSAVE_DELAY)
+          } else {
+            error.value = '草稿自动保存被中断，请点「保存草稿」重试。'
+            errorAction.value = 'save'
+          }
+          return
+        }
+        autoRetry = 0
         savedKeys[entry] = snapshotKey(snapshot)
       } while (autoPending)
     } catch (e) { error.value = (e as Error).message; errorAction.value = 'save' }
     finally { autoSaving = false }
   }
+  /** 关窗兜底：异步请求会随 WebView 关闭被丢弃，改用 host.flush 的 keepalive 请求送出。 */
+  function flushOnHide() {
+    if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null }
+    if (!unsaved.value) return
+    const snapshot = body()
+    if (host.flush && host.flush('draft', snapshot)) savedKeys[mode.value] = snapshotKey(snapshot)
+  }
+  if (typeof window !== 'undefined') window.addEventListener('pagehide', flushOnHide)
   onScopeDispose(() => {
-    if (autoTimer === null) return
-    clearTimeout(autoTimer); autoTimer = null; void autosave()
+    if (typeof window !== 'undefined') window.removeEventListener('pagehide', flushOnHide)
+    if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null; void autosave() }
   })
   function changeMode(value: Mode) { pause(); mode.value = value; error.value = ''; notice.value = ''; void load() }
   function pause() {

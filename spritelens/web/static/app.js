@@ -42,6 +42,17 @@
     });
   }
 
+  // 关窗兜底：普通 fetch 会随 WebView 关闭被丢弃，用 keepalive 让浏览器把请求送出。
+  // 不能用 navigator.sendBeacon：它无法携带 X-Local-Token，会被服务端拒绝。
+  function flushBeacon(path, body) {
+    try {
+      fetch(path, { method: "POST", keepalive: true,
+        headers: { "X-Local-Token": TOKEN, "Content-Type": "application/json" },
+        body: JSON.stringify(body) }).catch(function () {});
+      return true;
+    } catch (e) { return false; }
+  }
+
   function query(params) {
     var parts = [];
     Object.keys(params).forEach(function (key) {
@@ -71,6 +82,8 @@
     request: function (path, body) { return accountRequests.request("planner", "/api/breeding-planner/" + path,
       body === undefined ? {} : { method: "POST", body: body }); },
     cancel: function () { accountRequests.cancel("planner"); },
+    // 关窗兜底：见 flushBeacon（keepalive 请求，能带本地令牌头）。
+    flush: function (path, body) { return flushBeacon("/api/breeding-planner/" + path, body); },
     context: function () { return accountRequests.petContext(); },
     openPet: function (gid) { petFilters.reset(); switchPage("pets", gid); }
   });
