@@ -160,6 +160,20 @@ describe('配窝请求、恢复和编辑边界', () => {
     expect(model.unsaved.value).toBe(false)
     stop()
   })
+  // 回归：页面首次渲染时（load 还没返回）就会读一次 unsaved，此时 restored 仍为 false。
+  // 若 unsaved 在这时短路掉对 drafts 的订阅，之后草稿怎么改都恒为 false：
+  // 保存按钮永久禁用、自动保存永不发出请求——真实链路就是这个症状（见 src/smoke/plannerApi.test.ts）。
+  it('首次渲染就读过未保存标记后，草稿改动仍能标记为未保存', async () => {
+    const { model, stop } = setup()
+    expect(model.unsaved.value).toBe(false)
+    await model.load()
+    expect(model.unsaved.value).toBe(false)
+    model.draft.value.capacity = 6
+    expect(model.unsaved.value).toBe(true)
+    model.draft.value.goals = []
+    expect(model.unsaved.value).toBe(true)
+    stop()
+  })
   it('保存成功后清除未保存标记，继续修改会重新标记', async () => {
     const { model, stop } = setup(); await model.load()
     expect(model.unsaved.value).toBe(false)

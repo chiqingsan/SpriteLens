@@ -33,7 +33,7 @@ export function useBreedingPlanner(host: PlannerHost) {
   const dirty = reactive({ target: false, selected: false }), edited = reactive({ target: false, selected: false })
   const history: Record<Mode, Placement[][]> = { target: [], selected: [] }, future: Record<Mode, Placement[][]> = { target: [], selected: [] }
   const solvedInputs: Record<Mode, string> = { target: '', selected: '' }
-  const restored = { target: false, selected: false }
+  const restored = reactive({ target: false, selected: false })
   const historyRevision = ref(0), busy = ref(''), error = ref(''), notice = ref(''), revision = ref(0), errorAction = ref<'' | 'save' | 'load'>('')
   const savedKeys = reactive<Record<Mode, string>>({ target: '', selected: '' })
   let generation = 0, loadedUid: number | null = null, suppress = false
@@ -45,7 +45,13 @@ export function useBreedingPlanner(host: PlannerHost) {
   const canUndo = computed(() => (historyRevision.value, history[mode.value].length > 0))
   const canRedo = computed(() => (historyRevision.value, future[mode.value].length > 0))
   const canRestore = computed(() => edited[mode.value] && !!originals[mode.value][active[mode.value]])
-  const unsaved = computed(() => !!context.value?.uid && restored[mode.value] && snapshotKey(drafts[mode.value]) !== savedKeys[mode.value])
+  // 注意：必须先读草稿再判断，否则组件首次渲染时（restored 还是 false）会短路掉对 drafts 的依赖，
+  // 此后草稿怎么改 unsaved 都恒为 false：保存按钮永久禁用、自动保存永不触发（改动全部只在内存里）。
+  const unsaved = computed(() => {
+    const key = snapshotKey(drafts[mode.value])
+    if (!context.value?.uid || !restored[mode.value]) return false
+    return key !== savedKeys[mode.value]
+  })
   watch(drafts, () => {
     if (suppress) return
     restored[mode.value] = true
@@ -78,8 +84,8 @@ export function useBreedingPlanner(host: PlannerHost) {
           const payload = saved as { draft: unknown; error?: string }
           if (payload.error) error.value = payload.error
           if (payload.draft) {
-            const restored = parseSaved(payload.draft)
-            suppress = true; drafts[entry] = copy(restored); suppress = false
+            const savedDraft = parseSaved(payload.draft)
+            suppress = true; drafts[entry] = copy(savedDraft); suppress = false
             dirty[entry] = true
           }
           restored[entry] = true
