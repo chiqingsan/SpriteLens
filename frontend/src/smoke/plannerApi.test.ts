@@ -97,6 +97,20 @@ describe.runIf(!!base)('配窝页真实 API 冒烟', () => {
     expect(seen.some(item => item.startsWith('POST')), '清除方案后必须发出落盘请求').toBe(true)
     const after = await api('/api/breeding-planner/draft?mode=target')
     expect(after.draft?.goals ?? [], '服务端草稿里的目标必须被清空').toEqual([])
+
+    // 容量卡（2026-10-18 改版）：图文卡片 + 学院绿窝开关 + 底部容量条，开关直接改变总容量。
+    const capacityTotal = () => (root.querySelector('.planner-capacity-total strong')?.textContent || '').trim()
+    const academySwitch = root.querySelector('.planner-capacity-academy input[type="checkbox"]') as HTMLInputElement | null
+    expect(root.querySelector('.planner-capacity-art'), '容量卡应有示意图位').toBeTruthy()
+    expect(academySwitch, '学院绿窝应是开关控件').toBeTruthy()
+    expect(capacityTotal()).toBe('10 窝')
+    academySwitch!.click()
+    await sleep(80)
+    expect(capacityTotal(), '打开学院绿窝后容量 +1').toBe('11 窝')
+    academySwitch!.click()
+    await sleep(80)
+    expect(capacityTotal(), '关闭后回到 10 窝').toBe('10 窝')
+
     mounted.unmount()
   })
 })

@@ -191,4 +191,14 @@
 <symbol id="star-filled" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
   <path d="m12 3 2.8 5.7 6.2 .9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2-4.5-4.4 6.2-.9z" />
 </symbol>
+<symbol id="graduation-cap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M2 8.5 12 4l10 4.5-10 4.5-10-4.5Z" />
+  <path d="M6 10.9V16c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5v-5.1" />
+  <path d="M21 9.6V14" />
+</symbol>
+<symbol id="sprout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 21v-8" />
+  <path d="M12 13c0-3.3 2.7-6 6-6 0 3.3-2.7 6-6 6Z" />
+  <path d="M12 15c0-2.8-2.2-5-5-5 0 2.8 2.2 5 5 5Z" />
+</symbol>
 </svg>

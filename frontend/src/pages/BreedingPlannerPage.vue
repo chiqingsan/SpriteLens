@@ -231,11 +231,23 @@ defineExpose({ load: model.load, pause, resetAccount })
       <header><span class="planner-sidebar-title-icon"><UiIcon :name="mode === 'target' ? 'flag' : 'users'" /></span><strong>{{ mode === 'target' ? '培育目标' : '参与精灵' }}</strong></header>
       <div class="planner-sidebar-scroll">
         <section class="planner-capacity">
-          <div>
-            <label>普通小窝 <select v-model.number="draft.capacity" aria-label="普通小窝数量"><option v-for="count in 11" :key="count" :value="count - 1">{{ count - 1 }} 个</option></select></label>
-            <label><input v-model="draft.academy" type="checkbox">学院绿窝 +1</label>
+          <div class="planner-capacity-main">
+            <span class="planner-capacity-art" aria-hidden="true"><UiIcon name="home" /></span>
+            <label class="planner-capacity-nests">
+              <span class="planner-capacity-label">普通小窝</span>
+              <select v-model.number="draft.capacity" aria-label="普通小窝数量"><option v-for="count in 11" :key="count" :value="count - 1">{{ count - 1 }} 个</option></select>
+            </label>
+            <label class="planner-capacity-academy">
+              <input v-model="draft.academy" type="checkbox" role="switch">
+              <span class="planner-switch" aria-hidden="true"><i /></span>
+              <span class="planner-capacity-label">学院绿窝 +1</span>
+              <UiIcon name="graduation-cap" />
+            </label>
           </div>
-          <small>本次规划容量 · {{ draft.capacity + Number(draft.academy) }} 窝</small>
+          <div class="planner-capacity-total">
+            <span class="planner-capacity-total-label"><UiIcon name="box" />本次规划容量</span>
+            <strong>{{ draft.capacity + Number(draft.academy) }} 窝<UiIcon name="sprout" /></strong>
+          </div>
         </section>
         <template v-if="mode === 'target'">
            <div class="planner-section-title"><strong>添加目标蛋</strong><small>点击添加 · 最多 30 个</small></div>

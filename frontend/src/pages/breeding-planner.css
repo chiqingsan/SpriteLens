@@ -928,51 +928,149 @@
   min-height: 320px;
 }
 
-/* 侧栏容量设置 */
-.planner-capacity { 
-  display: flex; 
-  flex-direction: column;
-  gap: var(--space-3); 
-  padding: var(--space-5);
+/* 侧栏容量设置：左示意图 + 普通小窝下拉 + 学院绿窝开关，底部一条「本次规划容量」大字。 */
+.planner-capacity {
+  display: grid;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: var(--radius-md); 
+  border-radius: var(--radius-lg);
   margin-bottom: var(--space-5);
+  background: var(--surface-1);
+}
+
+.planner-capacity-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-4) var(--space-5);
+}
+
+/* 示意图位：没有美术资源时用本地图标加浅绿底，保持图文卡片的分量 */
+.planner-capacity-art {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: var(--radius-md);
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+.planner-capacity-art .ui-icon { width: 26px; height: 26px; }
+
+.planner-capacity-nests {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.planner-capacity-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.planner-capacity-nests select {
+  width: auto;
+  min-width: 104px;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--fs-md);
+}
+
+.planner-capacity-academy {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+  border-left: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--teal-soft);
+  cursor: pointer;
+}
+
+.planner-capacity-academy .ui-icon { width: 18px; height: 18px; flex: none; color: var(--teal); }
+
+/* 真实 checkbox 只做视觉隐藏，保留键盘焦点与读屏状态（role=switch 由模板声明） */
+.planner-capacity-academy input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.planner-switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--surface-4);
+  transition: background-color var(--motion-fast) var(--motion-ease);
+}
+
+.planner-switch i {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--white);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .18);
+  transition: transform var(--motion-fast) var(--motion-ease);
+}
+
+.planner-capacity-academy input:checked + .planner-switch { background: var(--teal); }
+.planner-capacity-academy input:checked + .planner-switch i { transform: translateX(18px); }
+.planner-capacity-academy input:focus-visible + .planner-switch { box-shadow: 0 0 0 3px var(--teal-soft); }
+
+.planner-capacity-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--line-soft);
   background: var(--surface-2);
 }
 
-.planner-capacity > div {
-  display: flex;
+.planner-capacity-total-label {
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-
-.planner-capacity label { 
-  display: flex; 
-  align-items: center; 
-  gap: var(--space-2); 
+  gap: var(--space-2);
   font-size: var(--fs-sm);
-  color: var(--ink);
-  font-weight: 500;
-}
-
-.planner-capacity select {
-  min-width: 80px;
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--fs-sm);
-}
-
-.planner-capacity input[type="checkbox"] {
-  margin: 0;
-}
-
-.planner-capacity small { 
-  flex-basis: 100%;
   color: var(--muted);
-  font-size: var(--fs-xs);
-  padding-top: var(--space-2);
-  border-top: 1px dashed var(--line-soft);
 }
+
+.planner-capacity-total-label .ui-icon { width: 18px; height: 18px; flex: none; color: var(--teal); }
+
+.planner-capacity-total strong {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.planner-capacity-total strong .ui-icon { width: 18px; height: 18px; flex: none; color: var(--teal); }
 
 .planner-search { 
   width: 100%; 
@@ -2029,8 +2127,20 @@ dialog.planner-picker[open] {
 }
 
 .planner-capacity {
-  padding: var(--space-4);
   border-radius: var(--radius-md);
+}
+
+.planner-capacity-main {
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.planner-capacity-academy {
+  padding-left: var(--space-4);
+}
+
+.planner-capacity-total {
+  padding: var(--space-2) var(--space-4);
 }
 
 .planner-goal-editor {
