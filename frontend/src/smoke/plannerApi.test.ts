@@ -83,9 +83,9 @@ describe.runIf(!!base)('配窝页真实 API 冒烟', () => {
     await sleep(900)
     probe('clear+1100')
     if (!seen.some(item => item.startsWith('POST'))) {
-      const capacity = root.querySelector('.planner-capacity select') as HTMLSelectElement | null
-      console.log('[probe] 没有发生 POST，改容量触发一次：', !!capacity)
-      if (capacity) { capacity.value = '9'; capacity.dispatchEvent(new Event('change', { bubbles: true })) }
+      const increment = root.querySelector('.planner-stepper button:last-of-type') as HTMLButtonElement | null
+      console.log('[probe] 没有发生 POST，改容量触发一次：', !!increment)
+      increment?.click()
       await sleep(900)
       probe('capacity+900')
     }
@@ -98,17 +98,29 @@ describe.runIf(!!base)('配窝页真实 API 冒烟', () => {
     const after = await api('/api/breeding-planner/draft?mode=target')
     expect(after.draft?.goals ?? [], '服务端草稿里的目标必须被清空').toEqual([])
 
-    // 容量卡（2026-10-18 改版）：图文卡片 + 学院绿窝开关 + 底部容量条，开关直接改变总容量。
+    // 容量卡（2026-10-18 改版）：图文卡片 + 计数步进器 + 学院绿窝勾选框 + 底部容量条。
     const capacityTotal = () => (root.querySelector('.planner-capacity-total strong')?.textContent || '').trim()
-    const academySwitch = root.querySelector('.planner-capacity-academy input[type="checkbox"]') as HTMLInputElement | null
+    const stepperValue = () => (root.querySelector('.planner-stepper-value')?.textContent || '').trim()
+    const [minus, plus] = [...root.querySelectorAll<HTMLButtonElement>('.planner-stepper button')]
+    const academyCheck = root.querySelector('.planner-capacity-academy input[type="checkbox"]') as HTMLInputElement | null
     expect(root.querySelector('.planner-capacity-art'), '容量卡应有示意图位').toBeTruthy()
-    expect(academySwitch, '学院绿窝应是开关控件').toBeTruthy()
+    expect(academyCheck, '学院绿窝应是勾选框').toBeTruthy()
+    expect(stepperValue(), '计数器显示普通小窝数量').toBe('10')
+    expect(plus?.disabled, '普通小窝上限 10，+ 应禁用').toBe(true)
+    minus?.click()
+    await sleep(60)
+    expect(stepperValue()).toBe('9')
+    expect(capacityTotal(), '减少普通小窝后容量条同步').toBe('9 窝')
+    expect(plus?.disabled, '未到上限时 + 可用').toBe(false)
+    plus?.click()
+    await sleep(60)
+    expect(stepperValue()).toBe('10')
     expect(capacityTotal()).toBe('10 窝')
-    academySwitch!.click()
-    await sleep(80)
+    academyCheck!.click()
+    await sleep(60)
     expect(capacityTotal(), '打开学院绿窝后容量 +1').toBe('11 窝')
-    academySwitch!.click()
-    await sleep(80)
+    academyCheck!.click()
+    await sleep(60)
     expect(capacityTotal(), '关闭后回到 10 窝').toBe('10 窝')
 
     mounted.unmount()

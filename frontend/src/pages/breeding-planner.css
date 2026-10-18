@@ -952,15 +952,15 @@
 .planner-capacity-art {
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   flex: none;
   border-radius: var(--radius-md);
   background: var(--teal-soft);
   color: var(--teal);
 }
 
-.planner-capacity-art .ui-icon { width: 26px; height: 26px; }
+.planner-capacity-art .ui-icon { width: 22px; height: 22px; }
 
 .planner-capacity-nests {
   display: flex;
@@ -980,29 +980,55 @@
   color: var(--ink);
 }
 
-.planner-capacity-nests select {
-  width: auto;
-  min-width: 104px;
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--fs-md);
+/* 计数步进器：− / 数字 / +，上限 10 与学院绿窝的 +1 分开表达 */
+.planner-stepper {
+  display: inline-flex;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+
+.planner-stepper button {
+  width: 30px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--fs-lg);
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+}
+
+.planner-stepper button:hover:not(:disabled) { background: var(--surface-2); }
+.planner-stepper button:disabled { color: var(--muted); cursor: not-allowed; }
+
+.planner-stepper-value {
+  display: grid;
+  place-items: center;
+  min-width: 42px;
+  padding: var(--space-2) 0;
+  border-left: 1px solid var(--line-soft);
+  border-right: 1px solid var(--line-soft);
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .planner-capacity-academy {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
   flex: 0 0 auto;
   margin-left: auto;
-  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+  padding-left: var(--space-3);
   border-left: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--teal-soft);
   cursor: pointer;
 }
 
-.planner-capacity-academy .ui-icon { width: 18px; height: 18px; flex: none; color: var(--teal); }
-
-/* 真实 checkbox 只做视觉隐藏，保留键盘焦点与读屏状态（role=switch 由模板声明） */
+/* 真实 checkbox 只做视觉隐藏，保留键盘焦点与读屏状态；勾选外观由 .planner-check 绘制 */
 .planner-capacity-academy input {
   position: absolute;
   width: 1px;
@@ -1014,31 +1040,52 @@
   clip-path: inset(50%);
 }
 
-.planner-switch {
+.planner-check {
   position: relative;
-  width: 40px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   flex: none;
-  border-radius: 999px;
-  background: var(--surface-4);
-  transition: background-color var(--motion-fast) var(--motion-ease);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  transition: background-color var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease);
 }
 
-.planner-switch i {
+.planner-check::after {
+  content: '';
   position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--white);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, .18);
-  transition: transform var(--motion-fast) var(--motion-ease);
+  top: 2px;
+  left: 6px;
+  width: 5px;
+  height: 10px;
+  border: solid var(--white);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  opacity: 0;
 }
 
-.planner-capacity-academy input:checked + .planner-switch { background: var(--teal); }
-.planner-capacity-academy input:checked + .planner-switch i { transform: translateX(18px); }
-.planner-capacity-academy input:focus-visible + .planner-switch { box-shadow: 0 0 0 3px var(--teal-soft); }
+.planner-capacity-academy input:checked + .planner-check { background: var(--teal); border-color: var(--teal); }
+.planner-capacity-academy input:checked + .planner-check::after { opacity: 1; }
+.planner-capacity-academy input:focus-visible + .planner-check { box-shadow: 0 0 0 3px var(--teal-soft); }
+
+.planner-capacity-cap {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+.planner-capacity-cap .ui-icon { width: 14px; height: 14px; }
+
+/* ≤1200px 视口时侧栏收到 340px：让装饰性的毕业帽让位，保证容量卡仍是一行，
+   避免勾选框掉到第二行造成高度跳动。 */
+@media (max-width: 1200px) {
+  .planner-capacity-cap { display: none; }
+}
 
 .planner-capacity-total {
   display: flex;

@@ -233,15 +233,19 @@ defineExpose({ load: model.load, pause, resetAccount })
         <section class="planner-capacity">
           <div class="planner-capacity-main">
             <span class="planner-capacity-art" aria-hidden="true"><UiIcon name="home" /></span>
-            <label class="planner-capacity-nests">
-              <span class="planner-capacity-label">普通小窝</span>
-              <select v-model.number="draft.capacity" aria-label="普通小窝数量"><option v-for="count in 11" :key="count" :value="count - 1">{{ count - 1 }} 个</option></select>
-            </label>
+            <div class="planner-capacity-nests">
+              <span id="planner-nest-count-label" class="planner-capacity-label">普通小窝</span>
+              <span class="planner-stepper" role="group" aria-labelledby="planner-nest-count-label">
+                <button type="button" :disabled="draft.capacity <= 0" aria-label="减少普通小窝" @click="draft.capacity = Math.max(0, draft.capacity - 1)">−</button>
+                <output class="planner-stepper-value" aria-live="polite">{{ draft.capacity }}</output>
+                <button type="button" :disabled="draft.capacity >= 10" aria-label="增加普通小窝" @click="draft.capacity = Math.min(10, draft.capacity + 1)">+</button>
+              </span>
+            </div>
             <label class="planner-capacity-academy">
-              <input v-model="draft.academy" type="checkbox" role="switch">
-              <span class="planner-switch" aria-hidden="true"><i /></span>
+              <input v-model="draft.academy" type="checkbox">
+              <span class="planner-check" aria-hidden="true" />
               <span class="planner-capacity-label">学院绿窝 +1</span>
-              <UiIcon name="graduation-cap" />
+              <span class="planner-capacity-cap" aria-hidden="true"><UiIcon name="graduation-cap" /></span>
             </label>
           </div>
           <div class="planner-capacity-total">
