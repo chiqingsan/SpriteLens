@@ -226,10 +226,10 @@ export function useBreedingPlanner(host: PlannerHost) {
     if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null; void autosave() }
   })
   function changeMode(value: Mode) { pause(); mode.value = value; error.value = ''; notice.value = ''; void load() }
-  function pause() {
+  /** 暂停当前入口；flush 为真时把待写的自动保存补一次（清空方案时先清空再落盘，不写旧草稿）。 */
+  function pause(flush = true) {
     generation++; host.cancel(); busy.value = ''
-    // 离开页面或切号前把待写的自动保存补一次。
-    if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null; void autosave() }
+    if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null; if (flush) void autosave() }
   }
   function resetAccount() {
     pause(); suppress = true
@@ -271,10 +271,14 @@ export function useBreedingPlanner(host: PlannerHost) {
     }
     edit(original.placements)
   }
+  /** 清除方案：清空画布预览与培育目标（自选模式保留参与精灵），并把清空结果落盘。 */
   function clearPlan() {
-    pause()
+    pause(false)
+    const cleared = drafts[mode.value]
     suppress = true
-    drafts[mode.value].placements = []
+    cleared.placements = []
+    cleared.goals = []
+    cleared.approved = []
     results[mode.value] = null
     active[mode.value] = 0
     dirty[mode.value] = false
@@ -286,9 +290,10 @@ export function useBreedingPlanner(host: PlannerHost) {
     suppress = false
     historyRevision.value++
     revision.value++
-    notice.value = ''
+    notice.value = mode.value === 'target' ? '已清除当前方案与培育目标。' : '已清除当前方案。'
     error.value = ''
     errorAction.value = ''
+    scheduleAutosave()
   }
   return { context, mode, draft, result, plan, parents, dirty, edited, busy, error, errorAction, notice, revision, unsaved,
     canGenerate, canUndo, canRedo, canRestore, load, refresh, run, save, changeMode, pause, resetAccount, edit, undo, choosePlan, restorePlan, clearPlan }

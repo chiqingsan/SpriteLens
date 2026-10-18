@@ -134,18 +134,30 @@ describe('配窝请求、恢复和编辑边界', () => {
     expect(() => parseResult({ ...result(1), plans: [{ ...result(1).plans[0], placements: [{ gid: 1 }] }] })).toThrow()
     stop()
   })
-  it('清除当前方案并保留培育配置', async () => {
-    const { model, host, stop } = setup(); await model.load()
-    model.draft.value.goals = [{ goal_id: 'goal-1', egg_key: 'egg-a', size_mark: '', voice_mark: '', nature_id: 0, priority: false }]
-    model.draft.value.placements = positions
-    vi.mocked(host.request).mockImplementation(async (_path, body) => result((body as { revision: number }).revision))
-    await model.run('solve')
+  it('清除方案清空预览与培育目标，并把清空结果落盘', async () => {
+    const { model, host, stop } = setup()
+    const goal = { goal_id: 'goal-1', egg_key: 'egg-a', size_mark: '', voice_mark: '', nature_id: 0, priority: false }
+    vi.mocked(host.request).mockImplementation(async path => path === 'context' ? context(101)
+      : path === 'draft?mode=target'
+        ? { uid: 101, version: 1, draft: { ...model.draft.value, goals: [goal], placements: positions } }
+        : { uid: 101, version: 1, draft: null })
+    await model.load()
+    expect(model.draft.value.goals).toHaveLength(1)
+    expect(model.unsaved.value).toBe(false)
+    vi.mocked(host.request).mockClear()
+    vi.mocked(host.request).mockImplementation(async () => ({ uid: 101, version: 1, draft: null }))
     model.clearPlan()
     expect(model.draft.value.placements).toEqual([])
+    expect(model.draft.value.goals).toEqual([])
     expect(model.result.value).toBeNull()
-    expect(model.draft.value.goals).toHaveLength(1)
     expect(model.draft.value.capacity).toBe(10)
     expect(model.dirty.target).toBe(false)
+    expect(model.notice.value).toContain('已清除当前方案与培育目标')
+    await settle(300)
+    const drafts = vi.mocked(host.request).mock.calls.filter(call => call[0] === 'draft')
+    expect(drafts.length, '清除方案必须落盘，否则重启后目标蛋又回来').toBeGreaterThan(0)
+    expect((drafts[drafts.length - 1]![1] as { goals: unknown[] }).goals).toEqual([])
+    expect(model.unsaved.value).toBe(false)
     stop()
   })
   it('保存成功后清除未保存标记，继续修改会重新标记', async () => {

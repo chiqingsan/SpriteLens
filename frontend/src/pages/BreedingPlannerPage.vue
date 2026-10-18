@@ -186,7 +186,7 @@ defineExpose({ load: model.load, pause, resetAccount })
       <div class="planner-toolbar-actions">
         <button class="ghost-button" :disabled="!!busy || !context?.uid || !unsaved" :title="saveHint" @click="model.save"><span>保存草稿</span></button>
         <div class="planner-generate"><button class="planner-primary primary-button" :disabled="!model.canGenerate.value" :title="generationHint" @click="model.run('solve')"><UiIcon name="arrows-shuffle" /><span>{{ busy === 'solve' ? '正在规划' : plan ? '重新规划' : '生成方案' }}</span></button></div>
-        <button class="ghost-button" :disabled="!!busy || !draft.placements.length" @click="model.clearPlan"><UiIcon name="trash" /><span>清除方案</span></button>
+        <button class="ghost-button" :disabled="!!busy || (!draft.placements.length && !draft.goals.length && !draft.approved.length)" title="清除方案：清空画布上的窝位；按目标配窝时同时清空培育目标" @click="model.clearPlan"><UiIcon name="trash" /><span>清除方案</span></button>
       </div>
     </header>
     <div v-if="error" class="planner-notice is-error" role="alert"><UiIcon name="alert-circle" />{{ error }}<button class="breeder-detail-link" :disabled="!!busy" @click="errorAction === 'save' ? model.save() : model.refresh()">{{ errorAction === 'save' ? '重试保存' : '刷新资料' }}</button></div>
