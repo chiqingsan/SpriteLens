@@ -23,7 +23,7 @@ export interface Plan {
   edges: Array<{ male: string; female: string; marks: string[]; groups: string[]; nature: NatureReference }>
   mothers: Array<{ gid: string; egg_key: string | null; fathers: string[]; references: TargetReference[]; primary_goal_id: string; nature: NatureReference }>
   goals: Array<{ goal_id: string; covered: boolean; exact_mothers: number; mother_count: number; shared_mothers: number; ready: boolean; reason: string }>
-  metrics: { males?: number; females?: number; effective_mothers?: number; unused_slots?: number }
+  metrics: { males?: number; females?: number; effective_mothers?: number; gender_gap?: number; same_chain?: number; academy_nature_matches?: number; unused_slots?: number }
   unused_candidates: Array<{ gid: string; reason: string }>
 }
 export interface Iteration {

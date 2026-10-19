@@ -46,22 +46,29 @@ describe('小窝布局草图', () => {
     expect(canvas({ pending: true }).get('.planner-canvas-caption').text()).toContain('正在重新评估')
     expect(canvas({ plan: null }).get('.planner-canvas-caption').text()).toContain('拖动窝位可移到空位')
   })
-  it('方向键按 2 格移动，重叠和长按连发都不提交', async () => {
+  it('方向键不再移动窝位，Enter 仍可选择亲本', async () => {
     const wrapper = canvas()
     await nests(wrapper)[1]!.trigger('keydown', { key: 'ArrowRight' })
-    expect(wrapper.emitted('move')).toEqual([['2', 4, 0, null]])
-    await nests(wrapper)[3]!.trigger('keydown', { key: 'ArrowLeft' })
-    expect(wrapper.emitted('move')).toHaveLength(1)
-    expect(wrapper.get('.planner-warning').text()).toContain('重叠')
-    await nests(wrapper)[1]!.trigger('keydown', { key: 'ArrowRight', repeat: true })
-    expect(wrapper.emitted('move')).toHaveLength(1)
-  })
-  it('锁定位置的窝位不响应方向键，Enter 用于选择亲本', async () => {
-    const wrapper = canvas({ positions: [nest('1', 0, 0), nest('2', 2, 0), nest('3', 6, 0), nest('4', 8, 0, 'normal', 'position')] })
+    expect(wrapper.emitted('move')).toBeUndefined()
     await nests(wrapper)[3]!.trigger('keydown', { key: 'ArrowLeft' })
     expect(wrapper.emitted('move')).toBeUndefined()
     await nests(wrapper)[1]!.trigger('keydown', { key: 'Enter' })
     expect(wrapper.emitted('select')).toEqual([['2']])
+  })
+  it('位于原点的窝位可以继续拖到负坐标', async () => {
+    const wrapper = canvas({ plan: null, positions: [nest('1', 0, 0)] })
+    const nestElement = nests(wrapper)[0]!.element as SVGElement
+    const svg = wrapper.get('svg').element as SVGSVGElement
+    Object.defineProperty(nestElement, 'setPointerCapture', { value: () => {} })
+    Object.defineProperty(nestElement, 'ownerSVGElement', { value: svg })
+    Object.defineProperty(svg, 'getBoundingClientRect', { value: () => ({ left: 0, top: 0, width: 400, height: 400 }) })
+    nestElement.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 200, clientY: 200 }))
+    nestElement.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: -10, clientY: -10 }))
+    nestElement.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }))
+    const move = wrapper.emitted('move')?.[0]
+    expect(move?.[0]).toBe('1')
+    expect(move?.[1]).toBeLessThan(0)
+    expect(move?.[2]).toBeLessThan(0)
   })
   it('窝群始终在画布中间且足够大，不贴左上角（验收项）', () => {
     const [x, y, size] = viewBox(canvas())

@@ -14,6 +14,8 @@ const model = useBreedingPlanner(props.host)
 const { context, mode, draft, plan, result, busy, error, errorAction, notice, parents, dirty, unsaved } = model
 const selected = ref(''), picker = ref<HTMLDialogElement | null>(null), pickerSearch = ref<HTMLInputElement | null>(null), pickerKind = ref<'pool' | 'replace' | 'add'>('pool')
 const search = ref(''), gender = ref(''), nature = ref(''), group = ref(''), medal = ref(''), page = ref(1), eggSearch = ref('')
+const editingGoalIds = ref(new Set<string>())
+const expandedOutcomeIds = ref(new Set<string>())
 const iterationPage = ref(1), unusedPage = ref(1)
 const selectedPage = ref(1)
 const outcomes = ref<HTMLElement | null>(null)
@@ -39,10 +41,17 @@ const placementCounts = computed(() => draft.value.placements.reduce((counts, po
 }, { males: 0, females: 0 }))
 const goalSummary = (goal: Goal) => [goal.size_mark, goal.voice_mark, context.value?.natures.find(n => n.id === goal.nature_id)?.name, goal.priority ? '优先' : ''].filter(Boolean).join(' · ') || '奖牌、性格不限'
 watch(mode, () => { selected.value = '' })
-function changeGoal(goal: Goal, eggKey: string) {
-  goal.egg_key = eggKey
-  draft.value.approved = draft.value.approved.filter(key => !key.startsWith(`${goal.goal_id}:`))
-  notice.value = '目标蛋已更换，奖牌、性格和优先级保留；原迭代选择已清除，请重新规划。'
+function toggleGoalEditor(goalId: string) {
+  const next = new Set(editingGoalIds.value)
+  if (next.has(goalId)) next.delete(goalId)
+  else next.add(goalId)
+  editingGoalIds.value = next
+}
+function toggleOutcome(gid: string) {
+  const next = new Set(expandedOutcomeIds.value)
+  if (next.has(gid)) next.delete(gid)
+  else next.add(gid)
+  expandedOutcomeIds.value = next
 }
 const selectedPages = computed(() => Math.max(1, Math.ceil(draft.value.selected.length / 24)))
 const currentSelectedPage = computed(() => Math.min(selectedPage.value, selectedPages.value))
@@ -54,11 +63,15 @@ const iterationRows = computed(() => relevantIterations.value.slice((currentIter
 const unusedPages = computed(() => Math.max(1, Math.ceil((plan.value?.unused_candidates.length || 0) / 24)))
 const currentUnusedPage = computed(() => Math.min(unusedPage.value, unusedPages.value))
 const unusedRows = computed(() => plan.value?.unused_candidates.slice((currentUnusedPage.value - 1) * 24, currentUnusedPage.value * 24) || [])
+const outcomeColumns = computed(() => [
+  plan.value?.mothers.filter((_, index) => index % 2 === 0) || [],
+  plan.value?.mothers.filter((_, index) => index % 2 === 1) || [],
+].filter(column => column.length))
 const selectedParent = computed(() => parents.value.get(selected.value))
 const selectedPosition = computed(() => draft.value.placements.find(p => p.gid === selected.value))
 const eggName = (key: string | null) => context.value?.eggs.find(e => e.egg_key === key)?.name || '蛋种资料待补'
 const parentName = (gid: string) => parents.value.get(gid)?.name || `个体 ${gid}`
-const markOutcomes = (gid: string) => Array.from(new Map((plan.value?.edges.filter(e => e.female === gid) || []).map(edge => [edge.marks.join('＋'), edge.marks] as [string, string[]])).values())
+const outcomeEdges = (gid: string) => plan.value?.edges.filter(edge => edge.female === gid) || []
 const percent = (value: number | null | undefined) => value === null || value === undefined ? '未知' : `${Math.round(value * 100)}%`
 const statusName: Record<string, string> = { ready: '规划参考就绪', partial: '部分支持', no_plan: '暂未形成有效配对', invalid: '存在布局冲突' }
 const kindName: Record<string, string> = { exact: '合格组合', iterative: '迭代参考', unknown: '资料待补' }
@@ -92,6 +105,9 @@ function addGoal(eggKey: string) {
 }
 function removeGoal(id: string) {
   draft.value.goals = draft.value.goals.filter(g => g.goal_id !== id)
+  const next = new Set(editingGoalIds.value)
+  next.delete(id)
+  editingGoalIds.value = next
   draft.value.placements.forEach(p => { if (p.primary_goal_id === id) p.primary_goal_id = '' })
   draft.value.approved = draft.value.approved.filter(key => !key.startsWith(`${id}:`))
 }
@@ -120,15 +136,20 @@ function choose(gid: string) {
   if (pickerKind.value === 'replace') {
     const old = selectedPosition.value
     if (!old || old.lock) { error.value = '请先解除该亲本的锁定。'; return }
+    if (old.kind === 'academy' && parents.value.get(gid)?.gender !== 2) { error.value = '学院绿窝只能放置母本，请选择母本。'; return }
     positions = positions.map(p => p.gid === old.gid ? { ...p, gid, primary_goal_id: '' } : p)
     if (mode.value === 'selected') draft.value.selected = draft.value.selected.map(id => id === old.gid ? gid : id)
   } else {
     const normal = positions.filter(p => p.kind === 'normal').length
     const kind = normal < draft.value.capacity ? 'normal' : draft.value.academy && !positions.some(p => p.kind === 'academy') ? 'academy' : null
     if (!kind) { error.value = '当前小窝容量已满，请先移出精灵或增加容量。'; return }
-    const x = Math.max(-2, ...positions.map(p => p.x)) + 2
-    if (x > 18) { error.value = '固定画布右侧已满，请先移出精灵或重新规划。'; return }
-    positions.push({ gid, x, y: 0, kind, lock: '', primary_goal_id: '' })
+    if (kind === 'academy' && parents.value.get(gid)?.gender !== 2) { error.value = '学院绿窝只能放置母本，请选择母本。'; return }
+    const slot = Array.from({ length: 100 }, (_, index) => [index % 10 * 2, Math.floor(index / 10) * 2] as [number, number])
+      .sort((a, b) => Math.hypot(a[0] + 1 - 10, a[1] + 1 - 10) - Math.hypot(b[0] + 1 - 10, b[1] + 1 - 10))
+      .find(([x, y]) => !positions.some(p => Math.abs(p.x - x) < 2 && Math.abs(p.y - y) < 2))
+    if (!slot) { error.value = '画布内没有可用窝位，请先移出精灵或重新规划。'; return }
+    const [x, y] = slot
+    positions.push({ gid, x, y, kind, lock: '', primary_goal_id: '' })
   }
   if (mode.value === 'selected' && !draft.value.selected.includes(gid)) draft.value.selected.push(gid)
   selected.value = gid; closePicker(); model.edit(positions)
@@ -157,6 +178,11 @@ function moveNest(gid: string, x: number, y: number, targetGid: string | null) {
   }
   if (!second && first.x === x && first.y === y) return
   if (second) {
+    const academyGid = first.kind === 'academy' ? second.gid : second.kind === 'academy' ? first.gid : ''
+    if (academyGid && parents.value.get(academyGid)?.gender !== 2) {
+      error.value = '学院绿窝只能放置母本，不能与父本交换。'
+      return
+    }
     model.edit(draft.value.placements.map(p => p.gid === first.gid ? { ...p, x: second.x, y: second.y, kind: second.kind }
       : p.gid === second.gid ? { ...p, x: first.x, y: first.y, kind: first.kind } : { ...p }))
     notice.value = `已交换 ${parentName(first.gid)} 与 ${parentName(second.gid)} 的窝位，正在重新评估布局。`
@@ -192,11 +218,10 @@ defineExpose({ load: model.load, pause, resetAccount })
     <div v-if="error" class="planner-notice is-error" role="alert"><UiIcon name="alert-circle" />{{ error }}<button class="breeder-detail-link" :disabled="!!busy" @click="errorAction === 'save' ? model.save() : model.refresh()">{{ errorAction === 'save' ? '重试保存' : '刷新资料' }}</button></div>
     <div v-if="notice" class="planner-notice is-info" role="status"><UiIcon name="info-circle" />{{ notice }}</div>
     <main class="planner-main panel">
-      <div class="planner-status" role="status"><span>{{ context?.source === 'history' ? '历史观察背包' : '当前账号已观察背包' }} · {{ context?.pet_count ?? '—' }} 只</span><span v-if="busy">{{ { loading: '正在读取资料', evaluate: '正在重评布局', saving: '正在保存', solve: '正在选择亲本与摆位' }[busy] }}</span><button v-else-if="dirty[mode]" class="planner-status-action planner-warning" :disabled="!!busy" @click="model.run('evaluate')">待重新评估 · 点击重评</button><span v-else>{{ statusName[plan?.status || result?.status || ''] || '尚未生成方案' }}</span><span v-if="plan" class="planner-status-progress">{{ mode === 'target' ? `目标就绪 ${plan.goals.filter(g => g.ready).length} / ${draft.goals.length}` : `${plan.edges.length} 组配对` }}</span></div>
+      <div class="planner-status" role="status"><span class="planner-status-account"><span>{{ context?.source === 'history' ? '历史观察背包' : '当前账号已观察背包' }} · {{ context?.pet_count ?? '—' }} 只</span><span class="planner-status-eligible" title="传说精灵、迪莫、通行证精灵、活动精灵等不可生蛋精灵不会计入此数量">可参与配窝 {{ context?.available ? context.parents.length : '—' }} 只</span></span><span v-if="busy">{{ { loading: '正在读取资料', evaluate: '正在重评布局', saving: '正在保存', solve: '正在选择亲本与摆位' }[busy] }}</span><button v-else-if="dirty[mode]" class="planner-status-action planner-warning" :disabled="!!busy" @click="model.run('evaluate')">待重新评估 · 点击重评</button><span v-else>{{ statusName[plan?.status || result?.status || ''] || '尚未生成方案' }}</span><span v-if="plan" class="planner-status-progress">{{ mode === 'target' ? `目标就绪 ${plan.goals.filter(g => g.ready).length} / ${draft.goals.length}` : `${plan.edges.length} 组配对` }}</span></div>
       <div class="planner-scroll">
          <div class="planner-layout-heading"><div><strong>小窝布局</strong><small>{{ mode === 'target' ? '按培育条件选择亲本与窝位' : '分析所选精灵的配对关系与产物' }}</small></div><div v-if="draft.placements.length" class="planner-actions"><button class="ghost-button" :disabled="!!busy || !model.canUndo.value" title="撤销上一次窝位调整" @click="model.undo()">撤销</button><button class="ghost-button" :disabled="!!busy || !model.canRedo.value" title="重做被撤销的窝位调整" @click="model.undo(true)">重做</button><button v-if="model.canRestore.value" class="ghost-button" :disabled="!!busy" @click="model.restorePlan">恢复方案</button><button class="ghost-button" :disabled="!!busy" @click="model.run('evaluate')">重评布局</button><button class="ghost-button" :disabled="!context?.available || !!busy || mode === 'target' && !draft.goals.length" @click="showPicker('add')">补充布局亲本</button></div></div>
          <div v-if="plan || draft.placements.length" class="planner-summary" :class="{ 'is-stale': dirty[mode] }" aria-label="当前方案摘要"><div><small>当前入住亲本</small><strong>{{ placementCounts.males }} 父 / {{ placementCounts.females }} 母</strong></div><div><small>有配对的母本</small><strong>{{ plan ? `${plan.metrics.effective_mothers ?? 0} 只` : '待评估' }}</strong></div><div><small>{{ mode === 'target' ? '目标进度' : '配对关系' }}</small><strong>{{ plan ? mode === 'target' ? `${plan.goals.filter(g => g.ready).length} / ${draft.goals.length} 就绪` : `${plan.edges.length} 组` : mode === 'target' ? `${draft.goals.length} 项待评估` : '待评估' }}</strong></div><button v-if="plan" class="breeder-detail-link" @click="outcomes?.scrollIntoView({ block: 'start', behavior: 'smooth' })">{{ dirty[mode] ? '上次结果 · 待更新' : '查看产物详情 ↓' }}</button></div>
-         <div v-if="result && result.plans.length > 1" class="planner-alternatives"><button v-for="(candidate, index) in result.plans" :key="candidate.plan_id" class="chip" :class="{ active: candidate === plan }" :aria-pressed="candidate === plan" :disabled="!!busy" @click="selected = ''; model.choosePlan(index)">{{ candidate.plan_id === 'previous' ? '原方案 · 对照' : `方案 ${index + 1}` }}<small>{{ candidate.metrics.males ?? 0 }} 父 / {{ candidate.metrics.females ?? 0 }} 母 · {{ candidate.edges.length }} 组配对<span v-if="mode === 'target'"> · {{ candidate.goals.filter(g => g.ready).length }} 目标就绪</span></small></button><span title="在有限搜索范围内比较候选，不保证全局最优">搜索范围内推荐 ⓘ</span></div>
          <BreedingCanvas v-if="draft.placements.length" :positions="draft.placements" :parents="parents" :plan="plan" :selected="selected" :pending="dirty[mode] || busy === 'evaluate'" @select="selected = $event" @move="moveNest" />
          <div v-else class="planner-empty planner-start"><UiIcon name="egg" /><strong>{{ mode === 'target' ? '从培育目标开始规划' : '选择精灵，分析配窝方案' }}</strong><p>{{ mode === 'target' ? '在右侧添加目标蛋，按需设置奖牌与性格，再生成方案。' : '在右侧选择参与精灵，确认参与方式与小窝容量，再生成方案。' }}</p><small>① {{ mode === 'target' ? '添加目标' : '选择精灵' }}　→　② 确认条件　→　③ 生成方案</small></div>
         <section v-if="selectedPosition" class="planner-resident">
@@ -214,12 +239,47 @@ defineExpose({ load: model.load, pause, resetAccount })
           </div>
            <div v-if="mode === 'target' && plan?.status === 'no_plan' && draft.goals.some(g => !motherCounts.get(g.egg_key))" class="planner-notice is-warning">当前已观察背包中没有对应目标蛋的可繁育母本；请确认目标蛋、账号和背包采集记录。</div>
           <div v-for="goal in plan?.goals || []" :key="goal.goal_id" class="planner-goal-result" :class="{ 'planner-warning': !goal.ready }"><strong>{{ eggName(draft.goals.find(g => g.goal_id === goal.goal_id)?.egg_key || null) }}</strong><span>{{ goal.exact_mothers }} 合格主目标母本 · {{ goal.mother_count - goal.exact_mothers }} 迭代母本<span v-if="goal.shared_mothers"> · 另 {{ goal.shared_mothers }} 只母本可兼顾</span></span><small v-if="goal.reason">{{ goal.reason }}</small></div>
-          <article v-for="mother in plan?.mothers || []" :key="mother.gid" class="planner-outcome" :class="mother.references.find(r => r.goal_id === mother.primary_goal_id)?.kind || 'unknown'">
-            <header><strong>{{ eggName(mother.egg_key) }}</strong><button class="breeder-detail-link" @click="selected = mother.gid">{{ parentName(mother.gid) }} ♀</button><span class="chip">{{ mode === 'selected' ? '基础配对' : kindName[mother.references.find(r => r.goal_id === mother.primary_goal_id)?.kind || 'unknown'] }}</span></header>
-            <p>{{ mother.fathers.length ? `范围内 ${mother.fathers.length} 个父本：${mother.fathers.map(parentName).join('、')}` : '尚无范围内兼容父本；只有蛋种参考' }}</p>
-            <p v-if="mode === 'selected' && mother.fathers.length">共有奖牌参考：<template v-for="marks in markOutcomes(mother.gid)" :key="marks.join('＋')"><span v-if="marks.length" class="planner-mark-set"><MedalIcon v-for="mark in marks" :key="mark" :name="mark" /></span><span v-else>无共有奖牌参考</span></template></p><div v-for="reference in mother.references" :key="reference.goal_id" class="planner-reference"><span><strong>{{ reference.goal_id === mother.primary_goal_id ? '主目标' : '兼容目标' }}</strong> · 合格父本 <span class="planner-ratio" :title="`范围内父本共 ${reference.father_count} 个，其中 ${reference.matching_fathers} 个合格`"><strong>{{ reference.matching_fathers }}</strong><small>/{{ reference.father_count }}</small></span>{{ reference.iterative_fathers ? ` · 迭代 ${reference.iterative_fathers}` : '' }}</span><span v-if="draft.goals.find(g => g.goal_id === reference.goal_id)?.nature_id">目标奖牌＋性格已知贡献 <span class="planner-ratio"><strong>{{ percent(reference.nature_contribution) }}</strong></span> · 全父本性格 <span class="planner-ratio"><strong>{{ percent(reference.all_father_nature_contribution) }}</strong></span></span><small v-if="reference.interference.length" class="planner-warning">迭代或目标干扰父本：{{ reference.interference.map(parentName).join('、') }}</small></div>
-            <div class="planner-edge-details"><details><summary>逐父本奖牌与性格参考</summary><p v-for="edge in plan?.edges.filter(e => e.female === mother.gid)" :key="edge.male">{{ parentName(edge.male) }}：共有 {{ edge.marks.join('＋') || '无奖牌' }}；<span v-for="(share, name) in edge.nature.known" :key="name">{{ name }} {{ percent(share) }} </span><span v-if="edge.nature.random">随机 {{ percent(edge.nature.random) }} </span><span v-if="edge.nature.unknown">未知 {{ percent(edge.nature.unknown) }}</span></p></details><span>全父本等权参考：<span v-for="(share, name) in mother.nature.known" :key="name">{{ name }} {{ percent(share) }} </span>随机 {{ percent(mother.nature.random) }} · 未知 {{ percent(mother.nature.unknown) }}</span></div>
+          <div v-if="plan?.mothers?.length" class="planner-outcome-list">
+          <div v-for="(column, columnIndex) in outcomeColumns" :key="columnIndex" class="planner-outcome-column">
+          <article v-for="mother in column" :key="mother.gid" class="planner-outcome" :class="mother.references.find(r => r.goal_id === mother.primary_goal_id)?.kind || 'unknown'">
+            <header class="planner-outcome-header">
+              <div class="planner-outcome-title">
+                <strong>{{ eggName(mother.egg_key) }}</strong>
+                <span class="planner-outcome-status"><UiIcon v-if="mode === 'selected' || mother.references.find(r => r.goal_id === mother.primary_goal_id)?.kind === 'exact'" name="circle-check" />{{ mode === 'selected' ? '基础配对' : kindName[mother.references.find(r => r.goal_id === mother.primary_goal_id)?.kind || 'unknown'] }}</span>
+              </div>
+              <div class="planner-outcome-header-meta">
+                <span>父本 <strong>{{ mother.fathers.length }}</strong></span>
+                <i aria-hidden="true"></i>
+                <span>合格 <strong>{{ mother.references.find(r => r.goal_id === mother.primary_goal_id)?.matching_fathers || 0 }}/{{ mother.references.find(r => r.goal_id === mother.primary_goal_id)?.father_count || mother.fathers.length }}</strong></span>
+              </div>
+              <button type="button" class="planner-outcome-expand" :aria-expanded="expandedOutcomeIds.has(mother.gid)" :aria-label="`${parentName(mother.gid)}的奖牌与性格参考`" @click="toggleOutcome(mother.gid)"><UiIcon name="chevron-down" :class="{ 'is-expanded': expandedOutcomeIds.has(mother.gid) }" /></button>
+            </header>
+            <div class="planner-outcome-summary">
+              <div class="planner-outcome-parents">
+                <button v-for="gid in mother.fathers.slice(0, 4)" :key="gid" type="button" class="planner-parent-chip" @click="selected = gid">{{ parentName(gid) }}</button>
+                <span v-if="mother.fathers.length > 4" class="planner-parent-overflow">+{{ mother.fathers.length - 4 }}</span>
+                <span v-if="!mother.fathers.length" class="planner-outcome-empty">尚无兼容父本</span>
+              </div>
+              <div class="planner-outcome-nature-summary">
+                <span v-for="([name, share]) in Object.entries(mother.nature.known).slice(0, 2)" :key="name">{{ name }} {{ percent(share) }}</span>
+                <span v-if="Object.keys(mother.nature.known).length > 2 || mother.nature.random || mother.nature.unknown">+{{ Math.max(0, Object.keys(mother.nature.known).length - 2) + Number(!!mother.nature.random) + Number(!!mother.nature.unknown) }}</span>
+              </div>
+            </div>
+            <button type="button" class="planner-outcome-disclosure" :aria-expanded="expandedOutcomeIds.has(mother.gid)" @click="toggleOutcome(mother.gid)"><span><UiIcon name="star" />奖牌 / 性格参考</span><small>{{ expandedOutcomeIds.has(mother.gid) ? '收起详情' : '展开详情' }} <UiIcon :name="expandedOutcomeIds.has(mother.gid) ? 'chevron-down' : 'chevron-right'" /></small></button>
+            <div v-if="expandedOutcomeIds.has(mother.gid)" class="planner-outcome-evidence">
+              <div class="planner-outcome-evidence-grid">
+                <article v-for="edge in outcomeEdges(mother.gid)" :key="edge.male" class="planner-outcome-evidence-row">
+                  <strong>{{ parentName(edge.male) }}</strong>
+                  <span class="planner-outcome-mark"><template v-if="edge.marks.length"><MedalIcon v-for="mark in edge.marks" :key="mark" :name="mark" /></template><template v-else>无奖牌</template></span>
+                  <span class="planner-outcome-nature"><span v-for="(share, name) in edge.nature.known" :key="name">{{ name }} {{ percent(share) }}</span><span v-if="edge.nature.random">随机 {{ percent(edge.nature.random) }}</span><span v-if="edge.nature.unknown">未知 {{ percent(edge.nature.unknown) }}</span></span>
+                </article>
+              </div>
+              <div v-for="reference in mother.references" :key="reference.goal_id" class="planner-outcome-reference"><strong>{{ reference.goal_id === mother.primary_goal_id ? '主目标' : '兼容目标' }}</strong><span>合格 {{ reference.matching_fathers }}/{{ reference.father_count }}</span><span v-if="reference.iterative_fathers">迭代 {{ reference.iterative_fathers }}</span><span v-if="draft.goals.find(g => g.goal_id === reference.goal_id)?.nature_id">性格贡献 {{ percent(reference.nature_contribution) }} · 全父本 {{ percent(reference.all_father_nature_contribution) }}</span><small v-if="reference.interference.length" class="planner-warning">存在迭代或目标干扰父本</small></div>
+              <div class="planner-outcome-total"><strong>全父本参考</strong><span v-for="(share, name) in mother.nature.known" :key="name">{{ name }} {{ percent(share) }}</span><span v-if="mother.nature.random">随机 {{ percent(mother.nature.random) }}</span><span v-if="mother.nature.unknown">未知 {{ percent(mother.nature.unknown) }}</span></div>
+            </div>
           </article>
+          </div>
+          </div>
           <div v-if="plan?.metrics.unused_slots" class="planner-notice is-info">保留 {{ plan.metrics.unused_slots }} 个空窝：{{ mode === 'selected' && draft.selected.length === draft.placements.length ? '所选精灵已全部入住，剩余容量保留空窝。' : '当前有界方案未找到更多目标收益，可调整亲本或布局。' }}</div>
           <div v-for="issue in issues" :key="issue" class="planner-notice is-warning">{{ issue }}</div>
           <details v-if="plan?.unused_candidates.length"><summary>未采用的自选精灵（{{ plan.unused_candidates.length }}）</summary><p v-for="item in unusedRows" :key="item.gid">{{ parentName(item.gid) }} · …{{ item.gid.slice(-6) }}：{{ item.reason }}</p><div class="planner-actions"><button class="ghost-button" :disabled="currentUnusedPage <= 1" @click="unusedPage = currentUnusedPage - 1">上一页</button><span>{{ currentUnusedPage }} / {{ unusedPages }}</span><button class="ghost-button" :disabled="currentUnusedPage >= unusedPages" @click="unusedPage = currentUnusedPage + 1">下一页</button></div></details>
@@ -244,7 +304,7 @@ defineExpose({ load: model.load, pause, resetAccount })
             <label class="planner-capacity-academy">
               <input v-model="draft.academy" type="checkbox">
               <span class="planner-check" aria-hidden="true" />
-              <span class="planner-capacity-label">学院绿窝 +1</span>
+              <span class="planner-capacity-label">学院绿窝</span>
               <span class="planner-capacity-cap" aria-hidden="true"><UiIcon name="graduation-cap" /></span>
             </label>
           </div>
@@ -260,15 +320,18 @@ defineExpose({ load: model.load, pause, resetAccount })
            <small v-if="eggChoices.length > 24" class="planner-muted">仅显示前 24 项，搜索蛋名可查找其他目标。</small>
            <div v-if="!draft.goals.length" class="planner-sidebar-empty">点击上方目标蛋即可添加；奖牌、性格默认不限。</div>
           <div v-if="draft.goals.length" class="planner-section-title planner-configured-title"><strong>已添加目标</strong><span class="count-badge">{{ draft.goals.length }}</span></div>
-          <article v-for="(goal, index) in draft.goals" :key="goal.goal_id" class="planner-goal-editor">
-            <header><span class="count-badge">{{ index + 1 }}</span><strong>{{ eggName(goal.egg_key) }}</strong><button class="ghost-button" :aria-label="`移除目标${index + 1}`" @click="removeGoal(goal.goal_id)"><UiIcon name="x" /></button></header>
-             <p class="planner-goal-summary">{{ goalSummary(goal) }}</p>
-             <small :class="{ 'planner-warning': !motherCounts.get(goal.egg_key) }">{{ motherCounts.get(goal.egg_key) ? `可用母本 ${motherCounts.get(goal.egg_key)} 只` : '未观察到对应母本，请核对背包资料' }}</small>
-             <details class="planner-goal-options"><summary>编辑目标与附加条件</summary>
-               <label class="planner-egg-replace">目标蛋<select :value="goal.egg_key" @change="changeGoal(goal, ($event.target as HTMLSelectElement).value)"><option v-for="egg in context?.eggs" :key="egg.egg_key" :value="egg.egg_key">{{ egg.name }}</option></select><small>更换蛋种保留奖牌、性格和优先级，需重新选择迭代亲本。</small></label>
-               <div class="planner-goal-pair"><label>体型奖牌<select v-model="goal.size_mark"><option value="">不限</option><option>大块头</option><option>小不点</option></select></label><label>声音奖牌<select v-model="goal.voice_mark"><option value="">不限</option><option>婉转声</option><option>粗嗓门</option></select></label></div>
-               <div class="planner-goal-pair"><label>目标性格<select v-model.number="goal.nature_id"><option :value="0">不限</option><option v-for="n in context?.natures" :key="n.id" :value="n.id">{{ n.name }}</option></select></label><label>优先级<select v-model.number="goal.priority"><option :value="0">普通</option><option :value="1">优先</option></select></label></div>
-             </details>
+           <article v-for="(goal, index) in draft.goals" :key="goal.goal_id" class="planner-goal-editor">
+             <header><span class="count-badge">{{ index + 1 }}</span><strong>{{ eggName(goal.egg_key) }}</strong><small :class="{ 'planner-warning': !motherCounts.get(goal.egg_key) }">{{ motherCounts.get(goal.egg_key) ? `可用母本 ${motherCounts.get(goal.egg_key)} 只` : '未观察到对应母本' }}</small><button class="ghost-button" :aria-label="`移除目标${index + 1}`" @click="removeGoal(goal.goal_id)"><UiIcon name="x" /></button></header>
+              <p class="planner-goal-summary">{{ goalSummary(goal) }}</p>
+              <section class="planner-goal-options" :class="{ 'is-editing': editingGoalIds.has(goal.goal_id) }" :aria-label="`${eggName(goal.egg_key)}附加条件`">
+                <button type="button" class="planner-goal-toggle" :aria-expanded="editingGoalIds.has(goal.goal_id)" @click="toggleGoalEditor(goal.goal_id)"><span class="planner-goal-toggle-label"><UiIcon :name="editingGoalIds.has(goal.goal_id) ? 'chevron-down' : 'chevron-right'" />附加条件</span><span class="planner-goal-action">{{ editingGoalIds.has(goal.goal_id) ? '保存' : '编辑' }}</span></button>
+                <div v-if="editingGoalIds.has(goal.goal_id)" class="planner-goal-fields">
+                  <label>体型奖牌<select v-model="goal.size_mark"><option value="">不限</option><option>大块头</option><option>小不点</option></select></label>
+                  <label>声音奖牌<select v-model="goal.voice_mark"><option value="">不限</option><option>婉转声</option><option>粗嗓门</option></select></label>
+                  <label>目标性格<select v-model.number="goal.nature_id"><option :value="0">不限</option><option v-for="n in context?.natures" :key="n.id" :value="n.id">{{ n.name }}</option></select></label>
+                  <label>优先级<select v-model.number="goal.priority"><option :value="0">普通</option><option :value="1">优先</option></select></label>
+                </div>
+              </section>
           </article>
         </template>
         <template v-else>
@@ -289,16 +352,6 @@ defineExpose({ load: model.load, pause, resetAccount })
           </article>
           <button class="planner-primary" :disabled="!draft.approved.length || !model.canGenerate.value" @click="model.run('solve')">生成迭代方案</button>
         </section>
-        <details class="planner-rules">
-          <summary>规则与参考边界</summary>
-          <ul>
-            <li>摆位是工具草图规则：20×20 格、每窝占 2×2、中心吸附半格，手动坐标限 0～18 格，仅视图居中不改草稿坐标。</li>
-            <li>画布连线表示奖牌支持：实线为合格支持、虚线为干扰；父本 30%＋母本 30%＋随机 40% 是模型参考，不是实测保证。</li>
-            <li>搜索有节点与时间预算，只返回已验证的较优布局，不宣称全局最优。</li>
-            <li>迭代候选只表示方向接近，不代表后代可达；勾选准许后才会纳入求解。</li>
-          </ul>
-          <p>规则 {{ context?.rule_version || '—' }} · 几何 {{ context?.geometry_version || '—' }} · 目录 {{ context?.catalog_version || '—' }}{{ result ? ` · 本次搜索${result.search_status === 'bounded' ? '达预算（bounded）' : '未运行'}` : '' }}</p>
-        </details>
       </div>
     </aside>
     <dialog ref="picker" class="planner-picker" aria-labelledby="planner-picker-title" aria-modal="true" @click="($event.target === picker) && closePicker()">

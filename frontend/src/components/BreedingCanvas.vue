@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { BreederParent } from '../types/breederLibrary'
 import type { Placement, Plan } from '../types/breedingPlanner'
 
@@ -7,7 +7,13 @@ const props = defineProps<{ positions: Placement[]; parents: Map<string, Breeder
 const emit = defineEmits<{ select: [gid: string]; move: [gid: string, x: number, y: number, targetGid: string | null] }>()
 const drag = ref<{ gid: string; x: number; y: number; moved: boolean; cellX: number; cellY: number } | null>(null)
 const hint = ref('')
-const outside = computed(() => props.positions.some(p => p.x < 0 || p.x > 18 || p.y < 0 || p.y > 18))
+const canvasElement = ref<HTMLElement | null>(null)
+const canvasHeight = ref(0)
+let canvasObserver: ResizeObserver | null = null
+const BOARD_MIN = -18
+const BOARD_MAX = 18
+const outside = computed(() => props.positions.some(p => p.x < BOARD_MIN || p.x > BOARD_MAX || p.y < BOARD_MIN || p.y > BOARD_MAX))
+const canvasStyle = computed(() => canvasHeight.value ? { '--planner-canvas-height': `${canvasHeight.value}px` } : undefined)
 // 硬性规定：配窝预览（窝群）必须显示在画布中间，且不能小到看不清。
 // 视口以窝群包围盒中心为中心、格距固定 32 单位（一格 1 格）；视口越小窝越大，
 // 因此视口按窝群自适应（小窝群也收到 VIEW_MIN），只有越界旧草稿才继续扩大视口。
@@ -23,6 +29,14 @@ const boardBounds = computed(() => {
   const size = Math.round(Math.max(VIEW_MIN, maxX - minX + VIEW_PAD, maxY - minY + VIEW_PAD))
   return { x: Math.round((minX + maxX - size) / 2), y: Math.round((minY + maxY - size) / 2), size }
 })
+onMounted(() => {
+  if (typeof ResizeObserver === 'undefined' || !canvasElement.value) return
+  const syncCanvasHeight = () => { canvasHeight.value = Math.round(canvasElement.value!.getBoundingClientRect().height) }
+  canvasObserver = new ResizeObserver(syncCanvasHeight)
+  canvasObserver.observe(canvasElement.value)
+  syncCanvasHeight()
+})
+onBeforeUnmount(() => canvasObserver?.disconnect())
 // 连线和说明以格子中心为准；拖动中的窝跟随指针位置。
 function center(gid: string) {
   const position = props.positions.find(item => item.gid === gid)
@@ -42,9 +56,9 @@ const caption = computed(() => {
   if (!props.positions.length) return '还没有小窝。生成方案或补充亲本后，这里会显示 20×20 草图内的窝位。'
   const academy = props.positions.filter(position => position.kind === 'academy').length
   const nests = `共 ${props.positions.length} 个小窝（普通 ${props.positions.length - academy}／学院 ${academy}），按 2×2 占地、中心吸附半格摆放。`
-  if (!props.plan) return `${nests}拖动窝位可移到空位或与另一窝交换，也可用方向键移动、Enter 选择。`
+  if (!props.plan) return `${nests}拖动窝位可移到空位或与另一窝交换，Enter 选择。`
   const interference = links.value.filter(link => link.interference).length
-  return `${nests}${props.pending ? '布局已改动，正在重新评估…' : `当前 ${links.value.length} 条父本连线${interference ? `，其中 ${interference} 条为干扰连边（虚线）` : ''}。`}拖动窝位可交换，也可用方向键移动、Enter 选择。`
+  return `${nests}${props.pending ? '布局已改动，正在重新评估…' : `当前 ${links.value.length} 条父本连线${interference ? `，其中 ${interference} 条为干扰连边（虚线）` : ''}。`}拖动窝位可交换，Enter 选择。`
 })
 
 // 2×2 占地下，间距小于 2 格视为重叠。
@@ -60,11 +74,17 @@ function pointerDown(event: PointerEvent, gid: string) {
 function pointerMove(event: PointerEvent) {
   if (!drag.value) return
   const svg = (event.currentTarget as SVGGElement).ownerSVGElement
-  const matrix = svg?.getScreenCTM()
-  if (!svg || !matrix) return
-  const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse())
-  drag.value.cellX = Math.max(0, Math.min(18, Math.round((point.x - 32) / 32)))
-  drag.value.cellY = Math.max(0, Math.min(18, Math.round((point.y - 32) / 32)))
+  if (!svg) return
+  const rect = svg.getBoundingClientRect()
+  const bounds = boardBounds.value
+  const scale = Math.min(rect.width / bounds.size, rect.height / bounds.size)
+  if (!scale) return
+  const offsetX = (rect.width - bounds.size * scale) / 2
+  const offsetY = (rect.height - bounds.size * scale) / 2
+  const pointX = bounds.x + (event.clientX - rect.left - offsetX) / scale
+  const pointY = bounds.y + (event.clientY - rect.top - offsetY) / scale
+  drag.value.cellX = Math.max(BOARD_MIN, Math.min(BOARD_MAX, Math.round((pointX - 32) / 32)))
+  drag.value.cellY = Math.max(BOARD_MIN, Math.min(BOARD_MAX, Math.round((pointY - 32) / 32)))
   if (Math.hypot(event.clientX - drag.value.x, event.clientY - drag.value.y) > 5) drag.value.moved = true
 }
 function pointerUp() {
@@ -79,33 +99,19 @@ function pointerUp() {
   hint.value = ''
   emit('move', current.gid, current.cellX, current.cellY, null)
 }
-const steps: Record<string, [number, number]> = { ArrowLeft: [-2, 0], ArrowRight: [2, 0], ArrowUp: [0, -2], ArrowDown: [0, 2] }
 function key(event: KeyboardEvent, gid: string) {
   if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); emit('select', gid); return }
-  const step = steps[event.key]
-  if (!step) return
-  event.preventDefault()
-  if (event.repeat) return
-  const position = props.positions.find(item => item.gid === gid)
-  if (!position || position.lock === 'position') return
-  const x = Math.max(0, Math.min(18, position.x + step[0]))
-  const y = Math.max(0, Math.min(18, position.y + step[1]))
-  if (x === position.x && y === position.y) return
-  if (overlapped(gid, x, y)) { hint.value = '该位置与已有小窝重叠，已保持原位。'; return }
-  hint.value = ''
-  emit('select', gid)
-  emit('move', gid, x, y, null)
 }
 </script>
 <template>
-  <div class="planner-canvas-view">
-    <div class="planner-canvas">
+  <div class="planner-canvas-view" :style="canvasStyle">
+    <div ref="canvasElement" class="planner-canvas">
       <svg :viewBox="`${boardBounds.x} ${boardBounds.y} ${boardBounds.size} ${boardBounds.size}`" preserveAspectRatio="xMidYMid meet" aria-label="小窝布局草图">
         <defs><pattern id="planner-grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" class="planner-grid-line" fill="none" /></pattern></defs>
         <rect class="planner-board-grid" :x="boardBounds.x" :y="boardBounds.y" :width="boardBounds.size" :height="boardBounds.size" fill="url(#planner-grid)" />
         <g v-if="!pending" class="planner-canvas-links" aria-hidden="true"><line v-for="link in links" :key="link.key" class="planner-edge" :class="{ interference: link.interference, dim: link.dim }" :x1="link.male.x" :y1="link.male.y" :x2="link.female.x" :y2="link.female.y" /></g>
         <g v-for="(position, index) in positions" :key="position.gid" class="planner-nest" :class="[{ selected: selected === position.gid, academy: position.kind === 'academy', dragging: drag?.gid === position.gid, unrelated: !!plan && !connected.has(position.gid) }, `gender-${parents.get(position.gid)?.gender}`]"
-          :transform="`translate(${(drag?.gid === position.gid ? drag.cellX : position.x) * 32 + 32},${(drag?.gid === position.gid ? drag.cellY : position.y) * 32 + 32})`" :data-gid="position.gid" tabindex="0" role="button" :aria-label="`${index + 1}号，${parents.get(position.gid)?.name || '当前记录未找到'}，${parents.get(position.gid)?.gender === 1 ? '父本' : '母本'}${position.lock ? '，已锁定' : ''}，方向键移动，Enter 选择，也可拖动到空位或与另一窝交换位置`"
+          :transform="`translate(${(drag?.gid === position.gid ? drag.cellX : position.x) * 32 + 32},${(drag?.gid === position.gid ? drag.cellY : position.y) * 32 + 32})`" :data-gid="position.gid" tabindex="0" role="button" :aria-label="`${index + 1}号，${parents.get(position.gid)?.name || '当前记录未找到'}，${parents.get(position.gid)?.gender === 1 ? '父本' : '母本'}${position.lock ? '，已锁定' : ''}，Enter 选择，也可拖动到空位或与另一窝交换位置`"
           @focus="emit('select', position.gid)" @pointerdown="pointerDown($event, position.gid)" @pointermove="pointerMove" @pointerup="pointerUp" @pointercancel="drag = null" @keydown="key($event, position.gid)">
           <rect x="-32" y="-32" width="64" height="64" rx="8" />
           <text x="-25" y="-17" class="planner-nest-number">{{ index + 1 }}</text>

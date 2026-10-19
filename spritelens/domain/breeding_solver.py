@@ -8,13 +8,32 @@ from time import monotonic
 
 from spritelens.domain.breeder_library import can_pair
 from spritelens.domain.breeding_planner import (
-    BOARD_MAX, Placement, Pool, Request, evaluate, overlaps, pair_key, pair_match,
+    BOARD_MAX, BOARD_MIN, Placement, Pool, Request, evaluate, overlaps, pair_key, pair_match,
 )
 
 
 def in_board(x: float, y: float) -> bool:
-    """窝中心是否落在 20×20 草图内；生成的方案不得依赖画布外的坐标。"""
-    return 0 <= x <= BOARD_MAX and 0 <= y <= BOARD_MAX
+    """窝中心是否落在可编辑坐标范围内。"""
+    return BOARD_MIN <= x <= BOARD_MAX and BOARD_MIN <= y <= BOARD_MAX
+
+
+def center_layout(placements: tuple[Placement, ...]) -> tuple[Placement, ...]:
+    """把窝群占地包围盒的中心对齐到 20×20 画布中心。"""
+    if not placements:
+        return placements
+    min_x = min(p.x for p in placements)
+    max_x = max(p.x + 2 for p in placements)
+    min_y = min(p.y for p in placements)
+    max_y = max(p.y + 2 for p in placements)
+    target = (BOARD_MAX + 2) / 2
+    dx = round((target - (min_x + max_x) / 2) * 2) / 2
+    dy = round((target - (min_y + max_y) / 2) * 2) / 2
+    return tuple(replace(p, x=p.x + dx, y=p.y + dy) for p in placements)
+
+
+def center_grid(grid: tuple[tuple[float, float], ...]) -> tuple[tuple[float, float], ...]:
+    """把候选格位的占地包围盒中心对齐到画布中心，保留半格坐标。"""
+    return tuple((p.x, p.y) for p in center_layout(tuple(Placement("", x, y) for x, y in grid)))
 
 
 def opportunities(pool: Pool, request: Request, cancel: Event) -> tuple[list[dict], set[str], dict[str, bool | None], list[tuple[str, str]], bool]:
@@ -93,7 +112,11 @@ def solve(pool: Pool, request: Request, cancel: Event, budget: int = 4500) -> di
             continue
         slot = next(((x, y) for x, y in start_slots if not any(overlaps(Placement("", x, y), p) for p in relocated)), None)
         if slot is not None:
-            kind = "normal" if sum(p.kind == "normal" for p in relocated) < request.capacity else "academy"
+            kind = "normal"
+            if (request.academy and parent.gid in pool.parents and pool.parents[parent.gid].pet.gender == 2
+                    and not any(p.kind == "academy" for p in relocated)
+                    and sum(p.kind == "normal" for p in relocated) >= request.capacity):
+                kind = "academy"
             relocated.append(replace(parent, x=slot[0], y=slot[1], kind=kind))
     base = tuple(relocated)
     selected = set(request.selected)
@@ -131,9 +154,10 @@ def solve(pool: Pool, request: Request, cancel: Event, budget: int = 4500) -> di
         issues.append("候选较多，本次在有界候选池内搜索")
     pairs = ([(m, f) for m in ordered if pool.parents[m].pet.gender == 1 for f in ordered if can_pair(pool.parents[m], pool.parents[f], False)]
              if request.mode == "selected" else [(m, f) for m, f in pairs if m in ordered and f in ordered])
-    # 2×2贴边的紧凑网格与分离簇；固定位置锁周围补充半格候选。
-    grids = [((2, 2),) + tuple((x, y) for y in (0, 2, 4) for x in (0, 2, 4, 6) if (x, y) != (2, 2)),
-             tuple((x, y) for y in (0, 2) for x in (0, 2, 4, 9, 11, 13))]
+    # 2×2紧凑网格先构造相对形状，再把实际占地中心对齐到20×20画布中心。
+    raw_grids = [((2, 2), (4, 4)) + tuple((x + 2, y + 2) for y in (0, 2, 4) for x in (0, 2, 4, 6) if (x, y) not in ((0, 0), (2, 2))),
+                 tuple((x + 2, y + 2) for y in (0, 2) for x in (0, 2, 4, 9, 11, 13))]
+    grids = [center_grid(grid) for grid in raw_grids]
     if base:
         grids = [tuple(dict.fromkeys((p.x + dx, p.y + dy) for p in base
                                      for dx, dy in ((0, 0), (2, 0), (-2, 0), (0, 2), (0, -2), (2, 2), (-2, -2), (2, -2), (-2, 2), (4, 0), (0, 4), (2.5, 0), (0, 2.5))
@@ -179,7 +203,8 @@ def solve(pool: Pool, request: Request, cancel: Event, budget: int = 4500) -> di
                         school_free = request.academy and not any(p.kind == "academy" for p in placements)
                         kinds = [tuple("normal" for _ in residents)] if normal_count + len(residents) <= request.capacity else []
                         if school_free and normal_count + len(residents) - 1 <= request.capacity:
-                            kinds += [tuple("academy" if i == index else "normal" for i in range(len(residents))) for index in range(len(residents))]
+                            kinds += [tuple("academy" if i == index else "normal" for i in range(len(residents)))
+                                      for index, gid in enumerate(residents) if pool.parents[gid].pet.gender == 2]
                         for nest_types in kinds:
                             state = placements + tuple(Placement(gid, x, y, kind) for gid, (x, y), kind in zip(residents, coordinates, nest_types))
                             key = tuple(sorted((p.gid, p.x, p.y, p.kind) for p in state))
@@ -215,6 +240,12 @@ def solve(pool: Pool, request: Request, cancel: Event, budget: int = 4500) -> di
     ranked = sorted(best.values(), key=lambda row: (row[1]["score"], tuple(p.gid for p in row[0])), reverse=True)
     connected_plans = [row for row in ranked if row[1]["edges"]]
     winners = connected_plans[:3] if connected_plans else ranked[:1]
+    if not fixed:
+        centered_winners = []
+        for positions, _ in winners:
+            centered = center_layout(positions)
+            centered_winners.append((centered, evaluate(pool, request, centered)))
+        winners = centered_winners
     opposite_groups = {gender: {group for gid in request.selected if gid in pool.parents and pool.parents[gid].pet.gender != gender
                                for group in pool.parents[gid].groups} for gender in (1, 2)}
     unused_reasons = {gid: "当前记录未找到可繁育个体" if gid not in pool.parents else

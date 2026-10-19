@@ -51,6 +51,32 @@ class PlannerTests(TestCase):
         self.assertTrue(planned["edges"])
         self.assertTrue(planned["goals"][0]["covered"])
 
+    def test_plain_goal_fills_connected_capacity_and_balances_gender(self):
+        pets = tuple(self.fixture.pet(i, 1 if i <= 6 else 2) for i in range(1, 13))
+        pool = build_pool(pets, self.static, self.eggs, {})
+        pool.eggs.update({str(p.gid): "test" for p in pets if p.gid > 6})
+        planned = solve(pool, Request(goals=(Goal("plain", "test"),), capacity=11), Event())["plans"][0]
+        self.assertEqual(len(planned["placements"]), 11)
+        self.assertLessEqual(planned["metrics"]["gender_gap"], 1)
+        self.assertEqual(planned["metrics"]["unused_slots"], 0)
+        self.assertAlmostEqual((min(p["x"] for p in planned["placements"]) + max(p["x"] for p in planned["placements"]) + 2) / 2, 10)
+        self.assertAlmostEqual((min(p["y"] for p in planned["placements"]) + max(p["y"] for p in planned["placements"]) + 2) / 2, 10)
+
+    def test_plain_goal_prefers_target_egg_evolution_chain(self):
+        pets = (self.fixture.pet(1, base=3), self.fixture.pet(2, base=1), self.fixture.pet(3, 2, base=1))
+        pool = build_pool(pets, self.static, self.eggs, {})
+        pool.eggs["3"] = "test"
+        planned = solve(pool, Request(goals=(Goal("plain", "test"),), capacity=2), Event())["plans"][0]
+        self.assertEqual({p["gid"] for p in planned["placements"]}, {"2", "3"})
+        self.assertEqual(planned["metrics"]["same_chain"], 2)
+
+    def test_replanning_recenters_unlocked_saved_layout(self):
+        request = replace(self.request, goals=(Goal("plain", "test"),), capacity=2,
+                          placements=(Placement("1", 0, 0), Placement("2", 2, 0)))
+        planned = solve(self.pool, request, Event())["plans"][0]
+        self.assertAlmostEqual((min(p["x"] for p in planned["placements"]) + max(p["x"] for p in planned["placements"]) + 2) / 2, 10)
+        self.assertAlmostEqual((min(p["y"] for p in planned["placements"]) + max(p["y"] for p in planned["placements"]) + 2) / 2, 10)
+
     def test_unknown_not_false_negative_and_opposing_marks_not_automatic(self):
         for voice, kind in ((0, "unknown"), (-99, "none")):
             pool = build_pool((replace(self.pets[0], voice=voice), self.pets[1]), self.static, self.eggs, {})
@@ -61,18 +87,35 @@ class PlannerTests(TestCase):
         self.assertNotEqual(pair_match(pool, "1", "2", self.goal)["kind"], "exact")
 
     def test_all_fathers_and_academy_branch_are_evaluated(self):
-        pets = (self.pets[0], self.pets[1], self.fixture.pet(3, nature=11, voice=-99))
+        pets = (self.pets[0], self.pets[1], self.fixture.pet(3, nature=11, voice=-99), self.fixture.pet(4, 2))
         pool = build_pool(pets, self.static, self.eggs, {})
-        pool.eggs["2"] = "test"
-        positions = (Placement("1", 0, 0), Placement("2", 2, 0), Placement("3", 4, 0, "academy"))
+        pool.eggs.update({"2": "test", "4": "test"})
+        positions = (Placement("1", 0, 0), Placement("2", 2, 0), Placement("3", 4, 0), Placement("4", 6, 0, "academy"))
         result = evaluate(pool, replace(self.request, academy=True), positions)
-        self.assertEqual(len(result["edges"]), 2)
-        reference = result["mothers"][0]["references"][0]
+        self.assertEqual(len(result["edges"]), 3)
+        reference = next(m for m in result["mothers"] if m["gid"] == "2")["references"][0]
         self.assertEqual(reference["father_fraction"], .5)
         self.assertEqual(reference["nature_contribution"], .3)
         self.assertEqual(reference["interference"], ["3"])
-        self.assertEqual(result["mothers"][0]["nature"]["known"]["聪明"], .5)
+        academy_mother = next(m for m in result["mothers"] if m["gid"] == "4")
+        self.assertEqual(academy_mother["nature"]["known"][self.static.nature(2).name], 1.0)
         self.assertEqual(result["status"], "partial")
+
+    def test_academy_nest_rejects_father(self):
+        result = evaluate(self.pool, replace(self.request, academy=True),
+                          (Placement("1", 0, 0, "academy"), Placement("2", 2, 0)))
+        self.assertEqual(result["status"], "invalid")
+        self.assertIn("学院绿窝必须放置母本", result["issues"])
+
+    def test_solver_prefers_target_nature_mother_for_academy_nest(self):
+        pets = (self.pets[0], self.pets[1], replace(self.pets[2], nature=11))
+        pool = build_pool(pets, self.static, self.eggs, {})
+        pool.eggs.update({"2": "test", "3": "test"})
+        request = replace(self.request, capacity=2, academy=True)
+        planned = solve(pool, request, Event())["plans"][0]
+        academy = next(p for p in planned["placements"] if p["kind"] == "academy")
+        self.assertEqual(academy["gid"], "2")
+        self.assertEqual(planned["metrics"]["academy_nature_matches"], 1)
 
     def test_geometry_contact_half_grid_range_and_no_duplicate_instance(self):
         for x, y, expected in ((2, 0, "ready"), (2.5, 2.5, "ready"), (3, 2.5, "no_plan"), (1.5, 0, "invalid")):
@@ -200,6 +243,10 @@ class PlannerTests(TestCase):
                  "placements": [asdict(p) for p in outside],
                  "rule_version": "planner-dual-mark-v1", "geometry_version": "community-grid-v1"}
         self.assertEqual(len(parse_draft(value).placements), 2)
+
+    def test_negative_edit_margin_is_valid_for_manual_layouts(self):
+        result = evaluate(self.pool, self.request, (Placement("1", -2, -2),))
+        self.assertNotIn("超出 20×20 草图范围", "".join(result["issues"]))
 
     def test_voice_override_and_snapshot_share_one_version(self):
         from types import SimpleNamespace

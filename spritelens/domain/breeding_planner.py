@@ -14,6 +14,8 @@ from spritelens.domain.static_data import StaticData
 RULE_VERSION = "planner-dual-mark-v1"
 GEOMETRY_VERSION = "community-grid-v1"
 # 20×20 草图内的窝中心坐标上限（2×2 占地、中心吸附半格），与页面画布一致。
+# 手动编辑保留对称的负坐标边界，避免位于 (0, 0) 的旧布局无法继续向左上拖动。
+BOARD_MIN = -18
 BOARD_MAX = 18
 UNKNOWN_GROUPS = {"未知", "未发现", "暂无蛋组", "暂无", ""}
 INFERTILE_GROUPS = {"无", "无法孵蛋", "无蛋组"}
@@ -143,6 +145,13 @@ def nature_reference(m: Candidate, f: Candidate, male: Placement, female: Placem
 
 def evaluate(pool: Pool, request: Request, placements: tuple[Placement, ...]) -> dict:
     issues = []
+    target_chain_ids = {
+        member
+        for goal in request.goals
+        for gid, candidate in pool.parents.items()
+        if candidate.pet.gender == 2 and pool.eggs.get(gid) == goal.egg_key
+        for member in candidate.chain
+    }
     if request.mode == "selected" and request.participation == "all":
         if len(request.selected) > request.capacity + int(request.academy):
             issues.append("全部参与的精灵数量超过当前小窝容量")
@@ -154,6 +163,8 @@ def evaluate(pool: Pool, request: Request, placements: tuple[Placement, ...]) ->
         issues.append("同一个体不能入住多个小窝")
     if len([p for p in placements if p.kind == "normal"]) > request.capacity or sum(p.kind == "academy" for p in placements) > int(request.academy):
         issues.append("布局超过当前普通窝或学院绿窝容量")
+    if any(p.kind == "academy" and p.gid in pool.parents and pool.parents[p.gid].pet.gender != 2 for p in placements):
+        issues.append("学院绿窝必须放置母本")
     for old in request.placements:
         current = next((p for p in placements if p.gid == old.gid), None)
         if old.lock and (current is None or old.lock == "position" and (current.x, current.y, current.kind) != (old.x, old.y, old.kind)):
@@ -163,7 +174,7 @@ def evaluate(pool: Pool, request: Request, placements: tuple[Placement, ...]) ->
             issues.append(f"当前记录未找到可繁育个体 {p.gid}")
         if any(overlaps(p, q) for q in placements[:i]):
             issues.append("小窝占地发生重叠")
-        if not (0 <= p.x <= BOARD_MAX and 0 <= p.y <= BOARD_MAX):
+        if not (BOARD_MIN <= p.x <= BOARD_MAX and BOARD_MIN <= p.y <= BOARD_MAX):
             issues.append("草稿中有窝位超出 20×20 草图范围，请重新规划或调整位置")
     if issues:
         return {"status": "invalid", "issues": issues, "edges": [], "mothers": [], "goals": [], "score": (), "metrics": {}}
@@ -258,7 +269,18 @@ def evaluate(pool: Pool, request: Request, placements: tuple[Placement, ...]) ->
                   -sum(match["gap"] for g, match in iterative_edges if match["missing_marks"][0] == g.size_mark)))
     if request.mode == "selected":
         score = [sum(bool(m["fathers"]) for m in mothers), len(connected), sum(len(e["marks"]) for e in edges)]
-    score.extend((-sum(p.gid not in connected for p in placements), -len(placements)))
+    males = sum(pool.parents[p.gid].pet.gender == 1 for p in placements)
+    females = sum(pool.parents[p.gid].pet.gender == 2 for p in placements)
+    same_chain = sum(bool(set(pool.parents[p.gid].chain) & target_chain_ids) for p in placements)
+    # 先保证所有入住精灵都在有效连线中，再尽量填满容量；同等方案下平衡公母并偏好目标蛋进化链。
+    score.extend((-sum(p.gid not in connected for p in placements), len(placements), -abs(males - females), same_chain))
+    academy_nature_matches = sum(
+        any(pool.parents[p.gid].pet.nature == goal.nature_id and goal.nature_id and pool.eggs.get(p.gid) == goal.egg_key
+            for goal in request.goals)
+        for p in placements
+        if p.kind == "academy" and p.gid in pool.parents and pool.parents[p.gid].pet.gender == 2
+    )
+    score.append(academy_nature_matches)
     required = set(request.selected) if request.mode == "selected" and request.participation == "all" else {p.gid for p in request.placements if p.lock}
     ready = required <= connected and (all(r["ready"] for r in results) and all(r["kind"] == "exact" and r["father_fraction"] == 1 and not r["interference"] for r in refs) if request.mode == "target" else True)
     if required - connected:
@@ -266,6 +288,8 @@ def evaluate(pool: Pool, request: Request, placements: tuple[Placement, ...]) ->
         issues.append("必须参与但尚未形成兼容连线：" + "、".join(names))
     return {"status": "no_plan" if not edges else "ready" if ready else "partial", "issues": issues,
             "edges": edges, "mothers": mothers, "goals": results, "score": tuple(score),
-            "metrics": {"males": sum(pool.parents[p.gid].pet.gender == 1 for p in placements),
-                        "females": len(mothers), "effective_mothers": sum(bool(m["fathers"]) for m in mothers),
+            "metrics": {"males": males,
+                        "females": females, "effective_mothers": sum(bool(m["fathers"]) for m in mothers),
+                        "gender_gap": abs(males - females), "same_chain": same_chain,
+                        "academy_nature_matches": academy_nature_matches,
                         "unused_slots": request.capacity + int(request.academy) - len(placements)}}
