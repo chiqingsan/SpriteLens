@@ -469,7 +469,7 @@ class LocalServerTest(unittest.TestCase):
 
 
 class HandbookPayloadTest(unittest.TestCase):
-    """图鉴载荷：收集状态、筛选与进化链解析（用迷你静态表驱动）。"""
+    """图鉴载荷：纯静态资料（不读玩家数据）、筛选排序与精灵蛋联查。"""
 
     @classmethod
     def setUpClass(cls):
@@ -477,116 +477,155 @@ class HandbookPayloadTest(unittest.TestCase):
         tmp = Path(cls._tmp.name)
         static_dir = tmp / "static"
         static_dir.mkdir()
+        # dex_no 刻意避开与 handbook_no 同值：两者都是「编号」，同值时检索会同时命中两个物种。
         (static_dir / "species.json").write_text(
             json.dumps(
                 {
-                    "100": {"name": "火兽", "handbook_no": "002", "types": [1], "type_names": ["火"],
-                            "stats": {"hp": 100, "sum": 500}, "quality": 3, "stage": 1,
-                            "max_energy": 10, "evolutions": [200]},
-                    "200": {"name": "烈焰兽", "handbook_no": "003", "types": [1], "type_names": ["火"],
-                            "stats": {"hp": 120, "sum": 560}, "quality": 4, "stage": 2,
-                            "max_energy": 15, "evolutions": []},
-                    "300": {"name": "水兽", "handbook_no": "012", "types": [2], "type_names": ["水"],
-                            "stats": {"hp": 90, "sum": 480}, "quality": 2, "stage": 1,
-                            "max_energy": 10, "evolutions": []},
+                    "100": {"name": "火兽", "handbook_no": "002", "dex_no": 1, "types": [1],
+                            "type_names": ["火"], "egg_groups": ["动物组"],
+                            "gender_ratio": {"male": 50, "female": 50},
+                            "height_range": [40, 80], "weight_range": [5000, 9000],
+                            "description": "火兽的图鉴描述", "stats": {"hp": 100, "sum": 500},
+                            "quality": 3, "stage": 1, "max_energy": 10, "evolutions": [200]},
+                    "200": {"name": "烈焰兽", "handbook_no": "003", "dex_no": 21, "types": [1],
+                            "type_names": ["火"], "egg_groups": [],
+                            "gender_ratio": {"male": 50, "female": 50},
+                            "height_range": [80, 120], "weight_range": [9000, 12000],
+                            "stats": {"hp": 120, "sum": 560},
+                            "quality": 4, "stage": 2, "max_energy": 15, "evolutions": []},
+                    "300": {"name": "水兽", "handbook_no": "012", "dex_no": 31, "types": [2],
+                            "type_names": ["水"], "egg_groups": ["海洋组"],
+                            "gender_ratio": {"male": 50, "female": 50},
+                            "height_range": [30, 60], "weight_range": [3000, 6000],
+                            "stats": {"hp": 90, "sum": 480},
+                            "quality": 2, "stage": 1, "max_energy": 10, "evolutions": []},
+                    "3002": {"name": "水蓝蓝", "handbook_no": "008", "dex_no": 41, "types": [3],
+                             "type_names": ["草"], "egg_groups": ["动物组"],
+                             "gender_ratio": {"male": 50, "female": 50},
+                             "height_range": [20, 40], "weight_range": [2000, 4000],
+                             "stats": {"hp": 80, "sum": 400},
+                             "quality": 2, "stage": 1, "max_energy": 10, "evolutions": []},
                 },
                 ensure_ascii=False,
             ),
             encoding="utf-8",
         )
-        for name in ("natures.json", "types.json", "skills.json"):
+        (static_dir / "types.json").write_text(
+            json.dumps(
+                {"1": {"name": "火", "color": "#e2764b"},
+                 "2": {"name": "水", "color": "#4b8fe2"},
+                 "3": {"name": "草", "color": "#83d256"}},
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        # 相性表只存非 1 倍例外项：草打火 2 倍、火打草 0.5 倍、水打火免疫。
+        (static_dir / "type_chart.json").write_text(
+            json.dumps(
+                {"version": 1, "chart": {"3": {"1": 2.0}, "1": {"3": 0.5}, "2": {"1": 0.0}}},
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        (static_dir / "eggs.json").write_text(
+            json.dumps(
+                {
+                    "groups": {"6": "动物组", "13": "海洋组"},
+                    "eggs": [
+                        {"egg_key": "火兽#1001", "name_key": "火兽", "egg_conf_id": 1001,
+                         "egg_name": "火兽蛋", "name": "火兽", "base_id": 100, "dex_no": 1,
+                         "handbook_no": "002", "egg_type_name": "普通", "hatch_label": "12小时",
+                         "hatch_seconds": 43200, "egg_group_ids": [6],
+                         "egg_group_names": ["动物组"]},
+                    ],
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        for name in ("natures.json", "skills.json"):
             (static_dir / name).write_text("{}", encoding="utf-8")
 
+        from spritelens.domain.eggs import EggCatalog
         from spritelens.domain.static_data import StaticData
 
         cls.static = StaticData(static_dir)
-        # 已收集 100（两只，取最高等级）与 300；200 未收集
-        cls.context = _make_context(
-            tmp,
-            pets=(
-                _pet(1, name="火兽", level=20, base_conf=100),
-                _pet(2, name="火兽", level=45, base_conf=100),
-                _pet(3, name="水兽", level=30, base_conf=300),
-            ),
-        )
+        cls.catalog = EggCatalog(static_dir)
 
     @classmethod
     def tearDownClass(cls):
         cls._tmp.cleanup()
 
     def _payload(self, **kwargs):
-        return handbook_payload(self.static, self.context.pet_repository, **kwargs)
+        return handbook_payload(self.static, self.catalog, **kwargs)
 
-    def test_collection_status_from_snapshot(self):
+    def _keys(self, **kwargs):
+        return [row["key"] for row in self._payload(**kwargs)["species"]]
+
+    def test_payload_is_static_only(self):
+        """图鉴是资料页：没有账号数据也能出全量资料，且不夹带背包统计。"""
         payload = self._payload()
-        self.assertEqual(payload["total"], 3)
-        self.assertEqual(payload["collected"], 2)
-        by_key = {row["key"]: row for row in payload["species"]}
-        self.assertTrue(by_key["100"]["collected"])
-        self.assertEqual(by_key["100"]["owned_count"], 2)
-        self.assertEqual(by_key["100"]["best_level"], 45)
-        self.assertFalse(by_key["200"]["collected"])
-        self.assertEqual(by_key["200"]["owned_count"], 0)
+        self.assertEqual(payload["total"], 4)
+        self.assertEqual(payload["shown"], 4)
+        self.assertNotIn("collected", payload)
+        self.assertNotIn("uid", payload)
+        for row in payload["species"]:
+            for field in ("collected", "owned_count", "best_level"):
+                self.assertNotIn(field, row)
+        self.assertEqual(payload["stage_options"], [1, 2])
+        self.assertEqual(payload["egg_group_options"], ["动物组", "海洋组"])
 
-    def test_uncollected_filter(self):
-        payload = self._payload(uncollected_only=True)
-        self.assertEqual([row["key"] for row in payload["species"]], ["200"])
+    def test_filters_by_type_stage_and_egg_group(self):
+        self.assertEqual(self._keys(type_name="水"), ["300"])
+        self.assertEqual(self._keys(stage=2), ["200"])
+        self.assertEqual(self._keys(egg_group="动物组"), ["100", "3002"])
+        self.assertEqual(self._keys(type_name="草", stage=1), ["3002"])
+        self.assertEqual(self._keys(type_name="水", egg_group="动物组"), [])
 
-    def test_collected_filter(self):
-        payload = self._payload(collected_only=True)
-        self.assertEqual(sorted(row["key"] for row in payload["species"]), ["100", "300"])
+    def test_sort_orders(self):
+        self.assertEqual(self._keys(), ["100", "200", "3002", "300"])
+        self.assertEqual(self._keys(sort="stats"), ["200", "100", "300", "3002"])
+        self.assertEqual(self._keys(sort="name"), ["300", "3002", "100", "200"])
 
-    def test_type_filter(self):
-        payload = self._payload(type_name="水")
-        self.assertEqual([row["key"] for row in payload["species"]], ["300"])
+    def test_search_matches_name_and_ids(self):
+        self.assertEqual(self._keys(search="烈焰"), ["200"])
+        # 整串命中 base_conf_id / 图鉴号时只回归属物种，不连带前缀邻居
+        self.assertEqual(self._keys(search="3002"), ["3002"])
+        self.assertEqual(self._keys(search="002"), ["100"])
+        self.assertEqual(self._keys(search="012"), ["300"])
 
-    def test_search_matches_name_and_key(self):
-        self.assertEqual(
-            [row["key"] for row in self._payload(search="烈焰")["species"]], ["200"]
-        )
-        self.assertEqual([row["key"] for row in self._payload(search="300")["species"]], ["300"])
+    def test_search_falls_back_to_substring_when_number_unknown(self):
+        """编号无精确命中时仍按子串兜底，避免检索词打空。"""
+        self.assertEqual(self._keys(search="兽"), ["100", "200", "300"])
+
+    def test_egg_and_matchups_come_from_static_tables(self):
+        rows = {row["key"]: row for row in self._payload()["species"]}
+        egg = rows["100"]["egg"]
+        self.assertEqual(egg["name"], "火兽蛋")
+        self.assertEqual(egg["hatch_label"], "12小时")
+        self.assertEqual(egg["hatch_hours"], 12.0)
+        self.assertEqual(egg["egg_type"], "普通")
+        self.assertEqual(egg["egg_groups"], ["动物组"])
+        self.assertIsNone(rows["200"]["egg"])
+        # 防御相性：草打火 2 倍、水打火免疫、火打火 1 倍不进列表
+        self.assertEqual(rows["100"]["matchups"]["weak"], ["草"])
+        self.assertEqual(rows["100"]["matchups"]["immune"], ["水"])
+        self.assertEqual(rows["100"]["matchups"]["resist"], [])
 
     def test_search_finds_zero_padded_handbook_number(self):
         """卡面编号（handbook_no，如「002」）必须能搜到——原实现只比 name/base_conf_id。"""
-        from spritelens.domain.static_data import StaticData
+        for key, info in self.static.species_items():
+            if not info.handbook_no:
+                continue
+            with self.subTest(handbook_no=info.handbook_no):
+                self.assertIn(key, self._keys(search=info.handbook_no))
 
-        with tempfile.TemporaryDirectory() as tmp:
-            static_dir = Path(tmp)
-            (static_dir / "species.json").write_text(
-                json.dumps(
-                    {
-                        "3001": {"name": "喵喵", "handbook_no": "002", "types": [1], "type_names": ["火"],
-                                 "stats": {"hp": 100, "sum": 500}, "quality": 3,
-                                 "stage": 1, "max_energy": 10, "evolutions": []},
-                        "3002": {"name": "水蓝蓝", "handbook_no": "008", "types": [2], "type_names": ["水"],
-                                 "stats": {"hp": 100, "sum": 500}, "quality": 3,
-                                 "stage": 1, "max_energy": 10, "evolutions": []},
-                    },
-                    ensure_ascii=False,
-                ),
-                encoding="utf-8",
-            )
-            for name in ("natures.json", "types.json", "skills.json"):
-                (static_dir / name).write_text("{}", encoding="utf-8")
-            static = StaticData(static_dir)
-            numbered = [(key, info.handbook_no) for key, info in static.species_items()]
-            if not any(no for _, no in numbered):
-                self.skipTest("该静态表未提供 handbook_no")
-            # 整串编号（含补零写法）精确命中：只回归属该编号的物种
-            for key, handbook_no in numbered:
-                if not handbook_no:
-                    continue
-                with self.subTest(handbook_no=handbook_no):
-                    rows = handbook_payload(
-                        static, self.context.pet_repository, search=handbook_no
-                    )["species"]
-                    self.assertIn(key, [row["key"] for row in rows])
-            # 「002」不再连带 base_conf_id 里含 002 的无关物种（如 3002）
-            payload = handbook_payload(static, self.context.pet_repository, search="002")
-            keys = [row["key"] for row in payload["species"]]
-            self.assertEqual(
-                keys, [k for k, no in numbered if no and no.lstrip("0") == "2"]
-            )
+    def test_empty_static_returns_empty_payload(self):
+        payload = handbook_payload(None)
+        self.assertEqual(payload["total"], 0)
+        self.assertEqual(payload["species"], [])
+        self.assertEqual(payload["stage_options"], [])
+        self.assertEqual(payload["egg_group_options"], [])
 
 if __name__ == "__main__":
     unittest.main()

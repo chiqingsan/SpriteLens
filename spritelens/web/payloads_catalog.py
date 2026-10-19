@@ -13,6 +13,7 @@ from spritelens.domain.color_cards import ColorCatalog
 from spritelens.domain.static_data import StaticData
 from spritelens.domain.display import TYPE_COLORS
 from spritelens.domain.egg_box import EGG_KIND_LABELS, egg_kind
+from spritelens.domain.eggs import EggCatalog
 from spritelens.domain.home_breeding import HomeBreedingProfile, infer_range_couples
 from spritelens.domain.breeding_nature import parent_nature_reference
 from spritelens.domain.measurements import range_position, range_text
@@ -40,74 +41,92 @@ def _handbook_haystacks(key: str, info) -> tuple[str, ...]:
 
 
 def _handbook_exact_match(needle: str, key: str, info) -> bool:
-    """编号精确命中：handbook_no / dex_no 整串相等（dex_no 按数值比）。
+    """精确命中：图鉴号 / base_conf_id 整串相等，或 dex_no 数值相等。
 
-    只看编号字段，不含 base_conf_id——后者是「3002 含 002」这类子串命中的来源。
+    子串匹配只作兜底：base_conf_id 的子串会让「3002 含 002」连带一堆无关物种，
+    所以检索词整串命中某个编号时只认这些物种，不再混入前缀邻居。
     """
-    if needle == info.handbook_no.lower():
+    if needle == info.handbook_no.lower() or needle == key.lower():
         return True
     return needle.isdigit() and int(needle) == info.dex_no
 
 
+def _handbook_egg(catalog: EggCatalog | None, key: str) -> dict | None:
+    """该物种对应的精灵蛋资料（与蛋图鉴同源）；无蛋或目录缺失时为 None。"""
+    if catalog is None or not key.isdigit():
+        return None
+    egg = catalog.egg_by_base_id(int(key))
+    if egg is None:
+        return None
+    return {
+        "egg_conf_id": egg.egg_conf_id,
+        "name": egg.egg_name or egg.name,
+        "species_name": egg.name,
+        "hatch_hours": round(egg.hatch_seconds / 3600, 1),
+        "hatch_label": egg.hatch_label,
+        "egg_groups": list(egg.egg_group_names),
+        "egg_type": egg.egg_type_name,
+    }
+
+
 def handbook_payload(
     static: StaticData | None,
-    repository: PetRepository,
+    catalog: EggCatalog | None = None,
     *,
     search: str = "",
     type_name: str = "",
-    collected_only: bool = False,
-    uncollected_only: bool = False,
+    stage: int = 0,
+    egg_group: str = "",
+    sort: str = "dex",
 ) -> dict:
-    """图鉴载荷：全物种目录 + 收集状态（来自当前快照）+ 筛选。
+    """图鉴资料载荷：全物种目录 + 游戏静态资料（不读玩家数据）。
 
-    收集状态以「会话快照里出现过该 base_conf_id」为准（与宠物仓库同源）；
-    图鉴是只读视图，不做独立持久化——快照本身已由本地库恢复。
+    图鉴是资料查询页（WIKI 性质），没有账号与快照也必须可用，因此载荷不接
+    pet 仓库、也不返回「已收集 / 拥有几只 / 最高等级」这类背包统计——那属于
+    精灵背包与炫彩色卡。资料含种族值、系别相性、蛋组、性别比、身高体重、
+    图鉴描述、进化链，以及该物种对应的精灵蛋（与蛋图鉴同源）。
 
-    搜索匹配 name / display_name / base_conf_id / dex_no / handbook_no。
-    编号精确命中优先：检索词整串等于某个物种的 handbook_no 或 dex_no 时，
-    只返回这些物种，不再混入子串兜底结果——「002」原先会连带命中 3002、
-    5002 等一堆 base_conf_id 含「002」的无关物种。无精确命中才退回子串匹配，
-    因此按名称搜（如「烈焰」）行为不变。
+    搜索匹配 name / display_name / base_conf_id / dex_no / handbook_no；编号
+    精确命中优先：检索词整串等于 handbook_no 或 dex_no 时只返回这些物种，
+    不再混入子串兜底结果（「002」原先会连带命中 3002、5002 等 base_conf_id
+    含「002」的物种）。无精确命中才退回子串匹配，按名称搜行为不变。
+
+    筛选与排序全部来自静态数据：系别 / 阶段 / 蛋组，排序 dex / name / stats。
     """
-    snapshot = repository.consistent_snapshot()
     if static is None:
         return {
-            "uid": snapshot.uid, "version": snapshot.version, "complete": None,
             "species": [],
             "total": 0,
-            "collected": 0,
             "shown": 0,
             "type_options": [],
-            "filters": {"search": search, "type": type_name,
-                        "collected_only": collected_only, "uncollected_only": uncollected_only},
+            "stage_options": [],
+            "egg_group_options": [],
+            "filters": {"search": search, "type": type_name, "stage": stage,
+                        "egg_group": egg_group, "sort": sort},
         }
-
-    # 收集统计：base_conf_id → 拥有只数 / 其中最高等级
-    owned: dict[str, dict] = {}
-    for pet in snapshot.pets:
-        key = str(pet.base_conf_id)
-        if not key or key == "0":
-            continue
-        entry = owned.setdefault(key, {"count": 0, "max_level": 0})
-        entry["count"] += 1
-        entry["max_level"] = max(entry["max_level"], pet.level)
 
     needle = search.strip().lower()
 
-    def matches(key: str, info) -> bool:
+    def matches(info) -> bool:
         if type_name and type_name not in info.type_names:
             return False
-        if collected_only and key not in owned:
+        if stage and stage != info.stage:
             return False
-        if uncollected_only and key in owned:
+        if egg_group and egg_group not in info.egg_groups:
             return False
         return True
 
     rows: list[dict] = []
     exact_rows: list[dict] = []
     type_names_seen: set[str] = set()
+    stages_seen: set[int] = set()
+    egg_groups_seen: set[str] = set()
     for key, info in static.species_items():
         type_names_seen.update(info.type_names)
+        stages_seen.add(info.stage)
+        egg_groups_seen.update(info.egg_groups)
+        if not matches(info):
+            continue
         if needle:
             exact = _handbook_exact_match(needle, key, info)
             if not exact and not any(
@@ -116,9 +135,6 @@ def handbook_payload(
                 continue
         else:
             exact = False
-        if not matches(key, info):
-            continue
-        own = owned.get(key)
         row = {
                 "key": key,
                 "name": info.name,
@@ -126,6 +142,7 @@ def handbook_payload(
                 "dex_no": info.dex_no,
                 "handbook_no": info.handbook_no,
                 "icon_url": species_icon_url(int(key)) if key.isdigit() else "",
+                "types": list(info.types),
                 "egg_groups": list(info.egg_groups),
                 "gender_ratio": list(info.gender_ratio),
                 "height_range": list(info.height_range),
@@ -134,6 +151,7 @@ def handbook_payload(
                 "has_shiny": info.has_shiny,
                 "type_names": list(info.type_names),
                 "type_colors": [type_color_for(static, name) for name in info.type_names],
+                "matchups": static.matchups(info.types),
                 "stats": dict(info.stats),
                 "stat_sum": info.stat_sum,
                 "quality": info.quality,
@@ -146,9 +164,7 @@ def handbook_payload(
                 ],
                 "chain_members": [{"key": str(e), "name": member.name}
                                   for e in info.chain_members if (member := static.species(e)) is not None],
-                "collected": own is not None,
-                "owned_count": own["count"] if own else 0,
-                "best_level": own["max_level"] if own else 0,
+                "egg": _handbook_egg(catalog, key),
                 "description": info.description,
             }
         rows.append(row)
@@ -157,20 +173,33 @@ def handbook_payload(
     # 编号精确命中优先：有人认领编号时不再混入子串兜底结果
     if exact_rows:
         rows = exact_rows
+    if sort == "name":
+        rows.sort(key=lambda row: (row["name"], row["key"]))
+    elif sort == "stats":
+        rows.sort(key=lambda row: (-row["stat_sum"], row["name"]))
+    else:
+        rows.sort(key=lambda row: (
+            0 if row["handbook_no"].isdigit() else 1,
+            int(row["handbook_no"]) if row["handbook_no"].isdigit() else row["dex_no"],
+            row["key"],
+        ))
     return {
         "species": rows,
-        "uid": snapshot.uid, "version": snapshot.version, "complete": None,
         "total": len(static.species_items()),
-        "collected": len(owned),
         "shown": len(rows),
         "type_options": sorted(type_names_seen),
+        "stage_options": sorted(stage for stage in stages_seen if stage),
+        "egg_group_options": sorted(egg_groups_seen),
         "filters": {
             "search": search,
             "type": type_name,
-            "collected_only": collected_only,
-            "uncollected_only": uncollected_only,
+            "stage": stage,
+            "egg_group": egg_group,
+            "sort": sort,
         },
     }
+
+
 def male_matrix_payload(pet_repository, static: StaticData | None, gender: str = "all") -> dict:
     """种公阵列载荷：性格 × 蛋组覆盖矩阵（对标孵蛋管理器）。
 

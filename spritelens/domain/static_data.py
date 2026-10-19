@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -28,6 +29,7 @@ _TABLE_FILES = {
     "natures": "natures.json",
     "types": "types.json",
     "skills": "skills.json",
+    "type_chart": "type_chart.json",
 }
 
 
@@ -123,6 +125,7 @@ class StaticData:
         self._natures: dict[int, NatureInfo] = {}
         self._types: dict[int, TypeInfo] = {}
         self._skills: dict[int, SkillInfo] = {}
+        self._matchup_chart: dict[int, dict[int, float]] = {}
         self._species_misses = 0
         self._species_hits = 0
         self._name_color_cache: dict[str, str] | None = None
@@ -224,6 +227,26 @@ class StaticData:
                 damage_type=int(damage_type) if isinstance(damage_type, int) else None,
             )
 
+        # 属性相性表：只存「非 1 倍」的例外项，缺失整体降级为空（图鉴显示未知）。
+        chart_path = self.directory / _TABLE_FILES["type_chart"]
+        chart_raw = _load_table(self.directory, _TABLE_FILES["type_chart"]) if chart_path.is_file() else {}
+        raw_chart = chart_raw.get("chart")
+        if isinstance(raw_chart, dict):
+            for attacker, rows in raw_chart.items():
+                if not isinstance(rows, dict):
+                    continue
+                try:
+                    attacker_id = int(attacker)
+                except (TypeError, ValueError):
+                    continue
+                multipliers: dict[int, float] = {}
+                for defender, value in rows.items():
+                    try:
+                        multipliers[int(defender)] = float(value)
+                    except (TypeError, ValueError):
+                        continue
+                self._matchup_chart[attacker_id] = multipliers
+
     # -- 查询 ----------------------------------------------------------
     def species(self, base_conf_id: int) -> SpeciesInfo | None:
         """按协议 pet.base_conf_id 取物种信息；命中率可经 stats() 观测。"""
@@ -285,6 +308,30 @@ class StaticData:
                 info.name: info.color for info in self._types.values() if info.color
             }
         return self._name_color_cache
+
+    def matchups(self, type_ids: Sequence[int]) -> dict[str, list[str]]:
+        """防御相性：该系别组合的弱点 / 抵抗 / 免疫（纯静态资料，不读玩家数据）。
+
+        图表来自游戏 type_chart，缺省 1 倍，逐攻击系别连乘防御方各系别；
+        无图表或无有效系别时返回空列表，前端按「未知」降级。
+        """
+        result: dict[str, list[str]] = {"weak": [], "resist": [], "immune": []}
+        defenders = [int(type_id) for type_id in type_ids if int(type_id) in self._types]
+        if not defenders or not self._matchup_chart:
+            return result
+        scored: list[tuple[float, str]] = []
+        for attacker_id, info in self._types.items():
+            multiplier = 1.0
+            for defender in defenders:
+                multiplier *= self._matchup_chart.get(attacker_id, {}).get(defender, 1.0)
+            if multiplier != 1.0:
+                scored.append((multiplier, info.name))
+        result["immune"] = sorted(name for value, name in scored if value == 0)
+        result["weak"] = [name for _, name in sorted(
+            ((value, name) for value, name in scored if value > 1), key=lambda item: (-item[0], item[1]))]
+        result["resist"] = [name for _, name in sorted(
+            ((value, name) for value, name in scored if 0 < value < 1), key=lambda item: (item[0], item[1]))]
+        return result
 
     def skill(self, skill_id: int) -> SkillInfo | None:
         return self._skills.get(skill_id)

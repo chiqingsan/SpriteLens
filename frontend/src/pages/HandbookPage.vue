@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { ApiClient } from '../api/client'
-import { useHandbook, type HandbookMode } from '../composables/useHandbook'
-import type { HandbookSpecies } from '../types/handbook'
+import { useHandbook } from '../composables/useHandbook'
+import type { HandbookSpecies, HandbookSort } from '../types/handbook'
 import { typeBadgeStyle } from '../components/handbookDisplay'
 import HandbookDetail from '../components/HandbookDetail.vue'
 import UiIcon from '../components/UiIcon.vue'
@@ -54,10 +54,10 @@ function keydown(event: KeyboardEvent) {
     closeButton.value?.focus()
   }
 }
-const modes: { mode: HandbookMode; label: string }[] = [
-  { mode: 'all', label: '全部' },
-  { mode: 'collected', label: '已收集' },
-  { mode: 'uncollected', label: '未收集' },
+const sorts: { value: HandbookSort; label: string }[] = [
+  { value: 'dex', label: '图鉴号' },
+  { value: 'name', label: '名称' },
+  { value: 'stats', label: '六维和' },
 ]
 watch(data, () => {
   limit.value = PAGE_SIZE
@@ -75,19 +75,19 @@ defineExpose({ load, pause, resume, resetAccount, error })
   <div class="workspace split" :class="{ 'detail-collapsed': !item }" data-vue-page>
     <section ref="content" class="content-panel" :aria-busy="loading">
       <div class="panel-toolbar">
-        <span id="hb-count" class="count-badge">收录 {{ data?.collected || 0 }} / {{ data?.total || 0 }} 种</span>
+        <span id="hb-count" class="count-badge">共 {{ data?.total || 0 }} 种 · 显示 {{ data?.shown || 0 }} 种</span>
         <label class="inline-field">搜索<input id="hb-search" v-model="filters.search" type="text" placeholder="名字 / 图鉴号 / 图鉴 ID"></label>
         <label class="inline-field">系别<select id="hb-type" v-model="filters.type"><option value="">全部系别</option><option v-for="name in data?.type_options" :key="name">{{ name }}</option></select></label>
-        <div id="hb-mode" class="segmented" role="group" aria-label="收集状态">
-          <button v-for="entry in modes" :key="entry.mode" type="button" :class="{ active: filters.mode === entry.mode }" :aria-pressed="filters.mode === entry.mode" @click="filters.mode = entry.mode">{{ entry.label }}</button>
-        </div>
+        <label class="inline-field">阶段<select id="hb-stage" v-model.number="filters.stage"><option :value="0">全部阶段</option><option v-for="stage in data?.stage_options" :key="stage" :value="stage">第 {{ stage }} 阶</option></select></label>
+        <label class="inline-field">蛋组<select id="hb-egg-group" v-model="filters.eggGroup"><option value="">全部蛋组</option><option v-for="name in data?.egg_group_options" :key="name">{{ name }}</option></select></label>
+        <label class="inline-field">排序<select id="hb-sort" v-model="filters.sort"><option v-for="entry in sorts" :key="entry.value" :value="entry.value">{{ entry.label }}</option></select></label>
       </div>
       <div class="table-wrap">
         <div v-if="loading && !data" class="empty-hint" role="status"><UiIcon name="clock" />正在加载图鉴…</div>
         <div v-else-if="error" class="empty-hint" role="alert"><UiIcon name="search" />图鉴加载失败：{{ error }}<div class="button-row"><button class="ghost-button" @click="load">重试</button></div></div>
         <template v-else>
           <div id="hb-grid" class="hb-grid">
-            <article v-for="row in shown" :key="row.key" class="hb-card" :class="{ uncollected: !row.collected, active: selected === row.key }" role="button" tabindex="0" :aria-label="`查看${row.name}详情`" :aria-pressed="selected === row.key" @click="open(row, $event)" @keydown.enter.prevent.stop="open(row, $event)" @keydown.space.prevent.stop="open(row, $event)">
+            <article v-for="row in shown" :key="row.key" class="hb-card" :class="{ active: selected === row.key }" role="button" tabindex="0" :aria-label="`查看${row.name}详情`" :aria-pressed="selected === row.key" @click="open(row, $event)" @keydown.enter.prevent.stop="open(row, $event)" @keydown.space.prevent.stop="open(row, $event)">
               <div class="hb-head">
                 <span class="hb-key">{{ row.handbook_no || (row.dex_no ? String(row.dex_no) : row.key) }}</span>
                 <span class="hb-art"><span aria-hidden="true">{{ (row.name || '?').slice(0, 1) }}</span><img v-if="row.icon_url" :src="row.icon_url" alt="" loading="lazy" @error="($event.target as HTMLImageElement).remove()"></span>
@@ -98,13 +98,13 @@ defineExpose({ load, pause, resume, resetAccount, error })
                 <span v-if="!row.type_names.length" class="muted">—</span>
                 <span class="hb-sum">六维 {{ row.stat_sum || '—' }}</span>
               </div>
-              <span v-if="row.collected" class="hb-badge">拥有 {{ row.owned_count }} · Lv{{ row.best_level }}</span>
-              <span v-else class="hb-badge none">未收集</span>
+              <span v-if="row.egg" class="hb-badge">蛋 {{ row.egg.name }} · {{ row.egg.hatch_label }}</span>
+              <span v-else class="hb-badge none">无蛋资料</span>
               <div v-if="row.evolutions.length" class="hb-evo">进化 → <b>{{ row.evolutions[0]!.name }}</b>{{ row.evolutions.length > 1 ? ` 等 ${row.evolutions.length} 条` : '' }}</div>
             </article>
             <div v-if="remaining" class="hb-more"><button id="hb-more-btn" class="ghost-button small" @click="more">显示更多（剩余 {{ remaining }} 种）</button></div>
           </div>
-          <div v-if="data && !data.species.length" id="hb-empty" class="empty-hint">没有符合筛选条件的物种<div v-if="filters.search || filters.type || filters.mode !== 'all'" class="button-row"><button class="ghost-button" @click="clear">清除筛选</button></div></div>
+          <div v-if="data && !data.species.length" id="hb-empty" class="empty-hint">没有符合筛选条件的物种<div v-if="filters.search || filters.type || filters.stage || filters.eggGroup" class="button-row"><button class="ghost-button" @click="clear">清除筛选</button></div></div>
         </template>
       </div>
     </section>

@@ -703,11 +703,12 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         return web.json_response(
             handbook_payload(
                 self._context.static_data,
-                self._context.pet_repository,
+                self._context.egg_catalog,
                 search=query.get("search", ""),
                 type_name=query.get("type", ""),
-                collected_only=_as_bool(query.get("collected")),
-                uncollected_only=_as_bool(query.get("uncollected")),
+                stage=_as_int(query.get("stage"), 0),
+                egg_group=query.get("egg_group", ""),
+                sort=query.get("sort", "dex"),
             )
         )
 

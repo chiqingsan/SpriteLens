@@ -4,13 +4,19 @@ import { useHandbook } from './useHandbook'
 
 const species = {
   key: '100', name: '火兽', display_name: '', dex_no: 1, handbook_no: '002', icon_url: '',
-  egg_groups: ['动物组'], gender_ratio: [50, 50], height_range: [0, 0], weight_range: [0, 0],
+  types: [1], egg_groups: ['动物组'], gender_ratio: [50, 50], height_range: [0, 0], weight_range: [0, 0],
   reference_ranges: { height: '0.4~0.8m', weight: '5~9kg' }, has_shiny: true,
-  type_names: ['火'], type_colors: ['#e2764b'], stats: { hp: 60, atk: 60, spa: 60, def: 60, spd: 60, spe: 60, sum: 360 },
+  type_names: ['火'], type_colors: ['#e2764b'], matchups: { weak: ['水'], resist: ['草'], immune: [] },
+  stats: { hp: 60, atk: 60, spa: 60, def: 60, spd: 60, spe: 60, sum: 360 },
   stat_sum: 360, quality: 3, stage: 1, max_energy: 10, evolutions: [{ key: '200', name: '烈焰兽' }],
-  chain_members: [{ key: '100', name: '火兽' }], collected: true, owned_count: 2, best_level: 31, description: '',
+  chain_members: [{ key: '100', name: '火兽' }],
+  egg: { egg_conf_id: 7, name: '火兽蛋', species_name: '火兽', hatch_hours: 12, hatch_label: '12小时', egg_groups: ['动物组'], egg_type: '普通' },
+  description: '',
 }
-const payload = { species: [species], total: 1, collected: 1, shown: 1, type_options: ['火'] }
+const payload = {
+  species: [species], total: 1, shown: 1,
+  type_options: ['火'], stage_options: [1, 2], egg_group_options: ['动物组'],
+}
 const scopes: ReturnType<typeof effectScope>[] = []
 afterEach(() => { scopes.splice(0).forEach(scope => scope.stop()); vi.useRealTimers() })
 function setup(api: Parameters<typeof useHandbook>[0]) {
@@ -64,32 +70,34 @@ describe('图鉴请求生命周期', () => {
     expect(page.error.value).toBe('')
     expect(page.data.value?.total).toBe(1)
   })
-  it('筛选映射到收集状态参数，清除筛选回到全部', async () => {
+  it('筛选映射到阶段/蛋组/排序参数，清除筛选回到默认', async () => {
     const api = vi.fn().mockResolvedValue(payload), page = setup(api)
     await page.load()
     expect(api.mock.calls[0]![0]).toBe('/api/handbook?')
-    page.filters.mode = 'uncollected'
+    page.filters.stage = 3
     await nextTick()
-    expect(api.mock.calls[1]![0]).toContain('uncollected=1')
-    // 不能用 toContain('collected=1')：它是 uncollected=1 的子串。
-    expect(api.mock.calls[1]![0]).not.toMatch(/[?&]collected=1/)
-    page.filters.mode = 'collected'
+    expect(api.mock.calls[1]![0]).toContain('stage=3')
+    page.filters.eggGroup = '动物组'
     await nextTick()
-    expect(api.mock.calls[2]![0]).toContain('collected=1')
+    expect(decodeURIComponent(api.mock.calls[2]![0]!)).toContain('egg_group=动物组')
+    page.filters.sort = 'stats'
+    await nextTick()
+    expect(api.mock.calls[3]![0]).toContain('sort=stats')
     page.clear()
     await nextTick()
-    expect(page.filters.mode).toBe('all')
-    expect(api.mock.calls[3]![0]).toBe('/api/handbook?')
+    expect(page.filters.stage).toBe(0)
+    expect(page.filters.sort).toBe('dex')
+    expect(api.mock.calls[4]![0]).toBe('/api/handbook?')
   })
 })
 
-it('离页保留已加载目录，返回相同筛选不再请求', async () => {
+it('离页保留已加载图鉴，返回相同筛选不再请求', async () => {
   const api = vi.fn().mockResolvedValue(payload), model = setup(api)
   await model.resume(); const current = model.data.value
   model.pause(); await model.resume()
   expect(api).toHaveBeenCalledTimes(1); expect(model.data.value).toBe(current)
 })
-it('切号清空旧账号收集状态，返回后按最新筛选重新请求', async () => {
+it('切号清空已加载资料，返回后重新请求', async () => {
   const api = vi.fn().mockResolvedValue(payload), model = setup(api)
   await model.load()
   model.resetAccount()

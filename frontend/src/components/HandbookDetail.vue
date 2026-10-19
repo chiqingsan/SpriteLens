@@ -14,16 +14,22 @@ const rows = computed(() => order.map(key => ({
   width: Math.round(((item.stats[key] || 0) / peak.value) * 100),
 })))
 const dexText = computed(() => item.handbook_no || (item.dex_no ? String(item.dex_no) : ''))
+// 相性表里只有本物种自身系别有颜色资料，其余系别用中性底色。
+const ownColors = computed(() => {
+  const map: Record<string, string> = {}
+  item.type_names.forEach((name, index) => { map[name] = item.type_colors[index] || '' })
+  return map
+})
+function colorOf(name: string) { return ownColors.value[name] }
+const hasMatchups = computed(() => Boolean(
+  item.matchups.weak.length || item.matchups.resist.length || item.matchups.immune.length))
 // 进化链优先展示完整链成员（含自身），没有链成员时退回 evolutions。
 const chain = computed(() => (item.chain_members.length ? item.chain_members : item.evolutions))
 </script>
 <template>
   <div class="detail-title"><h2>{{ item.name }}</h2><span class="muted">#{{ item.key }}</span></div>
   <div class="detail-sub">
-    <template v-if="item.collected"><b class="positive">已收集</b> ·
-      <button type="button" class="ghost-button small" :data-goto-pets="item.name" :title="`到精灵背包看我的${item.name}`">拥有 {{ item.owned_count }} 只 · 最高 Lv{{ item.best_level }}</button>
-    </template>
-    <span v-else class="muted">尚未收集</span>
+    <span class="muted">资料页（不读取账号数据）</span>
   </div>
   <div v-if="dexText || item.gender_ratio[0] || item.gender_ratio[1] || item.has_shiny" class="detail-sub">
     <template v-if="dexText">图鉴号 {{ dexText }}</template>
@@ -42,6 +48,27 @@ const chain = computed(() => (item.chain_members.length ? item.chain_members : i
 
   <div v-if="item.egg_groups.length" class="detail-section"><h3>蛋组</h3>
     <div class="skill-list"><span v-for="group in item.egg_groups" :key="group" class="skill-chip">{{ group }}</span></div>
+  </div>
+
+  <div v-if="hasMatchups" class="detail-section"><h3>属性相性</h3>
+    <div class="info-line"><span class="muted">弱点</span>
+      <span v-for="name in item.matchups.weak" :key="'w' + name" class="type-badge" :style="typeBadgeStyle(colorOf(name))">{{ name }}</span>
+      <span v-if="!item.matchups.weak.length" class="muted">—</span>
+    </div>
+    <div class="info-line"><span class="muted">抵抗</span>
+      <span v-for="name in item.matchups.resist" :key="'r' + name" class="type-badge" :style="typeBadgeStyle(colorOf(name))">{{ name }}</span>
+      <span v-if="!item.matchups.resist.length" class="muted">—</span>
+    </div>
+    <div class="info-line"><span class="muted">免疫</span>
+      <span v-for="name in item.matchups.immune" :key="'i' + name" class="type-badge" :style="typeBadgeStyle(colorOf(name))">{{ name }}</span>
+      <span v-if="!item.matchups.immune.length" class="muted">—</span>
+    </div>
+  </div>
+
+  <div v-if="item.egg" class="detail-section"><h3>精灵蛋</h3>
+    <div class="info-line">{{ item.egg.name }} · 孵化 {{ item.egg.hatch_label }}<template v-if="item.egg.egg_type"> · {{ item.egg.egg_type }}蛋</template></div>
+    <div v-if="item.egg.egg_groups.length" class="skill-list"><span v-for="group in item.egg.egg_groups" :key="group" class="skill-chip">{{ group }}</span></div>
+    <div class="button-row"><button type="button" class="ghost-button small" data-goto-page="egg-dex">到蛋蛋图鉴看该蛋</button></div>
   </div>
 
   <div class="detail-section"><h3>物种参考范围</h3>
