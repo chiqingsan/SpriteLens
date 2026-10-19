@@ -81,3 +81,76 @@ class PetPresentationTest(unittest.TestCase):
         matrix = colors_payload(Repo(), catalog, None)
         self.assertEqual(matrix["pet_total"], 1)
         self.assertEqual(next(iter(matrix["matrix"].values()))[0]["color_card"]["particle_id"], 1)
+
+    def test_colors_payload_keeps_unresolved_numbers_out_of_the_grid(self):
+        """编号解析不出来的持有者进 unknown，不能让前端渲染没有编号的裸卡面。"""
+        from types import SimpleNamespace
+
+        catalog = ColorCatalog(static_dir())
+        unresolved = replace(_pet(1, name="假帧", level=10, first=True), glass_type=2, glass_value=99, mutation_type=8)
+        unknown_number = replace(_pet(2, name="未来卡", level=10, first=True), glass_type=1, glass_value=41, mutation_type=8)
+        seasonal = replace(_pet(3, name="赛季", level=10, first=True), glass_type=2, glass_value=4, mutation_type=8)
+
+        class Repo:
+            def consistent_snapshot(self):
+                return SimpleNamespace(pets=(unresolved, unknown_number, seasonal), uid=7, version=3)
+
+        payload = colors_payload(Repo(), catalog, None)
+        self.assertEqual(payload["pet_total"], 3)
+        self.assertEqual(payload["matrix"], {})
+        # card_id_for 只认目录里有的编号：赛季值不在 {1..4,1000}、或编号不在 44 张里，都返回空串。
+        # 这些持有者进 unknown，前端按「编号未解析」提示，不会再渲染孤立的「#」。
+        self.assertEqual([row["card_id"] for row in payload["unknown"]], ["", ""])
+        self.assertEqual([row["unresolved"] for row in payload["unknown"]], [True, True])
+        self.assertEqual([row["gid"] for row in payload["seasonal"]], [seasonal.gid])
+        self.assertEqual([row["card_id"] for row in payload["seasonal"]], ["s4"])
+
+    def test_colors_payload_exposes_full_grid_and_card_labels(self):
+        from types import SimpleNamespace
+
+        class EmptyRepo:
+            def consistent_snapshot(self):
+                return SimpleNamespace(pets=(), uid=0, version=0)
+
+        catalog = ColorCatalog(static_dir())
+        rows = catalog.cards()
+        if not rows or not getattr(rows[0], "card_id", ""):
+            self.skipTest("色卡目录缺失")
+        fair = [card for card in rows if not ColorCatalog.is_seasonal(card.card_id)]
+        by_base: dict[str, set[str]] = {}
+        for card in fair:
+            by_base.setdefault(card.base_name, set()).add(card.mix_name)
+        fair_keys = {f"{card.base_name}|{card.mix_name}" for card in fair}
+
+        payload = colors_payload(EmptyRepo(), catalog, None)
+        self.assertEqual(payload["card_total"], len(rows))
+        self.assertEqual(len(payload["catalogs"]), len(rows))
+        # 格子元数据 = 每张卡一组底色×混色（含赛季卡自己那组），供前端区分「空位」与「有卡未持有」
+        self.assertTrue(fair_keys <= set(payload["cells"]))
+        self.assertEqual(len(payload["cells"]), len(fair_keys) + len(rows) - len(fair))
+        self.assertLessEqual(len(payload["cells"]), len(rows))
+        for key, cell in payload["cells"].items():
+            self.assertEqual(key, f"{cell['base_name']}|{cell['mix_name']}")
+            self.assertEqual(cell["pet_count"], 0)
+            self.assertTrue(cell["label"])
+        # 赛季卡不进坐标轴：否则矩阵会多出永远不可能有普通卡的一行四列
+        base_order: list[str] = []
+        for card in fair:
+            if card.base_name not in base_order:
+                base_order.append(card.base_name)
+        self.assertEqual([a["name"] for a in payload["base_axis"]], base_order)
+        self.assertNotIn("赛季", [a["name"] for a in payload["base_axis"]])
+        self.assertFalse([a for a in payload["mix_axis"] if a["name"].startswith("S")])
+        # 轴字母按首次出现顺序编号，和轴向量的下标一一对应
+        self.assertEqual(
+            [a["letter"] for a in payload["base_axis"]],
+            [chr(ord("A") + i) for i in range(len(base_order))],
+        )
+        # 卡面标签 = 底色字母 + 混色序号，且不重名（字母按轴内首次出现编号）
+        labels = [c["label"] for c in payload["catalogs"]]
+        self.assertEqual(len(set(labels)), len(labels))
+        self.assertEqual(payload["catalogs"][0]["label"], "A1")
+        self.assertEqual(
+            [a["letter"] for a in payload["base_axis"]],
+            [chr(ord("A") + i) for i in range(len(by_base))],
+        )

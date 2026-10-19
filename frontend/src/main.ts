@@ -9,6 +9,8 @@ export { mountHome } from './homeBridge'
 export { mountCollectionLines } from './collectionLinesBridge'
 export { mountBreederLibrary } from './breederLibraryBridge'
 export { mountBreedingPlanner } from './breedingPlannerBridge'
+export { mountHandbook } from './handbookBridge'
+export { mountColors } from './colorsBridge'
 export { mountPetFilters } from './petFilterBridge'
 export { mountPetInventory } from './petInventoryBridge'
 

@@ -199,33 +199,9 @@
         </div>
       </section>
 
-      <!-- 精灵图鉴 -->
-      <section id="page-handbook" class="page">
-        <div class="workspace split">
-          <section class="content-panel">
-            <div class="panel-toolbar">
-              <span id="hb-count" class="count-badge">收录 0 / 0 种</span>
-              <label class="inline-field">搜索
-                <input id="hb-search" type="text" placeholder="名字 / 图鉴 ID">
-              </label>
-              <label class="inline-field">系别
-                <select id="hb-type"></select>
-              </label>
-              <div class="segmented" id="hb-mode">
-                <button data-mode="all" class="active">全部</button>
-                <button data-mode="collected">已收集</button>
-                <button data-mode="uncollected">未收集</button>
-              </div>
-            </div>
-            <div class="table-wrap">
-              <div id="hb-grid" class="hb-grid"></div>
-              <div id="hb-empty" class="empty-hint" hidden>没有符合筛选条件的物种</div>
-            </div>
-          </section>
-          <aside id="hb-detail" class="detail-panel">
-            <div class="empty-hint">点击左侧图鉴卡片查看详情</div>
-          </aside>
-        </div>
+      <!-- 精灵图鉴（Vue） -->
+      <section id="page-handbook" class="page" data-vue-page>
+        <div class="empty-hint">正在加载图鉴…</div>
       </section>
 
       <!-- 蛋图鉴 -->
@@ -269,32 +245,9 @@
       <section id="page-home" class="page">
         <div id="home-root"></div>
       </section>
-      <!-- 炫彩色卡：底色 × 混色矩阵 -->
-      <section id="page-colors" class="page">
-        <div class="stack">
-          <section class="panel">
-            <div class="panel-head">
-              <h2>色卡矩阵</h2>
-              <span id="cl-meta" class="muted">底色在横轴、混色在纵轴；数据来自宠物帧的 glass 参数</span>
-            </div>
-            <div class="table-wrap">
-              <div id="cl-matrix" class="mm-matrix"></div>
-              <div id="cl-empty" class="empty-hint" hidden>宠物库中没有带色卡的宠物</div>
-            </div>
-          </section>
-          <div class="overview-lower">
-            <section class="panel">
-              <div class="panel-head"><h2>赛季卡</h2><span id="cl-seasonal-count" class="muted"></span></div>
-              <div id="cl-seasonal" class="bl-chips"></div>
-              <div id="cl-seasonal-empty" class="empty-hint" hidden>暂无赛季卡</div>
-            </section>
-            <section class="panel">
-              <div class="panel-head"><h2>未收录编号</h2><span id="cl-unknown-count" class="muted"></span></div>
-              <div id="cl-unknown" class="bl-chips"></div>
-              <div id="cl-unknown-empty" class="empty-hint" hidden>全部色卡都已收录</div>
-            </section>
-          </div>
-        </div>
+      <!-- 炫彩色卡：底色 × 混色矩阵（Vue） -->
+      <section id="page-colors" class="page" data-vue-page>
+        <div class="empty-hint">正在加载色卡…</div>
       </section>
       <!-- 炫彩花种 -->
       <section id="page-flowers" class="page">

@@ -107,6 +107,8 @@
     if (petInventory) { petInventory.unmount(); }
     if (petFilters) { petFilters.unmount(); }
     eggDex.unmount();
+    handbookPage.unmount();
+    colorsPage.unmount();
   });
 
   /* ---------- 小工具 ---------- */
@@ -142,16 +144,6 @@
 
   var TYPE_FALLBACK = "#6b8188";
 
-  function badgeStyle(color) {
-    // 游戏色不变；按WCAG相对亮度选择白/黑字，任意主题下均可读。
-    var rgb = /^#[0-9a-f]{6}$/i.test(color) ? color.slice(1).match(/../g).map(function (part) {
-      var value = parseInt(part, 16) / 255;
-      return value <= .04045 ? value / 12.92 : Math.pow((value + .055) / 1.055, 2.4);
-    }) : [0, 0, 0];
-    var luminance = rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722;
-    return "background:" + color + ";color:" + (luminance > .179 ? "#000000" : "#ffffff");
-  }
-
   /* 解码树着色：`名字 [类型] = 值` 与 `└ 文本: ...` 分色（先转义再套 span，避免注入） */
   function colorizeDecoded(text) {
     var safe = esc(text);
@@ -167,12 +159,6 @@
     page: "overview",
     events: [],
     selectedEventIndex: null,
-    hb: { search: "", type: "", mode: "all" },
-    hbData: null,
-    hbSpecies: [],
-    hbSelected: null,
-    hbTypeBuilt: false,
-    hbLimit: 120,
     capture: null
   };
 
@@ -193,6 +179,8 @@
       petInventory.pause(); petFilters.pause();
     }
     if (state.page === "egg-dex") { eggDex.leave(); }
+    if (state.page === "handbook") { handbookPage.leave(); }
+    if (state.page === "colors") { colorsPage.leave(); }
     window.SpriteLensUI.closeDetail(false, true);
     state.page = name;
     $("page-title").textContent = document.querySelector('.nav-item[data-page="' + name + '"]').textContent.trim();
@@ -209,7 +197,8 @@
       if (revealGid) { petInventory.reveal(revealGid).catch(function (err) { toast("精灵定位失败：" + err.message, true); }); }
       else { loadPets(false, true); }
     }
-    if (name === "handbook") { loadHandbook(false, true); }
+    if (name === "handbook") { handbookPage.load(); }
+    if (name === "colors") { colorsPage.load(); }
     if (name === "egg-dex") { eggDex.load(); }
     if (name === "egg-box") { loadEggBoxPage(true); }
     if (name === "male-matrix") { loadMaleMatrix(); }
@@ -218,7 +207,6 @@
     if (name === "breeder-library") { breederLibrary.load(); }
     if (name === "planner") { breedingPlanner.load(); }
     if (name === "flowers") { loadFlowers(); }
-    if (name === "colors") { loadColors(); }
     if (name === "events") { loadEvents(); }
     if (name === "capture") { loadCapture(); }
   }
@@ -314,22 +302,21 @@
     breedingPlanner.resetAccount();
     if (state.page !== "egg-dex") { window.SpriteLensUI.closeDetail(false, true); }
     petInventory.resetAccount(); petFilters.resetAccount(); state._petsVersion = -1;
-    state.hbData = null; state.hbSpecies = []; state.hbSelected = null;
+    handbookPage.resetAccount();
+    colorsPage.resetAccount();
     eggBoxVersion = -1;
     if (eggBoxPage) { eggBoxPage.resetAccount(); }
     homeVersion = -1;
     if (homePage) { homePage.resetAccount(); }
     flowerState.data = { available: false }; flowerState.version = -1; renderFlowers();
     mmState.data = null; mmState.selected = null;
-    ["hb-grid", "mm-matrix", "cl-matrix", "cl-seasonal", "cl-unknown"].forEach(function (id) {
+    ["mm-matrix", "bl-male", "bl-female"].forEach(function (id) {
       $(id).innerHTML = "";
     });
-    ["hb-count", "mm-count", "cl-meta", "cl-seasonal-count", "cl-unknown-count"].forEach(function (id) {
+    ["mm-count", "bl-male-count", "bl-female-count"].forEach(function (id) {
       $(id).textContent = "等待当前账号数据";
     });
-    ["hb-detail", "mm-detail"].forEach(function (id) {
-      $(id).innerHTML = '<div class="empty-hint">请选择当前账号的条目</div>';
-    });
+    $("mm-detail").innerHTML = '<div class="empty-hint">请选择当前账号的条目</div>';
   }
 
   function renderState(payload) {
@@ -399,8 +386,8 @@
     var version = payload.pets_version;
     if (version !== undefined && version !== state._petsVersion) {
       state._petsVersion = version;
-      var refresh = { pets: loadPets, handbook: loadHandbook, "male-matrix": loadMaleMatrix,
-        "breeder-library": function () { breederLibrary.load(); }, colors: loadColors };
+      var refresh = { pets: loadPets, handbook: function () { return handbookPage.load(); }, "male-matrix": loadMaleMatrix,
+        "breeder-library": function () { return breederLibrary.load(); }, colors: function () { return colorsPage.load(); } };
       if (refresh[state.page]) { refresh[state.page](false); }
       if (state.page === "home") { loadHome(false); }
       if (state.page === "collection-lines") { collectionLines.load(); }
@@ -420,198 +407,28 @@
     });
   }
 
-  /* ---------- 精灵图鉴 ---------- */
-  var HB_PAGE_SIZE = 120; // 一次渲染上限：1015 个富卡片全量入 DOM 会明显卡顿
-  var hbQuery = "";
-
-  function loadHandbook(resetLimit, reuse) {
-    if (resetLimit !== false) { state.hbLimit = HB_PAGE_SIZE; }
-    var params = {
-      search: state.hb.search,
-      type: state.hb.type,
-      collected: state.hb.mode === "collected" ? "1" : "",
-      uncollected: state.hb.mode === "uncollected" ? "1" : ""
+  /* ---------- 精灵图鉴（Vue 页，挂载后由页面自己拉数据） ---------- */
+  var handbookPage = (function () {
+    var mounted = null;
+    return {
+      load: function () {
+        if (mounted) { mounted.resume(); return; }
+        var root = $("page-handbook");
+        root.textContent = "正在加载图鉴…";
+        return import("/static/vue/entry.js").then(function (page) {
+          mounted = page.mountHandbook(root, TOKEN, {
+            failed: function (message) { toast("图鉴加载失败：" + message, true); }
+          });
+        }).catch(function (err) {
+          root.textContent = "图鉴启动失败，请切页重试：" + err.message;
+          toast("图鉴启动失败：" + err.message, true);
+        });
+      },
+      leave: function () { if (mounted) { mounted.pause(); } },
+      resetAccount: function () { if (mounted) { mounted.resetAccount(); } },
+      unmount: function () { if (mounted) { mounted.unmount(); mounted = null; } }
     };
-    var path = "/api/handbook" + query(params);
-    var owner = accountRequests.petContext();
-    if (reuse && state.hbData && state.hbData.uid === owner.uid
-        && state.hbData.version >= owner.version && hbQuery === path) { return Promise.resolve(); }
-    return accountRequests.request("handbook", path).then(function (payload) {
-      if (!payload) { return; }
-      state.hbData = payload;
-      hbQuery = path;
-      state.hbSpecies = payload.species || [];
-      renderHandbook(payload);
-    }).catch(function (err) { toast("图鉴加载失败：" + err.message, true); });
-  }
-
-  function renderHandbook(payload) {
-    $("hb-count").textContent = "收录 " + (payload.collected || 0) + " / " + (payload.total || 0) + " 种";
-    var all = payload.species || [];
-    var shown = all.slice(0, state.hbLimit);
-    var remaining = all.length - shown.length;
-    $("hb-empty").hidden = all.length > 0;
-
-    // 系别下拉与模式按钮只建一次
-    if (!state.hbTypeBuilt && (payload.type_options || []).length) {
-      state.hbTypeBuilt = true;
-      $("hb-type").innerHTML = '<option value="">全部系别</option>'
-        + payload.type_options.map(function (name) {
-            return '<option value="' + esc(name) + '">' + esc(name) + "</option>";
-          }).join("");
-    }
-
-    $("hb-grid").innerHTML = shown.map(function (item) {
-      var types = (item.type_names || []).map(function (name, index) {
-        var color = (item.type_colors || [])[index] || TYPE_FALLBACK;
-        return '<span class="type-badge" style="' + badgeStyle(color) + '">' + esc(name) + "</span>";
-      }).join(" ");
-      var evo = (item.evolutions || []).length
-        ? '<div class="hb-evo">进化 → <b>' + esc(item.evolutions[0].name) + "</b>"
-          + (item.evolutions.length > 1 ? " 等 " + item.evolutions.length + " 条" : "") + "</div>"
-        : "";
-      var badge = item.collected
-        ? '<span class="hb-badge">拥有 ' + item.owned_count + " · Lv" + item.best_level + "</span>"
-        : '<span class="hb-badge none">未收集</span>';
-      var dexLabel = item.handbook_no || (item.dex_no ? String(item.dex_no) : item.key);
-      var img = item.icon_url
-        ? '<img src="' + esc(item.icon_url) + '" alt="" loading="lazy" onerror="this.remove()">'
-        : "";
-      return '<article class="hb-card' + (item.collected ? "" : " uncollected")
-        + '" data-key="' + esc(item.key) + '" role="button" tabindex="0" aria-label="查看' + esc(item.name) + '详情">'
-        + '<div class="hb-head"><span class="hb-key">' + esc(dexLabel) + "</span>"
-        + '<span class="hb-art">' + esc((item.name || "?").slice(0, 1)) + img + "</span>"
-        + "<div><strong>" + esc(item.name) + "</strong>"
-        + "<small>" + (item.stage ? "第 " + item.stage + " 阶" : "") + "</small></div></div>"
-        + '<div class="hb-meta">' + (types || '<span class="muted">—</span>')
-        + '<span class="hb-sum">六维 ' + (item.stat_sum || "—") + "</span></div>"
-        + badge + evo
-        + "</article>";
-    }).join("");
-
-    // 分批渲染的「显示更多」：剩余过多时给出提示，避免误解为只收录了这些
-    if (remaining > 0) {
-      var footer = document.createElement("div");
-      footer.className = "hb-more";
-      footer.innerHTML = '<button id="hb-more-btn" class="ghost-button small">显示更多（剩余 '
-        + remaining + " 种）</button>";
-      $("hb-grid").appendChild(footer);
-      footer.querySelector("#hb-more-btn").addEventListener("click", function () {
-        state.hbLimit += HB_PAGE_SIZE * 2;
-        renderHandbook(state.hbData);
-      });
-    }
-
-    $("hb-grid").querySelectorAll(".hb-card").forEach(function (card) {
-      card.addEventListener("click", function () {
-        state.hbSelected = card.dataset.key;
-        $("hb-grid").querySelectorAll(".hb-card").forEach(function (node) {
-          node.classList.toggle("active", node === card);
-        });
-        renderHandbookDetail(state.hbSelected);
-      });
-    });
-    if (state.hbSelected) { renderHandbookDetail(state.hbSelected); }
-  }
-
-  function findSpecies(key) {
-    for (var i = 0; i < (state.hbSpecies || []).length; i++) {
-      if (state.hbSpecies[i].key === key) { return state.hbSpecies[i]; }
-    }
-    return null;
-  }
-
-  function renderHandbookDetail(key) {
-    var item = findSpecies(key);
-    var panel = $("hb-detail");
-    if (!item) {
-      panel.innerHTML = '<div class="empty-hint">点击左侧图鉴卡片查看详情</div>';
-      return;
-    }
-    var stats = item.stats || {};
-    var peak = Math.max.apply(null, Object.keys(stats).map(function (k) { return stats[k]; }).concat([1]));
-    var labels = { hp: "生命", atk: "物攻", spa: "魔攻", def: "物防", spd: "魔防", spe: "速度" };
-    var rows = ["hp", "atk", "spa", "def", "spd", "spe"].map(function (slot) {
-      var value = stats[slot] || 0;
-      return "<tr><td>" + labels[slot] + '</td><td class="num">' + value + "</td>"
-        + '<td class="bar"><span class="detail-bar"><i style="width:'
-        + Math.round((value / peak) * 100) + '%"></i></span></td></tr>';
-    }).join("");
-
-    var types = (item.type_names || []).map(function (name, index) {
-      var color = (item.type_colors || [])[index] || TYPE_FALLBACK;
-      return '<span class="type-badge" style="' + badgeStyle(color) + '">' + esc(name) + "</span>";
-    }).join(" ") || '<span class="muted">—</span>';
-
-    var chain = (item.chain_members || []).length ? item.chain_members : item.evolutions || [];
-    var evoHtml = chain.length
-      ? chain.map(function (evo) {
-          return '<span class="skill-chip">' + esc(evo.name) + "（" + esc(evo.key) + "）</span>";
-        }).join("")
-      : '<span class="muted">无进化记录</span>';
-
-    var owned = item.collected
-      ? '<b class="positive">已收集</b> · 拥有 ' + item.owned_count + " 只 · 最高 Lv" + item.best_level
-      : '<span class="muted">尚未收集</span>';
-
-    var metaLines = [];
-    var dexText = item.handbook_no || (item.dex_no ? String(item.dex_no) : "");
-    if (dexText) { metaLines.push("图鉴号 " + esc(dexText)); }
-    var ratio = item.gender_ratio || [0, 0];
-    if (ratio[0] || ratio[1]) {
-      metaLines.push("性别比 ♂" + ratio[0] + "% / ♀" + ratio[1] + "%");
-    }
-    if (item.has_shiny) { metaLines.push("有闪光形态"); }
-
-    panel.innerHTML =
-      '<div class="detail-title"><h2>' + esc(item.name) + "</h2>"
-      + '<span class="muted">#' + esc(item.key) + "</span></div>"
-      + '<div class="detail-sub">' + owned + "</div>"
-      + (metaLines.length ? '<div class="detail-sub">' + metaLines.join(" · ") + "</div>" : "")
-
-      + (item.description
-        ? '<div class="detail-section"><h3>图鉴描述</h3><p class="species-desc">' + esc(item.description) + "</p></div>"
-        : "")
-
-      + '<div class="detail-section"><h3>系别</h3><div class="info-line">' + types + "</div></div>"
-
-      + ((item.egg_groups || []).length
-          ? '<div class="detail-section"><h3>蛋组</h3><div class="skill-list">'
-            + item.egg_groups.map(function (g) { return '<span class="skill-chip">' + esc(g) + "</span>"; }).join("")
-            + "</div></div>"
-          : "")
-
-      + window.SpriteLensAppearance.ranges("物种参考范围", item.reference_ranges)
-      + '<div class="detail-section"><h3>种族值</h3>'
-      + '<table class="stat-table"><tbody>' + rows + "</tbody></table>"
-      + '<div class="info-line muted">总和 ' + (item.stat_sum || 0)
-      + (item.max_energy ? " · 最大能量 " + item.max_energy : "")
-      + (item.quality ? " · 品质 " + item.quality : "") + "</div></div>"
-
-      + '<div class="detail-section"><h3>进化链</h3><div class="skill-list">' + evoHtml + "</div></div>";
-  }
-
-  function bindHandbookFilters() {
-    var timer = null;
-    $("hb-search").addEventListener("input", function (event) {
-      state.hb.search = event.target.value.trim();
-      clearTimeout(timer);
-      timer = setTimeout(loadHandbook, 220);
-    });
-    $("hb-type").addEventListener("change", function () {
-      state.hb.type = $("hb-type").value;
-      loadHandbook();
-    });
-    $("hb-mode").querySelectorAll("button").forEach(function (node) {
-      node.addEventListener("click", function () {
-        state.hb.mode = node.dataset.mode;
-        $("hb-mode").querySelectorAll("button").forEach(function (item) {
-          item.classList.toggle("active", item === node);
-        });
-        loadHandbook();
-      });
-    });
-  }
+  })();
 
   /* ---------- 协议流 ---------- */
   function loadEvents() {
@@ -1004,6 +821,29 @@
       petFilters.search(String(chip.dataset.mm));
       loadPets();
     });
+    document.getElementById("page-breeder-library").addEventListener("click", function (event) {
+      var chip = event.target.closest("[data-mm]");
+      if (!chip) { return; }
+      switchPage("pets");
+      petFilters.search(String(chip.dataset.mm));
+      loadPets();
+    });
+    // 页面内的跨页入口：接管成 switchPage，Vue 页只声明目标，不自己改路由。
+    function bindPageLinks(rootId) {
+      var root = $(rootId);
+      if (!root) { return; }
+      root.addEventListener("click", function (event) {
+        var toPage = event.target.closest("[data-goto-page]");
+        if (toPage) { switchPage(String(toPage.dataset.gotoPage)); return; }
+        var toPets = event.target.closest("[data-goto-pets]");
+        if (!toPets) { return; }
+        // 图鉴详情按物种名回背包预筛：名字命中即该物种的全部个体。
+        switchPage("pets");
+        petFilters.search(String(toPets.dataset.gotoPets));
+        loadPets();
+      });
+    }
+    ["page-handbook", "page-egg-dex", "egg-box-root"].forEach(bindPageLinks);
     $("mm-matrix").addEventListener("click", function (event) {
       var chip = event.target.closest("[data-mm]");
       if (chip) {
@@ -1087,13 +927,6 @@
   }
 
   /* ---------- 炫彩色卡 ---------- */
-  function loadColors() {
-    accountRequests.request("colors", "/api/colors").then(function (payload) {
-      if (payload) { renderColors(payload); }
-    }).catch(function (err) {
-      toast("色卡加载失败：" + err.message, true);
-    });
-  }
 
   function petChip(pet, withLevel) {
     var mark = '<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/static/icons/sprite.svg#gender-' + (pet.gender === 2 ? "female" : "male") + '"></use></svg>';
@@ -1102,49 +935,28 @@
       + (withLevel === false ? "" : '<small>Lv' + pet.level + "</small>") + "</span>" + window.SpriteLensPetPresentation.colorCard(pet.color_card);
   }
 
-  function axisSwatch(axis) {
-    return axis && axis.hex
-      ? '<i class="swatch" style="background:' + esc(axis.hex) + '"></i>' : "";
-  }
-
-  function renderColors(payload) {
-    var baseAxis = payload.base_axis || [];
-    var mixAxis = payload.mix_axis || [];
-    var matrix = payload.matrix || {};
-    var head = '<tr><th class="mm-corner">混色 \ 底色</th>' + baseAxis.map(function (b) {
-      return "<th>" + axisSwatch(b) + esc(b.name) + "</th>";
-    }).join("") + "</tr>";
-    var body = mixAxis.map(function (mix) {
-      var cells = baseAxis.map(function (base) {
-        var pets = matrix[base.name + "|" + mix.name];
-        if (!pets) { return "<td class='mm-cell empty'>—</td>"; }
-        var chips = pets.map(petChip).join("");
-        return '<td class="mm-cell">' + chips + "</td>";
-      }).join("");
-      return '<tr><th class="mm-rowhead">' + axisSwatch(mix) + "<b>" + esc(mix.name) + "</b></th>" + cells + "</tr>";
-    }).join("");
-    $("cl-matrix").innerHTML = "<table><thead>" + head + "</thead><tbody>" + body + "</tbody></table>";
-    $("cl-empty").hidden = (payload.pet_total || 0) > 0;
-    /* 收录卡数：矩阵内 + 赛季卡涉及的卡号去重 */
-    var seen = {};
-    Object.keys(matrix).forEach(function (key) {
-      (matrix[key] || []).forEach(function (pet) { seen[pet.card_id] = true; });
-    });
-    var seasonal = payload.seasonal || [];
-    seasonal.forEach(function (pet) { seen[pet.card_id] = true; });
-    var collected = Object.keys(seen).length;
-    $("cl-meta").textContent = "收录 " + collected + " / " + payload.card_total + " 张 · 持有者 "
-      + payload.pet_total + " 只 · 赛季卡 " + seasonal.length + " 只";
-    $("cl-seasonal").innerHTML = seasonal.map(petChip).join("");
-    $("cl-seasonal-count").textContent = seasonal.length + " 只";
-    $("cl-seasonal-empty").hidden = seasonal.length > 0;
-    var unknown = payload.unknown || [];
-    $("cl-unknown").innerHTML = unknown.map(function (pet) {
-      return petChip(pet) + '<span class="muted">#' + esc(pet.card_id) + "</span>";
-    }).join("");
-    $("cl-unknown-count").textContent = unknown.length + " 只";
-    $("cl-unknown-empty").hidden = unknown.length > 0;
-  }
+  /* ---------- 炫彩色卡（Vue 页，挂载后由页面自己拉数据） ---------- */
+  var colorsPage = (function () {
+    var mounted = null;
+    return {
+      load: function () {
+        if (mounted) { mounted.resume(); return; }
+        var root = $("page-colors");
+        root.textContent = "正在加载色卡…";
+        return import("/static/vue/entry.js").then(function (page) {
+          mounted = page.mountColors(root, TOKEN, {
+            failed: function (message) { toast("色卡加载失败：" + message, true); }
+          });
+        }).catch(function (err) {
+          root.textContent = "色卡启动失败，请切页重试：" + err.message;
+          toast("色卡启动失败：" + err.message, true);
+        });
+      },
+      leave: function () { if (mounted) { mounted.pause(); } },
+      resetAccount: function () { if (mounted) { mounted.resetAccount(); } },
+      unmount: function () { if (mounted) { mounted.unmount(); mounted = null; } }
+    };
+  })();
 
   var lastImageMode = "portrait";
   document.addEventListener("preferenceschanged", function (event) { if (petFilters) { petFilters.setShortcuts(event.detail.shortcuts); } });
@@ -1200,7 +1012,6 @@
       renderCapture(payload.capture || {});
       renderState(payload.state || {});
       renderFeaturePlaceholders();
-      bindHandbookFilters();
       bindMaleMatrixActions();
       bindCaptureActions();
       loadIfaces();

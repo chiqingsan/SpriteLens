@@ -233,6 +233,7 @@ defineExpose({
           <span v-if="model.data.value?.hatching !== null && model.data.value" class="eggbox-hatching-count">在孵 {{ model.data.value.hatching }} 枚</span>
         </div>
         <div class="eggbox-list-controls">
+          <button type="button" class="ghost-button small" data-goto-page="egg-dex" title="到蛋图鉴查蛋的孵化与蛋组信息">蛋图鉴</button>
           <button type="button" class="eggbox-sort" :class="model.filters.ascending ? 'eggbox-sort--ascending' : 'eggbox-sort--descending'"
             :aria-pressed="!model.filters.ascending"
             :aria-label="`当前按获得时间${model.filters.ascending ? '升序' : '倒序'}排列，点击切换为${model.filters.ascending ? '倒序' : '升序'}`"

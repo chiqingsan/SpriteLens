@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import replace
 from math import trunc
 
+from spritelens.domain.color_cards import ColorCatalog
 from spritelens.domain.static_data import StaticData
 from spritelens.domain.display import TYPE_COLORS
 from spritelens.domain.egg_box import EGG_KIND_LABELS, egg_kind
@@ -27,6 +28,27 @@ def species_icon_url(base_conf_id: int) -> str:
     return pet_images(base_conf_id)["portrait_url"]
 
 
+def _handbook_haystacks(key: str, info) -> tuple[str, ...]:
+    """图鉴可检索字段（全小写）。
+
+    卡面印的是 handbook_no，但原实现只匹配 name 与 base_conf_id，导致
+    「照着卡面编号搜不到、反而搜出一堆无关物种」；dex_no 同理。
+    """
+    return tuple(text.lower() for text in (
+        info.name, info.display_name, key, str(info.dex_no), info.handbook_no,
+    ) if text)
+
+
+def _handbook_exact_match(needle: str, key: str, info) -> bool:
+    """编号精确命中：handbook_no / dex_no 整串相等（dex_no 按数值比）。
+
+    只看编号字段，不含 base_conf_id——后者是「3002 含 002」这类子串命中的来源。
+    """
+    if needle == info.handbook_no.lower():
+        return True
+    return needle.isdigit() and int(needle) == info.dex_no
+
+
 def handbook_payload(
     static: StaticData | None,
     repository: PetRepository,
@@ -40,6 +62,12 @@ def handbook_payload(
 
     收集状态以「会话快照里出现过该 base_conf_id」为准（与宠物仓库同源）；
     图鉴是只读视图，不做独立持久化——快照本身已由本地库恢复。
+
+    搜索匹配 name / display_name / base_conf_id / dex_no / handbook_no。
+    编号精确命中优先：检索词整串等于某个物种的 handbook_no 或 dex_no 时，
+    只返回这些物种，不再混入子串兜底结果——「002」原先会连带命中 3002、
+    5002 等一堆 base_conf_id 含「002」的无关物种。无精确命中才退回子串匹配，
+    因此按名称搜（如「烈焰」）行为不变。
     """
     snapshot = repository.consistent_snapshot()
     if static is None:
@@ -65,21 +93,33 @@ def handbook_payload(
         entry["max_level"] = max(entry["max_level"], pet.level)
 
     needle = search.strip().lower()
+
+    def matches(key: str, info) -> bool:
+        if type_name and type_name not in info.type_names:
+            return False
+        if collected_only and key not in owned:
+            return False
+        if uncollected_only and key in owned:
+            return False
+        return True
+
     rows: list[dict] = []
+    exact_rows: list[dict] = []
     type_names_seen: set[str] = set()
     for key, info in static.species_items():
         type_names_seen.update(info.type_names)
-        if type_name and type_name not in info.type_names:
-            continue
-        if needle and needle not in info.name.lower() and needle not in key:
+        if needle:
+            exact = _handbook_exact_match(needle, key, info)
+            if not exact and not any(
+                needle in text for text in _handbook_haystacks(key, info)
+            ):
+                continue
+        else:
+            exact = False
+        if not matches(key, info):
             continue
         own = owned.get(key)
-        if collected_only and own is None:
-            continue
-        if uncollected_only and own is not None:
-            continue
-        rows.append(
-            {
+        row = {
                 "key": key,
                 "name": info.name,
                 "display_name": info.display_name,
@@ -111,7 +151,12 @@ def handbook_payload(
                 "best_level": own["max_level"] if own else 0,
                 "description": info.description,
             }
-        )
+        rows.append(row)
+        if exact:
+            exact_rows.append(row)
+    # 编号精确命中优先：有人认领编号时不再混入子串兜底结果
+    if exact_rows:
+        rows = exact_rows
     return {
         "species": rows,
         "uid": snapshot.uid, "version": snapshot.version, "complete": None,
@@ -224,20 +269,89 @@ def flowers_payload(flower_repo, static: StaticData | None, catalog=None, pet_re
         "friends": friends,
         **metadata,
     }
+def _color_axis(cards, attr: str, color_attr: str) -> tuple[dict[str, str], dict[str, str]]:
+    """颜色轴：名称 → 色值（加载顺序）+ 名称 → 轴字母。
+
+    字母按首次出现顺序编号（A、B、C…），用于卡面「底色字母+混色数字」标签。
+    mock/降级路径可能没有 color 字段，故 getattr 防御。
+    """
+    letters: dict[str, str] = {}
+    colors: dict[str, str] = {}
+    for card in cards:
+        name = getattr(card, attr, "")
+        if not name or name in letters:
+            continue
+        letters[name] = chr(ord("A") + (len(letters) % 26))
+        colors[name] = getattr(card, color_attr, None) or ""
+    return colors, letters
+
+
+def _matrix_key(base_name: str, mix_name: str) -> str:
+    return f"{base_name}|{mix_name}"
+
+
 def colors_payload(pet_repository, catalog, static: StaticData | None) -> dict:
     """炫彩色卡载荷：宠物库按 glass → 卡号聚合，输出底色×混色矩阵。
 
-    蛋神同款交互：底色在横轴、混色在纵轴；未收录的卡号（glass 在但目录无）
-    与赛季卡单独分组。
+    蛋神同款交互：底色在横轴、混色在纵轴；赛季卡与未解析编号单独分组。
+
+    格子三态由三个字段的键共同表达，前端不再需要自己推算：
+    - catalogs: 目录内卡号清单（含卡面标签 base_letter+mix_letter 与配色名）。
+    - cells[键] = {card_id, card_number, base_name, mix_name, base_color, mix_color,
+      base_letter, mix_letter, label, names, pet_count}：本地目录里存在这张卡。
+    - matrix[键]: 当前账号抽到了这张卡。cells 有键而 matrix 无键 = 有卡未持有；
+      两者都无键 = 该底色×混色组合在本作里没有卡。
+    - unknown: card_id 解析为空（unresolved=True，glass 值不在目录编码规则内）
+      或解析出编号但本地目录没有这张卡（unresolved=False）。
+
+    轴的几何只由普通卡决定：赛季卡（s1-s4）的底色名「赛季」、混色名「S1..S4」不进
+    坐标轴，否则矩阵会多出永远不可能有普通卡的一行四列，把 44 张卡摊成 128 格。
     """
     cards = catalog.cards() if catalog is not None else ()
     snapshot = pet_repository.consistent_snapshot() if pet_repository is not None else None
-    # 轴带目录色（mock/降级路径可能没有 color 字段，getattr 防御）
-    base_map: dict[str, str | None] = {}
-    mix_map: dict[str, str | None] = {}
+    fair_cards = tuple(
+        card for card in cards if not ColorCatalog.is_seasonal(str(getattr(card, "card_id", "") or ""))
+    )
+    base_colors, base_letters = _color_axis(fair_cards, "base_name", "base_color")
+    mix_colors, mix_letters = _color_axis(fair_cards, "mix_name", "mix_color")
+
+    def card_face(card) -> dict:
+        """卡面标签：底色字母 + 混色数字（与卡面印刷一致），配色名自解释。"""
+        base_letter = base_letters.get(card.base_name, "")
+        mix_number = mix_letters.get(card.mix_name, "")
+        number = ""
+        if mix_number:
+            number = str(ord(mix_number) - ord("A") + 1)
+        # 赛季卡不在网格里，没有网格标签；用混色名（S1..S4）当卡面标签，避免标签为空。
+        label = f"{base_letter}{number}".strip() or card.mix_name
+        return {
+            "card_id": card.card_id,
+            "card_number": card.card_id,
+            "base_name": card.base_name,
+            "mix_name": card.mix_name,
+            "base_color": getattr(card, "base_color", "") or "",
+            "mix_color": getattr(card, "mix_color", "") or "",
+            "base_letter": base_letter,
+            "mix_letter": mix_number,
+            "label": label,
+            "names": f"{card.base_name}底 · {card.mix_name}混",
+        }
+
+    # 目录清单：卡号 → 卡面信息（带 card_id 的才进目录，mock 对象可缺）
+    catalogs: list[dict] = []
+    cell_meta: dict[str, dict] = {}
     for card in cards:
-        base_map.setdefault(card.base_name, getattr(card, "base_color", None))
-        mix_map.setdefault(card.mix_name, getattr(card, "mix_color", None))
+        card_id = str(getattr(card, "card_id", "") or "")
+        if not card_id:
+            continue
+        face = card_face(card)
+        catalogs.append(face)
+        # 同色对多卡号时保留卡号最小的一张作为格子代表（编号稳定可比）
+        key = _matrix_key(card.base_name, card.mix_name)
+        existing = cell_meta.get(key)
+        if existing is None or card_id < existing["card_id"]:
+            cell_meta[key] = face
+
     matrix: dict[str, list[dict]] = {}
     seasonal: list[dict] = []
     unknown: list[dict] = []
@@ -259,20 +373,38 @@ def colors_payload(pet_repository, catalog, static: StaticData | None) -> dict:
             "color_card": catalog.effect_for(pet.glass_type, pet.glass_value),
         }
         total += 1
+        if not card_id:
+            # 编号没解析出来：glass 有值但 card_id_for 返回空串。放进「未解析」而不是
+            # 让前端渲染一个没有编号的裸卡面（原实现会显示孤立的「#」）。
+            summary["unresolved"] = True
+            unknown.append(summary)
+            continue
         if card_id.startswith("s"):
             seasonal.append(summary)
             continue
         card = catalog.card(card_id)
         if card is None:
+            # 编号能解析、但本地目录没有这张卡（目录版本落后）：按编号单列，不猜底色/混色
+            summary["unresolved"] = False
             unknown.append(summary)
             continue
-        matrix.setdefault(f"{card.base_name}|{card.mix_name}", []).append(summary)
+        summary["base_name"] = card.base_name
+        summary["mix_name"] = card.mix_name
+        matrix.setdefault(_matrix_key(card.base_name, card.mix_name), []).append(summary)
+    # 格子元数据：catalogs 的键 = 目录里有这张卡，matrix 的键 = 当前账号抽到了。
+    # 两者都不在 = 该底色×混色组合在本作里根本没有卡（44 张卡只填 128 格中的一部分）。
+    cells = {
+        key: {**meta, "pet_count": len(matrix.get(key, ()))}
+        for key, meta in cell_meta.items()
+    }
     return {
-        "base_axis": [{"name": n, "hex": h} for n, h in base_map.items()],
+        "base_axis": [{"name": n, "hex": h, "letter": base_letters[n]} for n, h in base_colors.items()],
         "uid": snapshot.uid if snapshot else 0, "version": snapshot.version if snapshot else 0,
         "complete": None,
-        "mix_axis": [{"name": n, "hex": h} for n, h in mix_map.items()],
+        "mix_axis": [{"name": n, "hex": h, "letter": mix_letters[n]} for n, h in mix_colors.items()],
         "matrix": matrix,
+        "cells": cells,
+        "catalogs": catalogs,
         "seasonal": seasonal,
         "unknown": unknown,
         "card_total": len(cards),

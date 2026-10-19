@@ -480,13 +480,13 @@ class HandbookPayloadTest(unittest.TestCase):
         (static_dir / "species.json").write_text(
             json.dumps(
                 {
-                    "100": {"name": "火兽", "types": [1], "type_names": ["火"],
+                    "100": {"name": "火兽", "handbook_no": "002", "types": [1], "type_names": ["火"],
                             "stats": {"hp": 100, "sum": 500}, "quality": 3, "stage": 1,
                             "max_energy": 10, "evolutions": [200]},
-                    "200": {"name": "烈焰兽", "types": [1], "type_names": ["火"],
+                    "200": {"name": "烈焰兽", "handbook_no": "003", "types": [1], "type_names": ["火"],
                             "stats": {"hp": 120, "sum": 560}, "quality": 4, "stage": 2,
                             "max_energy": 15, "evolutions": []},
-                    "300": {"name": "水兽", "types": [2], "type_names": ["水"],
+                    "300": {"name": "水兽", "handbook_no": "012", "types": [2], "type_names": ["水"],
                             "stats": {"hp": 90, "sum": 480}, "quality": 2, "stage": 1,
                             "max_energy": 10, "evolutions": []},
                 },
@@ -545,6 +545,48 @@ class HandbookPayloadTest(unittest.TestCase):
             [row["key"] for row in self._payload(search="烈焰")["species"]], ["200"]
         )
         self.assertEqual([row["key"] for row in self._payload(search="300")["species"]], ["300"])
+
+    def test_search_finds_zero_padded_handbook_number(self):
+        """卡面编号（handbook_no，如「002」）必须能搜到——原实现只比 name/base_conf_id。"""
+        from spritelens.domain.static_data import StaticData
+
+        with tempfile.TemporaryDirectory() as tmp:
+            static_dir = Path(tmp)
+            (static_dir / "species.json").write_text(
+                json.dumps(
+                    {
+                        "3001": {"name": "喵喵", "handbook_no": "002", "types": [1], "type_names": ["火"],
+                                 "stats": {"hp": 100, "sum": 500}, "quality": 3,
+                                 "stage": 1, "max_energy": 10, "evolutions": []},
+                        "3002": {"name": "水蓝蓝", "handbook_no": "008", "types": [2], "type_names": ["水"],
+                                 "stats": {"hp": 100, "sum": 500}, "quality": 3,
+                                 "stage": 1, "max_energy": 10, "evolutions": []},
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            for name in ("natures.json", "types.json", "skills.json"):
+                (static_dir / name).write_text("{}", encoding="utf-8")
+            static = StaticData(static_dir)
+            numbered = [(key, info.handbook_no) for key, info in static.species_items()]
+            if not any(no for _, no in numbered):
+                self.skipTest("该静态表未提供 handbook_no")
+            # 整串编号（含补零写法）精确命中：只回归属该编号的物种
+            for key, handbook_no in numbered:
+                if not handbook_no:
+                    continue
+                with self.subTest(handbook_no=handbook_no):
+                    rows = handbook_payload(
+                        static, self.context.pet_repository, search=handbook_no
+                    )["species"]
+                    self.assertIn(key, [row["key"] for row in rows])
+            # 「002」不再连带 base_conf_id 里含 002 的无关物种（如 3002）
+            payload = handbook_payload(static, self.context.pet_repository, search="002")
+            keys = [row["key"] for row in payload["species"]]
+            self.assertEqual(
+                keys, [k for k, no in numbered if no and no.lstrip("0") == "2"]
+            )
 
 if __name__ == "__main__":
     unittest.main()

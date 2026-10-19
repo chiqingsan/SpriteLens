@@ -86,6 +86,11 @@ class ColorCatalog:
     def available(self) -> bool:
         return bool(self._cards)
 
+    @staticmethod
+    def is_seasonal(card_id: str) -> bool:
+        """赛季卡（s1-s4）不属于普通底色×混色网格，栏目单独成组。"""
+        return card_id.startswith("s") and card_id[1:] in _SEASON_IDS
+
     def effect_for(self, glass_type: int, glass_value: int) -> dict | None:
         """低 20 位为卡号，高位 1..4 为粒子；未知粒子不猜测。"""
         card_id = self.card_id_for(glass_type, glass_value)

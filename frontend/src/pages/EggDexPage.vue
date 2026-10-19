@@ -69,12 +69,13 @@ onUnmounted(() => { observer.disconnect(); close(false); narrow.removeEventListe
   <div class="workspace split" :class="{ 'detail-collapsed': !egg }" data-vue-page>
     <section ref="content" class="content-panel" :aria-busy="loading">
       <div class="panel-toolbar">
-        <span id="ed-count" class="count-badge">收录 {{ data?.shown || 0 }} / {{ data?.total || 0 }} 种蛋</span>
+        <span id="ed-count" class="count-badge">命中 {{ data?.shown || 0 }} / 全部 {{ data?.total || 0 }} 种蛋</span>
         <label class="inline-field">搜索<input id="ed-search" v-model="filters.search" type="text" placeholder="名字 / 蛋编号"></label>
         <label class="inline-field">蛋组<select id="ed-group" v-model="filters.group"><option value="">全部蛋组</option><option v-for="group in data?.groups" :key="group">{{ group }}</option></select></label>
         <label class="inline-field">类型<select id="ed-type" v-model="filters.egg_type"><option value="">全部类型</option><option v-for="type in data?.egg_types" :key="type">{{ type }}</option></select></label>
         <label class="inline-field">孵化时长<select id="ed-hatch" v-model="filters.hatch_min_hours"><option value="">全部</option><option v-for="hours in [8, 12, 16, 20]" :key="hours" :value="String(hours)">≥ {{ hours }} 小时</option></select></label>
         <button type="button" class="ghost-button small" @click="clear">清除筛选</button>
+        <button type="button" class="ghost-button small" data-goto-page="egg-box" title="到精灵蛋仓看我已获得的蛋">我的精灵蛋仓</button>
       </div>
       <div ref="viewport" class="table-wrap">
         <div v-if="loading && !data" class="empty-hint" role="status"><UiIcon name="clock" />正在加载蛋图鉴…</div>

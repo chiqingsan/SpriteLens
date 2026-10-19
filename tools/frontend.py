@@ -55,12 +55,16 @@ def build() -> int:
     manifest = json.loads((stage / ".vite/manifest.json").read_text(encoding="utf-8"))
     entry = manifest["src/main.ts"]
     # 稳定入口由旧壳动态 import，媒体继续使用现有 /static 路径。
+    # 新增页面桥必须同步登记在这里：漏登记时壳只会在浏览器里报「xxx is not a function」。
+    mounts = ("mount", "mountEggBox", "mountHome", "mountCollectionLines",
+              "mountBreederLibrary", "mountBreedingPlanner", "mountPetFilters",
+              "mountPetInventory", "mountHandbook", "mountColors")
     styles = sorted({name for chunk in manifest.values() for name in chunk.get("css", [])})
     loader = "".join(
         f"const link{i} = document.createElement('link'); link{i}.rel = 'stylesheet'; "
         f"link{i}.href = '/static/vue/{name}'; document.head.appendChild(link{i});\n"
         for i, name in enumerate(styles))
-    loader += f"export {{ mount, mountEggBox, mountHome, mountCollectionLines, mountBreederLibrary, mountBreedingPlanner, mountPetFilters, mountPetInventory }} from './{entry['file']}';\n"
+    loader += f"export {{ {', '.join(mounts)} }} from './{entry['file']}';\n"
     (stage / "entry.js").write_text(loader, encoding="utf-8", newline="\n")
     outputs = {path.relative_to(stage).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
                for path in sorted(stage.rglob("*")) if path.is_file()}
