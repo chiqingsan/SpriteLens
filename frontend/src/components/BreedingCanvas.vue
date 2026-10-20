@@ -147,7 +147,9 @@ function key(event: KeyboardEvent, gid: string) {
           <rect x="-32" y="-32" width="64" height="64" rx="8" />
           <title>{{ parents.get(position.gid)?.name || '记录缺失' }}</title>
           <text x="-25" y="-17" class="planner-nest-number">{{ index + 1 }}</text>
-          <UiIcon :name="parents.get(position.gid)?.gender === 1 ? 'gender-male' : 'gender-female'" x="16" y="-29" class="planner-nest-gender" />
+          <svg x="16" y="-29" width="16" height="16" viewBox="0 0 24 24" class="planner-nest-gender" aria-hidden="true">
+            <use :href="`/static/icons/sprite.svg#${parents.get(position.gid)?.gender === 1 ? 'gender-male' : 'gender-female'}`" width="24" height="24" />
+          </svg>
           <image v-if="parents.get(position.gid)?.icon_url" :href="parents.get(position.gid)!.icon_url" x="-22" y="-8" width="44" height="44" preserveAspectRatio="xMidYMid meet" />
           <g v-if="position.kind === 'academy'" class="planner-nest-badge is-academy" transform="translate(-31,18)"><rect width="34" height="14" rx="7" /><text x="17" y="10" text-anchor="middle">学院</text><title>学院绿窝：必须放母本，性格 100% 遗传母本</title></g>
           <g v-if="position.lock" class="planner-nest-badge is-lock" transform="translate(22,22)"><circle r="9" /><text y="4" text-anchor="middle">锁</text><title>{{ position.lock === 'position' ? '位置锁定：不能拖动或换位' : '参与锁定：保持在本方案中' }}</title></g>
