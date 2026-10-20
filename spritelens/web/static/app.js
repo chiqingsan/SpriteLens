@@ -127,6 +127,12 @@
     setTimeout(function () { node.remove(); }, 3600);
   }
 
+  window.SpriteLensAccountCard.init({
+    api: api,
+    notify: toast,
+    onState: renderState
+  });
+
   function levelColor(level) {
     if (level >= 60) { return "#d08a1e"; }
     if (level >= 40) { return "#7a5cc4"; }
@@ -315,10 +321,10 @@
     if (homePage) { homePage.resetAccount(); }
     flowerState.data = { available: false }; flowerState.version = -1; renderFlowers();
     mmState.data = null; mmState.selected = null;
-    ["hb-grid", "mm-matrix", "bl-male", "bl-female", "cl-matrix", "cl-seasonal", "cl-unknown"].forEach(function (id) {
+    ["hb-grid", "mm-matrix", "cl-matrix", "cl-seasonal", "cl-unknown"].forEach(function (id) {
       $(id).innerHTML = "";
     });
-    ["hb-count", "mm-count", "bl-male-count", "bl-female-count", "cl-meta", "cl-seasonal-count", "cl-unknown-count"].forEach(function (id) {
+    ["hb-count", "mm-count", "cl-meta", "cl-seasonal-count", "cl-unknown-count"].forEach(function (id) {
       $(id).textContent = "等待当前账号数据";
     });
     ["hb-detail", "mm-detail"].forEach(function (id) {

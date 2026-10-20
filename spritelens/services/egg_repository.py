@@ -140,6 +140,25 @@ class EggBoxRepository:
             self._version += 1
         return len(eggs)
 
+    def select_historical_account(
+        self,
+        uid: int,
+        eggs: tuple[EggBoxEntry, ...],
+        slots: set[int] | None,
+    ) -> None:
+        """应用已读取完成的历史蛋仓与孵化槽，不再重复读取数据库。"""
+        if uid <= 0:
+            raise ValueError("账号 uid 无效")
+        with self._lock:
+            self._account.select_loaded(uid)
+            self._eggs = {egg.instance_id: egg for egg in eggs}
+            self._hatch_slots = set(slots or ())
+            self._historical_ids = set(self._eggs)
+            self._source = "historical"
+            self._slots_source = "historical" if slots is not None else "unknown"
+            self._loaded_uid = uid
+            self._version += 1
+
     @property
     def loaded_uid(self) -> int:
         """当前蛋仓数据归属的账号 uid（实时会话跟随身份，离线为恢复账号）。"""

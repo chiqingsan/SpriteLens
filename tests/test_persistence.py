@@ -96,6 +96,51 @@ def pet_event(pets: list[tuple[int, str, int]], direction: str = "s2c") -> Packe
 
 
 class IdentityExtractionTest(unittest.TestCase):
+    def test_login_game_avatar_survives_scene_refresh_and_account_restore(self):
+        event = PacketEvent(
+            ts=0.0, session_id="s", direction="s2c", opcode=0x0102,
+            opcode_name="ZoneLoginRsp", payload_len=0,
+            decoded=[_field("player_info", children=[_field("brief_info", children=[
+                _field("uin", raw=UID), _field("name", raw="角色".encode()),
+                _field("role_level", raw=55), _field("additional_data", children=[
+                    _field("card_brief_info", children=[
+                        _field("card_icon_selected", raw=1001017),
+                    ]),
+                    _field("plat_avatar_url", raw=b"https://example.com/platform-avatar.png"),
+                ]),
+            ])])],
+        )
+        avatar_url = "/static/account-avatars/1001017.png"
+        self.assertEqual(extract_identity(event).avatar_url, avatar_url)
+        db = Database(":memory:")
+        store = PetStore(db)
+        self.addCleanup(db.close)
+        self.addCleanup(store.close)
+        repo = PetRepository(store=store)
+        repo.handle_packet(event)
+        repo.handle_packet(identity_event())
+        self.assertEqual(repo.identity.avatar_url, avatar_url)
+        store.flush()
+        restored = PetRepository(store=store)
+        restored.load_persisted(UID)
+        self.assertEqual(restored.cached_identity.avatar_url, avatar_url)
+        repo.handle_packet(identity_event(uid=OTHER_UID))
+        self.assertEqual(repo.identity.avatar_url, "")
+
+    def test_platform_avatar_is_ignored_without_game_avatar(self):
+        avatar_url = "http://thirdqq.qlogo.cn/avatar/100"
+        event = PacketEvent(
+            ts=0.0, session_id="s", direction="s2c", opcode=0x0102,
+            opcode_name="ZoneLoginRsp", payload_len=0,
+            decoded=[_field("player_info", children=[_field("brief_info", children=[
+                _field("uin", raw=UID), _field("name", raw="角色".encode()),
+                _field("role_level", raw=69), _field("additional_data", children=[
+                    _field("plat_avatar_url", raw=avatar_url.encode()),
+                ]),
+            ])])],
+        )
+        self.assertEqual(extract_identity(event).avatar_url, "")
+
     def test_extract_from_self_info(self):
         identity = extract_identity(identity_event())
         self.assertIsNotNone(identity)

@@ -197,6 +197,7 @@ _MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
             updated_at   REAL NOT NULL
         )
     """,)),
+    (16, ("ALTER TABLE accounts ADD COLUMN avatar_url TEXT NOT NULL DEFAULT ''",)),
 )
 
 

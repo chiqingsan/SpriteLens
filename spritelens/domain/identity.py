@@ -33,6 +33,7 @@ class PlayerIdentity:
     uid: int
     name: str
     level: int
+    avatar_url: str = ""
 
 
 def _find(fields: list[dict], name: str) -> dict | None:
@@ -71,6 +72,14 @@ def _raw_text(field: dict | None) -> str:
     return raw if isinstance(raw, str) else ""
 
 
+def _game_avatar_url(children: list[dict]) -> str:
+    additional_data = _find(children, "additional_data")
+    card = _find((additional_data or {}).get("children") or [], "card_brief_info")
+    icon_id = _raw_int(_find((card or {}).get("children") or [], "card_icon_selected"))
+    # 游戏名片头像与精灵图鉴图标是两套资源；文件名保留原始头像 ID。
+    return f"/static/account-avatars/{icon_id}.png" if icon_id > 0 else ""
+
+
 def extract_identity(event: PacketEvent) -> PlayerIdentity | None:
     """从一条 s2c 事件中提取当前角色身份；无命中返回 None。"""
     if event.direction != "s2c":
@@ -82,7 +91,9 @@ def extract_identity(event: PacketEvent) -> PlayerIdentity | None:
             children = brief.get("children") or []
             uid = _raw_int(_find(children, "uin"))
             if uid > 0:
-                return PlayerIdentity(uid, _raw_text(_find(children, "name")), _raw_int(_find(children, "role_level")))
+                return PlayerIdentity(uid, _raw_text(_find(children, "name")),
+                                      _raw_int(_find(children, "role_level")),
+                                      _game_avatar_url(children))
     for node in event.decoded:
         if node.get("name") != _SELF_INFO:
             continue

@@ -33,6 +33,7 @@ from spritelens.repositories.home_store import HomeStore
 from spritelens.repositories.pet_store import PetStore
 from spritelens.repositories.settings import DEFAULT_CAPTURE_PORT, SettingsRepository
 from spritelens.services.egg_repository import EggBoxRepository
+from spritelens.services.account_selection_service import AccountSelectionService
 from spritelens.services.flower_repository import FlowerRepository
 from spritelens.services.home_repository import HomeRepository
 from spritelens.services.event_logger import EventLogWriter
@@ -67,6 +68,7 @@ class AppContext:
     egg_box: EggBoxRepository | None = None  # 蛋仓聚合（缺失时蛋仓页面空态）
     home_repo: HomeRepository | None = None  # 家园快照（缺失时家园页空态）
     flower_repo: FlowerRepository | None = None  # 花田快照（缺失时花种页空态）
+    account_selection: AccountSelectionService | None = None
     database: Database | None = None  # 组合根持有并负责关闭（R09）
     key_store: KeyStore | None = None  # 会话文件 writer 的生命周期归组合根持有
     _capture_stopped: bool = False
@@ -242,6 +244,16 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
     # autostart 之后失败也必须停源（D01）：capture 停机在逆序回滚里先于
     # 存储关闭执行；未启动时 stop 幂等（recorder/monitor 各自处理空态）
     _created(capture_vm.stop)
+    account_selection = AccountSelectionService(
+        pet_store=pet_store,
+        egg_store=egg_store,
+        home_store=home_store,
+        pet_repository=pet_repository,
+        egg_box=egg_box,
+        home_repo=home_repo,
+        flower_repo=flower_repo,
+        capture_running=lambda: capture_vm.snapshot().running,
+    )
     events_vm = EventsViewModel(monitor=monitor)
     pet_vm = PetViewModel(pet_repository, static_data=static_data)
     context = AppContext(
@@ -261,6 +273,7 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
         home_store=home_store,
         home_repo=home_repo,
         flower_repo=flower_repo,
+        account_selection=account_selection,
         database=database,
         key_store=key_store,
     )

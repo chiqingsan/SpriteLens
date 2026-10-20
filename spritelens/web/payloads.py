@@ -263,11 +263,13 @@ def pet_summary_payload(vm: PetView, static: StaticData | None) -> dict:
         "uid": vm.uid,
         "version": vm.version(),
         "identity": (
-            {"uid": identity.uid, "name": identity.name, "level": identity.level}
+            {"uid": identity.uid, "name": identity.name, "level": identity.level,
+             **({"avatar_url": identity.avatar_url} if identity.avatar_url else {})}
             if identity is not None
             else None
         ),
-        "cached_identity": {"uid": cached.uid, "name": cached.name, "level": cached.level} if cached else None,
+        "cached_identity": {"uid": cached.uid, "name": cached.name, "level": cached.level,
+                            **({"avatar_url": cached.avatar_url} if cached.avatar_url else {})} if cached else None,
         "stats": {
             "total": stats.total,
             "maxed": stats.maxed,

@@ -1,20 +1,51 @@
 /* 定稿布局：应用壳与背包样式，复用主题 token；不改变业务卡片配色。 */
 :root { --backpack-control: 36px; --pet-search-width: clamp(220px, 18vw, 280px); }
 #page-pets { --pet-side-width: 360px; }
-.account-card { margin-bottom: var(--space-5); border: 1px solid var(--sidebar-line); border-radius: var(--radius-md); background: var(--panel); }
+.account-card { position: relative; margin-bottom: var(--space-5); padding-bottom: var(--space-4); border: 1px solid var(--sidebar-line); border-radius: var(--radius-lg); background: var(--sidebar-bg); box-shadow: none; }
 .account-information { position: relative; }
 .account-information > summary { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-5); cursor: pointer; list-style: none; }
 .account-information > summary::-webkit-details-marker { display: none; }
-.account-avatar { width: 36px; height: 36px; border-radius: var(--radius-md); flex: none; }
+.account-information > summary:hover { background: var(--sidebar-hover); }
+.account-avatar { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-lg); background: var(--teal-soft); overflow: hidden; flex: none; }
+.account-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.account-avatar > span { color: var(--teal); }
+.account-avatar .ui-icon { display: block; width: 24px; height: 24px; }
+.account-expand { box-sizing: content-box; flex: none; padding: var(--space-1); border-radius: var(--radius-md); background: var(--surface-2); color: var(--sidebar-text); transition: transform var(--motion-fast) var(--motion-ease); }
+.account-information[open] .account-expand { transform: rotate(180deg); }
 .account-empty .account-avatar { opacity: .45; }
 .account-copy { flex: 1; min-width: 0; }
-.account-copy strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); }
-.account-copy small { display: block; font-size: var(--fs-3xs); color: var(--muted); margin-top: var(--space-1); }
-.account-extra { padding: 0 var(--space-5) var(--space-3); color: var(--muted); font-size: var(--fs-xs); }
-.account-uid-row { display: flex; align-items: center; justify-content: space-between; height: 36px; margin: 0 var(--space-5); border-top: 1px solid var(--line-soft); font-size: var(--fs-3xs); color: var(--muted); }
+.account-copy strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); }
+.account-copy small { display: block; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-3xs); color: var(--muted); margin-top: var(--space-1); white-space: nowrap; }
+.account-popover { position: fixed; z-index: 125; display: flex; flex-direction: column; gap: var(--space-3); width: min(340px, calc(100vw - var(--sidebar) - var(--space-6))); max-height: min(520px, calc(100vh - var(--space-8))); padding: var(--space-4); border: 1px solid var(--sidebar-line); border-radius: var(--radius-lg); background: var(--surface-1); box-shadow: var(--shadow-pop); }
+.account-popover[hidden] { display: none; }
+.account-manager-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.account-manager-head strong { color: var(--sidebar-text); font-size: var(--fs-sm); }
+.account-manager-head span { color: var(--sidebar-muted); font-size: var(--fs-3xs); }
+.account-list { display: flex; flex-direction: column; gap: var(--space-2); min-height: 52px; overflow: auto; }
+.account-option { display: grid; grid-template-columns: 34px minmax(0, 1fr) 18px; align-items: center; gap: var(--space-3); width: 100%; min-height: 56px; padding: var(--space-2) var(--space-3); border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--sidebar-text); text-align: left; cursor: pointer; }
+.account-option:hover { background: var(--sidebar-hover); }
+.account-option.current { border-color: var(--sidebar-line); background: var(--teal-soft); }
+.account-option:disabled { cursor: not-allowed; background: var(--surface-2); color: var(--sidebar-muted); }
+.account-option-avatar { display: grid; place-items: center; width: 34px; height: 34px; overflow: hidden; border-radius: 50%; background: var(--teal-soft); color: var(--teal); }
+.account-option-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.account-option-avatar .ui-icon { width: 19px; height: 19px; }
+.account-option-copy { min-width: 0; }
+.account-option-copy strong, .account-option-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-option-copy strong { font-size: var(--fs-xs); }
+.account-option-copy small { margin-top: 2px; color: var(--sidebar-muted); font-size: var(--fs-3xs); font-variant-numeric: tabular-nums; }
+.account-option-check { color: var(--teal); font-size: var(--fs-md); font-weight: 700; }
+.account-switch-note { margin: 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--sidebar-muted); font-size: var(--fs-3xs); line-height: 1.4; }
+.account-switch-button { width: 100%; min-height: 36px; border: 1px solid var(--teal); border-radius: var(--radius-md); background: var(--teal); color: var(--surface-1); font-size: var(--fs-xs); font-weight: 600; }
+.account-switch-button:hover:not(:disabled) { background: var(--teal-dark); }
+.account-switch-button:disabled { cursor: not-allowed; border-color: var(--sidebar-line); background: var(--surface-2); color: var(--sidebar-muted); }
+.account-uid-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); height: 32px; padding: 0 var(--space-3); margin: 0 var(--space-5); border-radius: var(--radius-md); background: var(--surface-2); font-size: var(--fs-xs); color: var(--ink-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.account-uid-row .icon-button { flex: none; width: 24px; height: 24px; padding: var(--space-1); border-radius: var(--radius-sm); background: var(--teal-soft); }
+.account-uid-row .icon-button:hover { background: var(--sidebar-hover); transform: none; }
 .icon-button { width: 28px; height: 28px; padding: var(--space-1); background: transparent; border-radius: var(--radius-sm); }
-.sidebar-foot { padding: var(--space-3) 0 0; flex: none; }
-.sidebar-settings { display: flex; align-items: center; justify-content: flex-start; width: 100%; text-align: left; border: 1px solid var(--sidebar-line); border-radius: var(--radius-md); background: var(--panel); }
+.sidebar-foot { padding: var(--space-5) 0 0; flex: none; }
+.sidebar-settings { display: flex; align-items: center; justify-content: flex-start; gap: var(--space-5); width: 100%; height: 48px; padding: 0 var(--space-6); text-align: left; border: 1px solid var(--sidebar-line); border-radius: var(--radius-lg); background: var(--sidebar-bg); box-shadow: none; font-size: var(--fs-md); }
+.sidebar-settings .nav-icon { width: 20px; height: 20px; }
+.sidebar-settings > .ui-icon { width: 16px; height: 16px; }
 /* 只命中右侧箭头（设置图标是 .ui-icon.nav-icon，不能让它吃到 auto margin 居中） */
 .sidebar-settings > .ui-icon:not(.nav-icon) { margin-left: auto; }
 .topbar { grid-template-columns: auto minmax(0, 1fr) auto; min-height: 64px; }
@@ -145,14 +176,10 @@
 #pet-grid.box-fill-grid .point-name { font-size: var(--fs-xs); line-height: 16px; }
 #pet-grid.game-box-grid .point-egg-group { font-size: 11px; line-height: 20px; }
 @media (max-width: 760px) {
-  .account-card { border: 0; margin: 0 0 var(--space-5); background: transparent; }
+  .account-card { border: 0; margin: 0 0 var(--space-5); padding-bottom: 0; background: transparent; box-shadow: none; }
   .account-information > summary { justify-content: center; padding: var(--space-1); height: 44px; }
-  .account-information > summary > .ui-icon, .account-copy, .account-uid-row, .account-extra { display: none; }
-  .account-card:has(details[open])::after { content: ''; position: fixed; left: 72px; top: calc(var(--account-top, 0px) + 16px); width: 212px; height: 136px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-md); z-index: 125; }
-  .desktop-window { --account-top: var(--window-titlebar); }
-  .account-information[open] .account-copy { display: block; position: fixed; left: 88px; top: calc(var(--account-top, 0px) + 28px); width: 176px; z-index: 126; }
-  .account-card:has(details[open]) .account-uid-row { display: flex; position: fixed; left: 88px; top: calc(var(--account-top, 0px) + 76px); width: 176px; margin: 0; z-index: 126; }
-  .account-information[open] .account-extra { display: block; position: fixed; left: 88px; top: calc(var(--account-top, 0px) + 120px); padding: 0; z-index: 126; }
+  .account-information > summary > .ui-icon, .account-copy, .account-uid-row { display: none; }
+  .account-popover { width: min(340px, calc(100vw - var(--sidebar) - var(--space-6))); max-height: calc(100vh - var(--space-8)); }
 }
 
 .quick-settings-dialog { width: min(880px, calc(100vw - 40px)); max-height: min(800px, calc(100vh - 40px)); padding: var(--space-5); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--panel); color: var(--ink); }

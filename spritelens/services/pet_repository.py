@@ -66,6 +66,10 @@ class PetRepository:
         identity = extract_identity(event)
         if identity is not None:
             with self._lock:
+                # 进场景/会话接续身份不带头像，只补用同一账号已观察的地址。
+                previous = self._cached_identity
+                if previous is not None and previous.uid == identity.uid and not identity.avatar_url:
+                    identity = replace(identity, avatar_url=previous.avatar_url)
                 switched = self._account.observe(identity)
                 self._cached_identity = identity
                 if switched:
@@ -76,7 +80,7 @@ class PetRepository:
                     self._medals = None
                     self._version += 1
             if self._store is not None:
-                self._store.put_account(identity.uid, identity.name, identity.level)
+                self._store.put_account(identity.uid, identity.name, identity.level, identity.avatar_url)
 
         medal_update = extract_medals(event)
         changed_medals: list[Pet] = []
@@ -248,6 +252,34 @@ class PetRepository:
         if self._store is None:
             return ()
         return self._store.list_accounts()
+
+    def cached_account_profiles(self) -> tuple[tuple[int, str, int, str], ...]:
+        """读取本地历史账号资料，供账号管理浮层展示。"""
+        if self._store is None:
+            return ()
+        return self._store.list_account_profiles()
+
+    def select_historical_account(
+        self,
+        uid: int,
+        account: tuple[int, str, int, str],
+        pets: tuple[Pet, ...],
+        backpack: Backpack,
+    ) -> None:
+        """替换为已读取完成的历史账号快照，不再重复读取数据库。"""
+        if uid <= 0:
+            raise ValueError("账号 uid 无效")
+        with self._lock:
+            self._account.select_loaded(uid)
+            self._cached_identity = PlayerIdentity(*account)
+            self._pets = {pet.gid: pet for pet in pets}
+            self._backpack = Backpack(dict(backpack.boxes), backpack.teams, backpack.active_team)
+            self._locations = self._backpack.locations()
+            self._medals = None
+            for pet in pets:
+                if pet.colorful_conf_id > 0 and pet.name:
+                    self._colorful_names.setdefault(pet.colorful_conf_id, pet.name)
+            self._version += 1
 
     def save_voice_override(self, uid: int, gid: int, voice: int | None) -> bool:
         """保存已有宠物的声音修正；返回目标是否属于指定账号。"""

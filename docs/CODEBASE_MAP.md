@@ -20,6 +20,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `tools/create_shortcut.bat` + `ps1` | 创建桌面快捷方式（幂等，ps1 用 $PSScriptRoot 自定位） |
 | `requirements.txt` | scapy / pycryptodome / aiohttp / pywebview（无 UI 框架之外的额外依赖） |
 | `tools/import_schema.py` | 导入外部 schema 全集到 data/schemas（本地目录或 GitHub） |
+| `tools/import_account_avatars.py` | 固定版本游戏名片头像配置与 ID 映射同步；运行时头像按需缓存 |
 | `tools/import_static_data.py` | 导入基础静态表（物种/性格/系别/技能）到 data/static |
 | `tools/import_assets.py` | 导入图鉴元数据 + 精灵图 + 系别图标 + 系别克制表 |
 | `tools/import_egg_data.py` | 导入蛋目录（蛋组/孵化时长/公母比/身高体重/进化链）到 data/static/eggs.json |
@@ -38,6 +39,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `data/schemas/` | 外挂 schema：`opcodes.json` + `messages/*.json`（字段级合并） |
 | `data/static/` | 静态映射：`species/natures/types/skills/type_chart/eggs/medals/specialities/flower_levels/color_cards.json` + 各 `_meta.json`；特性来源见 `_specialities_meta.json` |
 | `spritelens/web/static/` | 前端资源：`index.html`（分组导航骨架）/ `boot.js`（启动自恢复链）/ `app.css`（布局与组件 token）/ `themes.css`（三套主题色值）/ `app.js`（数据渲染）/ `ui.css` / `ui.js`（详情抽屉、键盘与焦点）/ `appearance.js`（主题与显示偏好）/ `pet-presentation.js`（头像/色卡/标记渲染）/ `icons.js` + `icons/`（本地 SVG sprite）/ `favicon.png` / `pet-media/`（官方原始头像与全身图）/ `type-icons/` `egg-icons/` `medal-icons/`（奖牌及标记图标）/ `rarity/` `color-cards/` |
+| `spritelens/web/account_avatar_cache.py` | 游戏名片头像 ID 映射、云端按需下载与用户数据目录缓存；失败由前端回退 Logo |
 | `data/recordings/` | 运行时录制产物（gitignore；本地回放样例不在版本库） |
 
 ## 维护与审查文档
@@ -103,6 +105,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `services/capture_service.py` | 采集运行服务：接入层创建与生命周期、录制 tee、手动密钥、副作用命令串行化（阶段1.3 自 capture_vm 抽出） |
 | `services/session_tracker.py` | 会话表（LRU，支持 drop）与全局统计 |
 | `services/account_tracker.py` | 账号切换判定；display_uid 是已加载/实时归属，写路径 uid 不变（同 uid 重复帧/离线加载登录不算切换） |
+| `services/account_selection_service.py` | 本地历史账号列表与跨宠物/蛋仓/家园/花田的串行历史切换 |
 | `services/pet_repository.py` | 宠物聚合、身份/切号、彩名学习与入库；consistent_snapshot 单次取齐宠物/箱位/位置/uid/version |
 | `services/egg_repository.py` | 蛋仓聚合；EggBoxSnapshot 一次取齐条目/槽/uid/version/历史来源，恢复 IO 竞争拒绝提交 |
 | `services/home_repository.py` | 家园聚合（快照覆盖 + 切号清空 + 增量帧版本提示） |
@@ -118,6 +121,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `view_models/_shared.py` | 解码树文本渲染 |
 | `web/server.py` | 本地服务：aiohttp，仅回环 + 随机端口 + token 鉴权 + WS 推送；数据/偏好路由与 bootstrap，采集域路由由 routes_capture mixin 提供 |
 | `web/routes_capture.py` | 采集域路由与载荷（/api/capture*、/api/state、capture/state 载荷；阶段1.4 自 server.py 拆出） |
+| `web/routes_accounts.py` | `/api/accounts` 与 `/api/accounts/select`：历史账号列表、采集运行保护和切换结果 |
 | `web/server_helpers.py` | HTTP query 解析助手（路由模块共用） |
 | `web/run.py` | 界面入口：pywebview 窗口（系统 WebView2）+ 单实例唤醒 + 降级提示 |
 | `web/payloads.py` | 宠物域载荷（宠物行/列表页/概览/箱位）+ 目录域兼容重导出（无 UI 依赖） |
@@ -229,7 +233,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 |---|---|
 | `spritelens/domain/pet_conditions.py` | 全局AND/OR、异色炫彩/奖牌/参考快捷标记筛选，复用既有物种参考与卡片规则 |
 | `spritelens/web/pet_queries.py` | 新增筛选参数的 HTTP 输入边界；无共享状态写入 |
-| `spritelens/web/static/account-card.js` | 现有账号快照的卡片展示与窗口内 UID 隐藏；不参与账号归属或持久化 |
+| `spritelens/web/static/account-card.js` | 账号卡片、真实头像、UID 隐藏与本地历史账号管理浮层；切号请求交给账号 API |
 | `spritelens/web/static/backpack-layout.css` | 定稿应用壳/宠物页布局、工具条与响应式几何，复用主题 tokens |
 | `tests/test_pet_ui_conditions.py` | 全局 AND/OR、真实奖牌与参考标记区别、非法查询拒绝 |
 | `frontend/src/components/PetShortcutSettings.vue` | 原生dialog快捷设置：分组勾选具体选项、草稿、保存和关闭；沿用现有快捷偏好边界 |

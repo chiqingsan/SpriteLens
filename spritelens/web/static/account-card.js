@@ -1,30 +1,228 @@
-/* 账号展示只消费现有快照；UID 可见性是本窗口的局部状态。 */
+/* 账号卡片与本地历史账号切换浮层。 */
 (function () {
   "use strict";
+
   var role = null;
   var concealed = false;
-  var uid = document.getElementById("role-uid");
-  var button = document.getElementById("btn-uid-visibility");
-  function showUid() {
-    uid.textContent = role ? "UID " + (concealed ? "••••••••" : role.uid) : "UID —";
-    button.hidden = !role;
-    button.setAttribute("aria-pressed", String(concealed));
-    button.setAttribute("aria-label", concealed ? "显示 UID" : "隐藏 UID");
-    button.querySelector("use").setAttribute("href", "/static/icons/sprite.svg#" + (concealed ? "eye-off" : "eye"));
-  }
-  button.addEventListener("click", function () { concealed = !concealed; showUid(); });
+  var api = null;
+  var notify = function () {};
+  var onState = function () {};
+  var selectedUid = 0;
+  var pendingUid = 0;
+  var accountData = null;
+  var switching = false;
   var card = document.getElementById("account-card");
   var information = card.querySelector("details");
-  document.addEventListener("pointerdown", function (event) { if (!card.contains(event.target)) { information.open = false; } });
-  document.addEventListener("keydown", function (event) { if (event.key === "Escape") { information.open = false; } });
+  var popover = document.getElementById("account-popover");
+  var accountList = document.getElementById("account-list");
+  var switchNote = document.getElementById("account-switch-note");
+  var switchButton = document.getElementById("btn-account-switch");
+  var uid = document.getElementById("role-uid");
+  var uidButton = document.getElementById("btn-uid-visibility");
+  var avatar = document.getElementById("role-avatar");
+  var avatarFallback = document.getElementById("role-avatar-fallback");
+
+  function icon(name, className) {
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", className || "ui-icon");
+    svg.setAttribute("aria-hidden", "true");
+    var use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+    use.setAttribute("href", "/static/icons/sprite.svg#" + name);
+    svg.appendChild(use);
+    return svg;
+  }
+
+  function maskedUid(value) {
+    var text = String(value || "");
+    if (text.length <= 5) { return text; }
+    return text.slice(0, 3) + "••••" + text.slice(-2);
+  }
+
+  function validAvatar(value) {
+    var source = String(value || "");
+    return /^\/static\/account-avatars\/\d+\.png$/.test(source) ? source : "";
+  }
+
+  function logoAvatar() {
+    var image = document.createElement("img");
+    image.src = "/static/favicon.png";
+    image.alt = "";
+    return image;
+  }
+
+  function showUid() {
+    uid.textContent = role ? "UID " + (concealed ? "••••••••" : role.uid) : "UID —";
+    uidButton.hidden = !role;
+    uidButton.setAttribute("aria-pressed", String(concealed));
+    uidButton.setAttribute("aria-label", concealed ? "显示 UID" : "隐藏 UID");
+    uidButton.querySelector("use").setAttribute("href", "/static/icons/sprite.svg#" + (concealed ? "eye-off" : "eye"));
+  }
+
+  function renderAvatar(node, source) {
+    node.replaceChildren();
+    var image = document.createElement("img");
+    image.alt = "";
+    image.referrerPolicy = "no-referrer";
+    if (source) {
+      image.src = source;
+      image.addEventListener("error", function () {
+        node.replaceChildren(logoAvatar());
+      }, { once: true });
+    } else {
+      node.appendChild(logoAvatar());
+      return;
+    }
+    node.appendChild(image);
+  }
+
+  function updateSwitchButton() {
+    var blocked = !accountData || accountData.can_switch === false || switching;
+    switchButton.disabled = blocked || Number(pendingUid) === Number(selectedUid);
+    switchButton.textContent = switching ? "切换中…" : "切换账号";
+    switchNote.hidden = !(accountData && accountData.reason);
+    switchNote.textContent = accountData && accountData.reason || "";
+  }
+
+  function renderAccountList() {
+    accountList.replaceChildren();
+    if (!accountData || !accountData.accounts || !accountData.accounts.length) {
+      var empty = document.createElement("span");
+      empty.className = "muted";
+      empty.textContent = "暂无历史账号";
+      accountList.appendChild(empty);
+      switchButton.disabled = true;
+      return;
+    }
+    var canSwitch = accountData.can_switch !== false && !switching;
+    accountData.accounts.forEach(function (profile) {
+      var current = Number(profile.uid) === Number(pendingUid);
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "account-option" + (current ? " current" : "");
+      button.setAttribute("role", "option");
+      button.setAttribute("aria-selected", String(current));
+      button.disabled = !canSwitch && Number(profile.uid) !== Number(selectedUid);
+      var profileAvatar = document.createElement("span");
+      profileAvatar.className = "account-option-avatar";
+      renderAvatar(profileAvatar, validAvatar(profile.avatar_url));
+      var copy = document.createElement("span");
+      copy.className = "account-option-copy";
+      var name = document.createElement("strong");
+      name.textContent = profile.name || "未命名账号";
+      var detail = document.createElement("small");
+      detail.textContent = "Lv" + (profile.level || "—") + " · UID " + maskedUid(profile.uid);
+      copy.appendChild(name);
+      copy.appendChild(detail);
+      var check = document.createElement("span");
+      check.className = "account-option-check";
+      check.textContent = Number(profile.uid) === Number(selectedUid) ? "✓" : "";
+      button.appendChild(profileAvatar);
+      button.appendChild(copy);
+      button.appendChild(check);
+      button.addEventListener("click", function () {
+        pendingUid = Number(profile.uid);
+        renderAccountList();
+        updateSwitchButton();
+      });
+      accountList.appendChild(button);
+    });
+    updateSwitchButton();
+  }
+
+  function setAccountData(data) {
+    accountData = data || { accounts: [], can_switch: false, reason: "" };
+    selectedUid = Number(accountData.selected_uid || selectedUid || 0);
+    if (!pendingUid || !accountData.accounts.some(function (item) { return Number(item.uid) === Number(pendingUid); })) {
+      pendingUid = selectedUid;
+    }
+    renderAccountList();
+  }
+
+  function loadAccounts() {
+    if (!api) { return; }
+    accountList.textContent = "正在读取历史账号…";
+    api("/api/accounts").then(setAccountData).catch(function (error) {
+      accountList.textContent = "历史账号读取失败";
+      updateSwitchButton();
+      notify("账号列表加载失败：" + error.message, true);
+    });
+  }
+
+  function positionPopover() {
+    if (!information.open) { return; }
+    var cardRect = card.getBoundingClientRect();
+    var sidebar = document.querySelector(".sidebar").getBoundingClientRect();
+    var narrow = window.matchMedia("(max-width: 760px)").matches;
+    popover.style.left = Math.round(narrow ? sidebar.right + 8 : cardRect.left) + "px";
+    popover.style.top = Math.round(cardRect.bottom + 8) + "px";
+  }
+
+  function selectAccount() {
+    if (!api || switching || !pendingUid || Number(pendingUid) === Number(selectedUid)) { return; }
+    switching = true;
+    updateSwitchButton();
+    renderAccountList();
+    api("/api/accounts/select", { method: "POST", body: { uid: pendingUid } })
+      .then(function (result) {
+        switching = false;
+        setAccountData(result.accounts);
+        information.open = false;
+        onState(result.state);
+        notify("已切换到「" + ((result.account && result.account.name) || "未命名账号") + "");
+      })
+      .catch(function (error) {
+        switching = false;
+        updateSwitchButton();
+        renderAccountList();
+        notify("账号切换失败：" + error.message, true);
+      });
+  }
+
+  avatar.addEventListener("error", function () {
+    avatar.hidden = true;
+    avatarFallback.hidden = false;
+  });
+  uidButton.addEventListener("click", function () {
+    concealed = !concealed;
+    showUid();
+  });
+  information.addEventListener("toggle", function () {
+    popover.hidden = !information.open;
+    if (information.open) {
+      positionPopover();
+      loadAccounts();
+    }
+  });
+  switchButton.addEventListener("click", selectAccount);
+  document.addEventListener("pointerdown", function (event) {
+    if (!card.contains(event.target)) { information.open = false; }
+  });
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") { information.open = false; }
+  });
+  window.addEventListener("resize", positionPopover);
+
   window.SpriteLensAccountCard = {
+    init: function (options) {
+      options = options || {};
+      api = options.api || null;
+      notify = options.notify || notify;
+      onState = options.onState || onState;
+    },
     render: function (identity, cached) {
       role = identity || cached;
       document.getElementById("role-name").textContent = role ? role.name || "未命名账号" : "尚未识别账号";
-      document.getElementById("role-label").textContent = identity ? "当前账号" : cached ? "本次未确认" : "登录游戏后识别";
-      document.getElementById("role-level").textContent = role && role.level ? "角色等级 Lv" + role.level : "暂无角色等级";
-      document.getElementById("account-card").classList.toggle("account-empty", !role);
+      document.getElementById("role-label").textContent = role ? "Lv" + (role.level || "—") : "登录游戏后识别";
+      card.classList.toggle("account-empty", !role);
+      selectedUid = role ? Number(role.uid) : selectedUid;
+      var source = validAvatar(role && role.avatar_url);
+      if ((avatar.getAttribute("src") || "") !== source) {
+        avatar.hidden = !source;
+        avatarFallback.hidden = !!source;
+        if (source) { avatar.src = source; } else { avatar.removeAttribute("src"); }
+      }
       showUid();
+      if (information.open && accountData) { renderAccountList(); }
     }
   };
 })();

@@ -22,6 +22,15 @@
   `ZoneEnterSceneRsp`(0x0152) 的 `self_info.avatar.base.logic_id`
   （实测 101384922，与外部工具记录的账号一致），同节点含 `name`（角色名）与
   `lv`（等级）。
+  - 账号卡片使用游戏名片头像：`player_info.brief_info.additional_data.card_brief_info.card_icon_selected`。
+    本机 2026-10-20 登录包实测值为 `1001017`（游戏配置名「初心·喵喵」），对应专用资源
+    `img_1022`，与精灵图鉴喵喵 `3001/icon.png` 不同。头像按原始 ID 映射到
+    `/static/account-avatars/{id}.png`，由本地服务按 ID 从映射中的云端来源按需获取，并原样缓存到
+    用户数据目录 `account-avatar-cache/`；仓库只保留来源、配置版本和资源 ID 映射在同目录
+    `manifest.json`，通过 `tools/import_account_avatars.py` 同步。缓存原图保留透明区域，不裁剪转码。
+    `plat_avatar_url`（字段 9，bytes）是 QQ/平台头像，不能作为游戏头像；没有已知游戏头像映射
+    时显示应用 Logo。SQLite v16 继续保存最终的游戏头像 URL，缺头像的同账号场景/接续身份保留
+    已观察值，切号不复用。
   - **必须走已核验路径**：`ZoneSceneClientEnterSceneFinishNtyAck` 的
     `other_actors[*].npc.base.logic_id` 是 NPC 编号（实测「护主犬」
     435444924297510922），误取会串数据；不能递归搜索所有玩家结构。

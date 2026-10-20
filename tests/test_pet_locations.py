@@ -30,8 +30,10 @@ def message(no, value):
     return make_varint((no << 3) | 2) + make_varint(len(value)) + value
 
 
-def login_event():
+def login_event(avatar_url: str = ""):
     brief = integer(1, 123) + message(3, "测试角色".encode()) + integer(5, 55)
+    if avatar_url:
+        brief += message(9, avatar_url.encode())
     slots = [0, 0, 26925] + [0] * 27
     box = integer(1, 2) + b"".join(integer(3, gid) for gid in slots)
     backpack = message(3, box)
@@ -301,6 +303,19 @@ class LocationTest(unittest.TestCase):
         locations = update_locations(event, {999: PetLocation(8, 1)})
         self.assertEqual(locations, {26925: PetLocation(2, 3)})
         self.assertEqual(locations[26925].payload(), {"box_id": 2, "slot": 3, "row": 1, "column": 3})
+
+    def test_login_platform_avatar_is_not_used_as_game_avatar(self):
+        from spritelens.view_models import PetViewModel
+        from spritelens.web.payloads import pet_summary_payload
+
+        avatar_url = "https://example.com/platform-avatar.png"
+        repo = PetRepository()
+        repo.handle_packet(login_event(avatar_url))
+        self.assertEqual(extract_identity(login_event(avatar_url)).avatar_url, "")
+        vm = PetViewModel(repo)
+        payload = pet_summary_payload(vm.view_with(vm.filters), None)
+        self.assertNotIn("avatar_url", payload["identity"])
+        self.assertNotIn("avatar_url", payload["cached_identity"])
 
     def test_move_empty_slot_replaces_target_and_removes_old_position(self):
         before = {1: PetLocation(7, 3), 2: PetLocation(7, 24)}

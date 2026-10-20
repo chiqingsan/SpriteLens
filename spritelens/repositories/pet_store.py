@@ -32,11 +32,12 @@ _ATTR_SLOTS = ("hp", "atk", "spa", "def", "spd", "spe")
 
 # 名称/等级为空或 0 时不覆盖既有值（身份包可能缺字段，不能让好数据退化）
 _UPSERT_ACCOUNT = """
-INSERT INTO accounts (uid, name, level, first_seen, last_seen)
-VALUES (?, ?, ?, ?, ?)
+INSERT INTO accounts (uid, name, level, first_seen, last_seen, avatar_url)
+VALUES (?, ?, ?, ?, ?, ?)
 ON CONFLICT(uid) DO UPDATE SET
     name      = CASE WHEN excluded.name <> '' THEN excluded.name ELSE accounts.name END,
     level     = CASE WHEN excluded.level > 0 THEN excluded.level ELSE accounts.level END,
+    avatar_url = CASE WHEN excluded.avatar_url <> '' THEN excluded.avatar_url ELSE accounts.avatar_url END,
     last_seen = excluded.last_seen
 """
 
@@ -198,7 +199,7 @@ class PetStore:
         # 旧批次不会在新批次之后落库把值拉回去（R01）。
         self._flush_lock = threading.Lock()
         self._pending: dict[tuple[int, int], Pet] = {}
-        self._pending_accounts: dict[int, tuple[str, int]] = {}
+        self._pending_accounts: dict[int, tuple[str, int, str]] = {}
         self._pending_locations: dict[int, Backpack] = {}
         self._stop = threading.Event()
         self._worker: threading.Thread | None = None
@@ -222,13 +223,14 @@ class PetStore:
                 self._pending[(uid, pet.gid)] = pet
             self._ensure_worker_locked()
 
-    def put_account(self, uid: int, name: str, level: int) -> None:
+    def put_account(self, uid: int, name: str, level: int, avatar_url: str = "") -> None:
         if uid <= 0:
             return
         with self._lock:
             if self._closed:
                 return
-            self._pending_accounts[uid] = (name or "", int(level or 0))
+            previous = self._pending_accounts.get(uid)
+            self._pending_accounts[uid] = (name or "", int(level or 0), avatar_url or (previous[2] if previous else ""))
             self._ensure_worker_locked()
 
     # -- 落盘 ----------------------------------------------------------
@@ -281,7 +283,7 @@ class PetStore:
     def _commit_batch(
         self,
         pets: dict[tuple[int, int], Pet],
-        accounts: dict[int, tuple[str, int]],
+        accounts: dict[int, tuple[str, int, str]],
         locations: dict[int, Backpack],
     ) -> int:
         now = time.time()
@@ -289,7 +291,7 @@ class PetStore:
             if accounts:
                 self._db.execute_many(
                     _UPSERT_ACCOUNT,
-                    [(uid, name, level, now, now) for uid, (name, level) in accounts.items()],
+                    [(uid, name, level, now, now, avatar_url) for uid, (name, level, avatar_url) in accounts.items()],
                 )
             if pets:
                 self._db.execute_many(
@@ -419,10 +421,21 @@ class PetStore:
         rows = self._db.query(_SELECT_ACCOUNTS)
         return tuple((int(row["uid"]), str(row["name"])) for row in rows)
 
-    def load_account(self, uid: int) -> tuple[int, str, int] | None:
+    def list_account_profiles(self) -> tuple[tuple[int, str, int, str], ...]:
+        """本地历史账号资料（uid、名称、等级、头像），按最近活跃优先。"""
         self.flush()
-        rows = self._db.query("SELECT uid, name, level FROM accounts WHERE uid = ?", (uid,))
-        return (int(rows[0]["uid"]), str(rows[0]["name"]), int(rows[0]["level"])) if rows else None
+        rows = self._db.query(
+            "SELECT uid, name, level, avatar_url FROM accounts ORDER BY last_seen DESC"
+        )
+        return tuple(
+            (int(row["uid"]), str(row["name"]), int(row["level"]), str(row["avatar_url"] or ""))
+            for row in rows
+        )
+
+    def load_account(self, uid: int) -> tuple[int, str, int, str] | None:
+        self.flush()
+        rows = self._db.query("SELECT uid, name, level, avatar_url FROM accounts WHERE uid = ?", (uid,))
+        return (int(rows[0]["uid"]), str(rows[0]["name"]), int(rows[0]["level"]), str(rows[0]["avatar_url"])) if rows else None
 
     # -- 生命周期 ------------------------------------------------------
     def close(self) -> None:

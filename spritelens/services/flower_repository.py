@@ -67,5 +67,14 @@ class FlowerRepository:
         with self._lock:
             return FlowerRepoSnapshot(self._snapshot, self._account.display_uid, self._version)
 
+    def select_historical_account(self, uid: int) -> None:
+        """花田没有历史快照，切号时清空并标记为未知。"""
+        if uid <= 0:
+            raise ValueError("账号 uid 无效")
+        with self._lock:
+            self._account.select_loaded(uid)
+            self._snapshot = None
+            self._version += 1
+
 
 __all__ = ["FlowerRepository"]

@@ -171,6 +171,19 @@ class HomeRepository:
             self._version += 1
         return snapshot is not None
 
+    def select_historical_account(self, uid: int, snapshot: HomeSnapshot | None) -> None:
+        """应用已读取完成的历史家园快照；无快照时明确进入未知状态。"""
+        if uid <= 0:
+            raise ValueError("账号 uid 无效")
+        with self._lock:
+            self._account.select_loaded(uid)
+            self._snapshot = snapshot
+            self._active_session = None
+            self._active_scene_resource = None
+            self._active_home_observed = False
+            self._delta_count = 0
+            self._version += 1
+
     def pending_deltas(self) -> int:
         with self._lock:
             return self._delta_count

@@ -308,6 +308,10 @@ class PetViewModel:
         """本地库里有历史的账号（uid, 名字），供离线时也能加载。"""
         return self._repository.cached_accounts()
 
+    def cached_account_profiles(self) -> tuple[tuple[int, str, int, str], ...]:
+        """本地历史账号资料，供账号管理 UI 展示。"""
+        return self._repository.cached_account_profiles()
+
     def load_last_account(self) -> int:
         """启动即载入最近账号的历史宠物（离线也能看到上次的数据）。"""
         return self._repository.load_last_account()

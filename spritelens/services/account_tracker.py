@@ -42,6 +42,13 @@ class AccountTracker:
         if uid > 0:
             self._loaded_uid = uid
 
+    def select_loaded(self, uid: int) -> None:
+        """切换到指定历史账号，等待后续身份包恢复实时状态。"""
+        if uid <= 0:
+            raise ValueError("账号 uid 无效")
+        self._identity = None
+        self._loaded_uid = uid
+
     def observe(self, identity: PlayerIdentity) -> bool:
         """观察一条身份信息；返回 True 表示账号发生切换（须清空旧快照）。"""
         previous = self._identity

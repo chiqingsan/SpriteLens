@@ -48,7 +48,9 @@ from spritelens.web.payloads_catalog import (
     male_matrix_payload,
 )
 from spritelens.web.pet_media_cache import PetMediaCache
+from spritelens.web.account_avatar_cache import AccountAvatarCache
 from spritelens.web.routes_capture import CaptureRoutesMixin
+from spritelens.web.routes_accounts import AccountRoutesMixin
 from spritelens.web.collection_lines import register_collection_routes
 from spritelens.web.breeder_library import register_breeder_routes
 from spritelens.web.breeding_planner import register_planner_routes
@@ -79,7 +81,7 @@ def _quiet_connection_reset(loop: asyncio.AbstractEventLoop, context: dict) -> N
     loop.default_exception_handler(context)
 
 
-class LocalServer(CaptureRoutesMixin):
+class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
     """本地服务生命周期与路由；start() 后 `url` 可直接交给 pywebview。
 
     采集域 handler（/api/capture*、/api/state 与 capture/state 载荷）
@@ -112,6 +114,7 @@ class LocalServer(CaptureRoutesMixin):
         self._push_task: asyncio.Task | None = None
         self._last_state_json: str | None = None
         self._pet_media_cache: PetMediaCache | None = None
+        self._account_avatar_cache: AccountAvatarCache | None = None
         self._stopped = False
         self._stop_future = None
 
@@ -298,6 +301,9 @@ class LocalServer(CaptureRoutesMixin):
 
     async def _start_async(self) -> None:
         self._pet_media_cache = PetMediaCache(self._static_dir, data_root() / "pet-media-cache")
+        self._account_avatar_cache = AccountAvatarCache(
+            self._static_dir, data_root() / "account-avatar-cache"
+        )
         app = web.Application(
             middlewares=[self._auth_middleware, self._no_cache_middleware],
             client_max_size=8 * 1024 * 1024,
@@ -305,8 +311,11 @@ class LocalServer(CaptureRoutesMixin):
         app.router.add_get("/", self._index)
         app.router.add_get("/favicon.ico", self._favicon)
         app.router.add_get("/static/pet-media/{asset}", self._pet_media_asset)
+        app.router.add_get("/static/account-avatars/{asset}", self._account_avatar_asset)
         app.router.add_static("/static", self._static_dir, name="static")
         app.router.add_get("/api/bootstrap", self._api_bootstrap)
+        app.router.add_get("/api/accounts", self._api_accounts)
+        app.router.add_post("/api/accounts/select", self._api_accounts_select)
         app.router.add_get("/api/ui/preferences", self._api_ui_preferences)
         app.router.add_post("/api/ui/preferences", self._api_save_ui_preferences)
         app.router.add_post("/api/ui/open-browser", self._api_open_browser)
@@ -425,6 +434,15 @@ class LocalServer(CaptureRoutesMixin):
         if self._pet_media_cache is None:
             raise RuntimeError("精灵图片缓存尚未初始化")
         path = await self._pet_media_cache.resolve(request.match_info["asset"])
+        if path is None:
+            return web.Response(status=404)
+        return web.FileResponse(path)
+
+    async def _account_avatar_asset(self, request: web.Request) -> web.Response:
+        """头像只按需从映射的云端来源下载，成功后读用户缓存。"""
+        if self._account_avatar_cache is None:
+            raise RuntimeError("账号头像缓存尚未初始化")
+        path = await self._account_avatar_cache.resolve(request.match_info["asset"])
         if path is None:
             return web.Response(status=404)
         return web.FileResponse(path)
