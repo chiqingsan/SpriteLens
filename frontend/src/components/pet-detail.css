@@ -71,10 +71,10 @@
 .detail-measurements > header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
 .detail-measurements > header h3 { margin: 0; }
 .detail-measurements .segmented button { font-size: var(--fs-xs); padding: var(--space-2) var(--space-3); }
-.detail-measurement { --metric-color: var(--chart-h); padding: var(--space-5); border: 1px solid color-mix(in srgb, var(--metric-color) 22%, var(--line)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--metric-color) 6%, var(--panel)); }
-.measure-height { background: #f1f7f5; }
+.detail-measurement { --metric-color: var(--teal-dark); padding: var(--space-5); border: 1px solid color-mix(in srgb, var(--metric-color) 22%, var(--line)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--metric-color) 6%, var(--panel)); }
+.measure-height { --metric-color: var(--teal-dark); background: #f1f7f5; }
 .measure-weight { --metric-color: var(--teal); background: #f2f7f1; }
-.measure-voice { --metric-color: var(--chart-v); background: #f6f2fa; }
+.measure-voice { --metric-color: var(--chart-v, #8067a8); background: #f6f2fa; }
 .detail-measurement > header { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); font-size: var(--fs-sm); }
 .detail-measurement header b { margin-left: var(--space-2); font-size: 18px; font-variant-numeric: tabular-nums; }
 .detail-measurement header strong { color: var(--metric-color); font-size: 18px; font-variant-numeric: tabular-nums; }
