@@ -171,5 +171,5 @@
 .quick-settings-dialog footer { justify-content: flex-end; }
 
 .saved-shortcuts { display: grid; flex: none; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin-top: var(--space-2); max-height: 240px; overflow: auto; }
-.saved-shortcuts > .chip { min-width: 0; width: 100%; height: 34px; padding: var(--space-2); border-radius: var(--radius-sm); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.saved-shortcuts > .chip { display: grid; place-items: center; min-width: 0; width: 100%; height: 34px; padding: var(--space-2); border-radius: var(--radius-sm); font-size: var(--fs-xs); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #pet-filters .medal-choices { max-height: 280px; overflow: auto; }

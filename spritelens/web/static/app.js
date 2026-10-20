@@ -172,6 +172,7 @@
 
   /* ---------- 导航 ---------- */
   function switchPage(name, revealGid) {
+    if (name === "overview") { return; }
     if (state.page === name) { return; }
     if (name === "pets" || name === "egg-box") { $("page-" + name).classList.add("page-cached"); }
     if (state.page === "egg-box" && name !== "egg-box") { pauseEggBoxPage(); }
@@ -1198,6 +1199,7 @@
       bindCaptureActions();
       loadIfaces();
       connectPush();
+      switchPage("pets");
       if (window.__spritelensBoot) { window.__spritelensBoot.ready(); }
       else { $("startup").hidden = true; $("app").hidden = false; }
     }).catch(function (err) {

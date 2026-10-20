@@ -70,7 +70,7 @@
         <div class="account-uid-row"><span id="role-uid">UID —</span><button id="btn-uid-visibility" class="icon-button" aria-label="隐藏 UID" aria-pressed="false" hidden><svg class="ui-icon" aria-hidden="true"><use href="/static/icons/sprite.svg#eye"></use></svg></button></div>
       </section>
       <nav id="main-nav" aria-label="主导航">
-        <button class="nav-item active" data-page="overview">
+        <button class="nav-item" data-page="overview" hidden>
           <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/static/icons/sprite.svg#layout-dashboard"></use></svg>
           概览
         </button>
@@ -126,7 +126,7 @@
     <!-- 主区 -->
     <main class="main-shell">
       <header class="topbar">
-        <h1 id="page-title">概览</h1>
+        <h1 id="page-title">精灵背包</h1>
         <div class="capture-summary">
           <span id="pill-listen" class="status-pill idle">采集：未启动</span>
           <span id="pill-key" hidden class="status-pill idle">密钥：未获取</span>
@@ -140,7 +140,7 @@
       </header>
 
       <!-- 概览 -->
-      <section id="page-overview" class="page active">
+      <section id="page-overview" class="page" hidden>
         <div class="stat-grid">
           <article class="stat-card"><span>宠物总数</span><strong id="ov-total">0</strong></article>
           <article class="stat-card"><span>满级（60）</span><strong id="ov-maxed">0</strong></article>
@@ -172,7 +172,7 @@
       </section>
 
       <!-- 精灵背包（宠物仓库） -->
-      <section id="page-pets" class="page">
+      <section id="page-pets" class="page active">
         <div class="workspace split">
 
           <section class="content-panel">

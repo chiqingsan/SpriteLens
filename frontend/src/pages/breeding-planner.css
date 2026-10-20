@@ -219,7 +219,6 @@
     background-color var(--motion-fast) var(--motion-ease),
     border-color var(--motion-fast) var(--motion-ease),
     color var(--motion-fast) var(--motion-ease),
-    transform var(--motion-fast) var(--motion-ease),
     box-shadow var(--motion-base) var(--motion-ease),
     opacity var(--motion-fast) var(--motion-ease);
 }
@@ -441,8 +440,11 @@
 .planner-edge.dim { opacity: .15; }
 
 /* 窝位角标：学院窝与锁定状态都有文字，不靠颜色单独表达。 */
-.planner-nest-badge circle { fill: var(--surface-1); stroke: var(--line); stroke-width: 1.5; }
+.planner-nest-badge circle,
+.planner-nest-badge rect { fill: var(--surface-1); stroke: var(--line); stroke-width: 1.5; }
 .planner-nest-badge text { fill: var(--ink-soft); font-size: 11px; font-weight: 600; }
+.planner-nest-badge.is-academy rect { fill: var(--teal); stroke: var(--teal-dark); }
+.planner-nest-badge.is-academy text { fill: var(--surface-1); font-size: 9px; }
 .planner-nest-badge.is-lock circle { fill: var(--amber-soft); stroke: var(--amber-ink); }
 .planner-nest-badge.is-lock text { fill: var(--amber-ink); }
 
@@ -486,34 +488,36 @@
 .planner-nest:active,
 .planner-nest.dragging { cursor: grabbing; }
 
-.planner-nest rect { 
+.planner-nest.dragging { opacity: .78; }
+
+.planner-nest > rect {
   fill: var(--surface-1); 
   stroke: var(--line); 
   stroke-width: 2;
   transition: fill var(--motion-fast) var(--motion-ease), stroke var(--motion-fast) var(--motion-ease), stroke-width var(--motion-fast) var(--motion-ease);
 }
 
-.planner-nest:hover rect {
+.planner-nest:hover > rect {
   fill: var(--surface-2);
 }
 
-.planner-nest.gender-1 rect { 
-  stroke: var(--male); 
-  fill: color-mix(in srgb, var(--male) 8%, var(--surface-1));
+.planner-nest.gender-1 > rect {
+  stroke: var(--male-strong);
+  fill: var(--male);
 }
 
-.planner-nest.gender-2 rect { 
-  stroke: var(--female);
-  fill: color-mix(in srgb, var(--female) 8%, var(--surface-1));
+.planner-nest.gender-2 > rect {
+  stroke: var(--female-strong);
+  fill: var(--female);
 }
 
-.planner-nest.academy rect { 
+.planner-nest.academy > rect {
   fill: var(--teal-soft); 
   stroke: var(--teal); 
   stroke-width: 2.5;
 }
 
-.planner-nest.match-iterative rect { 
+.planner-nest.match-iterative > rect {
   stroke: var(--amber-ink); 
   stroke-dasharray: 5 3; 
   fill: var(--amber-soft); 
@@ -523,24 +527,92 @@
   opacity: .3; 
 }
 
-.planner-nest.related rect { 
+.planner-nest.related > rect {
   stroke: var(--teal); 
   stroke-width: 3; 
   fill: var(--teal-soft); 
 }
 
-.planner-nest.selected rect, 
-.planner-nest:focus-visible rect { 
+.planner-nest.selected > rect,
+.planner-nest:focus-visible > rect {
   stroke: var(--teal); 
-  stroke-width: 4;
-  fill: var(--teal-soft);
+  stroke-width: 3;
   filter: brightness(1.05);
 }
 
-.planner-nest-gender { 
-  font-size: 16px; 
-  fill: var(--ink); 
-  font-weight: 700; 
+.planner-nest.selected.gender-1 > rect,
+.planner-nest:focus-visible.gender-1 > rect {
+  fill: color-mix(in srgb, var(--teal-soft) 42%, var(--male));
+}
+
+.planner-nest.selected.gender-2 > rect,
+.planner-nest:focus-visible.gender-2 > rect {
+  fill: color-mix(in srgb, var(--teal-soft) 42%, var(--female));
+}
+
+.planner-nest.drop-target > rect {
+  stroke: var(--teal-dark);
+  stroke-width: 4;
+  stroke-dasharray: 6 3;
+}
+
+.planner-nest-name {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-fast) var(--motion-ease);
+}
+
+.planner-nest:hover .planner-nest-name,
+.planner-nest.selected .planner-nest-name,
+.planner-nest:focus-visible .planner-nest-name {
+  opacity: 1;
+}
+
+.planner-nest-name rect {
+  fill: var(--surface-1);
+  stroke: var(--teal);
+  stroke-width: 1;
+}
+
+.planner-nest-name text {
+  fill: var(--ink);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.planner-drop-preview {
+  pointer-events: none;
+}
+
+.planner-selected-outline {
+  pointer-events: none;
+}
+
+.planner-selected-outline rect {
+  fill: none;
+  stroke: var(--teal-dark);
+  stroke-width: 2.5;
+}
+
+.planner-drop-preview rect {
+  fill: none;
+  stroke-width: 3;
+  stroke-dasharray: 8 5;
+}
+
+.planner-drop-preview.is-valid rect,
+.planner-drop-preview.is-swap rect {
+  stroke: var(--teal-dark);
+}
+
+.planner-drop-preview.is-blocked rect {
+  stroke: var(--amber-ink);
+}
+
+.planner-nest-gender {
+  width: 16px;
+  height: 16px;
+  color: var(--ink);
   pointer-events: none; 
 }
 
@@ -589,13 +661,20 @@
   gap: var(--space-2); 
 }
 
-.planner-canvas-key button { 
+.planner-canvas-key-item {
+  position: relative;
+  min-height: 60px;
+  min-width: 0;
+}
+
+.planner-canvas-key-select {
   display: flex; 
   align-items: center; 
   gap: var(--space-3); 
   min-width: 0; 
   min-height: 52px;
-  padding: var(--space-3) var(--space-4); 
+  width: 100%;
+  padding: var(--space-3) 144px var(--space-3) var(--space-4);
   border: 1px solid var(--line); 
   border-radius: var(--radius-sm); 
   color: var(--ink); 
@@ -606,42 +685,110 @@
     background-color var(--motion-fast) var(--motion-ease),
     border-color var(--motion-fast) var(--motion-ease),
     color var(--motion-fast) var(--motion-ease),
-    transform var(--motion-fast) var(--motion-ease),
     box-shadow var(--motion-base) var(--motion-ease),
     opacity var(--motion-fast) var(--motion-ease);
 }
 
-.planner-canvas-key button:hover {
+.planner-canvas-key-select:hover {
   border-color: var(--teal);
   background: var(--surface-2);
 }
 
-.planner-canvas-key button.active { 
+.planner-page .planner-canvas-key-select:hover,
+.planner-page .planner-canvas-key-select:active {
+  transform: none;
+}
+
+.planner-canvas-key-select.active {
   border-color: var(--teal); 
   background: var(--teal-soft);
   color: var(--teal-dark);
   font-weight: 600;
+  border-width: 1px;
 }
 
-.planner-canvas-key button.related { 
+.planner-canvas-key-select.gender-1:not(.active) {
+  background: var(--male);
+  border-color: color-mix(in srgb, var(--male-strong) 55%, var(--line));
+}
+
+.planner-canvas-key-select.gender-2:not(.active) {
+  background: var(--female);
+  border-color: color-mix(in srgb, var(--female-strong) 55%, var(--line));
+}
+
+.planner-canvas-key-select.gender-1:not(.active):hover {
+  background: color-mix(in srgb, var(--male) 78%, var(--surface-2));
+}
+
+.planner-canvas-key-select.gender-2:not(.active):hover {
+  background: color-mix(in srgb, var(--female) 78%, var(--surface-2));
+}
+
+.planner-canvas-key-select.related {
   border-color: var(--teal); 
 }
 
-.planner-canvas-key button.unrelated { 
+.planner-canvas-key-select.unrelated {
   opacity: .4; 
 }
 
-.planner-canvas-key button > span { 
+.planner-canvas-key-select > span {
   color: var(--ink-soft); 
   flex: none;
   font-weight: 600;
   min-width: 42px;
 }
 
-.planner-canvas-key button > strong { 
+.planner-canvas-key-select > strong {
   overflow: hidden; 
   text-overflow: ellipsis; 
   white-space: nowrap; 
+}
+
+.planner-canvas-key-actions {
+  position: absolute;
+  z-index: 1;
+  top: var(--space-2);
+  right: var(--space-2);
+  bottom: var(--space-2);
+  display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1);
+  width: 128px;
+}
+
+.planner-canvas-key-locate,
+.planner-canvas-key-location {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-2) var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--teal-dark);
+  background: var(--surface-1);
+  font-size: var(--fs-3xs);
+  white-space: nowrap;
+}
+
+.planner-canvas-key-locate:hover {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+}
+
+.planner-canvas-key-location {
+  overflow: hidden;
+  color: var(--muted);
+  background: var(--surface-2);
+  text-overflow: ellipsis;
+}
+
+.planner-page .planner-canvas-key-locate:hover,
+.planner-page .planner-canvas-key-locate:active {
+  transform: none;
 }
 
 @container (max-width: 600px) { 
@@ -2222,50 +2369,95 @@ dialog.planner-picker[open] {
   padding-right: var(--space-1);
 }
 
-.planner-canvas-key button {
+.planner-canvas-key-select {
   display: grid;
-  grid-template-columns: 42px 36px minmax(0, 1fr);
+  grid-template-columns: 22px 40px minmax(0, 1fr);
   grid-template-rows: auto auto;
-  column-gap: var(--space-2);
+  column-gap: var(--space-1);
   row-gap: 0;
   min-height: 52px;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) 144px var(--space-2) var(--space-3);
 }
 
-.planner-canvas-key button > span {
+.planner-canvas-key-select > span {
   grid-row: 1 / 3;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-1);
-  min-width: 0;
+  min-width: 22px;
 }
 
-.planner-canvas-key button > span i {
-  font-style: normal;
+.planner-canvas-key-gender {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
 }
 
-.planner-canvas-key button > span i.male {
+.planner-canvas-key-gender.male {
   color: var(--male-ink);
 }
 
-.planner-canvas-key button > span i.female {
+.planner-canvas-key-gender.female {
   color: var(--female-ink);
 }
 
-.planner-canvas-key button > img {
+.planner-canvas-key-gender .ui-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.planner-canvas-key-select > img {
   grid-column: 2;
   grid-row: 1 / 3;
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   align-self: center;
   object-fit: contain;
 }
 
-.planner-canvas-key button > strong {
+.planner-canvas-key-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow: hidden;
   align-self: end;
 }
 
-.planner-canvas-key button > small {
+.planner-canvas-key-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planner-canvas-key-nature {
+  color: var(--muted);
+  font-size: var(--fs-3xs);
+  font-weight: 500;
+}
+
+.planner-canvas-key-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.planner-canvas-key-mark .medal-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.planner-canvas-key-select > small {
   overflow: hidden;
   color: var(--muted);
   font-size: var(--fs-3xs);
@@ -2390,23 +2582,23 @@ dialog.planner-picker[open] {
   opacity: .28;
 }
 
-.planner-canvas-key button {
-  grid-template-columns: 42px 40px minmax(0, 1fr);
+.planner-canvas-key-select {
+  grid-template-columns: 22px 40px minmax(0, 1fr);
   min-height: 60px;
   border-radius: var(--radius-md);
 }
 
-.planner-canvas-key button > img {
-  width: 36px;
-  height: 36px;
+.planner-canvas-key-select > img {
+  width: 40px;
+  height: 40px;
 }
 
-.planner-canvas-key button > small {
+.planner-canvas-key-select > small {
   font-size: var(--fs-xs);
 }
 
-.planner-canvas-key button.active {
-  border-width: 2px;
+.planner-canvas-key-select.active {
+  border-width: 1px;
 }
 
 .planner-egg-choices button {
@@ -2462,13 +2654,13 @@ dialog.planner-picker[open] {
 }
 
 @media (max-width: 1200px) {
-  .planner-canvas-key button {
-    grid-template-columns: 38px 36px minmax(0, 1fr);
+  .planner-canvas-key-select {
+    grid-template-columns: 22px 40px minmax(0, 1fr);
   }
 
-  .planner-canvas-key button > img {
-    width: 32px;
-    height: 32px;
+  .planner-canvas-key-select > img {
+    width: 40px;
+    height: 40px;
   }
 }
 
@@ -2528,7 +2720,7 @@ dialog.planner-picker[open] {
 @media (min-width: 1201px) {
   .planner-canvas-key {
     align-self: stretch;
-    height: var(--planner-canvas-height, 0px);
+    height: var(--planner-canvas-height, min(324px, 54cqw));
   }
 }
 

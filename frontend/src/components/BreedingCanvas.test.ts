@@ -4,8 +4,8 @@ import BreedingCanvas from './BreedingCanvas.vue'
 import type { BreederParent } from '../types/breederLibrary'
 import type { NatureReference, Plan, Placement, TargetReference } from '../types/breedingPlanner'
 
-const parent = (gid: string, name: string, gender: 1 | 2): BreederParent => ({ gid, name, species: '合成', dex_no: 1, gender, nature: '开朗',
-  groups: ['动物'], marks: [], voice: null, height_ratio: null, weight_ratio: null, is_shiny: false, is_colorful: false, icon_url: '', location: null })
+const parent = (gid: string, name: string, gender: 1 | 2, location: BreederParent['location'] = null, marks: BreederParent['marks'] = []): BreederParent => ({ gid, name, species: '合成', dex_no: 1, gender, nature: '开朗',
+  groups: ['动物'], marks, voice: null, height_ratio: null, weight_ratio: null, is_shiny: false, is_colorful: false, icon_url: '', location })
 const nest = (gid: string, x: number, y: number, kind: 'normal' | 'academy' = 'normal', lock: '' | 'participation' | 'position' = ''): Placement =>
   ({ gid, x, y, kind, lock, primary_goal_id: '' })
 const nature = (): NatureReference => ({ known: {}, random: null, unknown: null })
@@ -13,7 +13,7 @@ const reference = (goalId: string, interference: string[]): TargetReference => (
   iterative_fathers: 0, father_count: 1, father_fraction: 1, nature_contribution: null, all_father_nature_contribution: null, interference })
 const positions = [nest('1', 0, 0), nest('2', 2, 0), nest('3', 6, 0), nest('4', 8, 0)]
 const parents = new Map<string, BreederParent>()
-for (const item of [parent('1', '甲', 1), parent('2', '乙', 2), parent('3', '丙', 2), parent('4', '丁', 2)]) parents.set(item.gid, item)
+for (const item of [parent('1', '甲', 1), parent('2', '乙', 2, { box_id: 3, slot: 14, row: 3, column: 2 }, [{ label: '大块头', name: '大块头', source: 'worn' }]), parent('3', '丙', 2), parent('4', '丁', 2)]) parents.set(item.gid, item)
 const plan = (): Plan => ({ plan_id: 'plan-1', status: 'ready', issues: [], placements: positions,
   edges: [{ male: '1', female: '2', marks: [], groups: [], nature: nature() }, { male: '1', female: '3', marks: [], groups: [], nature: nature() }],
   mothers: [{ gid: '2', egg_key: 'egg-a', fathers: ['1'], references: [reference('g1', [])], primary_goal_id: 'g1', nature: nature() },
@@ -103,11 +103,43 @@ describe('小窝布局草图', () => {
     expect(pending.find('.planner-canvas-legend').exists()).toBe(false)
     expect(canvas({ selected: '3' }).findAll('line.planner-edge.dim')).toHaveLength(1)
   })
+  it('选中框和配对连线位于窝位之上，避免被相邻窝位覆盖', () => {
+    const wrapper = canvas({ selected: '3' })
+    const children = Array.from(wrapper.get('svg').element.children)
+    const nestIndex = Math.max(...children.map((child, index) => child.classList.contains('planner-nest') ? index : -1))
+    const linkIndex = children.findIndex(child => child.classList.contains('planner-canvas-links'))
+    const selectedIndex = children.findIndex(child => child.classList.contains('planner-selected-outline'))
+    expect(linkIndex).toBeGreaterThan(nestIndex)
+    expect(selectedIndex).toBeGreaterThan(linkIndex)
+    expect(wrapper.get('.planner-selected-outline rect').attributes()).toMatchObject({ x: '-32', y: '-32', width: '64', height: '64', rx: '8' })
+  })
   it('学院窝与锁定窝位用文字角标表达，不靠颜色', () => {
     const badges = canvas({ positions: [nest('1', 0, 0, 'academy'), nest('2', 2, 0, 'normal', 'position')] }).findAll('g.planner-nest-badge')
     expect(badges).toHaveLength(2)
-    expect(badges[0]!.text()).toContain('学')
+    expect(badges[0]!.text()).toContain('学院')
     expect(badges[1]!.text()).toContain('锁')
     expect(badges[1]!.find('title').text()).toContain('位置锁定')
+  })
+
+  it('窝位提供精灵名称提示，便于区分重复图片', () => {
+    expect(nests(canvas())[0]!.find('title').text()).toContain('甲')
+  })
+
+  it('亲本索引提供定位按钮并发出对应个体', async () => {
+    const wrapper = canvas()
+    const item = wrapper.findAll('.planner-canvas-key-item')[1]!
+    const select = item.find('.planner-canvas-key-select')
+    expect(select.exists()).toBe(true)
+    expect(select.classes()).toContain('gender-2')
+    expect(select.find('.planner-canvas-key-name').text()).toContain('乙')
+    expect(select.find('.planner-canvas-key-gender').attributes('aria-label')).toBe('母本')
+    expect(select.find('.planner-canvas-key-gender .ui-icon use').attributes('href')).toBe('/static/icons/sprite.svg#gender-female')
+    expect(select.find('.planner-canvas-key-mark img').attributes('alt')).toBe('大块头')
+    expect(select.find('small').text()).toContain('普通窝')
+    expect(select.find('small').text()).toContain('开朗')
+    expect(item.find('.planner-canvas-key-locate').exists()).toBe(true)
+    expect(item.find('.planner-canvas-key-actions').find('.planner-canvas-key-location').text()).toBe('第3箱·第3行第2列')
+    await item.find('.planner-canvas-key-locate').trigger('click')
+    expect(wrapper.emitted('locate')).toEqual([['2']])
   })
 })
