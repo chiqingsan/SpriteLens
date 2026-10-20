@@ -10,7 +10,7 @@ export function useEggDex(api: ApiClient) {
   let generation = 0
   let controller: AbortController | undefined
   let timer: ReturnType<typeof setTimeout> | undefined
-  let active = true, loadedQuery = ''
+  let active = true, loadedQuery = '', batch = false
   function query() {
     const params = new URLSearchParams()
     Object.entries(filters).forEach(([key, value]) => { if (value) params.set(key, value.trim()) })
@@ -40,6 +40,7 @@ export function useEggDex(api: ApiClient) {
     }
   }
   watch(() => ({ ...filters }), (next, previous) => {
+    if (batch) return
     // 输入时立即作废旧请求，不能等 debounce 结束才失效。
     invalidate()
     if (!active) return
@@ -54,6 +55,11 @@ export function useEggDex(api: ApiClient) {
     active = true
     if (!data.value || error.value || loadedQuery !== query()) await load()
   }
-  function clear() { Object.assign(filters, { search: '', group: '', egg_type: '', hatch_min_hours: '' }) }
+  function clear() {
+    batch = true
+    Object.assign(filters, { search: '', group: '', egg_type: '', hatch_min_hours: '' })
+    batch = false
+    return load()
+  }
   return { filters, data, loading, error, load, pause, resume, clear }
 }

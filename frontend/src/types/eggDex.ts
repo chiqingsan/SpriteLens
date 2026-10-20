@@ -1,4 +1,8 @@
+import { isWikiReference, type WikiReference } from './wikiReference'
+
 export interface Egg {
+  wiki?: WikiReference | null
+  can_same_ride?: boolean | null
   egg_conf_id: number; egg_name: string; name: string; base_id: number
   icon_url: string; egg_icon_url: string; handbook_no: string
   egg_type_name: string; hatch_label: string; hatch_seconds: number
@@ -23,6 +27,8 @@ function isEgg(value: unknown): value is Egg {
     key => typeof value[key] === 'number' && Number.isFinite(value[key]))
     && ['egg_name', 'name', 'icon_url', 'egg_icon_url', 'handbook_no', 'egg_type_name', 'hatch_label'].every(
       key => typeof value[key] === 'string')
+    && isWikiReference(value.wiki)
+    && (value.can_same_ride === undefined || value.can_same_ride === null || typeof value.can_same_ride === 'boolean')
     && Number.isSafeInteger(value.egg_conf_id) && Number.isSafeInteger(value.base_id)
     && strings(value.egg_group_names)
     && record(value.reference_ranges) && typeof value.reference_ranges.height === 'string'

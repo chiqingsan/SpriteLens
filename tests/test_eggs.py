@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 
 from spritelens.domain.eggs import EggCatalog
+from spritelens.domain.static_data import StaticData
 from spritelens.web.payloads import egg_dex_payload
 
 
@@ -72,6 +73,18 @@ class EggCatalogTests(unittest.TestCase):
         self.assertEqual([e["name"] for e in by_hatch["eggs"]], ["喵喵"])
         by_search = egg_dex_payload(self.catalog, search="3002")
         self.assertEqual([e["name"] for e in by_search["eggs"]], ["岚鸟"])
+
+    def test_missing_gender_uses_only_matching_species(self) -> None:
+        for name in ("natures", "types", "skills", "type_chart"):
+            (self.dir_path / f"{name}.json").write_text("{}", encoding="utf-8")
+        path = self.dir_path / "species.json"
+        path.write_text(json.dumps({"3002": {"name": "岚鸟", "gender_ratio": {"male": 20, "female": 80}}}), encoding="utf-8")
+        row = egg_dex_payload(self.catalog, static=StaticData(self.dir_path), search="3002")["eggs"][0]
+        self.assertEqual((row["gender_male"], row["gender_female"]), (20, 80))
+        path.write_text(json.dumps({"3002": {"name": "其它形态", "gender_ratio": {"male": 20, "female": 80}}}), encoding="utf-8")
+        row = egg_dex_payload(self.catalog, static=StaticData(self.dir_path), search="3002")["eggs"][0]
+        self.assertEqual((row["gender_male"], row["gender_female"]), (0, 0))
+
 
 if __name__ == "__main__":
     unittest.main()

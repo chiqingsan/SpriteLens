@@ -62,6 +62,7 @@ def _handbook_egg(catalog: EggCatalog | None, key: str) -> dict | None:
         "egg_conf_id": egg.egg_conf_id,
         "name": egg.egg_name or egg.name,
         "species_name": egg.name,
+        "icon_url": f"/static/egg-icons/{egg.egg_item_id}.png" if egg.egg_item_id else "",
         "hatch_hours": round(egg.hatch_seconds / 3600, 1),
         "hatch_label": egg.hatch_label,
         "egg_groups": list(egg.egg_group_names),
@@ -78,6 +79,7 @@ def handbook_payload(
     stage: int = 0,
     egg_group: str = "",
     sort: str = "dex",
+    details: bool = False,
 ) -> dict:
     """图鉴资料载荷：全物种目录 + 游戏静态资料（不读玩家数据）。
 
@@ -142,6 +144,7 @@ def handbook_payload(
                 "dex_no": info.dex_no,
                 "handbook_no": info.handbook_no,
                 "icon_url": species_icon_url(int(key)) if key.isdigit() else "",
+                "artwork_url": pet_images(int(key))["artwork_url"] if key.isdigit() else "",
                 "types": list(info.types),
                 "egg_groups": list(info.egg_groups),
                 "gender_ratio": list(info.gender_ratio),
@@ -162,10 +165,11 @@ def handbook_payload(
                     for e in info.evolutions
                     if (evo := static.species(e)) is not None
                 ],
-                "chain_members": [{"key": str(e), "name": member.name}
+                "chain_members": [{"key": str(e), "name": member.name, "icon_url": species_icon_url(e), "stage": member.stage}
                                   for e in info.chain_members if (member := static.species(e)) is not None],
                 "egg": _handbook_egg(catalog, key),
                 "description": info.description,
+                "wiki": static.wiki_reference.species(key, info.name) if details else None,
             }
         rows.append(row)
         if exact:
@@ -728,12 +732,17 @@ def egg_dex_payload(
     group: str = "",
     egg_type: str = "",
     hatch_min_hours: int = 0,
+    details: bool = False,
 ) -> dict:
     """蛋图鉴载荷：蛋目录静态数据 + 可选筛选（搜索/蛋组/蛋类型/孵化时长下限）。"""
     entries = catalog.entries() if catalog is not None else ()
     keyword = search.strip().lower()
     rows: list[dict] = []
     for info in entries:
+        male, female = info.gender_male, info.gender_female
+        species = static.species(info.base_id) if static is not None else None
+        if not (male or female) and species is not None and species.name == info.name:
+            male, female = species.gender_ratio
         if keyword and not any(keyword in value.lower() for value in (
             info.name_key, info.name, info.egg_name, str(info.egg_conf_id),
         )):
@@ -747,6 +756,8 @@ def egg_dex_payload(
         rows.append(
             {
                 "egg_conf_id": info.egg_conf_id,
+                "can_same_ride": static.wiki_reference.can_double_ride(info.base_id, info.name) if static is not None else None,
+                "wiki": static.wiki_reference.species(info.base_id, info.name) if details and static is not None else None,
                 "egg_name": info.egg_name,
                 "name": info.name,
                 "base_id": info.base_id,
@@ -760,11 +771,11 @@ def egg_dex_payload(
                 "hatch_label": info.hatch_label,
                 "hatch_seconds": info.hatch_seconds,
                 "egg_group_names": list(info.egg_group_names),
-                "gender_male": info.gender_male,
-                "gender_female": info.gender_female,
+                "gender_male": male,
+                "gender_female": female,
                 "gender_ratio_text": (
-                    f"♂{info.gender_male}% / ♀{info.gender_female}%"
-                    if info.gender_male or info.gender_female
+                    f"♂{male}% / ♀{female}%"
+                    if male or female
                     else "暂无"
                 ),
                 "height": [info.height_low, info.height_high],

@@ -165,7 +165,11 @@
   /* ---------- 导航 ---------- */
   function switchPage(name, revealGid) {
     if (name === "overview") { return; }
-    if (state.page === name) { return; }
+    if (state.page === name) {
+      if (name === "handbook" && revealGid) { handbookPage.load(revealGid); }
+      if (name === "egg-dex" && revealGid) { eggDex.load(revealGid); }
+      return;
+    }
     if (name === "pets" || name === "egg-box") { $("page-" + name).classList.add("page-cached"); }
     if (state.page === "egg-box" && name !== "egg-box") { pauseEggBoxPage(); }
     else { accountRequests.cancel(state.page); }
@@ -197,9 +201,9 @@
       if (revealGid) { petInventory.reveal(revealGid).catch(function (err) { toast("精灵定位失败：" + err.message, true); }); }
       else { loadPets(false, true); }
     }
-    if (name === "handbook") { handbookPage.load(); }
+    if (name === "handbook") { handbookPage.load(revealGid); }
     if (name === "colors") { colorsPage.load(); }
-    if (name === "egg-dex") { eggDex.load(); }
+    if (name === "egg-dex") { eggDex.load(revealGid); }
     if (name === "egg-box") { loadEggBoxPage(true); }
     if (name === "male-matrix") { loadMaleMatrix(); }
     if (name === "home") { loadHome(true); }
@@ -410,23 +414,28 @@
   /* ---------- 精灵图鉴（Vue 页，挂载后由页面自己拉数据） ---------- */
   var handbookPage = (function () {
     var mounted = null;
+    var generation = 0;
     return {
-      load: function () {
-        if (mounted) { mounted.resume(); return; }
+      load: function (entryId) {
+        if (mounted) { mounted.resume(); if (entryId) { mounted.reveal(entryId); } return; }
+        var current = ++generation;
         var root = $("page-handbook");
         root.textContent = "正在加载图鉴…";
         return import("/static/vue/entry.js").then(function (page) {
+          if (current !== generation) { return; }
           mounted = page.mountHandbook(root, TOKEN, {
             failed: function (message) { toast("图鉴加载失败：" + message, true); }
           });
+          if (entryId) { mounted.reveal(entryId); }
         }).catch(function (err) {
+          if (current !== generation) { return; }
           root.textContent = "图鉴启动失败，请切页重试：" + err.message;
           toast("图鉴启动失败：" + err.message, true);
         });
       },
-      leave: function () { if (mounted) { mounted.pause(); } },
+      leave: function () { generation++; if (mounted) { mounted.pause(); } },
       resetAccount: function () { if (mounted) { mounted.resetAccount(); } },
-      unmount: function () { if (mounted) { mounted.unmount(); mounted = null; } }
+      unmount: function () { generation++; if (mounted) { mounted.unmount(); mounted = null; } }
     };
   })();
 
@@ -683,14 +692,15 @@
         if (mounted) { mounted.pause(); }
       },
       unmount: function () { generation++; if (mounted) { mounted.unmount(); mounted = null; } },
-      load: function () {
-        if (mounted) { mounted.resume(); return; }
+      load: function (entryId) {
+        if (mounted) { mounted.resume(); if (entryId) { mounted.reveal(entryId); } return; }
         var current = ++generation;
         var root = $("page-egg-dex");
         root.textContent = "正在加载蛋图鉴…";
         return import("/static/vue/entry.js").then(function (page) {
           if (current !== generation) { return; }
           mounted = page.mount(root, TOKEN);
+          if (entryId) { mounted.reveal(entryId); }
         }).catch(function (err) {
           if (current !== generation) { return; }
           root.textContent = "蛋图鉴启动失败，请切页重试：" + err.message;
@@ -834,7 +844,7 @@
       if (!root) { return; }
       root.addEventListener("click", function (event) {
         var toPage = event.target.closest("[data-goto-page]");
-        if (toPage) { switchPage(String(toPage.dataset.gotoPage)); return; }
+        if (toPage) { switchPage(String(toPage.dataset.gotoPage), toPage.dataset.catalogId); return; }
         var toPets = event.target.closest("[data-goto-pets]");
         if (!toPets) { return; }
         // 图鉴详情按物种名回背包预筛：名字命中即该物种的全部个体。

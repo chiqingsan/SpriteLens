@@ -64,3 +64,5 @@ UI 视觉/组件规范 → UI_GUIDE；蛋神对标实施进度 → DANSHEN_FEATU
 当前路线与验收顺序只维护在 `ROADMAP.md`，协作规则维护在 `DEVELOPMENT_GUIDE.md`；
 历史评估中的架构、体积、测试数量与阶段状态须结合记录日期阅读。
 文档用 LF、不写本机绝对路径。
+
+- [本地 Wiki 补充资料](WIKI_REFERENCE.md)：当前维护说明；来源、离线导入、身份核对与运行边界。

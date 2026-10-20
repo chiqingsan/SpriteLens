@@ -1,6 +1,9 @@
-export interface HandbookEvolution { key: string | number; name: string }
+import { isWikiReference, type WikiReference } from './wikiReference'
+
+export interface HandbookEvolution { key: string | number; name: string; icon_url?: string; stage?: number }
 export interface HandbookMatchups { weak: string[]; resist: string[]; immune: string[] }
 export interface HandbookEgg {
+  icon_url?: string
   egg_conf_id: number
   name: string
   species_name: string
@@ -10,11 +13,13 @@ export interface HandbookEgg {
   egg_type: string
 }
 export interface HandbookSpecies {
+  wiki?: WikiReference | null
   key: string
   name: string
   display_name: string
   dex_no: number
   handbook_no: string
+  artwork_url: string
   icon_url: string
   types: number[]
   egg_groups: string[]
@@ -78,12 +83,13 @@ function egg(value: unknown): value is HandbookEgg | null {
 function isSpecies(value: unknown): value is HandbookSpecies {
   if (!record(value)) return false
   return typeof value.key === 'string' && typeof value.name === 'string'
-    && ['display_name', 'handbook_no', 'icon_url', 'description'].every(key => typeof value[key] === 'string')
+    && ['display_name', 'handbook_no', 'icon_url', 'artwork_url', 'description'].every(key => typeof value[key] === 'string')
     && ['dex_no', 'stat_sum', 'quality', 'stage', 'max_energy'].every(
       key => Number.isSafeInteger(value[key]))
     && typeof value.has_shiny === 'boolean'
     && numbers(value.types) && strings(value.egg_groups) && strings(value.type_names)
     && strings(value.type_colors)
+    && isWikiReference(value.wiki)
     && pair(value.gender_ratio) && pair(value.height_range) && pair(value.weight_range)
     && record(value.stats) && Object.values(value.stats).every(item => typeof item === 'number')
     && ranges(value.reference_ranges) && matchups(value.matchups) && egg(value.egg)

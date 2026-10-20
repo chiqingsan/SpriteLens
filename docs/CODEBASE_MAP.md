@@ -253,6 +253,28 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `spritelens/web/pet_details.py` | 既有宠物与静态资料生成详情DTO，不另读仓库 |
 | `tests/test_pet_detail.py` | 获得/佩戴归属、未知/空集合、合并落库、v9→v10迁移与详情契约 |
 
+## 本地 Wiki 图鉴补充（2026-10-19）
+
+| 文件 | 职责 |
+| --- | --- |
+| `tools/import_wiki_reference.py` | 从四份 Wiki Lua 数据模块生成暂存补充目录，记录来源 URL/哈希；不执行 Lua |
+| `data/static/wiki_reference.json` | 离线技能、特性、进化、分布及特殊蛋来源快照 |
+| `spritelens/domain/wiki_reference.py` | 游戏 ID/名称匹配与只读补充资料联查 |
+| `frontend/src/types/wikiReference.ts` | 图鉴补充 DTO 与接口边界校验 |
+| `frontend/src/components/WikiSkills.vue` | 技能来源/属性/文本过滤与学习资料展示 |
+| `frontend/src/components/WikiAcquisition.vue` | 两个图鉴共享的分布、活动、特殊蛋来源展示 |
+| `frontend/src/pages/catalog-wiki.css` | 蛋神式分页卡片、常驻详情、雷达与窄窗样式 |
+| `tests/test_wiki_reference.py` | 合成数据验证身份匹配、学习来源、零能耗、按需载荷和导入数据边界 |
+| `docs/WIKI_REFERENCE.md` | 当前资料来源、导入操作和维护边界 |
+
+| 图鉴共享组件 | 职责 |
+| --- | --- |
+| `frontend/src/components/DexPortrait.vue` | 完整源图 contain 展示及缺图占位 |
+| `frontend/src/components/DexFilterMenu.vue` | 单选/多选筛选弹窗与蛋组并交集模式 |
+| `frontend/src/components/DexRadar.vue` | 六维种族值雷达图 |
+| `frontend/src/components/DexGender.vue` | 精灵/蛋详情共享的公母比例圆环 |
+| `frontend/src/components/DexRanges.vue` | 精灵/蛋的参考范围条及物种分布展示 |
+
 | 智能配窝文件 | 职责 |
 | --- | --- |
 | `domain/breeding_planner.py` / `breeding_solver.py` / `breeding_nature.py` | 准入、统一布局评估、有界联合搜索与共用性格参考 |

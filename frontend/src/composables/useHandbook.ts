@@ -81,7 +81,7 @@ export function useHandbook(api: ApiClient) {
     batch = true
     Object.assign(filters, DEFAULTS)
     batch = false
-    void load()
+    return load()
   }
   return { filters, data, loading, error, load, pause, resume, resetAccount, clear }
 }

@@ -19,8 +19,9 @@ export function mountHandbook(root: HTMLElement, token: string, host: HandbookHo
   const stop = watchEffect(() => { if (page.value?.error) host.failed?.(page.value.error) })
   return {
     load: () => page.value?.resume(),
-    pause: () => page.value?.pause(),
-    resume: () => page.value?.resume(),
+    pause: () => { ready.value = false; page.value?.pause() },
+    resume: () => { ready.value = true; return page.value?.resume() },
+    reveal: (key: string | number) => page.value?.reveal(key),
     resetAccount: () => page.value?.resetAccount(),
     unmount: () => { stop(); app.unmount() },
   }

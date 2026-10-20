@@ -709,6 +709,7 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
                 stage=_as_int(query.get("stage"), 0),
                 egg_group=query.get("egg_group", ""),
                 sort=query.get("sort", "dex"),
+                details=_as_bool(query.get("details")),
             )
         )
 
@@ -722,6 +723,7 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
                 group=query.get("group", ""),
                 egg_type=query.get("egg_type", ""),
                 hatch_min_hours=_as_int(query.get("hatch_min_hours"), 0),
+                details=_as_bool(query.get("details")),
             )
         )
 

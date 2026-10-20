@@ -29,12 +29,14 @@ export function mountEggBox(root: HTMLElement, host: EggBoxHost) {
 
 export function mount(root: HTMLElement, token: string) {
   const active = ref(true), api = createApiClient(token)
+  const page = ref<InstanceType<typeof EggDexPage> | null>(null)
   const router = createRouter({ history: createMemoryHistory(), routes: [
-    { path: '/', component: EggDexPage, props: () => ({ api, active: active.value }) },
+    { path: '/', component: { setup: () => () => h(EggDexPage, { ref: page, api, active: active.value }) } },
   ] })
   const app = createApp({ render: () => h(RouterView) })
   app.use(createPinia()).use(router)
   void router.push('/')
   app.mount(root)
-  return { pause: () => { active.value = false }, resume: () => { active.value = true }, unmount: () => app.unmount() }
+  return { pause: () => { active.value = false }, resume: () => { active.value = true },
+    reveal: (key: string | number) => page.value?.reveal(key), unmount: () => app.unmount() }
 }

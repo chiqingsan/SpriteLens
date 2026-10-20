@@ -363,3 +363,10 @@ R09 已落实 Database 所有权与 AppContext 内部容错关闭，但装配失
 下一阶段保护三项边界：资源由组合根明确持有并按逆序释放；业务返回单一uid/version快照；页面和请求状态按功能隔离。
 `app.js`、`server.py`、`payloads_catalog.py` 是优先控制职责增长的位置；原始流录制与checkpoint的同步IO需要实际慢盘验证。
 资源流水线先明确来源、版本、临时输出验证和发布清单，再处理体积，保留当前兜底资源与可追溯原图。
+
+### 离线 Wiki 补充目录
+
+StaticData 组合只读 WikiReference，从随包 data/static/wiki_reference.json 加载补充资料；
+按游戏物种 ID 和名称核对，不覆盖基础目录，也不依赖玩家仓库。
+图鉴 REST 仅在 details=1 时展开技能、特性、进化与获取资料；Vue 负责详情请求失效和章节展示。
+导入只在开发维护期执行，运行时不访问 Wiki。来源与失败边界见 [本地 Wiki 资料](WIKI_REFERENCE.md)。

@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from spritelens.logs import get_logger
+from spritelens.domain.wiki_reference import WikiReference
 
 logger = get_logger("static_data")
 
@@ -119,6 +120,7 @@ class StaticData:
 
     def __init__(self, directory: Path | None) -> None:
         self.directory = directory
+        self.wiki_reference = WikiReference(directory)
         self._medals = _load_table(directory, "medals.json") if directory and (directory / "medals.json").is_file() else {}
         self._specialities = _load_table(directory, "specialities.json") if directory and (directory / "specialities.json").is_file() else {}
         self._species: dict[str, SpeciesInfo] = {}

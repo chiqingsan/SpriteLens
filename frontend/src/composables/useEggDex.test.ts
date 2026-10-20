@@ -91,3 +91,15 @@ it('隐藏时筛选变化不发请求，返回加载；失败后再次返回可�
   model.pause(); await model.resume()
   expect(api).toHaveBeenCalledTimes(3); expect(model.error.value).toBe('')
 })
+
+it('清除多个筛选只请求一次完整目录，且可等待请求完成', async () => {
+  const api = vi.fn().mockResolvedValue(payload), model = setup(api)
+  model.pause()
+  model.filters.search = '旧搜索'; model.filters.group = '动物组'; model.filters.egg_type = '普通'
+  await model.resume()
+  api.mockClear()
+  await model.clear()
+  expect(api).toHaveBeenCalledTimes(1)
+  expect(api.mock.calls[0]![0]).toBe('/api/eggs?')
+  expect(model.loading.value).toBe(false)
+})
