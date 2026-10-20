@@ -215,7 +215,9 @@
       document.getElementById("role-label").textContent = role ? "Lv" + (role.level || "—") : "登录游戏后识别";
       card.classList.toggle("account-empty", !role);
       selectedUid = role ? Number(role.uid) : selectedUid;
-      var source = validAvatar(role && role.avatar_url);
+      // 实时 self_info 可能没有名片头像；同一账号的历史缓存仍是可信头像来源。
+      var cachedAvatar = identity && cached && Number(identity.uid) === Number(cached.uid) ? cached.avatar_url : "";
+      var source = validAvatar(role && role.avatar_url) || validAvatar(cachedAvatar);
       if ((avatar.getAttribute("src") || "") !== source) {
         avatar.hidden = !source;
         avatarFallback.hidden = !!source;

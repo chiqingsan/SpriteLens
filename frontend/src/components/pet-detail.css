@@ -79,8 +79,8 @@
 .detail-measurement header b { margin-left: var(--space-2); font-size: 18px; font-variant-numeric: tabular-nums; }
 .detail-measurement header strong { color: var(--metric-color); font-size: 18px; font-variant-numeric: tabular-nums; }
 .detail-measurement-scale { display: flex; align-items: center; gap: var(--space-3); margin: var(--space-5) 0 var(--space-2); font-size: var(--fs-3xs); font-variant-numeric: tabular-nums; }
-.detail-range-track { position: relative; flex: 1; height: 6px; background: var(--surface-4); border-radius: 999px; }
-.detail-range-track > i { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--metric-color) 45%, var(--surface-4)); border-radius: inherit; }
+.detail-range-track { position: relative; flex: 1; height: 8px; background: var(--surface-4); border-radius: 999px; overflow: visible; }
+.detail-range-fill { position: absolute; inset: 0 auto 0 0; min-width: 2px; background: color-mix(in srgb, var(--metric-color) 68%, var(--surface-4)); border-radius: inherit; }
 .detail-range-track > b { position: absolute; top: -10px; width: 0; height: 0; border: 5px solid transparent; border-top-color: var(--metric-color); transform: translateX(-50%); }
 .detail-measurement small { display: block; line-height: 1.5; }
 .detail-medal-strip { display: flex; align-items: center; gap: var(--space-5); padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); min-height: 52px; }
