@@ -13,6 +13,7 @@ import unittest
 import urllib.error
 import urllib.parse
 import urllib.request
+from dataclasses import replace
 from pathlib import Path
 
 from spritelens.app_context import AppContext
@@ -574,6 +575,20 @@ class HandbookPayloadTest(unittest.TestCase):
                 self.assertNotIn(field, row)
         self.assertEqual(payload["stage_options"], [1, 2])
         self.assertEqual(payload["egg_group_options"], ["动物组", "海洋组"])
+
+    def test_duplicate_species_records_are_merged_to_complete_record(self):
+        original = self.static._species["100"]
+        self.static._species["099"] = replace(
+            original, stats={"hp": 0, "sum": 0}, description="", chain_members=()
+        )
+        try:
+            payload = self._payload()
+            rows = [row for row in payload["species"] if row["handbook_no"] == "002"]
+            self.assertEqual([row["key"] for row in rows], ["100"])
+            self.assertEqual(payload["total"], 4)
+            self.assertEqual(payload["shown"], 4)
+        finally:
+            del self.static._species["099"]
 
     def test_filters_by_type_stage_and_egg_group(self):
         self.assertEqual(self._keys(type_name="水"), ["300"])

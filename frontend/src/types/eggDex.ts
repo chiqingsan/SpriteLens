@@ -7,11 +7,13 @@ export interface Egg {
   icon_url: string; egg_icon_url: string; handbook_no: string
   egg_type_name: string; hatch_label: string; hatch_seconds: number
   egg_group_names: string[]; gender_male: number; gender_female: number
+  type_names?: string[]; type_colors?: string[]; type_icons?: Record<string, string>
   reference_ranges: { height: string; weight: string }
   chain: number[]; chain_names: Record<string, string>
 }
 export interface EggDex {
   eggs: Egg[]; total: number; shown: number; groups: string[]; egg_types: string[]
+  type_option_icons?: Record<string, string>
 }
 
 // 只校验页面消费的字段；新增后端字段不使旧客户端失效。
@@ -42,6 +44,9 @@ export function parseEggDex(value: unknown): EggDex {
     || !strings(value.groups) || !strings(value.egg_types)) {
     throw new Error('蛋图鉴数据格式不正确')
   }
+  const typeOptionIcons = record(value.type_option_icons)
+    && Object.values(value.type_option_icons).every(item => typeof item === 'string')
+    ? value.type_option_icons as Record<string, string> : undefined
   return { eggs: value.eggs, total: Number(value.total), shown: Number(value.shown),
-    groups: value.groups, egg_types: value.egg_types }
+    groups: value.groups, egg_types: value.egg_types, type_option_icons: typeOptionIcons }
 }

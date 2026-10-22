@@ -129,7 +129,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `web/account_state.py`、`web/static/account-requests.js` | F02：state 跨域归属核对与原生账号页请求取消/代次/序号/uid/域版本校验 |
 | `web/pet_media.py` | 物种 ID → 本地头像/立绘 URL（pet_media.json；缺图映射到同源图片路由） |
 | `web/pet_media_cache.py` | 精灵图本地优先；缺失时按需校验、转码、缓存官方 CDN 图片并记录哈希 |
-| `frontend/src/pages/EggDexPage.vue`、`components/`、`composables/useEggDex.ts` | 蛋图鉴展示、详情与请求生命周期；局部状态、卸载/取消与代次失效 |
+| `frontend/src/pages/EggDexPage.vue`、`pages/EggDexPage.test.ts`、`components/`、`composables/useEggDex.ts` | 蛋图鉴展示、固定分页/筛选/详情与请求生命周期；局部状态、卸载/取消与代次失效 |
 | `frontend/src/pages/EggBoxPage.vue`、`components/EggBox*.vue`、`composables/useEggBox.ts`、`types/eggBox.ts` | 精灵蛋仓列表/详情、筛选/排序、数值范围展示与 REST DTO 校验；请求归属由原壳桥接 |
 | `frontend/src/pages/HomePage.vue`、`pages/home.css`、`composables/useHome.ts`、`types/home.ts` | 家园居民搜索、房间/窝/家具观察视图；home DTO 运行校验与账号版本桥接 |
 | `frontend/src/homeBridge.ts` | 家园 Vue 生命周期桥：挂载/暂停/恢复/切号重置；账号请求仍由旧壳拥有 |
@@ -266,6 +266,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `frontend/src/pages/catalog-wiki.css` | 蛋神式分页卡片、常驻详情、雷达与窄窗样式 |
 | `tests/test_wiki_reference.py` | 合成数据验证身份匹配、学习来源、零能耗、按需载荷和导入数据边界 |
 | `docs/WIKI_REFERENCE.md` | 当前资料来源、导入操作和维护边界 |
+| `docs/prototypes/handbook/` | 图鉴视觉原型；当前收录已确认的蛋蛋图鉴清稿 |
 
 | 图鉴共享组件 | 职责 |
 | --- | --- |

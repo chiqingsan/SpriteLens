@@ -70,6 +70,44 @@ def _handbook_egg(catalog: EggCatalog | None, key: str) -> dict | None:
     }
 
 
+def _handbook_identity(key: str, info) -> tuple:
+    """同一可查询精灵的稳定身份；不把不同图鉴编号或体型范围误合并。"""
+    label = info.display_name or info.name
+    number = info.handbook_no or (str(info.dex_no) if info.dex_no else "")
+    if not label or not number:
+        return ("key", key)
+    return (
+        "species", label, number, tuple(info.type_names),
+        tuple(info.height_range), tuple(info.weight_range),
+    )
+
+
+def _handbook_completeness(key: str, info) -> tuple[int, ...]:
+    """重复记录优先使用资料更完整的记录；同样完整时使用较小的稳定 ID。"""
+    return (
+        int(info.stat_sum > 0), int(bool(info.description)),
+        int(bool(info.egg_groups)), int(bool(info.gender_ratio != (0, 0))),
+        int(info.height_range != (0, 0)), int(info.weight_range != (0, 0)),
+        int(bool(info.chain_members)), -int(key) if key.isdigit() else 0,
+    )
+
+
+def _handbook_catalog(static: StaticData) -> tuple[dict[str, str], tuple[tuple[str, object], ...]]:
+    """返回重复图鉴记录的别名映射，以及去重后的主记录。"""
+    items = static.species_items()
+    canonical: dict[tuple, tuple[str, object]] = {}
+    for key, info in items:
+        identity = _handbook_identity(key, info)
+        current = canonical.get(identity)
+        if current is None or _handbook_completeness(key, info) > _handbook_completeness(*current):
+            canonical[identity] = (key, info)
+    aliases = {
+        key: canonical[_handbook_identity(key, info)][0]
+        for key, info in items
+    }
+    return aliases, tuple(canonical.values())
+
+
 def handbook_payload(
     static: StaticData | None,
     catalog: EggCatalog | None = None,
@@ -118,13 +156,18 @@ def handbook_payload(
             return False
         return True
 
+    aliases, catalog_items = _handbook_catalog(static)
     rows: list[dict] = []
     exact_rows: list[dict] = []
     type_names_seen: set[str] = set()
     stages_seen: set[int] = set()
     egg_groups_seen: set[str] = set()
-    for key, info in static.species_items():
-        type_names_seen.update(info.type_names)
+    type_icons = {
+        info.name: f"/static/type-icons/type-{type_id}.png"
+        for type_id, info in static.type_items()
+    }
+    for key, info in catalog_items:
+        type_names_seen.update(name for name in info.type_names if name)
         stages_seen.add(info.stage)
         egg_groups_seen.update(info.egg_groups)
         if not matches(info):
@@ -137,6 +180,7 @@ def handbook_payload(
                 continue
         else:
             exact = False
+        matchups = static.matchups(info.types)
         row = {
                 "key": key,
                 "name": info.name,
@@ -154,19 +198,23 @@ def handbook_payload(
                 "has_shiny": info.has_shiny,
                 "type_names": list(info.type_names),
                 "type_colors": [type_color_for(static, name) for name in info.type_names],
-                "matchups": static.matchups(info.types),
+                "type_icons": {name: type_icons[name] for name in set(info.type_names) | set(sum(matchups.values(), [])) if name in type_icons},
+                "matchups": matchups,
                 "stats": dict(info.stats),
                 "stat_sum": info.stat_sum,
                 "quality": info.quality,
                 "stage": info.stage,
                 "max_energy": info.max_energy,
                 "evolutions": [
-                    {"key": str(e), "name": evo.name}
+                    {"key": member_key, "name": evo.name}
                     for e in info.evolutions
-                    if (evo := static.species(e)) is not None
+                    if (member_key := aliases.get(str(e), str(e)))
+                    and (evo := static.species(int(member_key))) is not None
                 ],
-                "chain_members": [{"key": str(e), "name": member.name, "icon_url": species_icon_url(e), "stage": member.stage}
-                                  for e in info.chain_members if (member := static.species(e)) is not None],
+                "chain_members": [{"key": member_key, "name": member.name, "icon_url": species_icon_url(int(member_key)), "stage": member.stage}
+                                  for e in info.chain_members
+                                  if (member_key := aliases.get(str(e), str(e)))
+                                  and (member := static.species(int(member_key))) is not None],
                 "egg": _handbook_egg(catalog, key),
                 "description": info.description,
                 "wiki": static.wiki_reference.species(key, info.name) if details else None,
@@ -189,9 +237,10 @@ def handbook_payload(
         ))
     return {
         "species": rows,
-        "total": len(static.species_items()),
+        "total": len(catalog_items),
         "shown": len(rows),
         "type_options": sorted(type_names_seen),
+        "type_option_icons": type_icons,
         "stage_options": sorted(stage for stage in stages_seen if stage),
         "egg_group_options": sorted(egg_groups_seen),
         "filters": {
@@ -736,6 +785,10 @@ def egg_dex_payload(
 ) -> dict:
     """蛋图鉴载荷：蛋目录静态数据 + 可选筛选（搜索/蛋组/蛋类型/孵化时长下限）。"""
     entries = catalog.entries() if catalog is not None else ()
+    type_icons = {
+        info.name: f"/static/type-icons/type-{type_id}.png"
+        for type_id, info in static.type_items()
+    } if static is not None else {}
     keyword = search.strip().lower()
     rows: list[dict] = []
     for info in entries:
@@ -773,6 +826,9 @@ def egg_dex_payload(
                 "egg_group_names": list(info.egg_group_names),
                 "gender_male": male,
                 "gender_female": female,
+                "type_names": list(species.type_names) if species is not None else [],
+                "type_colors": [type_color_for(static, name) for name in species.type_names] if species is not None and static is not None else [],
+                "type_icons": {name: type_icons[name] for name in species.type_names if name in type_icons} if species is not None else {},
                 "gender_ratio_text": (
                     f"♂{male}% / ♀{female}%"
                     if male or female
@@ -792,6 +848,7 @@ def egg_dex_payload(
         "shown": len(rows),
         "groups": list(catalog.group_names()) if catalog is not None else [],
         "egg_types": list(catalog.type_names()) if catalog is not None else [],
+        "type_option_icons": type_icons,
         "filters": {
             "search": search,
             "group": group,

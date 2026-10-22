@@ -97,13 +97,13 @@ it('离页保留已加载图鉴，返回相同筛选不再请求', async () => {
   model.pause(); await model.resume()
   expect(api).toHaveBeenCalledTimes(1); expect(model.data.value).toBe(current)
 })
-it('切号清空已加载资料，返回后重新请求', async () => {
+it('切号不影响静态图鉴资料，返回后不重复请求', async () => {
   const api = vi.fn().mockResolvedValue(payload), model = setup(api)
   await model.load()
   model.resetAccount()
-  expect(model.data.value).toBeNull()
+  expect(model.data.value?.total).toBe(1)
   expect(model.error.value).toBe('')
   await model.resume()
-  expect(api).toHaveBeenCalledTimes(2)
+  expect(api).toHaveBeenCalledTimes(1)
   expect(model.data.value?.total).toBe(1)
 })

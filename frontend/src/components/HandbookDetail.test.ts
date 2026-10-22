@@ -22,7 +22,7 @@ describe('图鉴详情', () => {
     expect(wrapper.text()).not.toContain('尚未收集')
     expect(wrapper.find('[data-goto-pets]').exists()).toBe(false)
   })
-  it('渲染属性相性的弱点/抵抗/免疫', () => {
+  it('渲染有数据的属性相性并隐藏空分组', () => {
     const wrapper = mount(HandbookDetail, { props: { item: species() } })
     const text = wrapper.text()
     expect(text).toContain('属性相性')
@@ -30,6 +30,37 @@ describe('图鉴详情', () => {
     expect(text).toContain('火')
     expect(text).toContain('抵抗')
     expect(text).toContain('水')
+    expect(text).not.toContain('免疫')
+    expect(wrapper.find('.dex-matchup-group.is-immune').exists()).toBe(false)
+  })
+  it('没有有效属性相性时隐藏整个区块', () => {
+    const wrapper = mount(HandbookDetail, { props: { item: species({ matchups: { weak: [], resist: [], immune: [] } }) } })
+    expect(wrapper.find('.dex-matchups').exists()).toBe(false)
+  })
+  it('数据范围显示数值端点和范围跨度，并隐藏空分布', () => {
+    const wrapper = mount(HandbookDetail, { props: { item: species() } })
+    const text = wrapper.text()
+    expect(text).toContain('身高 0.53–0.75 m')
+    expect(text).toContain('0.53 m')
+    expect(text).toContain('0.75 m')
+    expect(text).toContain('范围跨度 0.22 m')
+    expect(text).toContain('小不点 ≤0.53m · 大块头 ≥0.75m')
+    expect(text).toContain('体重 3.62–4.60 kg')
+    expect(text).toContain('范围跨度 0.98 kg')
+    expect(text).toContain('体型参考')
+    expect(text).toContain('小不点 ≤3.64kg · 大块头 ≥4.58kg')
+    expect(text).toContain('粗嗓门 −100–−96 dB')
+    expect(text).toContain('婉转声 96–100 dB')
+    expect(text).not.toContain('栖息分布')
+    expect(text).not.toContain('暂无分布数据')
+  })
+  it('不展示技能、描述和活动特殊蛋来源', () => {
+    const wrapper = mount(HandbookDetail, { props: { item: species({ description: '不应展示的描述' }) } })
+    const text = wrapper.text()
+    expect(text).not.toContain('技能资料')
+    expect(text).not.toContain('不应展示的描述')
+    expect(text).not.toContain('活动与特殊蛋来源')
+    expect(text).not.toContain('特殊蛋说明与来源')
   })
   it('有蛋资料时给出孵化时长与蛋图鉴入口', () => {
     const wrapper = mount(HandbookDetail, {
@@ -48,5 +79,22 @@ describe('图鉴详情', () => {
   it('无蛋资料时不出现蛋图鉴入口', () => {
     const wrapper = mount(HandbookDetail, { props: { item: species() } })
     expect(wrapper.find('[data-goto-page]').exists()).toBe(false)
+  })
+  it('进化链提供横向拖动容器', () => {
+    const wrapper = mount(HandbookDetail, {
+      props: {
+        item: species({
+          chain_members: [
+            { key: '3001', name: '喵喵', stage: 1 },
+            { key: '3002', name: '喵呜', stage: 2 },
+            { key: '3003', name: '魔力猫', stage: 3 },
+            { key: '3004', name: '超长名称精灵形态', stage: 4 },
+          ],
+        }),
+      },
+    })
+    const family = wrapper.get('.mini-family-members')
+    expect(family.attributes('tabindex')).toBe('0')
+    expect(family.attributes('aria-label')).toContain('可按住鼠标拖动')
   })
 })

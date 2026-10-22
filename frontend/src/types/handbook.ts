@@ -30,6 +30,7 @@ export interface HandbookSpecies {
   has_shiny: boolean
   type_names: string[]
   type_colors: string[]
+  type_icons?: Record<string, string>
   matchups: HandbookMatchups
   stats: Record<string, number>
   stat_sum: number
@@ -46,6 +47,7 @@ export interface Handbook {
   total: number
   shown: number
   type_options: string[]
+  type_option_icons?: Record<string, string>
   stage_options: number[]
   egg_group_options: string[]
 }
@@ -89,6 +91,8 @@ function isSpecies(value: unknown): value is HandbookSpecies {
     && typeof value.has_shiny === 'boolean'
     && numbers(value.types) && strings(value.egg_groups) && strings(value.type_names)
     && strings(value.type_colors)
+    && (value.type_icons === undefined || (record(value.type_icons)
+      && Object.values(value.type_icons).every(item => typeof item === 'string')))
     && isWikiReference(value.wiki)
     && pair(value.gender_ratio) && pair(value.height_range) && pair(value.weight_range)
     && record(value.stats) && Object.values(value.stats).every(item => typeof item === 'number')
@@ -105,7 +109,10 @@ export function parseHandbook(value: unknown): Handbook {
   }
   return {
     species: value.species, total: Number(value.total), shown: Number(value.shown),
-    type_options: value.type_options, stage_options: value.stage_options,
+    type_options: value.type_options,
+    type_option_icons: record(value.type_option_icons) && Object.values(value.type_option_icons).every(item => typeof item === 'string')
+      ? value.type_option_icons as Record<string, string> : undefined,
+    stage_options: value.stage_options,
     egg_group_options: value.egg_group_options,
   }
 }

@@ -98,6 +98,7 @@
 .filter-match-mode button { min-width: 34px; padding: var(--space-2); font-size: var(--fs-xs); }
 .filter-match-mode, #btn-reset-filters { height: 30px; }
 .quick-filters .chip, .filter-pair .chip { height: 34px; padding: var(--space-2); border-radius: var(--radius-sm); text-align: center; }
+.filter-pair .chip { display: flex; align-items: center; justify-content: center; width: 100%; box-sizing: border-box; }
 .text-button { background: transparent; color: var(--teal-dark); font-size: var(--fs-xs); padding: var(--space-1); }
 .quick-filters { margin-top: var(--space-3); }
 .shortcut-settings { margin-top: var(--space-3); }
@@ -116,7 +117,7 @@
 #pet-filters .filter-section .field { margin: var(--space-3) 0; }
 #pet-filters .filter-section > summary small { min-width: 0; max-width: none; margin-left: 0; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .medal-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.medal-choices .chip { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); min-width: 0; text-align: left; }
+.medal-choices .chip { display: flex; align-items: center; justify-content: center; gap: var(--space-2); padding: var(--space-3); min-width: 0; text-align: center; }
 .medal-choices img { width: 28px; height: 28px; object-fit: contain; flex: none; }
 .filter-type-icon { width: 22px; height: 22px; flex: none; }
 .type-choices .chip { display: inline-flex; align-items: center; gap: var(--space-3); }

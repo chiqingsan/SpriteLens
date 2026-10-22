@@ -306,7 +306,6 @@
     breedingPlanner.resetAccount();
     if (state.page !== "egg-dex") { window.SpriteLensUI.closeDetail(false, true); }
     petInventory.resetAccount(); petFilters.resetAccount(); state._petsVersion = -1;
-    handbookPage.resetAccount();
     colorsPage.resetAccount();
     eggBoxVersion = -1;
     if (eggBoxPage) { eggBoxPage.resetAccount(); }
@@ -390,7 +389,7 @@
     var version = payload.pets_version;
     if (version !== undefined && version !== state._petsVersion) {
       state._petsVersion = version;
-      var refresh = { pets: loadPets, handbook: function () { return handbookPage.load(); }, "male-matrix": loadMaleMatrix,
+      var refresh = { pets: loadPets, "male-matrix": loadMaleMatrix,
         "breeder-library": function () { return breederLibrary.load(); }, colors: function () { return colorsPage.load(); } };
       if (refresh[state.page]) { refresh[state.page](false); }
       if (state.page === "home") { loadHome(false); }

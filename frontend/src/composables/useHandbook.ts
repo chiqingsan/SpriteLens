@@ -69,13 +69,9 @@ export function useHandbook(api: ApiClient) {
     active = true
     if (!data.value || error.value || loadedQuery !== query()) await load()
   }
-  // 切号：丢掉上一个账号期间发出的请求与已加载视图，交由外壳重新 load。
+  // 图鉴是独立的静态资料库，切号不影响已加载内容，也不触发重新请求。
   function resetAccount() {
-    invalidate()
-    data.value = null
-    error.value = ''
-    loading.value = false
-    loadedQuery = ''
+    // 保留外壳的兼容调用，但不把账号生命周期带入图鉴状态。
   }
   function clear() {
     batch = true

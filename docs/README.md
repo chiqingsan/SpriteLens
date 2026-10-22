@@ -66,3 +66,4 @@ UI 视觉/组件规范 → UI_GUIDE；蛋神对标实施进度 → DANSHEN_FEATU
 文档用 LF、不写本机绝对路径。
 
 - [本地 Wiki 补充资料](WIKI_REFERENCE.md)：当前维护说明；来源、离线导入、身份核对与运行边界。
+- [图鉴原型](prototypes/handbook/README.md)：已确认的蛋蛋图鉴清稿与布局验收边界；其他图鉴方案仍在评审。
