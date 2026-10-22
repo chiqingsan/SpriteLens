@@ -29,7 +29,7 @@
     用户数据目录 `account-avatar-cache/`；仓库只保留来源、配置版本和资源 ID 映射在同目录
     `manifest.json`，通过 `tools/import_account_avatars.py` 同步。缓存原图保留透明区域，不裁剪转码。
     `plat_avatar_url`（字段 9，bytes）是 QQ/平台头像，不能作为游戏头像；没有已知游戏头像映射
-    时显示应用 Logo。SQLite v16 继续保存最终的游戏头像 URL，缺头像的同账号场景/接续身份保留
+    时显示应用 Logo。schema 1 保存最终的游戏头像 URL，缺头像的同账号场景/接续身份保留
     已观察值，切号不复用。
   - **必须走已核验路径**：`ZoneSceneClientEnterSceneFinishNtyAck` 的
     `other_actors[*].npc.base.logic_id` 是 NPC 编号（实测「护主犬」
@@ -48,7 +48,7 @@
   位置」，不能当作接头依据——新连接的 s2c 序号会重置，用旧值比较会误判。
   实现取「首次 s2c 帧序号必须严格大于旧检查点」判定接续；SYN/ACK 到达即
   失效旧身份。这是本机行为约定，不是协议字段语义（详见
-  `docs/SESSION_RESUME_VERIFICATION.md`）。
+  `docs/archive/SESSION_RESUME_VERIFICATION.md`）。
 
 ## 未解事项（已知存在、暂不影响主功能）
 
@@ -68,7 +68,7 @@ PetData字段67=`catch_way`，字段32=`add_time`（Unix秒）。蛋神1.2.0的
 以“方式 #ID”显示。全局AND/OR统一组合这些条件；OR下可由其他已选条件命中。
 SQLite v9追加两列，旧行保留并默认为未知；须再次收到游戏宠物数据才能补齐。
 简略更新缺少获得信息时保留已采集值，切号仍清除账号快照；首次落库时间不作回填。
-迁移使用现有DDL事务与回滚机制，新增回归覆盖v8升级、旧行保留、字段读写及未知日期。
+当前 schema 1 直接包含获得方式和时间字段；回归覆盖字段读写、简略更新保留已知信息及未知日期。
 
 ### 特性名称映射（2026-10-13 静态核对）
 

@@ -187,14 +187,14 @@ class EggBoxRepository:
         with self._lock:
             return set(self._hatch_slots)
 
-    def annotations(self, uid: int) -> dict[int, dict[str, int | str | bool]]:
+    def annotations(self, uid: int) -> dict[int, dict[str, int | str | bool | None]]:
         return self._store.annotations(uid) if self._store is not None else {}
 
     def save_annotations(self, uid: int, instance_id: int, nature_id: int, nest: str,
-                         note: str, voice_tag: str) -> None:
+                         note: str, voice_tag: str, voice_db: int | None) -> None:
         if self._store is None:
             raise RuntimeError("蛋仓存储不可用")
-        self._store.save_annotations(uid, instance_id, nature_id, nest, note, voice_tag)
+        self._store.save_annotations(uid, instance_id, nature_id, nest, note, voice_tag, voice_db)
         with self._lock:
             self._version += 1
 

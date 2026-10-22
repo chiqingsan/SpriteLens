@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -85,6 +86,12 @@ class CaptureService:
         self._command_lock = threading.Lock()
 
     # -- 命令（串行） ----------------------------------------------------
+    @contextmanager
+    def command_scope(self):
+        """让组合根把跨服务命令纳入采集的同一串行边界。"""
+        with self._command_lock:
+            yield
+
     def start(self) -> None:
         """构造接入层并启动；失败转 last_error 供页面提示。
 

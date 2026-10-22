@@ -13,7 +13,7 @@ from spritelens.domain.identity import PlayerIdentity
 from spritelens.domain.pet_locations import Backpack, PetBox
 from spritelens.domain.static_data import NatureInfo, SpeciesInfo, StaticData
 from spritelens.view_models.pet_vm import PetFilters, PetViewModel
-from spritelens.web.payloads import overview_payload, pets_payload
+from spritelens.web.payloads import pets_payload
 from spritelens.web.server import LocalServer
 from tests.test_web_server import _make_context, _pet
 
@@ -80,7 +80,6 @@ class PetSnapshotContractTest(unittest.TestCase):
         self.switch_to_b()
         with patch.object(self.repo, "snapshot", side_effect=AssertionError("禁止重新读 live pets")):
             payload = pets_payload(view, self.context.static_data)
-            overview = overview_payload(view, self.context.static_data)
         self.assertEqual((payload["uid"], payload["version"], payload["total"]), (101, 10, 2))
         self.assertEqual([pet["gid"] for pet in payload["pets"]], [1, 2])
         self.assertEqual(payload["pets"][0]["location"]["box_id"], 1)
@@ -91,7 +90,6 @@ class PetSnapshotContractTest(unittest.TestCase):
         self.assertEqual(payload["options"]["egg_groups"], ["动物组", "海洋组"])
         self.assertEqual(payload["options"]["talent_max"], 3)
         self.assertEqual(payload["options"]["measurement_limits"], view.measurement_limits())
-        self.assertEqual((overview["uid"], overview["version"], overview["stats"]["total"]), (101, 10, 2))
 
     def test_bootstrap_reuses_one_snapshot_after_switch(self) -> None:
         original = self.repo.consistent_snapshot
@@ -107,17 +105,12 @@ class PetSnapshotContractTest(unittest.TestCase):
         payload = json.loads(response.text)
         self.assertEqual(take.call_count, 1)
         self.assertEqual([pet["gid"] for pet in payload["pets"]["pets"]], [1, 2])
-        self.assertEqual(payload["overview"]["uid"], 101)
-        self.assertEqual(payload["overview"]["version"], 10)
-        self.assertEqual(payload["overview"]["identity"]["uid"], 101)
-        self.assertEqual(payload["overview"]["cached_identity"]["uid"], 101)
-        self.assertEqual(payload["overview"]["stats"]["maxed"], 1)
-        self.assertEqual(payload["overview"]["stats"]["max_level"], 60)
-        self.assertEqual(payload["overview"]["stats"]["types"][0]["name"], "火")
         state = payload["state"]
         self.assertEqual((state["uid"], state["pets_version"], state["pets_total"]), (101, 10, 2))
-        self.assertEqual(state["stats"], payload["overview"]["stats"])
-        self.assertEqual(state["identity"], payload["overview"]["identity"])
+        self.assertEqual(state["stats"]["maxed"], 1)
+        self.assertEqual(state["stats"]["max_level"], 60)
+        self.assertEqual(state["stats"]["types"][0]["name"], "火")
+        self.assertEqual(state["identity"]["uid"], 101)
 
     def test_state_uses_one_snapshot_for_ws_and_rest(self) -> None:
         original = self.repo.consistent_snapshot
@@ -158,14 +151,10 @@ class PetSnapshotContractTest(unittest.TestCase):
         payload = asyncio.run(self.server._api_bootstrap(None))
         data = json.loads(payload.text)
         self.assertEqual(data["pets"]["uid"], 101)
-        self.assertEqual(data["overview"]["uid"], 101)
         self.assertEqual(data["state"]["uid"], 101)
-        self.assertIsNone(data["overview"]["identity"])
-        self.assertEqual(data["overview"]["cached_identity"]["uid"], 101)
         self.repo._cached_identity = None
         data = json.loads(asyncio.run(self.server._api_bootstrap(None)).text)
         self.assertEqual(data["pets"]["uid"], 101)
-        self.assertIsNone(data["overview"]["cached_identity"])
 
     def test_snapshot_reuse_keeps_request_filters_independent(self) -> None:
         vm = self.context.pet_vm

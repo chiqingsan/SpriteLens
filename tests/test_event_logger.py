@@ -22,6 +22,37 @@ def _event(opcode: int = 0x134A, decoded: list | None = None) -> PacketEvent:
 
 
 class EventLogWriterTest(unittest.TestCase):
+    def test_disk_failure_is_visible_and_unrecorded_events_are_counted(self):
+        from unittest.mock import patch
+
+        writer = EventLogWriter(self.dir)
+        with patch.object(writer, "_open_day_file", side_effect=OSError("disk full")):
+            writer.handle_packet(_event())
+            with self.assertRaises(OSError):
+                writer.flush()
+        self.assertIn("disk full", writer.error)
+        writer.handle_packet(_event())
+        self.assertEqual(writer.dropped_count, 2)
+        with self.assertRaises(OSError):
+            writer.close()
+        self.assertFalse(writer._worker.is_alive())
+
+    def test_failed_flush_and_failed_file_close_do_not_kill_worker_before_barrier(self):
+        from unittest.mock import Mock, patch
+
+        writer = EventLogWriter(self.dir)
+        file = Mock()
+        file.flush.side_effect = OSError("disk full")
+        file.close.side_effect = OSError("close flush failed")
+        writer._file = file
+        with patch.object(writer, "_open_day_file", return_value=file):
+            writer.handle_packet(_event())
+            with self.assertRaises(OSError):
+                writer.flush(timeout=1)
+        with self.assertRaises(OSError):
+            writer.close()
+        self.assertFalse(writer._worker.is_alive())
+
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.addCleanup(self._tmp.cleanup)
@@ -112,7 +143,8 @@ class EventLogWriterTest(unittest.TestCase):
 
             _t.sleep(0.005)
 
-        writer.close()  # 应在超时后返回，不关闭文件
+        with self.assertRaises(TimeoutError):
+            writer.close()  # 超时必须留出可重试的关闭状态
         release.set()  # worker 恢复写盘
         self.assertTrue(
             wrote_after_release.wait(timeout=3),
@@ -123,6 +155,7 @@ class EventLogWriterTest(unittest.TestCase):
         files = list(self.dir.glob("eventlog_*.jsonl"))
         self.assertEqual(len(files), 1)
         self.assertEqual(len(files[0].read_text(encoding="utf-8").strip().splitlines()), 1)
+        writer.close()
 
 
 if __name__ == "__main__":

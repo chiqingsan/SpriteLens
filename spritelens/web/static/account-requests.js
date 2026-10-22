@@ -4,9 +4,9 @@
   function create(api) {
     var uid = null;
     var versions = {};
-    var fields = { overview: "pets_version", pets: "pets_version", handbook: "pets_version",
-      "male-matrix": "pets_version", "breeder-library": "pets_version", planner: "pets_version",
-      colors: "pets_version", "collection-lines": "pets_version", "egg-box": "egg_box_version", home: "home_version", flowers: "flower_version" };
+    var fields = { pets: "pets_version", handbook: "pets_version",
+      "breeder-library": "pets_version", planner: "pets_version",
+      colors: "pets_version", "collection-lines": "pets_version", "egg-box": "egg_box_version", home: "home_version" };
     var generation = 0;
     var pending = {};
     function cancel(key) {
@@ -16,7 +16,7 @@
     function observe(state) {
       var nextUid = state.uid;
       if (!Number.isSafeInteger(nextUid) || nextUid < 0) { throw new Error("状态载荷缺少有效 uid"); }
-      var names = ["pets_version", "egg_box_version", "home_version", "flower_version"];
+      var names = ["pets_version", "egg_box_version", "home_version"];
       if (names.some(function (name) { return !Number.isSafeInteger(state[name]); })) {
         throw new Error("状态载荷缺少有效版本");
       }

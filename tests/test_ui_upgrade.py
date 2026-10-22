@@ -24,11 +24,10 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class PreferencesTest(unittest.TestCase):
-    def test_legacy_presets_migrate_once_and_empty_shortcuts_survive_restart(self):
+    def test_shortcuts_are_current_data_and_empty_shortcuts_survive_restart(self):
         custom = {"name": "雌性", "filters": {"gender": 2}}
         self.repo.set("ui.preferences", {"shortcuts": [custom]})
-        self.assertEqual([item["name"] for item in self.vm.snapshot()["shortcuts"]],
-                         ["大块头", "小不点", "婉转声", "粗嗓门", "雌性"])
+        self.assertEqual([item["name"] for item in self.vm.snapshot()["shortcuts"]], ["雌性"])
         self.vm.update({"shortcuts": []})
         self.assertEqual(UIPreferencesViewModel(SettingsRepository(self.path)).snapshot()["shortcuts"], [])
 
@@ -203,11 +202,9 @@ class UpgradeAPITest(unittest.TestCase):
     def test_ratios_do_not_depend_on_filter_result(self):
         first = next(pet for pet in self.get_pets()["pets"] if pet["gid"] == 1)
         filtered = self.get_pets(search="A")["pets"][0]
-        self.assertEqual(first["height_pct"], .5)
+        self.assertEqual(first["range_positions"]["height"]["ratio"], .5)
         self.assertEqual(first["range_positions"], filtered["range_positions"])
-        self.assertEqual(first["egg_ranges"]["height"], "0.23–0.31 m")
         unknown = self.get_pets(search="B")["pets"][0]
-        self.assertEqual(unknown["reference_ranges"]["height"], "暂无数据")
         self.assertIsNone(unknown["range_positions"]["height"]["ratio"])
 
     def test_preferences_auth_validation_and_bootstrap(self):

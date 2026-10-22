@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { PetsModel } from '../composables/usePets'
 import PetDetail from './PetDetail.vue'
 import './pet-detail.css'
-const props = defineProps<{ model: PetsModel; open: boolean; enabled: boolean; trigger: HTMLElement | null; imageMode: string }>()
+const props = defineProps<{ model: PetsModel; open: boolean; enabled: boolean; trigger: HTMLElement | null }>()
 const emit = defineEmits<{ close: [restore?: boolean]; locate: [id: number] }>()
 const pet = computed(() => props.model.selected.value === null ? null : props.model.find(props.model.selected.value))
 const detailedPet = computed(() => {

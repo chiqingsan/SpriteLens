@@ -87,7 +87,7 @@
   document.addEventListener("click", function (event) {
     if (event.target.closest("[data-vue-page]")) { return; }
     if (event.target.closest(".nav-item")) { return; }
-    var source = event.target.closest("#hb-grid .hb-card, #eb-grid .hb-card, #mm-matrix [data-mmkey]");
+    var source = event.target.closest("#hb-grid .hb-card, #eb-grid .hb-card");
     if (!source || event.target.closest("[data-mm]")) { return; }
     var panel = source.closest(".workspace").querySelector(".detail-panel");
     if (panel) { openDetail(panel.id, source); }

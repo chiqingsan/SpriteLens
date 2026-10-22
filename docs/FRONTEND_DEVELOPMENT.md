@@ -1,6 +1,6 @@
 # Vue 前端开发与构建
 
-状态：当前维护文档，2026-10-13 工程与蛋图鉴已落地。读者：前端开发者、打包维护者。
+状态：当前维护文档，2026-10-22 更新；当前页面归属见 [AI_CONTEXT](AI_CONTEXT.md)。读者：前端开发者、打包维护者。
 维护边界：本文维护命令、生成文件与迁移桥；任务状态只在 [ROADMAP](ROADMAP.md) 更新，
 视觉遵循 [UI_GUIDE](UI_GUIDE.md)，设计依据见 [VUE3_MIGRATION](VUE3_MIGRATION.md)。
 
@@ -65,17 +65,17 @@ Vue Router 使用 memory history，Pinia 已安装；本页无共享业务状态
 蛋图鉴是静态目录，不伪造 uid/version。精灵蛋仓复用 `accountRequests` 的 UID、域版本、账号代次和取消语义；
 蛋仓 DTO 运行校验包含目录蛋组、数值测量范围、快照来源和可编辑标签；标签保存通过本地鉴权 POST，数据按 uid 与蛋/精灵实例持久化。分类使用后端 `egg_kind`，协议 `category` 仍表示获取来源，不作为蛋类型筛选。
 蛋仓数据、筛选、选中项及详情由 `EggBoxPage.vue` 独占；账号切换清空页面数据，离页暂停并取消请求。
-背包和蛋仓返回时复用同账号、同版本的有效快照；背包还核对筛选条件，错误或保存后未同步状态重新加载。手动标注、收藏和声音修正成功保存后由仓库推进版本，使 WS 和返回页缓存失效；失败不推进版本。概览使用 bootstrap/WS 统计，不为总数重复拉取宠物列表。
-蛋性格/蛋窝与手动绑定归蛋注释表；宠物详情的手动分贝单独覆盖协议读数，蛋的声音标签只读取绑定精灵的手动分贝。
+背包和蛋仓返回时复用同账号、同版本的有效快照；背包还核对筛选条件，错误或保存后未同步状态重新加载。手动标注、收藏和蛋声音 dB 成功保存后由仓库推进版本，使 WS 和返回页缓存失效；失败不推进版本。宠物统计随 bootstrap/WS state 返回，不为总数重复拉取宠物列表。
+蛋性格/蛋窝/声音标签/手动声音归蛋注释表；精灵详情不提供声音覆盖，精灵声音只读取协议抓取值。
 后端按精确配置、Wiki 物品变体与协议 `mutation_type` / `precious_egg_type` 分类；随机配置 ID 不等于特殊蛋。
 图片只使用蛋图，随机蛋的物种/蛋组显示为孵化前未确定，缺范围不借用普通蛋范围。
 账号页迁移仍依赖 F01/F02 的快照与失效语义。
 宠物基础筛选在 bootstrap 时通过 mountPetFilters 挂载；控件与基础状态归 Vue。
-查询/恢复/清理接口连接应用壳与矩阵跳转；usePetAdvancedFilters 独占蛋组、绝对范围与位置筛选。
+查询/恢复/清理接口连接应用壳与图鉴/色卡跳转；usePetAdvancedFilters 独占蛋组、绝对范围与位置筛选。
 Vue 使用 Teleport 独占搜索/排序和天赋占位子树，挂载容器用 display:contents 保持旧布局。
 输入立即使旧 pets 请求失效，随后防抖重载；离页暂停、切号清派生选项，关闭卸载清定时器。
 基础筛选 DTO 检查消费的 options；列表 DTO 校验 uid/version、消费的行字段、箱/队槽形状和匹配一致性。
-PetInventory 与 usePets 独占请求/数据/加载错误、三视图、分页、箱队与选择；PetDetailPanel 管理详情显示、键盘、焦点与窄屏 inert。
+PetInventory 与 usePets 独占请求/数据/加载错误、两视图、分页、箱队与选择；PetDetailPanel 管理详情显示、键盘、焦点与窄屏 inert。
 请求复用统一 API 客户端；每次取旧壳唯一 petContext（uid/version/generation），不建立平行账号 store。
 bootstrap 先核对载荷与账号上下文；后续请求校验序号、代次、uid 和最新版本，离页/切号/新条件取消并失效。
 列表错误可直接重试；显示完整数据、过滤空态、未采集箱表和未知槽位仍分别处理。表格只在选中该视图时构建行。
@@ -103,3 +103,7 @@ F03 完整页面构建的生产 JS 为 160.73 kB / gzip 57.87 kB（Vite 输出�
 草稿持久化是跨层行为（页面 → `account-requests.js` → HTTP → `SettingsRepository` → `config.json`），单测用替身覆盖不到，因此保留一条真实链路冒烟：`tools/planner_smoke_server.py` 起真实 LocalServer（临时目录、合成账号、预置「只有目标、没有窝位」的草稿），`frontend/src/smoke/plannerApi.test.ts` 用 jsdom 挂载真实页面组件与真实 `account-requests.js` 打真实 HTTP，收尾时用全新 `SettingsRepository` 实例重读配置模拟「关掉软件重新打开」。未设置 `SMOKE_PLANNER_URL`/`SMOKE_PLANNER_TOKEN` 时整组跳过，不进入常规 `vitest run` 门禁；改动持久化、请求层或恢复路径时必须手工跑一次（用法见脚本头部注释）。
 
 一条教训：「未保存」门控（`unsaved` + `restored`）曾在组件首次渲染时短路掉对草稿的订阅（`restored` 当时是非响应式对象），于是标记恒为「已保存」——「保存草稿」永久禁用、自动保存永不发出请求，改动只留在内存，关掉软件再打开又变回原样。跨层状态不要用非响应式变量做门控，也不要在 computed 里先短路再订阅。
+
+桌面关闭通过 `SpriteLensPrepareClose` 等待 planner 两入口草稿、蛋标注和在途写请求返回；
+仅服务器确认成功后标记已保存。取消退出恢复交互；多窗口草稿冲突需要显式确认覆盖。
+原生 closing 的真实 WebView2 时序仍需实机验收，不能以浏览器调用握手函数替代。

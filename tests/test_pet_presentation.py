@@ -9,7 +9,8 @@ from spritelens.domain.pet_marks import pet_marks
 from spritelens.paths import static_dir
 from spritelens.repositories.settings import SettingsRepository
 from spritelens.view_models.ui_preferences import UIPreferencesViewModel, normalize_preferences
-from spritelens.web.payloads import pet_row, colors_payload
+from spritelens.web.payloads import pet_row
+from spritelens.web.payloads_catalog import colors_payload
 from tests.test_web_server import _pet
 
 
@@ -32,10 +33,10 @@ class PetPresentationTest(unittest.TestCase):
         # 完美无瑕等纪念奖牌不进入紧凑的四种标记区。
         self.assertEqual(pet_marks(replace(pet, worn_medal_id=1010), (0, 0)), [])
 
-    def test_saved_shortcuts_keep_other_filters_after_first_catch_removal(self):
+    def test_removed_shortcut_filters_are_rejected_without_legacy_migration(self):
         saved = [{"name": "条件", "filters": {"first_catch_only": True, "gender": 2, "natures": [3]}}]
         normalized = normalize_preferences({"shortcuts": saved})
-        self.assertEqual(normalized["shortcuts"][-1], {"name": "条件", "filters": {"gender": 2, "natures": [3]}})
+        self.assertEqual(normalized["shortcuts"], [])
         with tempfile.TemporaryDirectory() as tmp:
             vm = UIPreferencesViewModel(SettingsRepository(Path(tmp) / "config.json"))
             with self.assertRaises(ValueError):

@@ -38,9 +38,9 @@ export function useColors(api: ApiClient) {
     }
   }
   function pause() { active = false; invalidate(); loading.value = false }
-  function resume() {
+  function resume(force = false) {
     active = true
-    if (!loaded) return load()
+    if (force || !loaded) return load()
   }
   // 切号后残留的是上一账号的持有者，必须丢弃并等下次进入页面重取。
   function resetAccount() { pause(); data.value = null; error.value = ''; loaded = false }

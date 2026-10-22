@@ -213,26 +213,6 @@ def _wire_children(data: bytes):
 
 
 class PetRepositoryTest(unittest.TestCase):
-    def test_voice_overrides_are_read_through_the_public_repository(self):
-        store = Mock()
-        store.voice_overrides.return_value = {1: 0, 2: -35}
-        repo = PetRepository(store=store)
-        self.assertEqual(repo.voice_overrides(42), {1: 0, 2: -35})
-        store.voice_overrides.assert_called_once_with(42)
-
-    def test_voice_changes_invalidate_page_version_only_after_success(self):
-        store = Mock()
-        repo = PetRepository(store=store)
-        before = repo.version
-        self.assertTrue(repo.save_voice_override(42, 1, 80))
-        self.assertEqual(repo.version, before + 1)
-        store.set_voice_override.side_effect = OSError("synthetic disk failure")
-        with self.assertRaises(OSError):
-            repo.save_voice_override(42, 1, None)
-        store.has_pet.return_value = False
-        self.assertFalse(repo.save_voice_override(42, 2, 80))
-        self.assertEqual(repo.version, before + 1)
-
     def _feed(self, repo: PetRepository, gid: int, name: bytes, level: int) -> None:
         repo.handle_packet(_named_event("s2c", [_named_pet_node(gid, 20508, name, level)]))
 

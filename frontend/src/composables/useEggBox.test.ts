@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useEggBox } from './useEggBox'
 import type { EggBox, EggBoxAnnotations, EggBoxEntry, EggBoxSaveAnnotations } from '../types/eggBox'
 
-const annotations = { nature_id: 0, nest_override: '' as const, note: '', voice_tag: '' as const }
+const annotations = { nature_id: 0, nest_override: '' as const, note: '', voice_tag: '' as const, voice_db: null }
 
 function egg(instanceId: number): EggBoxEntry {
   return {
@@ -67,6 +67,18 @@ function annotationHarness() {
 }
 
 describe('useEggBox annotation drafts', () => {
+  it('关闭前 flush 保存尚未失焦的声音，并等待服务端确认', async () => {
+    const t = annotationHarness(); await t.model.load()
+    t.edit({ voice_db: -20 }, false)
+    let completed = false
+    const flushing = t.model.flush().then(() => { completed = true })
+    await Promise.resolve()
+    expect(completed).toBe(false)
+    expect(t.requests[0]!.value.voice_db).toBe(-20)
+    t.requests[0]!.done.resolve()
+    await flushing
+    expect(t.stored.get(42)!.eggs[0]!.annotations.voice_db).toBe(-20)
+  })
   it('返回复用同版本快照，版本变化和加载失败触发重新加载', async () => {
     const t = annotationHarness(); await t.model.load()
     t.model.pause(); await t.model.resume(1)

@@ -1,8 +1,6 @@
 """独立产线路由与 JSON 契约，复用应用鉴权和账号快照。"""
 from __future__ import annotations
 
-import asyncio
-
 from aiohttp import web
 
 from spritelens.app_context import AppContext
@@ -11,6 +9,7 @@ from spritelens.domain.measurements import range_position
 from spritelens.services.collection_lines_service import CollectionLinesService
 from spritelens.view_models.collection_lines_vm import CollectionLinesViewModel, CollectionView
 from spritelens.web.pet_media import pet_images
+from spritelens.web.background import run_blocking
 
 
 def collection_payload(view: CollectionView, goal: CollectionGoal, context: AppContext) -> dict:
@@ -66,6 +65,6 @@ def register_collection_routes(app: web.Application, context: AppContext) -> Non
                               request.query.get("colorful") == "1", request.query.get("ignore_missing_male") == "1")
         def payload() -> dict:
             return collection_payload(vm.snapshot(goal), goal, context)
-        return web.json_response(await asyncio.to_thread(payload))
+        return web.json_response(await run_blocking(request, payload))
 
     app.router.add_get("/api/collection-lines", get_lines)

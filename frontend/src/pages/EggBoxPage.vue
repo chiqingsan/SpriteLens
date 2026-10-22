@@ -216,6 +216,7 @@ onUnmounted(() => {
 })
 
 defineExpose({
+  flush: model.flush,
   load,
   resume,
   pause,

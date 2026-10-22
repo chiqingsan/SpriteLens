@@ -201,7 +201,7 @@ function approve(key: string) {
 function pause() { picker.value?.close(); pickerOpener = null; model.pause() }
 function resetAccount() { pause(); selected.value = ''; model.resetAccount() }
 onBeforeUnmount(pause)
-defineExpose({ load: model.load, pause, resetAccount })
+defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
 </script>
 
 <template>

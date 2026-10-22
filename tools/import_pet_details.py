@@ -1,4 +1,4 @@
-"""补全静态数据：图鉴描述 / sum 修正 / 技能名补缺 / 奖牌表 / 蛋图标 / 花种等级表。
+"""补全静态数据：图鉴描述 / sum 修正 / 技能名补缺 / 奖牌表 / 蛋图标。
 
 数据来源：游戏客户端配置整理的宠物目录与技能/奖牌名映射（事实性数据）。
 对 data/static/ 就地补全：
@@ -9,7 +9,6 @@
   3. medals.json   新表：体型/声音奖牌与勋章 id → 名称
   4. spritelens/web/static/egg-icons/   蛋图标（按 egg_item_id 命名）
   5. spritelens/web/static/medal-icons/ 奖牌图标（按 medal_id 命名）
-  6. flower_levels.json  炫彩花种等级表
 
 用法: python tools/import_pet_details.py [蛋神解包目录]
 """
@@ -104,21 +103,12 @@ def import_egg_icons(src: Path) -> str:
     return f"egg-icons: {copied} 个蛋图标"
 
 
-def import_flower_levels(src: Path) -> str:
-    data = json.loads((src / "assets" / "catalog" / "flowerLevels.json").read_text(encoding="utf-8"))
-    (STATIC / "flower_levels.json").write_text(
-        json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
-    )
-    levels = data.get("levels") or {}
-    return f"flower_levels.json: {len(levels)} 组等级表"
-
-
 def main() -> int:
     src = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_SRC
     if not src.is_dir():
         print(f"源目录不存在: {src}")
         return 1
-    for step in (enrich_species, fill_skills, import_medals, import_egg_icons, import_flower_levels):
+    for step in (enrich_species, fill_skills, import_medals, import_egg_icons):
         print(step(src))
     return 0
 

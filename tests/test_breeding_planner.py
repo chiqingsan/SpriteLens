@@ -2,7 +2,7 @@
 from dataclasses import asdict, replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from threading import Event, Thread
+from threading import Event
 from unittest import TestCase
 from unittest.mock import patch
 
@@ -24,13 +24,13 @@ class PlannerTests(TestCase):
         self.eggs = EggCatalog(Path("data/static"))
         self.goal = Goal("g1", "test", "大块头", "婉转声", 2)
         self.pets = tuple([fixture.pet(1)] + [fixture.pet(i, 2) for i in range(2, 13)])
-        self.pool = build_pool(self.pets, self.static, self.eggs, {})
+        self.pool = build_pool(self.pets, self.static, self.eggs)
         self.pool.eggs.update({str(p.gid): "test" for p in self.pets})
         self.request = Request(goals=(self.goal,))
 
     def test_relaxed_marks_and_95_raw_db_need_explicit_iteration(self):
         self.assertEqual(pair_match(self.pool, "1", "2", self.goal)["kind"], "exact")
-        near = build_pool((replace(self.pets[0], voice=95), self.pets[1]), self.static, self.eggs, {})
+        near = build_pool((replace(self.pets[0], voice=95), self.pets[1]), self.static, self.eggs)
         near.eggs.update({"2": "test"})
         match = pair_match(near, "1", "2", self.goal)
         self.assertEqual((match["kind"], match["candidate_voice"], match["gap"]), ("iterative", 95, 1))
@@ -53,7 +53,7 @@ class PlannerTests(TestCase):
 
     def test_plain_goal_fills_connected_capacity_and_balances_gender(self):
         pets = tuple(self.fixture.pet(i, 1 if i <= 6 else 2) for i in range(1, 13))
-        pool = build_pool(pets, self.static, self.eggs, {})
+        pool = build_pool(pets, self.static, self.eggs)
         pool.eggs.update({str(p.gid): "test" for p in pets if p.gid > 6})
         planned = solve(pool, Request(goals=(Goal("plain", "test"),), capacity=11), Event())["plans"][0]
         self.assertEqual(len(planned["placements"]), 11)
@@ -64,7 +64,7 @@ class PlannerTests(TestCase):
 
     def test_plain_goal_prefers_target_egg_evolution_chain(self):
         pets = (self.fixture.pet(1, base=3), self.fixture.pet(2, base=1), self.fixture.pet(3, 2, base=1))
-        pool = build_pool(pets, self.static, self.eggs, {})
+        pool = build_pool(pets, self.static, self.eggs)
         pool.eggs["3"] = "test"
         planned = solve(pool, Request(goals=(Goal("plain", "test"),), capacity=2), Event())["plans"][0]
         self.assertEqual({p["gid"] for p in planned["placements"]}, {"2", "3"})
@@ -79,16 +79,16 @@ class PlannerTests(TestCase):
 
     def test_unknown_not_false_negative_and_opposing_marks_not_automatic(self):
         for voice, kind in ((0, "unknown"), (-99, "none")):
-            pool = build_pool((replace(self.pets[0], voice=voice), self.pets[1]), self.static, self.eggs, {})
+            pool = build_pool((replace(self.pets[0], voice=voice), self.pets[1]), self.static, self.eggs)
             pool.eggs["2"] = "test"
             self.assertEqual(pair_match(pool, "1", "2", self.goal)["kind"], kind)
-        pool = build_pool((replace(self.pets[0], weight=0, height=200), self.pets[1]), self.static, self.eggs, {})
+        pool = build_pool((replace(self.pets[0], weight=0, height=200), self.pets[1]), self.static, self.eggs)
         pool.eggs["2"] = "test"
         self.assertNotEqual(pair_match(pool, "1", "2", self.goal)["kind"], "exact")
 
     def test_all_fathers_and_academy_branch_are_evaluated(self):
         pets = (self.pets[0], self.pets[1], self.fixture.pet(3, nature=11, voice=-99), self.fixture.pet(4, 2))
-        pool = build_pool(pets, self.static, self.eggs, {})
+        pool = build_pool(pets, self.static, self.eggs)
         pool.eggs.update({"2": "test", "4": "test"})
         positions = (Placement("1", 0, 0), Placement("2", 2, 0), Placement("3", 4, 0), Placement("4", 6, 0, "academy"))
         result = evaluate(pool, replace(self.request, academy=True), positions)
@@ -109,7 +109,7 @@ class PlannerTests(TestCase):
 
     def test_solver_prefers_target_nature_mother_for_academy_nest(self):
         pets = (self.pets[0], self.pets[1], replace(self.pets[2], nature=11))
-        pool = build_pool(pets, self.static, self.eggs, {})
+        pool = build_pool(pets, self.static, self.eggs)
         pool.eggs.update({"2": "test", "3": "test"})
         request = replace(self.request, capacity=2, academy=True)
         planned = solve(pool, request, Event())["plans"][0]
@@ -132,7 +132,7 @@ class PlannerTests(TestCase):
 
     def test_explicit_iteration_can_trade_exact_mothers_for_extra_goal_coverage(self):
         pets = (*self.pets[:4], self.fixture.pet(5, 2, voice=95))
-        pool = build_pool(pets, self.static, self.eggs, {})
+        pool = build_pool(pets, self.static, self.eggs)
         pool.eggs.update({str(p.gid): "test" for p in pets})
         pool.eggs["5"] = "other"
         request = replace(self.request, goals=(self.goal, replace(self.goal, goal_id="g2", egg_key="other")), approved=frozenset(("g2:1:5",)))
@@ -150,7 +150,7 @@ class PlannerTests(TestCase):
         fewer = evaluate(self.pool, replace(self.request, academy=True), (Placement("1", 2, 2, "academy"), Placement("2", 0, 0)))
         self.assertGreater(more["score"], fewer["score"])
         pets = (self.pets[0], self.pets[1], self.fixture.pet(20, base=5), self.fixture.pet(21, 2, base=5))
-        pool = build_pool(pets, self.static, self.eggs, {})
+        pool = build_pool(pets, self.static, self.eggs)
         pool.eggs.update({"2": "test", "21": "dragon"})
         request = replace(self.request, capacity=4, goals=(self.goal, replace(self.goal, goal_id="g2", egg_key="dragon")))
         result = solve(pool, request, Event())
@@ -186,9 +186,9 @@ class PlannerTests(TestCase):
 
     def test_known_group_survives_unknown_tag_and_conflicting_group_is_reported(self):
         self.static._species["1"] = replace(self.static._species["1"], egg_groups=("动物", "未知"))
-        self.assertTrue(build_pool(self.pets, self.static, self.eggs, {}).parents)
+        self.assertTrue(build_pool(self.pets, self.static, self.eggs).parents)
         self.static._species["1"] = replace(self.static._species["1"], egg_groups=("动物", "无法孵蛋"))
-        pool = build_pool(self.pets, self.static, self.eggs, {})
+        pool = build_pool(self.pets, self.static, self.eggs)
         self.assertFalse(pool.parents)
         self.assertTrue(pool.issues)
 
@@ -198,16 +198,31 @@ class PlannerTests(TestCase):
             self.repo._pets = {p.gid: p for p in self.pets}
             service = BreedingPlannerService(self.repo, self.static, self.eggs, settings)
             inventory, _ = service.snapshot()
-            value = {"placements": [{"gid": str(2**63 + 1), "x": 2, "y": 0}]}
-            service.save_draft(inventory.uid, inventory.version, "target", value)
+            value = {"revision": 1, "placements": [{"gid": str(2**63 + 1), "x": 2, "y": 0}]}
+            service.save_draft(inventory.uid, inventory.version, "target", 1, value, base_revision=0)
             self.assertEqual(service.load_draft(101, "target"), value)
             self.assertIsNone(service.load_draft(202, "target"))
-            with patch.object(settings, "set_checked", side_effect=OSError("full")), self.assertRaises(OSError):
-                service.save_draft(101, inventory.version, "target", {})
+            with patch.object(settings, "update_checked", side_effect=OSError("full")), self.assertRaises(OSError):
+                service.save_draft(101, inventory.version, "target", 2, {}, base_revision=1)
             self.assertEqual(service.load_draft(101, "target"), value)
             self.repo._account.observe(PlayerIdentity(202, "other", 1))
             with self.assertRaises(StalePlannerInput):
                 service.check(101, inventory.version)
+
+    def test_stale_draft_revision_cannot_overwrite_newer_saved_value(self):
+        with TemporaryDirectory() as directory:
+            settings = SettingsRepository(Path(directory) / "settings.json")
+            self.repo._pets = {p.gid: p for p in self.pets}
+            service = BreedingPlannerService(self.repo, self.static, self.eggs, settings)
+            inventory, _ = service.snapshot()
+            newer = {"revision": 2, "placements": [{"gid": "2**63", "x": 2, "y": 0}]}
+            older = {"revision": 1, "placements": []}
+            self.assertTrue(service.save_draft(inventory.uid, inventory.version, "target", 2, newer, base_revision=0))
+            self.assertFalse(service.save_draft(inventory.uid, inventory.version, "target", 1, older, base_revision=0))
+            conflict = {**newer, "placements": []}
+            self.assertFalse(service.save_draft(inventory.uid, inventory.version, "target", 2, conflict, base_revision=0))
+            self.assertTrue(service.save_draft(inventory.uid, inventory.version, "target", 2, newer, base_revision=0))
+            self.assertEqual(service.load_draft(inventory.uid, "target"), newer)
 
     def test_external_draft_rejects_invalid_half_grid_and_rule_version(self):
         value = {**asdict(self.request), "goals": [asdict(self.goal)], "selected": [], "approved": [],
@@ -248,28 +263,6 @@ class PlannerTests(TestCase):
         result = evaluate(self.pool, self.request, (Placement("1", -2, -2),))
         self.assertNotIn("超出 20×20 草图范围", "".join(result["issues"]))
 
-    def test_voice_override_and_snapshot_share_one_version(self):
-        from types import SimpleNamespace
-        changed, release, snapshot_done = Event(), Event(), Event()
-        voices, snapshots = {}, []
-        def save(uid, gid, voice):
-            voices[gid] = voice
-            changed.set()
-            if not release.wait(2):
-                raise TimeoutError("test writer was not released")
-        self.repo._store = SimpleNamespace(has_pet=lambda uid, gid: True, set_voice_override=save, voice_overrides=lambda uid: dict(voices))
-        writer = Thread(target=lambda: self.repo.save_voice_override(101, 1, 95))
-        reader = Thread(target=lambda: (snapshots.append(self.repo.breeding_snapshot()), snapshot_done.set()))
-        writer.start()
-        try:
-            self.assertTrue(changed.wait(2)); reader.start()
-            self.assertFalse(snapshot_done.is_set())
-        finally:
-            release.set(); writer.join(2)
-            if reader.ident is not None: reader.join(2)
-        self.assertEqual(snapshots[0][0].version, 1)
-        self.assertEqual(snapshots[0][1], {1: 95})
-
     def test_authenticated_api_roundtrip_stale_and_failed_save(self):
         import json
         import urllib.error
@@ -295,7 +288,7 @@ class PlannerTests(TestCase):
                 self.assertEqual(status, 200)
                 request = Request(mode="selected", selected=("1", "2"))
                 body = {**asdict(request), "selected": list(request.selected), "goals": [], "placements": [], "approved": [],
-                        "uid": 101, "version": info["version"], "revision": 4, "catalog_version": info["catalog_version"],
+                        "uid": 101, "version": info["version"], "revision": 4, "base_revision": 0, "catalog_version": info["catalog_version"],
                         "rule_version": info["rule_version"], "geometry_version": info["geometry_version"]}
                 status, result = post("solve", body)
                 self.assertEqual(status, 200, result)
@@ -306,7 +299,7 @@ class PlannerTests(TestCase):
                 self.assertEqual(restored["placements"], saved["placements"])
                 self.assertEqual(post("evaluate", {**saved, "uid": 202})[0], 409)
                 self.assertEqual(post("evaluate", {**saved, "catalog_version": "old"})[0], 409)
-                with patch.object(context.settings, "set_checked", side_effect=OSError("full")):
+                with patch.object(context.settings, "update_checked", side_effect=OSError("full")):
                     self.assertEqual(post("draft", saved)[0], 500)
                 context.settings.set_checked("breeding-planner.101.selected", {**restored, "geometry_version": "old-grid"})
                 self.assertIsNotNone(_http_get(root + "draft?mode=selected", server.token)[1]["draft"])

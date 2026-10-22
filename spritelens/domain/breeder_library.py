@@ -47,7 +47,7 @@ class Candidate:
     voice: int | None
 
 
-def candidates(pets: tuple[Pet, ...], static: StaticData, voice_overrides: dict[int, int]) -> tuple[Candidate, ...]:
+def candidates(pets: tuple[Pet, ...], static: StaticData) -> tuple[Candidate, ...]:
     result = []
     for pet in pets:
         species = static.species(pet.base_conf_id)
@@ -56,7 +56,7 @@ def candidates(pets: tuple[Pet, ...], static: StaticData, voice_overrides: dict[
         if any(group in EXCLUDED_GROUPS for group in species.egg_groups):
             continue
         nature = static.nature(pet.nature)
-        voice = voice_overrides.get(pet.gid, pet.voice if pet.voice != 0 else None)
+        voice = pet.voice if pet.voice != 0 else None
         voice = voice if voice is not None and -100 <= voice <= 100 else None
         effective_pet = replace(pet, voice=voice) if voice is not None else pet
         result.append(Candidate(pet, species, nature.name if nature else "", species.egg_groups,

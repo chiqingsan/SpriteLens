@@ -28,8 +28,8 @@ class BreedingPlannerService:
         self._active: Event | None = None
 
     def snapshot(self):
-        inventory, overrides = self.repository.breeding_snapshot()
-        pool = build_pool(inventory.pets, self.static, self.eggs, overrides) if self.static and self.static.available and self.eggs and self.eggs.available else None
+        inventory = self.repository.consistent_snapshot()
+        pool = build_pool(inventory.pets, self.static, self.eggs) if self.static and self.static.available and self.eggs and self.eggs.available else None
         return inventory, pool
 
     def check(self, uid: int, version: int) -> None:
@@ -74,8 +74,31 @@ class BreedingPlannerService:
     def load_draft(self, uid: int, mode: str):
         return deepcopy(self.settings.get_value(f"breeding-planner.{uid}.{mode}"))
 
-    def save_draft(self, uid: int, version: int, mode: str, draft: dict) -> None:
+    def save_draft(self, uid: int, version: int, mode: str, revision: int, draft: dict,
+                   *, base_revision: int) -> bool:
         if uid <= 0:
             raise ValueError("请先读取账号背包记录")
-        self.check(uid, version)
-        self.settings.set_checked(f"breeding-planner.{uid}.{mode}", deepcopy(draft))
+        if revision < 0:
+            raise ValueError("草稿修订号无效")
+        with self._lock:
+            self.check(uid, version)
+            accepted = False
+
+            def update(previous):
+                nonlocal accepted
+                previous_revision = (
+                    previous["revision"] if isinstance(previous, dict) else 0
+                )
+                # 重发同一请求是幂等操作；其它窗口基于旧草稿的保存必须显式冲突。
+                if previous == draft:
+                    accepted = True
+                    return previous
+                if base_revision != previous_revision:
+                    return previous
+                if revision <= previous_revision:
+                    raise ValueError("草稿修订号必须递增")
+                accepted = True
+                return deepcopy(draft)
+
+            self.settings.update_checked(f"breeding-planner.{uid}.{mode}", update)
+            return accepted

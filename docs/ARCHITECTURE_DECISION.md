@@ -8,6 +8,9 @@
 > 当前实测基线与风险见 [项目审查](reviews/PROJECT_REVIEW_2026-10-12.md)。Nuitka已经落地、PyQt已退役，
 > 当前CLI没有`--web`参数；本地启动token实际经URL fragment传递。历史段落不作为新增开发指引。
 
+> 维护修订（2026-10-22）：旧的隐藏概览和种公矩阵没有当前导航入口，已从运行代码、路由、载荷和测试中删除；
+> B1/B2 中的概览内容仅保留为历史决策记录；花田/花种功能也已按产品取舍于 2026-10-22 退役，相关实现、载荷、页面与资源已删除；获取方式中的“花种”仅作为历史协议来源枚举保留；协议流页面与 API 已删除，事件日志文件保留为排查证据。
+
 > 历史（RocoPeek 时期）：命题是"是否照搬蛋神助手重构"，当时结论为 **不照搬**（见 §1–§7）。
 > 该分析的前提是"项目定位为协议观测工具、不做商业功能"。
 >
@@ -64,7 +67,7 @@ Python 协议引擎，且体积大头是静态数据（与框架无关），目�
 | **B2. 与 PyQt 版能力对等** | 概览页补齐（协议事件卡 / 当前账号 / 采集状态三栏）、系别分布条形图（真系别色）、清空快照（二次确认）、RSC 一键禁用、安装进度条、解码详情着色 | ✅ 已完成 |
 | **B3. 功能扩展** | 对标蛋神本地功能。**精灵图鉴已落地**（1015 物种目录 + 收集状态 + 系别/收集筛选 + 卡片分页 + 物种详情/进化链）；顺带修正静态数据 `evolutions` 语义错误（原误取系别标记，实为物种 ID）。**打开即采集**：启动即自动开始（配置项 `capture.autostart`，默认开，可在采集页关闭）；UI 文案统一「监听」→「采集」。**宠物仓库卡片视图**：对标蛋神「点阵背包」（紧凑卡片 + 性别底色 + 六维迷你条 + 天赋徽章 + 分页），保留表格视图供横向比对；详情栏默认收起给网格让宽，选中后三栏展开。<br>**2026-10-19 口径修正**：用户澄清精灵图鉴 / 蛋图鉴是"查游戏资料的图鉴"（接近 WIKI），不统计玩家背包，没有账号数据也必须能用；因此收集状态与 `owned` 聚合已从图鉴载荷移除（改由精灵背包/蛋仓回答"我有哪些"），图鉴改为图鉴号检索 + 系别/阶段/蛋组筛选与排序 + 静态属性相性 + 对应精灵蛋联查，收集状态只保留在炫彩色卡（读当前账号快照） | 🔄 进行中 |
 | **B4. PyQt 退役 + 资源导入**（提前执行） | **仅保留 Web 界面**：`spritelens/ui/` 全量删除、`view_models` 移出 ui 包、显示常量下沉到 `domain/display.py`；`main.py` 无参即启动界面（`--web` 兼容保留）；**PyQt6 依赖移除并已实测卸载后全绿**。**静态资源导入**（`tools/import_assets.py`）：精灵图 788/1015 张（128px WebP，7.2MB，缺图回退首字头像）、系别图标雪碧图、图鉴元数据合并进 species.json（601 物种：图鉴号/蛋组/性别比/体型区间/闪光标记）、系别克制表 | ✅ 已完成 |
-| B3 后续 | 孵蛋推断 / 筛选矩阵 / 对战 HUD / 战报复盘（见 `FEATURE_MODULES.md`：M3/M4/M5/M6） | 待启动 |
+| B3 后续 | 孵蛋推断 / 筛选矩阵 / 对战 HUD / 战报复盘（见 `archive/FEATURE_MODULES.md`：M3/M4/M5/M6） | 待启动 |
 | B4 收尾 | 打包（PyInstaller + 静态数据按需） | 待启动 |
 
 B3 起每页沿用 §5.3 的量化判据（冷启动 ≤1.5 s、常驻内存 ≤250 MB、主程序打包 ≤60 MB、
@@ -105,7 +108,7 @@ B3 起每页沿用 §5.3 的量化判据（冷启动 ≤1.5 s、常驻内存 ≤
 | 命题 | 判断 | 依据 |
 |---|---|---|
 | 照搬蛋神助手架构重构 | ❌ 不建议 | 规模差 5 倍，且竞品自身有已证实的迁移负债（§2） |
-| "为了性能"重构 | ❌ 不成立 | 管线余量 600×：42,002 帧/s vs 实际 5~50 条/s（`TECH_EVALUATION.md` §1） |
+| "为了性能"重构 | ❌ 不成立 | 管线余量 600×：42,002 帧/s vs 实际 5~50 条/s（`archive/TECH_EVALUATION.md` §1） |
 | "为了体积"换 UI 框架 | ⚠️ 排最后 | 裁 Qt（−41.3 MB）、去 scapy（−16 MB）更划算且零重写（§4） |
 | 迁移的**正确**理由 | ✅ 功能表达力 | M5 战报 / M4 对战 HUD / M2 筛选矩阵，PyQt 实现成本高（§5） |
 | 推荐形态 | 混合渐进切片 | PyQt 壳保留系统页 + pywebview 承载数据页；先做垂直切片验证（§5） |
@@ -131,7 +134,7 @@ B3 起每页沿用 §5.3 的量化判据（冷启动 ≤1.5 s、常驻内存 ≤
 
 ### 2.2 竞品自身有已证实的迁移负债
 
-它有 Tkinter→Web 的完整迁移史，但**没迁干净**（`DANSHEN_ASSISTANT_ANALYSIS.md` §5.1）：
+它有 Tkinter→Web 的完整迁移史，但**没迁干净**（`archive/DANSHEN_ASSISTANT_ANALYSIS.md` §5.1）：
 
 ```
 web_runtime.py（Web 入口）
@@ -148,7 +151,7 @@ Web 版启动仍会初始化 Tkinter 模块。**这是缺失"架构测试"的代
 
 ### 2.3 我们的地基比它干净
 
-`COMPETITOR_ANALYSIS.md` 已有评语："协议层我们更强，架构我们更干净"。本次复核确认：
+`archive/COMPETITOR_ANALYSIS.md` 已有评语："协议层我们更强，架构我们更干净"。本次复核确认：
 
 - 单向分层 `ui → services → domain/repositories → capture/protocol`；业务层 Qt 零依赖
   （全仓 grep，仅 `main.py:4` 一处注释提及 PyQt6）
@@ -170,8 +173,8 @@ Web 版启动仍会初始化 Tkinter 模块。**这是缺失"架构测试"的代
 
 ## 3. 关键修正：承载形态选错了（本次最大收获）
 
-既有推荐方案 B 写的是 `QWebEngineView`（`STACK_EVALUATION.md` §3、
-`TECH_EVALUATION.md` §4.2），但**从未量化它的体积代价**。本次实测：
+既有推荐方案 B 写的是 `QWebEngineView`（`archive/STACK_EVALUATION.md` §3、
+`archive/TECH_EVALUATION.md` §4.2），但**从未量化它的体积代价**。本次实测：
 
 | 承载形态 | 内核来源 | 额外体积 | 说明 |
 |---|---|---|---|
@@ -190,7 +193,7 @@ Web 版启动仍会初始化 Tkinter 模块。**这是缺失"架构测试"的代
 其解包产物 `webview_guard.py` 内直接引用 pywebview 的 `edgechromium` 渲染器名，并有
 `Microsoft.Web.WebView2.Core` / `GetAvailableBrowserVersionString` 的运行时探测代码。
 45 MB 的包体也装不下"26 MB 静态资源 + 自带 Chromium"。
-（参考：`DANSHEN_ASSISTANT_ANALYSIS.md` §1.1、§10）
+（参考：`archive/DANSHEN_ASSISTANT_ANALYSIS.md` §1.1、§10）
 
 ---
 
@@ -215,7 +218,7 @@ Web 版启动仍会初始化 Tkinter 模块。**这是缺失"架构测试"的代
 ```
 
 **体积不是 UI 框架问题**：将来体积主因是静态数据与玩家 SQLite 数据（与框架无关）。
-PyQt6 裁剪+打包后约 30–35 MB（`TAURI_SIZE_EVALUATION.md` §4），
+PyQt6 裁剪+打包后约 30–35 MB（`archive/TAURI_SIZE_EVALUATION.md` §4），
 与 pywebview 形态的差距在同一量级——**不值 4,250 行重写**。
 
 ---
@@ -236,7 +239,7 @@ PyQt6 裁剪+打包后约 30–35 MB（`TAURI_SIZE_EVALUATION.md` §4），
   + 共享同一套 services / repositories（同进程或 sidecar，阶段 2 定）
 ```
 
-保留 PyQt 的理由（沿用 `TECH_EVALUATION.md` §4.2）：桌面工具的核心价值是
+保留 PyQt 的理由（沿用 `archive/TECH_EVALUATION.md` §4.2）：桌面工具的核心价值是
 双击即用、无浏览器、无端口管理；低频交互页（采集控制/诊断）留在 Qt 更省事。
 
 ### 5.2 三阶段
@@ -283,7 +286,7 @@ PyQt6 裁剪+打包后约 30–35 MB（`TAURI_SIZE_EVALUATION.md` §4），
 | 2 | DPI 感知 | 全项目 `Dpi/HighDpi` 零命中 | 高分屏渲染只靠 Qt6 默认兜底，无显式声明 | ⛔ 已失效：PyQt 退役后渲染全在 WebView2，pywebview 自带 DPI 处理，应用层无需声明 |
 | 3 | `excepthook` + 启动日志 | 无 `sys.excepthook`/`faulthandler`/`startup-error.log` | `start.bat` 用 pythonw，未捕获异常**静默消失** | ✅ 已实现（2026-10-10）：`logs/spritelens.crash.log` + 启动致命失败弹对话框，`tests/test_crash_log.py` 覆盖 |
 | 4 | `setWindowIcon` | `app.ico` 只被标题栏 logo 用（`widgets.py:705`） | 任务栏图标未设置 | ✅ 已实现（2026-10-10）：`tools/make_icon.py` 生成多尺寸 `resources/app.ico`，接 `webview.start(icon=...)` 与 favicon |
-| 5 | 架构测试 | 文档承诺"业务层无 Qt"但只有手工命令（`TECH_EVALUATION.md` 列为待办） | 竞品的 import 图污染正是缺此测试；建议仿 innovationb1ue `test_architecture.py`，同时把 §2.3 的反向 import 变红灯 | ✅ 已实现（2026-10-10）：`tests/test_architecture.py`，约束改为「业务层无 Web 依赖 + 无反向分层 + protocol 纯函数」 |
+| 5 | 架构测试 | 文档承诺"业务层无 Qt"但只有手工命令（`archive/TECH_EVALUATION.md` 列为待办） | 竞品的 import 图污染正是缺此测试；建议仿 innovationb1ue `test_architecture.py`，同时把 §2.3 的反向 import 变红灯 | ✅ 已实现（2026-10-10）：`tests/test_architecture.py`，约束改为「业务层无 Web 依赖 + 无反向分层 + protocol 纯函数」 |
 | 6 | 本地服务安全组合 | 尚无 HTTP 服务 | 一旦引入：随机端口 + 每次启动随机 token + `compare_digest` + 仅 127.0.0.1（约 30 行） | ✅ 已实现（B1 阶段） |
 
 打包仍剩的实质工作：PyInstaller/Nuitka spec（含 `data/` 与 `resources/` 附带清单）、
@@ -295,12 +298,12 @@ PyQt6 裁剪+打包后约 30–35 MB（`TAURI_SIZE_EVALUATION.md` §4），
 
 | 文档 | 关系 |
 |---|---|
-| `TECH_EVALUATION.md` | **强化**：性能结论（600× 余量）、两热点、推荐方向不变。**修正**：§4.2 承载形态 `QWebEngineView` → pywebview（§3） |
-| `STACK_EVALUATION.md` | **强化**：B≫C>A>D 排序、不该换 Python 协议层。**修正**：方案 B 承载形态（文首已加指针）；"测试基线 110 项"已过期（实际 175 项） |
-| `TAURI_SIZE_EVALUATION.md` | **强化**："体积大头是静态数据不是框架"；**补入** QWebEngineView 132.4 MB 新数据点 |
-| `DANSHEN_ASSISTANT_ANALYSIS.md` | **强化**：本文件是其启示⑫"UI 迁移路径已验证"的决策化落地 |
-| `FEATURE_MODULES.md` | **强化**：M5/M4/M2 是迁移的唯一正当理由 |
-| `COMPETITOR_ANALYSIS.md` | **强化**："架构我们更干净"的判断被本次复核确认 |
+| `archive/TECH_EVALUATION.md` | **强化**：性能结论（600× 余量）、两热点、推荐方向不变。**修正**：§4.2 承载形态 `QWebEngineView` → pywebview（§3） |
+| `archive/STACK_EVALUATION.md` | **强化**：B≫C>A>D 排序、不该换 Python 协议层。**修正**：方案 B 承载形态（文首已加指针）；"测试基线 110 项"已过期（实际 175 项） |
+| `archive/TAURI_SIZE_EVALUATION.md` | **强化**："体积大头是静态数据不是框架"；**补入** QWebEngineView 132.4 MB 新数据点 |
+| `archive/DANSHEN_ASSISTANT_ANALYSIS.md` | **强化**：本文件是其启示⑫"UI 迁移路径已验证"的决策化落地 |
+| `archive/FEATURE_MODULES.md` | **强化**：M5/M4/M2 是迁移的唯一正当理由 |
+| `archive/COMPETITOR_ANALYSIS.md` | **强化**："架构我们更干净"的判断被本次复核确认 |
 
 ### 本文件的边界
 

@@ -6,7 +6,6 @@ from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
-from unittest.mock import patch
 
 from spritelens.domain.breeder_library import BreederFilters
 from spritelens.domain.identity import PlayerIdentity
@@ -75,15 +74,12 @@ class BreederLibraryTests(unittest.TestCase):
         self.assertEqual(view.males, ())
         self.assertEqual(self.result(pets, height_min=.9).male_total, 1)
 
-    def test_unknown_voice_manual_zero_and_out_of_range_body_are_not_fabricated(self) -> None:
+    def test_unknown_voice_and_out_of_range_body_are_not_fabricated(self) -> None:
         pets = (self.pet(1, voice=0, height=999), self.pet(2, 2, voice=-99))
         view = self.result(pets, male=1, female=2, anchor=1)
         self.assertIsNone(view.prediction["voice"])
         self.assertIsNone(view.prediction["height_ratio"])
-        with patch.object(self.repo, "voice_overrides", return_value={1: 0}):
-            view = self.result(pets, male=1, female=2, anchor=1)
-            self.assertEqual(view.prediction["voice"], -49)
-            self.assertEqual(view.selected_male.voice, 0)
+        self.assertIsNone(self.result(pets, male=1, female=2, anchor=1).prediction["voice"])
         self.assertEqual(self.result(pets, height_max=1).male_total, 0)
 
     def test_unknown_natures_do_not_match_and_large_ids_remain_strings(self) -> None:

@@ -139,6 +139,8 @@
 .eggbox-choice-option { min-width: 0; min-height: 34px; padding: var(--space-1) var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); color: var(--ink-soft); font-size: var(--fs-xs); white-space: nowrap; }
 .eggbox-choice-option:hover { border-color: var(--teal-bright); background: var(--surface-1); }
 .eggbox-choice-option.selected { border-color: var(--teal); background: color-mix(in srgb, var(--teal-soft) 48%, var(--panel)); color: var(--teal-dark); font-weight: 700; }
+.eggbox-voice-input { display: grid; grid-template-columns: auto minmax(96px, 150px); align-items: center; justify-content: space-between; gap: var(--space-3); color: var(--ink-soft); font-size: var(--fs-xs); }
+.eggbox-voice-input input { width: 100%; min-height: 34px; padding: var(--space-1) var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); color: var(--ink); font: inherit; font-variant-numeric: tabular-nums; }
 .eggbox-note-input { width: 100%; min-height: 72px; padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); color: var(--ink); font-size: var(--fs-xs); resize: vertical; }
 .eggbox-edit-section .form-error { color: var(--danger-ink); }
 .eggbox-detail-section { display: grid; gap: var(--space-3); }

@@ -1,4 +1,4 @@
-"""目录域载荷：图鉴/种公矩阵/花田/色卡/家园/蛋仓/蛋图鉴（阶段1.4 拆分）。
+"""目录域载荷：图鉴/色卡/家园/蛋仓/蛋图鉴（阶段1.4 拆分）。
 
 从 payloads.py 按业务域机械搬移，函数体未改动；前端契约稳定，
 payloads.py 保留兼容重导出。本模块不依赖 aiohttp 与 pywebview。
@@ -21,7 +21,6 @@ from spritelens.domain.pet_marks import pet_marks
 from spritelens.web.pet_media import pet_images
 from spritelens.services.egg_repository import EggBoxSnapshot
 from spritelens.services.home_repository import HomeRepoSnapshot
-from spritelens.services.flower_repository import FlowerRepoSnapshot
 
 
 def species_icon_url(base_conf_id: int) -> str:
@@ -253,104 +252,6 @@ def handbook_payload(
     }
 
 
-def male_matrix_payload(pet_repository, static: StaticData | None, gender: str = "all") -> dict:
-    """种公阵列载荷：性格 × 蛋组覆盖矩阵（对标孵蛋管理器）。
-
-    行=性格（含正/负修正说明），列=蛋组，格子=该组合下的宠物摘要列表。
-    gender: all / male / female——按公母分库筛选。
-    """
-    snapshot = pet_repository.consistent_snapshot() if pet_repository is not None else None
-    pets = snapshot.pets if snapshot else ()
-    cells: dict[str, list[dict]] = {}
-    natures_seen: dict[str, dict] = {}
-    groups_seen: dict[str, None] = {}
-    for pet in pets:
-        species = static.species(pet.base_conf_id) if static is not None else None
-        if species is None or not species.egg_groups:
-            continue
-        if gender == "male" and pet.gender != 1:
-            continue
-        if gender == "female" and pet.gender != 2:
-            continue
-        nature_name = static.nature_name(pet.nature) if static is not None else str(pet.nature)
-        nature_info = static.nature(pet.nature) if static is not None else None
-        natures_seen.setdefault(
-            nature_name,
-            {
-                "name": nature_name,
-                "positive": nature_info.positive_stat if nature_info else None,
-                "negative": nature_info.negative_stat if nature_info else None,
-            },
-        )
-        summary = {
-            "gid": pet.gid,
-            "name": pet.name,
-            "gender": pet.gender,
-            "level": pet.level,
-            "icon_url": species_icon_url(pet.base_conf_id),
-        }
-        for group in species.egg_groups:
-            groups_seen.setdefault(group, None)
-            cells.setdefault(f"{nature_name}|{group}", []).append(summary)
-    order = {name: i for i, name in enumerate(sorted(groups_seen))}
-    cell_lists = {
-        key: sorted(items, key=lambda p: (-p["level"], p["gid"]))[:8]
-        for key, items in cells.items()
-        if items
-    }
-    return {
-        "natures": sorted(natures_seen.values(), key=lambda n: n["name"]),
-        "uid": snapshot.uid if snapshot else 0, "version": snapshot.version if snapshot else 0,
-        "complete": None,
-        "groups": sorted(groups_seen),
-        "cell_order": order,
-        "cells": cell_lists,
-        "total_pets": len(pets),
-        "matched": sum(len(v) for v in cells.values()),
-        "gender": gender,
-    }
-def flowers_payload(flower_repo, static: StaticData | None, catalog=None, pet_repository=None) -> dict:
-    """炫彩花种载荷：我的花田 + 好友花田摘要（花联查宠物名）。
-
-    名字降级链：图鉴物种表 → 蛋目录 → 宠物帧学习表（colorful_conf_id→名字）
-    → "#id"。
-    """
-    view = flower_repo.consistent_snapshot() if flower_repo is not None else FlowerRepoSnapshot(None, 0, 0)
-    snap = view.data
-    metadata = {"uid": view.uid, "version": view.version, "complete": None,
-                "source": "observed" if snap is not None else "unknown"}
-    if snap is None:
-        return {**metadata, "available": False, "own": [], "friends": []}
-
-    def name_of(conf_id: int) -> str:
-        species = static.species(conf_id) if static is not None else None
-        if species is not None:
-            return species.name
-        egg = catalog.egg_by_base_id(conf_id) if catalog is not None else None
-        if egg is not None:
-            return egg.name
-        learned = pet_repository.colorful_name(conf_id) if pet_repository is not None else None
-        return learned or f"#{conf_id}"
-
-    def row(r, owner):
-        return {
-            "slot_id": r.slot_id,
-            "slot_index": r.slot_index,
-            "pet_conf_id": r.pet_conf_id,
-            "pet_name": name_of(r.pet_conf_id) if r.pet_conf_id else "—",
-            "icon_url": species_icon_url(r.pet_conf_id) if r.pet_conf_id else "",
-            "planted_at": r.planted_at,
-            "owner": owner,
-        }
-
-    own = [row(r, "self") for r in snap.own]
-    friends = [row(r, "friend") for r in snap.friends]
-    return {
-        "available": True,
-        "own": own,
-        "friends": friends,
-        **metadata,
-    }
 def _color_axis(cards, attr: str, color_attr: str) -> tuple[dict[str, str], dict[str, str]]:
     """颜色轴：名称 → 色值（加载顺序）+ 名称 → 轴字母。
 
@@ -508,11 +409,6 @@ def home_payload(home_repo, static: StaticData | None, pet_repository=None, egg_
         {pet.gid: pet for pet in pet_view.pets}
         if pet_view is not None and pet_view.uid == view.uid else {}
     )
-    voice_overrides = (
-        pet_repository.voice_overrides(view.uid)
-        if pet_repository is not None and pet_view is not None and pet_view.uid == view.uid
-        else {}
-    )
     residents = []
     breeding_profiles = {}
     for r in snap.residents:
@@ -521,8 +417,7 @@ def home_payload(home_repo, static: StaticData | None, pet_repository=None, egg_
         species = static.species(base_conf_id) if static is not None and base_conf_id else None
         gender = r.gender or (pet.gender if pet else 0)
         nature_name = static.nature_name(pet.nature) if static is not None and pet and pet.nature else ""
-        voice = (voice_overrides[pet.gid] if pet and pet.gid in voice_overrides
-                 else pet.voice if pet and pet.voice != 0 else None)
+        voice = pet.voice if pet and pet.voice != 0 else None
         effective_pet = replace(pet, voice=voice) if pet is not None and voice is not None else pet
         height_position = range_position(pet.height, species.height_range) if pet and species else {"ratio": None}
         weight_position = range_position(pet.weight, species.weight_range) if pet and species else {"ratio": None}
@@ -668,6 +563,7 @@ def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_o
         nest_override = str(annotation.get("nest_override", ""))
         note = str(annotation.get("note", ""))
         voice_tag = str(annotation.get("voice_tag", ""))
+        voice_db = annotation.get("voice_db")
         favorite = bool(annotation.get("is_favorite", False))
         info = catalog.inventory_egg(egg.egg_conf_id, egg.pet_conf_id, egg.special_egg_conf_id) if catalog is not None else None
         kind = egg_kind(egg, info.precious_type if info else None, info.mutation_type if info else 0,
@@ -745,7 +641,7 @@ def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_o
                 "weight_g": egg.weight_g,
                 "home_egg": egg.home_egg,
                 "annotations": {"nature_id": nature_id, "nest_override": nest_override,
-                                "note": note, "voice_tag": voice_tag},
+                                "note": note, "voice_tag": voice_tag, "voice_db": voice_db},
                 "tags": {"nature": nature_label, "weight": weight_label, "voice": voice_label,
                          "medals": medals, "nest": nest_label},
                 "measurement_ranges": {
@@ -770,7 +666,7 @@ def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_o
         "complete": None,
         "hatch_slots": len(slots),
         "version": view.version,
-        # 数据归属（R05）：前端据此核对与概览身份是否一致，拒绝旧账号响应
+        # 数据归属（R05）：前端据此核对当前账号身份，拒绝旧账号响应
         "uid": view.uid,
     }
 def egg_dex_payload(
@@ -860,13 +756,10 @@ def egg_dex_payload(
 
 __all__ = [
     "egg_box_payload",
-    "flowers_payload",
     "home_payload",
     "colors_payload",
-    "male_matrix_payload",
     "egg_dex_payload",
     "handbook_payload",
-    "overview_payload",
     "pet_row",
     "pets_payload",
     "type_color_for",

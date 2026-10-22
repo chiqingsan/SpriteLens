@@ -83,7 +83,6 @@ class AccountSelectionServiceTest(unittest.TestCase):
         pets = _PetRepository(pet_store, events)
         eggs = _Repo(events, "eggs")
         home = _Repo(events, "home")
-        flowers = _Repo(events, "flowers")
         service = AccountSelectionService(
             pet_store=pet_store,
             egg_store=egg_store,
@@ -91,13 +90,12 @@ class AccountSelectionServiceTest(unittest.TestCase):
             pet_repository=pets,
             egg_box=eggs,
             home_repo=home,
-            flower_repo=flowers,
             capture_running=lambda: running,
         )
-        return service, pets, eggs, home, flowers, events
+        return service, pets, eggs, home, events
 
     def test_reads_every_domain_before_applying_any_snapshot(self):
-        service, pets, eggs, home, flowers, events = self.make_service()
+        service, pets, eggs, home, events = self.make_service()
 
         service.select(202)
 
@@ -106,19 +104,18 @@ class AccountSelectionServiceTest(unittest.TestCase):
         self.assertEqual(pets.selected, 202)
         self.assertEqual([item[0] for item in eggs.applied], [202])
         self.assertEqual([item[0] for item in home.applied], [202])
-        self.assertEqual([item[0] for item in flowers.applied], [202])
 
     def test_read_failure_keeps_current_account_and_does_not_apply(self):
-        service, pets, eggs, home, flowers, events = self.make_service(failure=OSError("read failed"))
+        service, pets, eggs, home, events = self.make_service(failure=OSError("read failed"))
 
         with self.assertRaises(OSError):
             service.select(202)
 
         self.assertEqual(pets.selected, 101)
-        self.assertFalse(eggs.applied or home.applied or flowers.applied)
+        self.assertFalse(eggs.applied or home.applied)
 
     def test_running_capture_blocks_switch(self):
-        service, pets, eggs, home, flowers, events = self.make_service(running=True)
+        service, pets, eggs, home, events = self.make_service(running=True)
 
         with self.assertRaises(AccountSwitchBusy):
             service.select(202)
@@ -126,7 +123,7 @@ class AccountSelectionServiceTest(unittest.TestCase):
         self.assertEqual(pets.selected, 101)
 
     def test_unknown_account_is_rejected(self):
-        service, pets, eggs, home, flowers, events = self.make_service()
+        service, pets, eggs, home, events = self.make_service()
 
         with self.assertRaises(AccountNotFound):
             service.select(404)

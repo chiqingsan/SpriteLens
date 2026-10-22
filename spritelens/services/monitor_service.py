@@ -3,7 +3,7 @@
 线程模型：on_chunk 与连接关闭（close_session）均由接入层**投递线程**
 按序调用（嗅探线程只做分类/重组/入队，见 npcap_source 模块注释——
 关闭事件排在残余数据之后，不会被抢跑）。内部用锁保护会话状态；
-UI 线程通过 drain_events() / snapshot 拉取，不做跨线程回调。
+事件消费者通过 drain_events() / snapshot 拉取，不做跨线程回调；运行中的 UI 不再提供协议流页面。
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from collections.abc import Callable
 from dataclasses import replace
 
 from spritelens.capture.base import CaptureSource, SourceCallback, StreamChunk
-from spritelens.capture.key_store import KeyStore, SessionCheckpoint, parse_key_text
+from spritelens.capture.key_store import KeyStore, SessionCheckpoint
 from spritelens.events import PacketEvent  # noqa: F401 - 过渡期重导出，见下
 from spritelens.logs import get_logger
 from spritelens.protocol.crypto import extract_ack_key, iter_decrypt_variants

@@ -14,7 +14,7 @@ ICONS = {
     "box": ["warehouse", "storage"], "table": ["matrix", "coverage"],
     "users": ["breeder", "parents"], "sitemap": ["planner", "nest"],
     "checklist": ["collection", "progress"], "home": ["home", "house"],
-    "palette": ["color", "palette"], "flower": ["flower", "seed"],
+    "palette": ["color", "palette"],
     "activity": ["protocol", "stream"], "settings": ["settings", "capture"],
     "filter": ["filter", "condition"], "filter-off": ["reset", "clear"],
     "refresh": ["reload", "refresh"], "search": ["search", "empty"],

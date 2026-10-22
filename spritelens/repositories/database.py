@@ -1,17 +1,17 @@
-"""SQLite 连接与迁移：持久化底座（连接管理 / 版本迁移 / 串行化访问）。
+"""SQLite 连接与基线结构：持久化底座（连接管理 / 串行化访问）。
 
 设计要点：
 - 单连接 + 互斥锁：sqlite3 连接对象非线程安全。写入发生在 PetStore 的
   worker 线程、读取发生在 UI 线程，统一由锁串行化；WAL 模式让读写在
   文件层面并发，锁只保护连接对象本身。
-- 迁移用 PRAGMA user_version：老库重开自动补齐；迁移只追加、不修改旧条目，
-  任何历史库都能升到最新结构（未来加背包/图鉴表即追加一条）。
+- 当前处于破坏性开发阶段，schema 1 直接描述完整当前结构；旧结构不会被
+  隐式迁移，避免把开发期历史负债带进发布基线。
 - 不依赖 UI 与网络：路径可指向临时目录或 :memory:，测试直接构造即可。
 """
 
 from __future__ import annotations
 
-import re
+import shutil
 import sqlite3
 import threading
 import time
@@ -21,188 +21,120 @@ from spritelens.logs import get_logger
 
 logger = get_logger("db")
 
-# 迁移语句里的 ALTER ADD COLUMN（用于幂等跳过历史半迁移库的已存在列）
-_ADD_COLUMN_RE = re.compile(
-    r"ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)", re.IGNORECASE
+_SCHEMA_VERSION = 1
+
+
+class DatabaseSchemaError(sqlite3.DatabaseError):
+    """本地数据库不是当前破坏性开发基线，需要备份后重建。"""
+
+
+_BASELINE_SCHEMA: tuple[str, ...] = (
+    """
+    CREATE TABLE accounts (
+        uid        INTEGER PRIMARY KEY,
+        name       TEXT    NOT NULL DEFAULT '',
+        level      INTEGER NOT NULL DEFAULT 0,
+        first_seen REAL    NOT NULL,
+        last_seen  REAL    NOT NULL,
+        avatar_url TEXT    NOT NULL DEFAULT ''
+    )
+    """,
+    """
+    CREATE TABLE pets (
+        uid            INTEGER NOT NULL,
+        gid            INTEGER NOT NULL,
+        conf_id        INTEGER NOT NULL DEFAULT 0,
+        name           TEXT    NOT NULL DEFAULT '',
+        level          INTEGER NOT NULL DEFAULT 0,
+        exp            INTEGER NOT NULL DEFAULT 0,
+        nature         INTEGER NOT NULL DEFAULT 0,
+        gender         INTEGER NOT NULL DEFAULT 0,
+        blood_id       INTEGER NOT NULL DEFAULT 0,
+        talent_rank    INTEGER NOT NULL DEFAULT 0,
+        is_first_catch INTEGER NOT NULL DEFAULT 0,
+        first_seen     REAL    NOT NULL,
+        updated_at     REAL    NOT NULL,
+        attr_hp        INTEGER NOT NULL DEFAULT 0,
+        attr_atk       INTEGER NOT NULL DEFAULT 0,
+        attr_spa       INTEGER NOT NULL DEFAULT 0,
+        attr_def       INTEGER NOT NULL DEFAULT 0,
+        attr_spd       INTEGER NOT NULL DEFAULT 0,
+        attr_spe       INTEGER NOT NULL DEFAULT 0,
+        height         INTEGER NOT NULL DEFAULT 0,
+        weight         INTEGER NOT NULL DEFAULT 0,
+        voice         INTEGER NOT NULL DEFAULT 0,
+        mutation_type  INTEGER NOT NULL DEFAULT 0,
+        classis        INTEGER NOT NULL DEFAULT 0,
+        breakthrough_lv INTEGER NOT NULL DEFAULT 0,
+        speciality_id  INTEGER NOT NULL DEFAULT 0,
+        ball_id        INTEGER NOT NULL DEFAULT 0,
+        attributes_json TEXT NOT NULL DEFAULT '',
+        skills_json    TEXT NOT NULL DEFAULT '',
+        base_conf_id   INTEGER NOT NULL DEFAULT 0,
+        colorful_conf_id INTEGER NOT NULL DEFAULT 0,
+        glass_type     INTEGER NOT NULL DEFAULT 0,
+        glass_value    INTEGER NOT NULL DEFAULT 0,
+        worn_medal_id  INTEGER NOT NULL DEFAULT 0,
+        is_trial_pet   INTEGER NOT NULL DEFAULT 0,
+        is_mirror_pet  INTEGER NOT NULL DEFAULT 0,
+        catch_way      INTEGER NOT NULL DEFAULT 0,
+        add_time       INTEGER NOT NULL DEFAULT 0,
+        awarded_medals_json TEXT DEFAULT NULL,
+        PRIMARY KEY (uid, gid)
+    )
+    """,
+    "CREATE INDEX idx_pets_conf ON pets(uid, conf_id)",
+    "CREATE INDEX idx_pets_level ON pets(uid, level)",
+    """
+    CREATE TABLE eggs (
+        uid            INTEGER NOT NULL,
+        instance_id    INTEGER NOT NULL,
+        egg_conf_id    INTEGER NOT NULL DEFAULT 0,
+        pet_conf_id    INTEGER NOT NULL DEFAULT 0,
+        quantity       INTEGER NOT NULL DEFAULT 0,
+        obtained_at    INTEGER NOT NULL DEFAULT 0,
+        hatching       INTEGER NOT NULL DEFAULT 0,
+        detail_json    TEXT    NOT NULL DEFAULT '',
+        updated_at     REAL    NOT NULL,
+        home_egg       INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (uid, instance_id)
+    )
+    """,
+    "CREATE INDEX idx_eggs_uid ON eggs(uid, updated_at)",
+    "CREATE TABLE pet_locations (uid INTEGER PRIMARY KEY, snapshot_json TEXT NOT NULL)",
+    """
+    CREATE TABLE egg_hatch_slots (
+        uid          INTEGER PRIMARY KEY,
+        slots_json   TEXT NOT NULL,
+        collected_at REAL NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE egg_annotations (
+        uid           INTEGER NOT NULL,
+        instance_id   INTEGER NOT NULL,
+        nature_id     INTEGER NOT NULL DEFAULT 0,
+        nest_override TEXT    NOT NULL DEFAULT '',
+        note          TEXT    NOT NULL DEFAULT '',
+        voice_tag     TEXT    NOT NULL DEFAULT '',
+        voice_db      INTEGER DEFAULT NULL,
+        is_favorite   INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (uid, instance_id)
+    )
+    """,
+    """
+    CREATE TABLE home_snapshots (
+        uid           INTEGER PRIMARY KEY,
+        snapshot_json TEXT    NOT NULL,
+        updated_at    REAL    NOT NULL
+    )
+    """,
 )
 
-# 结构版本：新增表/列时追加 (版本号, SQL 语句组)，不得修改已发布的条目
-_MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
-    (
-        1,
-        (
-            """
-            CREATE TABLE IF NOT EXISTS accounts (
-                uid        INTEGER PRIMARY KEY,
-                name       TEXT    NOT NULL DEFAULT '',
-                level      INTEGER NOT NULL DEFAULT 0,
-                first_seen REAL    NOT NULL,
-                last_seen  REAL    NOT NULL
-            )
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS pets (
-                uid            INTEGER NOT NULL,
-                gid            INTEGER NOT NULL,
-                conf_id        INTEGER NOT NULL DEFAULT 0,
-                name           TEXT    NOT NULL DEFAULT '',
-                level          INTEGER NOT NULL DEFAULT 0,
-                exp            INTEGER NOT NULL DEFAULT 0,
-                nature         INTEGER NOT NULL DEFAULT 0,
-                gender         INTEGER NOT NULL DEFAULT 0,
-                blood_id       INTEGER NOT NULL DEFAULT 0,
-                talent_rank    INTEGER NOT NULL DEFAULT 0,
-                is_first_catch INTEGER NOT NULL DEFAULT 0,
-                first_seen     REAL    NOT NULL,
-                updated_at     REAL    NOT NULL,
-                PRIMARY KEY (uid, gid)
-            )
-            """,
-            "CREATE INDEX IF NOT EXISTS idx_pets_conf  ON pets(uid, conf_id)",
-            "CREATE INDEX IF NOT EXISTS idx_pets_level ON pets(uid, level)",
-        ),
-    ),
-    (
-        2,
-        (
-            # 六维最终面板值（可排序/筛选；种族值等明细见 attributes_json）
-            "ALTER TABLE pets ADD COLUMN attr_hp  INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE pets ADD COLUMN attr_atk INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE pets ADD COLUMN attr_spa INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE pets ADD COLUMN attr_def INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE pets ADD COLUMN attr_spd INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE pets ADD COLUMN attr_spe INTEGER NOT NULL DEFAULT 0",
-            # 外观与培养标量（roco_helper 式筛选维度所需）
-            "ALTER TABLE pets ADD COLUMN height          INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE pets ADD COLUMN weight          INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE pets ADD COLUMN voice           INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE pets ADD COLUMN mutation_type   INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE pets ADD COLUMN classis         INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE pets ADD COLUMN breakthrough_lv INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE pets ADD COLUMN speciality_id   INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE pets ADD COLUMN ball_id         INTEGER NOT NULL DEFAULT 0",
-            # 明细 JSON：不同步建列，避免登录突发时写入放大（百只级 × 数十字段）
-            "ALTER TABLE pets ADD COLUMN attributes_json TEXT NOT NULL DEFAULT ''",
-            "ALTER TABLE pets ADD COLUMN skills_json     TEXT NOT NULL DEFAULT ''",
-            # 物种关联键：协议字段 15，静态物种表（系别/种族值）一律按它查
-            "ALTER TABLE pets ADD COLUMN base_conf_id    INTEGER NOT NULL DEFAULT 0",
-        ),
-    ),
-    (
-        3,
-        (
-            # 蛋仓快照（bagType==8）：一行一枚蛋实例，明细 JSON 冗余全字段
-            """
-            CREATE TABLE IF NOT EXISTS eggs (
-                uid            INTEGER NOT NULL,
-                instance_id    INTEGER NOT NULL,
-                egg_conf_id    INTEGER NOT NULL DEFAULT 0,
-                pet_conf_id    INTEGER NOT NULL DEFAULT 0,
-                quantity       INTEGER NOT NULL DEFAULT 0,
-                obtained_at    INTEGER NOT NULL DEFAULT 0,
-                hatching       INTEGER NOT NULL DEFAULT 0,
-                detail_json    TEXT    NOT NULL DEFAULT '',
-                updated_at     REAL    NOT NULL,
-                PRIMARY KEY (uid, instance_id)
-            )
-            """,
-            "CREATE INDEX IF NOT EXISTS idx_eggs_uid ON eggs (uid, updated_at)",
-        ),
-    ),
-    (
-        4,
-        (
-            # 炫彩外观字段（色卡/花种离线展示依赖；此前未落库，重启清零）
-            "ALTER TABLE pets ADD COLUMN colorful_conf_id INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE pets ADD COLUMN glass_type       INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE pets ADD COLUMN glass_value      INTEGER NOT NULL DEFAULT 0",
-        ),
-    ),
-    (
-        5,
-        (
-            "ALTER TABLE pets ADD COLUMN worn_medal_id INTEGER NOT NULL DEFAULT 0",
-            "CREATE TABLE IF NOT EXISTS pet_locations (uid INTEGER PRIMARY KEY, snapshot_json TEXT NOT NULL)",
-        ),
-    ),
-    (
-        6,
-        (
-            "ALTER TABLE pets ADD COLUMN is_trial_pet INTEGER NOT NULL DEFAULT 0",
-        ),
-    ),
-    (
-        7,
-        (
-            "ALTER TABLE pets ADD COLUMN is_mirror_pet INTEGER NOT NULL DEFAULT 0",
-        ),
-    ),
-    (
-        8,
-        (
-            # 孵化槽快照（R06）：slots 帧驱动的「槽中蛋 id」与采集时间独立
-            # 落库，重启恢复为历史状态——蛋条目自身的时间字段不可靠（实测
-            # 全 0 时槽位帧是唯一在孵证据）
-            """
-            CREATE TABLE IF NOT EXISTS egg_hatch_slots (
-                uid          INTEGER PRIMARY KEY,
-                slots_json   TEXT NOT NULL,
-                collected_at REAL NOT NULL
-            )
-            """,
-        ),
-    ),
-    (9, (
-        "ALTER TABLE pets ADD COLUMN catch_way INTEGER NOT NULL DEFAULT 0",
-        "ALTER TABLE pets ADD COLUMN add_time INTEGER NOT NULL DEFAULT 0",
-    )),
-    (10, ("ALTER TABLE pets ADD COLUMN awarded_medals_json TEXT DEFAULT NULL",)),
-    (11, (
-        "ALTER TABLE eggs ADD COLUMN home_egg INTEGER NOT NULL DEFAULT 0",
-        """
-        CREATE TABLE IF NOT EXISTS egg_annotations (
-            uid            INTEGER NOT NULL,
-            instance_id    INTEGER NOT NULL,
-            nature_id      INTEGER NOT NULL DEFAULT 0,
-            nest_override  TEXT    NOT NULL DEFAULT '',
-            pet_gid        INTEGER NOT NULL DEFAULT 0,
-            PRIMARY KEY (uid, instance_id)
-        )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS pet_voice_overrides (
-            uid        INTEGER NOT NULL,
-            gid        INTEGER NOT NULL,
-            voice      INTEGER NOT NULL,
-            updated_at REAL    NOT NULL,
-            PRIMARY KEY (uid, gid)
-        )
-        """,
-    )),
-    (12, (
-        "ALTER TABLE egg_annotations ADD COLUMN note TEXT NOT NULL DEFAULT ''",
-        "ALTER TABLE egg_annotations ADD COLUMN voice_extreme TEXT NOT NULL DEFAULT ''",
-        "ALTER TABLE egg_annotations ADD COLUMN voice_medal TEXT NOT NULL DEFAULT ''",
-    )),
-    (13, (
-        "ALTER TABLE egg_annotations ADD COLUMN voice_tag TEXT NOT NULL DEFAULT ''",
-        "UPDATE egg_annotations SET voice_tag = CASE WHEN voice_extreme != '' THEN voice_extreme "
-        "ELSE voice_medal END",
-    )),
-    (14, ("ALTER TABLE egg_annotations ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0",)),
-    (15, ("""
-        CREATE TABLE IF NOT EXISTS home_snapshots (
-            uid          INTEGER PRIMARY KEY,
-            snapshot_json TEXT NOT NULL,
-            updated_at   REAL NOT NULL
-        )
-    """,)),
-    (16, ("ALTER TABLE accounts ADD COLUMN avatar_url TEXT NOT NULL DEFAULT ''",)),
-)
 
 
 class Database:
-    """SQLite 连接包装：迁移、串行化执行、只读查询。"""
+    """SQLite 连接包装：基线初始化、串行化执行、只读查询。"""
 
     def __init__(self, path: Path | str) -> None:
         self.path = Path(path)
@@ -210,10 +142,14 @@ class Database:
         if str(self.path) != ":memory:":
             self.path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = self._open_or_recover()
-        with self._lock:
-            self._conn.execute("PRAGMA journal_mode=WAL")
-            self._conn.execute("PRAGMA synchronous=NORMAL")
-            self._apply_migrations_locked()
+        try:
+            with self._lock:
+                self._initialize_schema_locked()
+                self._conn.execute("PRAGMA journal_mode=WAL")
+                self._conn.execute("PRAGMA synchronous=NORMAL")
+        except Exception:
+            self._conn.close()
+            raise
 
     def _open_or_recover(self) -> sqlite3.Connection:
         """打开库；文件损坏时备份原文件并重建（不阻断启动，原数据留证）。
@@ -222,11 +158,29 @@ class Database:
         其他数据库错误原样抛出——把好库误判损坏会改名重建成空库。
         备份失败保留原文件并明确失败，绝不删除原文换来空库。
         """
+        preserved_sidecars: list[tuple[Path, Path]] = []
+        if str(self.path) != ":memory:" and self.path.exists():
+            for suffix in ("-wal", "-shm"):
+                source = Path(str(self.path) + suffix)
+                if not source.exists():
+                    continue
+                temporary = source.with_name(source.name + ".corrupt-preserve.tmp")
+                try:
+                    temporary.unlink(missing_ok=True)
+                    shutil.copy2(source, temporary)
+                except OSError:
+                    temporary.unlink(missing_ok=True)
+                    for _source, pending in preserved_sidecars:
+                        pending.unlink(missing_ok=True)
+                    raise
+                preserved_sidecars.append((source, temporary))
         try:
             conn = sqlite3.connect(str(self.path), check_same_thread=False)
             conn.execute("PRAGMA user_version").fetchone()  # 触发一次真实读取
         except sqlite3.DatabaseError as exc:
             if not self._is_corruption(exc):
+                for _source, temporary in preserved_sidecars:
+                    temporary.unlink(missing_ok=True)
                 raise
             logger.warning("数据库文件损坏（%s），备份后重建: %s", exc, self.path)
             try:
@@ -236,19 +190,78 @@ class Database:
             if str(self.path) != ":memory:" and self.path.exists():
                 backup = self.path.with_suffix(f".corrupt-{int(time.time())}.sqlite")
                 try:
-                    # WAL/SHM 与主库一起移走，避免残件干扰新库恢复
-                    for suffix in ("", "-wal", "-shm"):
-                        source = Path(str(self.path) + suffix)
-                        if suffix and not source.exists():
-                            continue
-                        source.replace(Path(str(backup) + suffix))
+                    for source, temporary in preserved_sidecars:
+                        if not source.exists() and temporary.exists():
+                            temporary.replace(source)
+                    self._backup_corrupt_group(backup)
                     logger.warning("原库已备份到: %s", backup)
-                except OSError as move_exc:
-                    logger.error("备份失败，保留原文件不重建: %s", move_exc)
-                    raise
-            conn = sqlite3.connect(str(self.path), check_same_thread=False)
+                finally:
+                    for _source, temporary in preserved_sidecars:
+                        temporary.unlink(missing_ok=True)
+                conn = sqlite3.connect(str(self.path), check_same_thread=False)
+        else:
+            for _source, temporary in preserved_sidecars:
+                temporary.unlink(missing_ok=True)
         conn.row_factory = sqlite3.Row
         return conn
+
+    def _backup_corrupt_group(self, backup: Path) -> None:
+        """完整备份主库及 sidecar，失败时恢复原路径后再抛错。
+
+        SQLite 的 WAL/SHM 必须与主库一起保留。逐个移动会在中途失败时
+        留下「主库已移走、sidecar 仍在原处」的不可恢复状态，因此先把每个
+        成员复制到临时备份并逐一固化，再清理原组；清理失败也从备份组恢复。
+        """
+        members = [
+            (Path(str(self.path) + suffix), Path(str(backup) + suffix))
+            for suffix in ("", "-wal", "-shm")
+        ]
+        existing = [(source, target) for source, target in members if source.exists()]
+        if not existing:
+            return
+        staged: list[tuple[Path, Path]] = []
+        try:
+            for source, target in existing:
+                temporary = target.with_name(target.name + ".tmp")
+                if temporary.exists():
+                    temporary.unlink()
+                shutil.copy2(source, temporary)
+                temporary.replace(target)
+                staged.append((source, target))
+            removed: list[Path] = []
+            try:
+                for source, _target in existing:
+                    source.unlink()
+                    removed.append(source)
+            except OSError:
+                for source, target in existing:
+                    if source not in removed:
+                        continue
+                    shutil.copy2(target, source)
+                raise
+        except OSError as exc:
+            # A failed staged copy leaves the original group untouched. If the
+            # cleanup phase already removed a member, restore every removed file.
+            for source, target in staged:
+                if not source.exists() and target.exists():
+                    try:
+                        shutil.copy2(target, source)
+                    except OSError:
+                        logger.exception("损坏库恢复原路径失败: %s", source)
+            if len(staged) < len(existing):
+                for _source, target in staged:
+                    try:
+                        target.unlink(missing_ok=True)
+                    except OSError:
+                        logger.exception("不完整损坏库备份清理失败: %s", target)
+            for _source, target in existing:
+                temporary = target.with_name(target.name + ".tmp")
+                try:
+                    temporary.unlink(missing_ok=True)
+                except OSError:
+                    logger.exception("损坏库临时备份清理失败: %s", temporary)
+            logger.error("备份失败，保留原文件不重建: %s", exc)
+            raise
 
     @staticmethod
     def _is_corruption(exc: sqlite3.DatabaseError) -> bool:
@@ -262,43 +275,49 @@ class Database:
         message = str(exc).lower()
         return "file is not a database" in message or "malformed" in message
 
-    # -- 迁移 ----------------------------------------------------------
-    def _apply_migrations_locked(self) -> None:
+    # -- 基线结构 ------------------------------------------------------
+    def _initialize_schema_locked(self) -> None:
         current = int(self._conn.execute("PRAGMA user_version").fetchone()[0])
-        for version, statements in _MIGRATIONS:
-            if version <= current:
-                continue
+        if current == 0:
+            tables = {
+                row[0]
+                for row in self._conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+                )
+            }
+            if tables:
+                raise DatabaseSchemaError(
+                    f"数据库 {self.path} 没有当前基线版本，但已经包含旧表；"
+                    "请先备份并删除本地数据库后重启"
+                )
             try:
-                # 整组 DDL 单事务：中途失败整体回滚，绝不留下「版本号未推进
-                # 但半个迁移已提交」的死局（旧实现逐句自动提交，重启必崩
-                # duplicate column name）
                 self._conn.execute("BEGIN")
-                for statement in statements:
-                    self._execute_migration_statement_locked(statement)
-                self._conn.execute(f"PRAGMA user_version = {version}")
+                for statement in _BASELINE_SCHEMA:
+                    self._conn.execute(statement)
+                self._conn.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
                 self._conn.commit()
-            except sqlite3.Error as exc:
+            except sqlite3.Error:
                 self._conn.rollback()
-                logger.error("数据库迁移 v%d 失败，已回滚: %s", version, exc)
                 raise
-            logger.info("数据库迁移: v%d → v%d (%s)", current, version, self.path)
-            current = version
-
-    def _execute_migration_statement_locked(self, statement: str) -> None:
-        """执行单条迁移语句；ALTER ADD COLUMN 幂等，修复历史半迁移库。
-
-        旧版逐句自动提交，中途中断会留下「列已存在但版本号没推进」的库：
-        重启重跑该句报 duplicate column name，启动被彻底卡死。这里对
-        ADD COLUMN 先查表结构，列已在则跳过——库自动修复到目标结构。
-        """
-        match = _ADD_COLUMN_RE.match(statement)
-        if match:
-            table, column = match.group(1), match.group(2)
-            existing = {row[1] for row in self._conn.execute(f"PRAGMA table_info({table})")}
-            if column in existing:
-                logger.warning("迁移跳过已存在列（历史半迁移库）: %s.%s", table, column)
-                return
-        self._conn.execute(statement)
+            logger.info("数据库初始化为 schema %d: %s", _SCHEMA_VERSION, self.path)
+            return
+        if current != _SCHEMA_VERSION:
+            raise DatabaseSchemaError(
+                f"数据库 {self.path} 使用不支持的 schema {current}；"
+                "当前开发不兼容旧数据库，请先备份并重建"
+            )
+        # SQLite 保存建表时的 DDL，直接与唯一基线比较，包含主键、默认值和索引。
+        expected = {" ".join(statement.split()) for statement in _BASELINE_SCHEMA}
+        actual = {
+            " ".join(row[0].split())
+            for row in self._conn.execute(
+                "SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'"
+            )
+        }
+        if actual != expected:
+            raise DatabaseSchemaError(
+                f"数据库 {self.path} 的结构与当前基线不一致；请先备份并重建"
+            )
 
     @property
     def schema_version(self) -> int:
@@ -317,15 +336,20 @@ class Database:
 
     def execute_many(self, sql: str, seq_of_params: list[tuple]) -> int:
         """批量执行（单事务、一次提交）；失败整体回滚后抛出。"""
-        if not seq_of_params:
-            return 0
+        return self.execute_batches([(sql, seq_of_params)])
+
+    def execute_batches(self, batches: list[tuple[str, list[tuple]]]) -> int:
+        """同一业务批次可写多张关联表；全部成功才提交。"""
         with self._lock:
             try:
-                cursor = self._conn.executemany(sql, seq_of_params)
+                self._conn.execute("BEGIN")
+                count = 0
+                for sql, rows in batches:
+                    if rows:
+                        count += self._conn.executemany(sql, rows).rowcount
                 self._conn.commit()
-                return cursor.rowcount
-            except sqlite3.Error:
-                # 不回滚会留下半批残缺行，并被后续任何 commit 一起带入磁盘
+                return count
+            except BaseException:
                 self._conn.rollback()
                 raise
 
@@ -338,4 +362,4 @@ class Database:
             self._conn.close()
 
 
-__all__ = ["Database"]
+__all__ = ["Database", "DatabaseSchemaError"]

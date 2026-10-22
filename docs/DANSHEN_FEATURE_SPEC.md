@@ -8,7 +8,7 @@
 > 反编译工具，靠字节码 + 常量表还原）→ 前端 JS 通读。
 > 解包产物：`C:\Users\chiqingsan\AppData\Local\Temp\ds\out\…exe_extracted\`。
 > 研究过程产物（pyc 反汇编 dump 等）在 `.research/`（不入库）。
-> 架构层结论见 [DANSHEN_ASSISTANT_ANALYSIS.md](DANSHEN_ASSISTANT_ANALYSIS.md)（历史文档，仍有效）。
+> 架构层结论见 [archive/DANSHEN_ASSISTANT_ANALYSIS.md](archive/DANSHEN_ASSISTANT_ANALYSIS.md)（历史文档，仍有效）。
 
 ## 1. 业务模块全景（PYZ 反汇编确认）
 
@@ -24,7 +24,7 @@
 | `home_scene` | 737 行 | 家园场景解码（居民/家具/产蛋窝/场景蛋） | 🟡 已有解析；场景/主人归属与增量过滤待修，见 F04-U2 |
 | `home_breeding_range` | 295 行 | 繁育范围（楼层×距离×蛋组兼容） | 🟡 家园页用于过期关系候选；智能配窝用独立 `community-grid-v1` 摆位规则（与家园距离规则不等价、不混算，见 F04-U5） |
 | `color_cards` | 小 | 炫彩色卡（glass→卡号/粒子映射） | ✅ 已实装（炫彩色卡页：底色×混色矩阵） |
-| `flower_seeds` / `flower_state` | 小 | 炫彩花种（协议帧 + 按天合并） | ✅ 已实装（炫彩花种页：0x0375 快照 + 宠物名学习表） |
+| `flower_seeds` / `flower_state` | 小 | 炫彩花种（协议帧 + 按天合并） | ⛔ 已退役（2026-10-22；实现、载荷与页面已删除） |
 | `pet_medals` | 4,710 行 | 体型/声音奖牌富化（种群内极值 + 内嵌种群名录） | ⬜ 富化未做（medals.json 静态表已导入） |
 | `desktop_catalog` | 小 | 静态目录加载（技能/勋章/特长/体型声音名） | 部分已有（static_data） |
 | `desktop_preferences` | 小 | WebView2 leveldb 旧偏好迁移 | 不适用（无历史包袱） |
@@ -34,8 +34,8 @@
 | 云端（app 内 market/subscription/sync 部分） | — | 交易市场/订阅/云同步 | ⛔ 明确不做 |
 
 前端页面（webui/ 40 个 JS 文件）：侧栏分组 = 精灵背包 / 蛋蛋仓库 / 家园信息 /
-孵蛋工具（种公阵列、种公母库、智能配窝、产线收集、交易市场）/ 精灵图鉴
-（精灵图鉴、蛋图鉴）/ 炫彩色卡 / 炫彩花种 / 换蛋广场 / 赞赏作者。
+孵蛋工具（种公母库、智能配窝、产线收集、交易市场）/ 精灵图鉴
+（精灵图鉴、蛋图鉴）/ 炫彩色卡 / 换蛋广场 / 赞赏作者。
 其中交易市场、换蛋广场、赞赏作者、账号体系为云端功能，不抄。
 
 ## 2. UI 布局（index.html 实测）
@@ -43,23 +43,22 @@
 ```
 app-shell
 ├── sidebar（品牌块 + 分组导航 + 底部"本地安全模式"）
-│     概览
 │     仓库与图鉴：精灵背包 / 精灵图鉴 / 蛋图鉴
-│     孵蛋工具：蛋蛋仓库 / 种公阵列 / 种公母库 / 智能配窝 / 产线收集
+│     孵蛋工具：蛋蛋仓库 / 种公母库 / 智能配窝 / 产线收集
 │     家园信息：我的家园
-│     炫彩：炫彩色卡 / 炫彩花种
-│     系统：协议流 / 采集与设置        ← SpriteLens 自有页归入系统组
+│     炫彩：炫彩色卡
+│     系统：采集与设置                ← 协议流页面已退役，事件日志保留在本地文件
 └── main-shell
       ├── topbar：角色块 | 状态 pill（握手/采集/密钥/录制）| 主按钮（开始采集）
       └── pages：每页 section#page-*；背包为中间网格 + 右侧筛选/详情共用栏（加全局导航构成三栏）
 modal-layer + toast-layer
 ```
 
-SpriteLens 已按此骨架重构（保留自有"概览/协议流/采集与设置"页）。
+SpriteLens 已按此骨架重构（保留自有"采集与设置"页；协议流页面已删除）。
 蛋神特有的交互资产，后续页面直接复用：
 
 - **点阵背包 / 属性卡片 / 对比表格**（segmented 切换；点击或 Enter 打开详情，悬停不放大）
-- **矩阵视图**（种公阵列：性格×蛋组覆盖矩阵；色卡：底色×混色矩阵）
+- **矩阵视图**（色卡：底色×混色矩阵；旧种公阵列已因没有当前入口而删除）
 - **分页器 + 右侧详情面板**（Master-Detail 范式，SpriteLens 已有）
 - **孵化时间倍率表**（原始/5 倍/6 倍/30 倍）——蛋图鉴已实现
 
@@ -120,24 +119,16 @@ recalculate / reconcile        快照对账（snapshot-species 规则）
 - SpriteLens 嵌套解析已能从真实字段树读出11居民/11窝/6条母本配对，核心数据无需蛋神 API；旧分支误读 actor 类型为房间等级，场景/主人/会话过滤及0x0413/0x0414增量判断仍待修。实施规格见 [家园开发计划](HOME_IMPLEMENTATION_PLAN.md)，状态以 ROADMAP 的 F04-U2 为准。
 - 蛋神家园主关系面板使用场景配对，未开启范围候选选项；SpriteLens 已有明确标记的过期关系候选。性格概率、均值声音和范围规则属于工具预测，不代表游戏内产物已实测。
 
-### 3.6 炫彩色卡（color_cards）与花种（flower_seeds/flower_state）
+### 3.6 炫彩色卡（color_cards）
 
 - 色卡从蛋/宠物的 **glass 信息**派生：`card_id = glass_type × glass_value`（" × " 组合）、
   `particle`（四角星/爱心/方块/镂空五角星，pattern_*.png）、赛季粒子（season）
 - UI：底色（横轴）× 混色（纵轴）矩阵；个人色卡 / 色卡图鉴预览双 tab
-- 花种：`handle_flower_message(flow, opcode, payload)` 协议驱动（opcode 线索 0x375/0x39D），
-  list/detail 两种消息；`flower_state.merge_flowers(previous, update, occurred)` 按 `day_key`（天）合并，
-  记录 baseId/pet/endTime，登录（login 域）拉全量、增量更新
-- 花种等级静态表：assets/catalog/flowerLevels.json（source: client-config-reference）
-
 ### 3.7 炫彩形态 id 体系与名字来源（重要结论）
 
 宠物帧 field58 = 炫彩形态 conf_id（130xxx/140xxx/5400xxx 系，实测 210/214 覆盖；
-roco_helper 同款字段名 caught_camp）。花种帧（0x0375 field13）按这套 id 引用宠物，
-**图鉴静态表（3001-5061 系）不含它，蛋神与 roco_helper 的发行包里也没有
-这套 id 的静态名字表**——两边都靠协议现场学习（宠物帧的 field58 + field3 名字
-成对出现）。SpriteLens 用 Pet.colorful_conf_id + PetRepository.colorful_name()
-学习表实现同款；未学到的 id 显示 "#id"（用户在游戏里获得该炫彩宠后自动补全）。
+roco_helper 同款字段名 caught_camp）。SpriteLens 将该字段作为宠物外观数据保留，
+图鉴与色卡展示不依赖一个额外的花种名字学习表。
 
 宠物帧 glass 的正确位置是 **field86 子消息 {field1: type, field2: value}**
 （decode_handbook_glass；162/266 只携带；field87 是 cheer_point 加油点，先前
@@ -167,7 +158,7 @@ desktopSkillMedalData.json 提供 skills/medals 名称映射（desktop_catalog �
 
 > 完整规格（帧层 / IV 派生 / 断流恢复 / FlowState 37 字段 / 解码器字段级映射，46KB）
 > 在反汇编研究产物 `.research/danshen-protocol.md`（临时目录，不入库；需要时按
-> DANSHEN_ASSISTANT_ANALYSIS.md §11 的方法重新生成）。
+> archive/DANSHEN_ASSISTANT_ANALYSIS.md §11 的方法重新生成）。
 
 蛋神路由结构 = `_process_frame` 的 if/elif 显式分支（17 个）+ 全扫描解码器（12 个，
 对每帧无条件尝试、结构校验通过即发事件）。与页面直接相关的：
@@ -182,7 +173,6 @@ desktopSkillMedalData.json 提供 skills/medals 名称映射（desktop_catalog �
 | 0x014A | s2c | **家园完整快照**（home_scene.decode_home_scene） | 我的家园 |
 | 0x0413 / 0x0414 | s2c | 家园增量 | 我的家园 |
 | 0x0152 / 0x015C | s2c | 家园资源响应（fields 3/12） | 我的家园 |
-| 0x039D | s2c | 花信息（flower_seeds.handle_flower_message；258/338 也参与） | 炫彩花种 |
 | 0x1883 / 0x1885 / 0x1891 | s2c | 盒子/背包业务响应 → box 快照 | 精灵背包（盒子视图） |
 | 0x01C5 | s2c | 放生宠物（从 known/box 状态全部移除） | 宠物状态一致性 |
 | 0x1324 | s2c | 战斗捕捉提示 → pet.capture | 捕获中心（远期） |
@@ -202,7 +192,7 @@ handbook、egg.upsert、pet.snapshot、team.snapshot 等——这套"结构准�
   字节作 IV"试解密 + 业务记录校验 → 成功则跳游标、发 `capture.gap` 事件。
   SpriteLens 的 frames.py 已有假 magic 同步 + reassembly 已有 pending 重排，
   但没有"3 秒停滞触发的主动恢复"——列为协议层第二待验证点。
-- 历史文档勘误：DANSHEN_ASSISTANT_ANALYSIS.md §3.2(7) 所述"活跃网卡智能排序
+- 历史文档勘误：archive/DANSHEN_ASSISTANT_ANALYSIS.md §3.2(7) 所述"活跃网卡智能排序
   （active_network_descriptions）"在 v1.1.6 中**不存在**——设备枚举仅用
   pcap_findalldevs，选择靠 config.json。SpriteLens 的 nic_rank.py 是自有增强（保留）。
 - 工程参数：pcap_setbuff 32 MiB（SpriteLens 已对齐：`PCAP_BUFFER_BYTES`）、BPF `tcp port 8195`、
@@ -212,35 +202,35 @@ handbook、egg.upsert、pet.snapshot、team.snapshot 等——这套"结构准�
 
 | 项 | 文件 | 说明 |
 |---|---|---|
-| UI 骨架 | `web/static/index.html` | 分组侧栏（14 页）+ modal 层 |
+| UI 骨架 | `web/static/index.html` | 分组侧栏 + 页面骨架 + modal 层 |
 | 启动自恢复链 | `web/static/boot.js` + app.js | 资源加载错误捕获 + 15s 超时重试 + 内联启动面板 |
 | 桌面壳三件套 | `system/webview_guard.py` / `window_geometry.py` / run.py | WebView2 预检、窗口几何 + DPI（见 §3.9） |
 | 活跃网卡排序 | `capture/nic_rank.py` | Get-NetAdapter Status=Up 前置 |
-| 静态目录 | `tools/import_*.py` + `data/static/` | 蛋目录 224 / 图鉴描述 601 / 色卡 44 / 花种等级表 / 奖牌表 |
+| 静态目录 | `tools/import_*.py` + `data/static/` | 蛋目录 224 / 图鉴描述 601 / 色卡 44 / 奖牌表 |
 | 蛋图鉴 / 蛋蛋仓库 | `domain/eggs.py` / `domain/egg_box.py` + `egg_store` | 蛋目录联查 + 蛋仓快照累积 → SQLite 持久化 + 孵化槽标记 |
-| 种公阵列 | payloads 种公矩阵 + app.js | 性格×蛋组覆盖矩阵 |
+| 种公阵列 | — | 旧实现已删除；当前无导航入口，候选筛选由种公母库与智能配窝承担 |
 | 筛选配对（种公母库） | `domain/breeder_library.py` + `view_models/breeder_library_vm.py` + `web/breeder_library.py` + Vue 页面 | 当前账号公母双列表、共同筛选、双向选配、普通窝参考；边界见 [功能规格](BREEDER_LIBRARY_SPEC.md) |
 | 我的家园 | `domain/home.py` + `domain/home_breeding.py` + `home_repository` + `frontend/src/pages/HomePage.vue` | 0x014A：居民/物种/窝位/场景配对/场景蛋；0x0413/0x0414：居民/场景蛋增量；过期关系按巢穴范围推导候选 |
-| 炫彩色卡 / 炫彩花种 | `domain/color_cards.py` / `domain/flowers.py` | glass→卡号矩阵；0x0375 花田 + 宠物名学习表 |
+| 炫彩色卡 | `domain/color_cards.py` | glass→卡号矩阵 |
 | 账号隔离 | `services/account_tracker.py` | 切号清空各域内存快照；同 uid 重复帧不误判 |
-| 持久化底座 | `repositories/*` + `services/event_logger.py` | v1→v4 追加式迁移（事务化）、宠物/蛋仓 write-behind |
+| 持久化底座 | `repositories/*` + `services/event_logger.py` | schema 1 完整基线、旧库显式重建、宠物/蛋仓 write-behind |
 | 抓包健壮性 | `capture/npcap_source.py` + `services/monitor_service.py` | 32MiB 缓冲、流/会话回收、关闭事件保序、丢弃计数 |
 
 ## 6. 待实施清单（分批建议）
 
-> 依赖顺序：协议 opcode 映射已在 §4 齐备（蛋仓 0x1344 / 家园 0x014A / 花 0x039D 等），
+> 依赖顺序：协议 opcode 映射已在 §4 齐备（蛋仓 0x1344 / 家园 0x014A 等），
 > 大部分页面的前置只剩"真实帧验证 + 字段映射落码"。
 
 **第二批（有 opcode 映射，可直接开工）**：
 1. 蛋蛋仓库 ✅ 已实装（0x1344 分页解析 + SQLite；"智能标注"UI 未做）
-2. 种公阵列 ✅ 已实装（性格×蛋组矩阵；0x0312 孵化槽已在蛋仓页标记）
+2. 种公阵列 ⛔ 已退役（旧页面、路由、载荷和测试已删除；0x0312 孵化槽仍在蛋仓页标记）
 3. 体型/声音奖牌富化 ⬜（medals.json 静态表已导入，极值富化规则未做）
 4. 协议层增强 🟡 部分：32MiB 缓冲 ✅；"3 秒停滞"断流恢复 ⬜、IV exact 模式兼容 ⬜
 
 **第三批（需真实帧验证字段映射）**：
 5. 我的家园 🟡 已有居民/窝位/场景配对/场景蛋解析和Vue展示；真实字段树已确认核心数据具备。场景归属、错误旧路径、增量过滤及参考页面交互待按 F04-U2-A 至 F 实施，游戏繁育效果仍待验证。
 6. 智能配窝 🟡 本地功能已实现（2026-10-17）；按用户目标蛋/自选精灵双入口独立设计，采用宽容双奖牌、多对多及选配/摆位联合搜索，不沿用蛋神固定覆盖权重；真实游戏与可见 WebView2 验收待做。完整规格与历史评分见 [智能配窝规格](BREEDING_PLANNER_SPEC.md)，实施状态见ROADMAP F04-U5；蛋神孵蛋推断引擎见§3.4，不等同于本项目待做的规划器。
-7. 炫彩花种 ✅ 已实装（0x0375 快照 + 名字学习表）
+7. 炫彩花种 ⛔ 已退役（2026-10-22；当前产品不保留花田功能）
 8. 炫彩色卡 ✅ 已实装（glass→卡号→底色×混色矩阵）
 
 **第四批（大工程）**：

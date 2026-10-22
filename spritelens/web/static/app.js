@@ -22,12 +22,13 @@
   }
 
   var TOKEN = readToken();
+  var pendingWrites = new Set();
 
   function api(path, options) {
     var opts = options || {};
     var headers = { "X-Local-Token": TOKEN };
     if (opts.body !== undefined) { headers["Content-Type"] = "application/json"; }
-    return fetch(path, {
+    var request = fetch(path, {
       method: opts.method || "GET",
       headers: headers,
       body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
@@ -40,18 +41,13 @@
       }
       return response.json();
     });
+    if (opts.method === "POST") {
+      pendingWrites.add(request);
+      request.then(function () { pendingWrites.delete(request); }, function () { pendingWrites.delete(request); });
+    }
+    return request;
   }
 
-  // 关窗兜底：普通 fetch 会随 WebView 关闭被丢弃，用 keepalive 让浏览器把请求送出。
-  // 不能用 navigator.sendBeacon：它无法携带 X-Local-Token，会被服务端拒绝。
-  function flushBeacon(path, body) {
-    try {
-      fetch(path, { method: "POST", keepalive: true,
-        headers: { "X-Local-Token": TOKEN, "Content-Type": "application/json" },
-        body: JSON.stringify(body) }).catch(function () {});
-      return true;
-    } catch (e) { return false; }
-  }
 
   function query(params) {
     var parts = [];
@@ -82,8 +78,7 @@
     request: function (path, body) { return accountRequests.request("planner", "/api/breeding-planner/" + path,
       body === undefined ? {} : { method: "POST", body: body }); },
     cancel: function () { accountRequests.cancel("planner"); },
-    // 关窗兜底：见 flushBeacon（keepalive 请求，能带本地令牌头）。
-    flush: function (path, body) { return flushBeacon("/api/breeding-planner/" + path, body); },
+    confirmOverwrite: function () { return window.confirm("另一窗口已保存了不同的草稿。是否用当前草稿覆盖？取消可保留双方内容。"); },
     context: function () { return accountRequests.petContext(); },
     openPet: function (gid) { petFilters.reset(); switchPage("pets", gid); }
   });
@@ -110,6 +105,21 @@
     handbookPage.unmount();
     colorsPage.unmount();
   });
+
+  window.SpriteLensPrepareClose = async function () {
+    if (document.activeElement instanceof HTMLElement) { document.activeElement.blur(); }
+    document.body.inert = true;
+    try {
+      await breedingPlanner.flush();
+      if (eggBoxPage) { await eggBoxPage.flush(); }
+      while (pendingWrites.size) { await Promise.all(Array.from(pendingWrites)); }
+      return { ok: true };
+    } catch (error) {
+      document.body.inert = false;
+      return { ok: false, error: error.message };
+    }
+  };
+  window.SpriteLensCancelClose = function () { document.body.inert = false; };
 
   /* ---------- 小工具 ---------- */
   var $ = function (id) { return document.getElementById(id); };
@@ -142,29 +152,14 @@
     return "#4c8f7a"; 
   }
 
-  var TYPE_FALLBACK = "#6b8188";
-
-  /* 解码树着色：`名字 [类型] = 值` 与 `└ 文本: ...` 分色（先转义再套 span，避免注入） */
-  function colorizeDecoded(text) {
-    var safe = esc(text);
-    return safe
-      .replace(/^([^\[\n=]+) \[([^\]]+)\] = (.*)$/gm,
-        '<span class="tok-name">$1</span>[<span class="tok-type">$2</span>] = <span class="tok-value">$3</span>')
-      .replace(/^(\s*└ 文本: )(.*)$/gm,
-        '<span class="tok-leaf">$1</span><span class="tok-text">$2</span>');
-  }
-
   /* ---------- 页面状态 ---------- */
   var state = {
-    page: "overview",
-    events: [],
-    selectedEventIndex: null,
+    page: "boot",
     capture: null
   };
 
   /* ---------- 导航 ---------- */
   function switchPage(name, revealGid) {
-    if (name === "overview") { return; }
     if (state.page === name) {
       if (name === "handbook" && revealGid) { handbookPage.load(revealGid); }
       if (name === "egg-dex" && revealGid) { eggDex.load(revealGid); }
@@ -205,89 +200,16 @@
     if (name === "colors") { colorsPage.load(); }
     if (name === "egg-dex") { eggDex.load(revealGid); }
     if (name === "egg-box") { loadEggBoxPage(true); }
-    if (name === "male-matrix") { loadMaleMatrix(); }
     if (name === "home") { loadHome(true); }
     if (name === "collection-lines") { collectionLines.load(); }
     if (name === "breeder-library") { breederLibrary.load(); }
     if (name === "planner") { breedingPlanner.load(); }
-    if (name === "flowers") { loadFlowers(); }
-    if (name === "events") { loadEvents(); }
     if (name === "capture") { loadCapture(); }
   }
 
   document.querySelectorAll(".nav-item").forEach(function (node) {
     node.addEventListener("click", function () { switchPage(node.dataset.page); });
   });
-
-  /* ---------- 概览 ---------- */
-  function renderOverview(data) {
-    var stats = data.stats || {};
-    $("ov-total").textContent = stats.total || 0;
-    $("ov-maxed").textContent = stats.maxed || 0;
-    $("ov-maxlv").textContent = stats.max_level || 0;
-
-    renderTypeDist(stats.types || []);
-
-    var accounts = data.accounts || [];
-    $("ov-accounts").innerHTML = accounts.length
-      ? accounts.map(function (item) {
-          return '<div class="account-row"><b>' + esc(item.name || "未命名")
-            + '</b><span>uid ' + esc(item.uid) + '</span></div>';
-        }).join("")
-      : '<span class="muted">暂无历史账号</span>';
-
-    renderRole(data.identity, data.cached_identity);
-    renderOverviewSide(data.identity);
-  }
-
-  /* 概览右栏：当前账号 + 采集状态（与角色识别结果、采集快照联动） */
-  function renderOverviewSide(identity) {
-    if (!$("ov-account")) { return; }
-    if (identity) {
-      $("ov-account").innerHTML = '<b>' + esc(identity.name || "未知角色") + "</b>"
-        + (identity.level ? " · Lv" + identity.level : "")
-        + '<span class="muted">（uid ' + identity.uid + "）</span>";
-      $("ov-account-hint").textContent = "来自登录时该角色自身信息推送";
-    } else {
-      $("ov-account").textContent = "尚未识别账号";
-      $("ov-account-hint").textContent = "登录游戏进入世界后自动识别";
-    }
-  }
-
-  function renderOverviewCapture(capture) {
-    if (!capture || !$("ov-capture")) { return; }
-    var running = !!capture.running;
-    $("ov-capture").innerHTML = running
-      ? '<b class="positive">采集中</b> · 原始流 ' + (capture.raw_chunks || 0) + " 段 · 解密成功 "
-        + (capture.decrypt_ok || 0)
-      : '<b>未启动</b>';
-    if (capture.last_error) {
-      $("ov-capture").innerHTML = '<b class="negative">启动失败</b> · ' + esc(capture.last_error);
-      $("ov-capture-hint").textContent = "检查网卡选择与 Npcap 安装状态";
-    } else if (running) {
-      $("ov-capture-hint").textContent = capture.any_key
-        ? "会话密钥已就绪，事件与宠物数据实时入库"
-        : "尚未获取会话密钥：若游戏已登录，请退回登录界面重新进入";
-    } else {
-      $("ov-capture-hint").textContent = "在「采集与设置」页选择网卡并开始采集";
-    }
-  }
-
-  /* 系别分布：横向条形图（每行 名字 / 条 / 数量），条色取系别主题色 */
-  function renderTypeDist(types) {
-    if (!types.length) {
-      $("ov-types").innerHTML = '<span class="muted">暂无数据</span>';
-      return;
-    }
-    var peak = types.reduce(function (max, item) { return Math.max(max, item.count); }, 1);
-    $("ov-types").innerHTML = types.map(function (item) {
-      var color = item.color || TYPE_FALLBACK;
-      var width = Math.max(4, Math.round((item.count / peak) * 100));
-      return '<div class="type-row"><span>' + esc(item.name) + "</span>"
-        + '<span class="type-track"><i style="width:' + width + "%;background:" + color + '"></i></span>'
-        + "<b>" + item.count + "</b></div>";
-    }).join("");
-  }
 
   /* ---------- 顶栏状态 ---------- */
   function renderRole(identity, cached) {
@@ -311,15 +233,6 @@
     if (eggBoxPage) { eggBoxPage.resetAccount(); }
     homeVersion = -1;
     if (homePage) { homePage.resetAccount(); }
-    flowerState.data = { available: false }; flowerState.version = -1; renderFlowers();
-    mmState.data = null; mmState.selected = null;
-    ["mm-matrix", "bl-male", "bl-female"].forEach(function (id) {
-      $(id).innerHTML = "";
-    });
-    ["mm-count", "bl-male-count", "bl-female-count"].forEach(function (id) {
-      $(id).textContent = "等待当前账号数据";
-    });
-    $("mm-detail").innerHTML = '<div class="empty-hint">请选择当前账号的条目</div>';
   }
 
   function renderState(payload) {
@@ -364,32 +277,14 @@
       homeVersion = payload.home_version;
       if (state.page === "home") { loadHome(true); }
     }
-    if (payload.flower_version !== undefined && payload.flower_version !== flowerState.version) {
-      flowerState.version = payload.flower_version;
-      if (state.page === "flowers") { loadFlowers(); }
-    }
 
     renderRole(payload.identity, payload.cached_identity);
-    var stats = payload.stats || {};
-    $("ov-total").textContent = stats.total || 0;
-    $("ov-maxed").textContent = stats.maxed || 0;
-    $("ov-maxlv").textContent = stats.max_level || 0;
-    if (payload.events_total !== undefined && $("ov-events")) {
-      $("ov-events").textContent = payload.events_total || 0;
-    }
-    renderOverviewSide(payload.identity);
-    renderOverviewCapture(payload.capture);
-
-    if (payload.stats && payload.stats.types) {
-      renderTypeDist(payload.stats.types || []);
-    }
-
     if (state.page === "capture") { renderCaptureSummary(payload.capture || {}); }
     if (payload.environment) { renderEnvBanner(payload.environment); }
     var version = payload.pets_version;
     if (version !== undefined && version !== state._petsVersion) {
       state._petsVersion = version;
-      var refresh = { pets: loadPets, "male-matrix": loadMaleMatrix,
+      var refresh = { pets: loadPets,
         "breeder-library": function () { return breederLibrary.load(); }, colors: function () { return colorsPage.load(); } };
       if (refresh[state.page]) { refresh[state.page](false); }
       if (state.page === "home") { loadHome(false); }
@@ -437,38 +332,6 @@
       unmount: function () { generation++; if (mounted) { mounted.unmount(); mounted = null; } }
     };
   })();
-
-  /* ---------- 协议流 ---------- */
-  function loadEvents() {
-    return api("/api/events").then(function (payload) {
-      state.events = payload.rows || [];
-      $("event-count").textContent = (payload.total || 0) + " 条";
-      $("event-empty").hidden = state.events.length > 0;
-      $("event-rows").innerHTML = state.events.map(function (row) {
-        var cls = row.direction === "s2c" ? "dir-tag s2c" : "dir-tag";
-        return '<tr data-index="' + row.index + '" role="button" tabindex="0" aria-label="查看协议事件详情">'
-          + "<td>" + esc(row.time) + "</td>"
-          + '<td><span class="' + cls + '">' + esc(row.direction) + "</span></td>"
-          + "<td>" + esc(row.opcode) + "</td>"
-          + "<td>" + esc(row.name) + "</td>"
-          + '<td class="col-gid">' + row.payload_len + "B</td></tr>";
-      }).join("");
-      $("event-rows").querySelectorAll("tr").forEach(function (rowNode) {
-        rowNode.addEventListener("click", function () {
-          state.selectedEventIndex = Number(rowNode.dataset.index);
-          $("event-rows").querySelectorAll("tr").forEach(function (item) {
-            item.classList.toggle("active", item === rowNode);
-          });
-          api("/api/events/detail" + query({ index: state.selectedEventIndex })).then(function (detail) {
-            if (state.selectedEventIndex !== Number(rowNode.dataset.index) || state.page !== "events") { return; }
-            $("event-detail").innerHTML = '<div class="detail-section"><h3>解码详情</h3>'
-              + '<pre class="detail-pre">' + colorizeDecoded(detail.detail) + "</pre></div>";
-            if (state.page === "events") { window.SpriteLensUI.openDetail("event-detail", rowNode); }
-          }).catch(function () {});
-        });
-      });
-    }).catch(function (err) { toast("事件加载失败：" + err.message, true); });
-  }
 
   /* ---------- 采集与设置 ---------- */
   // 横幅语义：仅在「未装 Npcap」或「RSC 开启」时显示。
@@ -550,7 +413,8 @@
       + (totals.raw_bytes || 0) + " 字节 · 解密成功 " + (totals.decrypt_ok || 0)
       + " · 缺密钥 " + (totals.key_miss || 0) + " · 会话 " + sessions.length
       + (dropped > 0 ? " · 丢弃 " + dropped + " 段" : "")
-      + (payload.event_log_name ? " · 事件日志 " + payload.event_log_name : "");
+      + (payload.event_log_name ? " · 事件日志 " + payload.event_log_name : "")
+      + (payload.event_log_error ? " · " + payload.event_log_error : "");
     $("session-rows").innerHTML = sessions.length ? sessions.map(function (item) {
       return "<tr><td>" + esc(item.session_id) + "</td>"
         + '<td>' + (item.has_key ? '<svg class="ui-icon" viewBox="0 0 24 24" aria-label="已获取"><use href="/static/icons/sprite.svg#circle-check"></use></svg>' : "—") + "</td>"
@@ -748,82 +612,7 @@
     });
   }
 
-  /* ---------- 种公阵列（性格 × 蛋组覆盖矩阵） ---------- */
-  var mmState = { gender: "all", data: null, selected: null };
-
-  function loadMaleMatrix() {
-    return accountRequests.request("male-matrix", "/api/male-matrix" + query({ gender: mmState.gender })).then(function (payload) {
-      if (!payload) { return; }
-      mmState.data = payload;
-      renderMaleMatrix();
-    }).catch(function (err) { toast("矩阵加载失败：" + err.message, true); });
-  }
-
-  var STAT_CN = { hp: "生命", atk: "物攻", spa: "魔攻", def: "物防", spd: "魔防", spe: "速度" };
-
-  function renderMaleMatrix() {
-    var payload = mmState.data;
-    if (!payload) { return; }
-    $("mm-count").textContent = "匹配 " + payload.matched + " / " + payload.total_pets + " 只";
-    var groups = payload.groups || [];
-    var natures = payload.natures || [];
-    var head = '<tr><th class="mm-corner">性格 \ 蛋组</th>' + groups.map(function (g) {
-      return '<th>' + esc(g) + "</th>";
-    }).join("") + "</tr>";
-    var body = natures.map(function (nature) {
-      var fix = [nature.positive, nature.negative].filter(Boolean)
-        .map(function (k) { return STAT_CN[k] || k; }).join("↑ ↓");
-      var cells = groups.map(function (group) {
-        var key = nature.name + "|" + group;
-        var pets = payload.cells[key];
-        var attr = ' data-mmkey="' + encodeURIComponent(key) + '" role="button" tabindex="0" aria-label="查看' + esc(key) + '组合"';
-        if (!pets) { return '<td class="mm-cell empty"' + attr + '>—</td>'; }
-        var chips = pets.map(function (pet) {
-          return petChip(pet, false);
-        }).join("");
-        return '<td class="mm-cell"' + attr + '>' + chips + "</td>";
-      }).join("");
-      return '<tr><th class="mm-rowhead"><b>' + esc(nature.name) + "</b>"
-        + (fix ? '<small>' + esc(fix) + "</small>" : "") + "</th>" + cells + "</tr>";
-    }).join("");
-    $("mm-matrix").innerHTML = "<table><thead>" + head + "</thead><tbody>" + body + "</tbody></table>";
-    $("mm-empty").hidden = natures.length > 0;
-  }
-
-  function renderMaleMatrixDetail(key) {
-    var payload = mmState.data;
-    if (!payload) { return; }
-    var pets = payload.cells[key] || [];
-    var panel = $("mm-detail");
-    document.querySelectorAll("#mm-matrix .mm-cell").forEach(function (node) {
-      node.classList.remove("selected");
-    });
-    var wanted = encodeURIComponent(key);
-    document.querySelectorAll('#mm-matrix td.mm-cell').forEach(function (node) {
-      node.classList.toggle("selected", node.dataset.mmkey === wanted);
-    });
-    var parts = key.split("|");
-    var rows = pets.map(function (pet) {
-      return '<div class="mm-row"><img src="' + esc(pet.icon_url) + '" alt="" loading="lazy" onerror="this.remove()">'
-        + '<b>' + esc(pet.name) + '</b><span class="muted">Lv' + pet.level + '</span>'
-        + '<span class="' + (pet.gender === 2 ? "female" : "male") + '-mark">' + '<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/static/icons/sprite.svg#gender-' + (pet.gender === 2 ? 'female' : 'male') + '"></use></svg>' + "</span></div>";
-    }).join("");
-    panel.innerHTML =
-      '<div class="detail-title"><h2>' + esc(parts[0]) + " × " + esc(parts[1]) + "</h2></div>"
-      + '<div class="detail-sub">该组合共 ' + pets.length + ' 只（同格取最高等级前 8 只）</div>'
-      + (rows || '<div class="empty-hint">空</div>');
-  }
-
-  function bindMaleMatrixActions() {
-    $("mm-gender").addEventListener("click", function (event) {
-      var btn = event.target.closest("[data-gender]");
-      if (!btn) { return; }
-      mmState.gender = btn.dataset.gender;
-      document.querySelectorAll("#mm-gender [data-gender]").forEach(function (node) {
-        node.classList.toggle("active", node === btn);
-      });
-      loadMaleMatrix();
-    });
+  function bindPageLinks() {
     document.getElementById("page-colors").addEventListener("click", function (event) {
       var chip = event.target.closest("[data-mm]");
       if (!chip) { return; }
@@ -838,7 +627,7 @@
       loadPets();
     });
     // 页面内的跨页入口：接管成 switchPage，Vue 页只声明目标，不自己改路由。
-    function bindPageLinks(rootId) {
+    function bindPageLinkRoot(rootId) {
       var root = $(rootId);
       if (!root) { return; }
       root.addEventListener("click", function (event) {
@@ -852,24 +641,8 @@
         loadPets();
       });
     }
-    ["page-handbook", "page-egg-dex", "egg-box-root"].forEach(bindPageLinks);
-    $("mm-matrix").addEventListener("click", function (event) {
-      var chip = event.target.closest("[data-mm]");
-      if (chip) {
-        // 跳到精灵背包并按 gid 搜索（详情可查）
-        switchPage("pets");
-        petFilters.search(String(chip.dataset.mm));
-        loadPets();
-        return;
-      }
-      var cell = event.target.closest("td.mm-cell");
-      if (!cell || !cell.dataset.mmkey) { return; }
-      var key = decodeURIComponent(cell.dataset.mmkey);
-      mmState.selected = key;
-      renderMaleMatrixDetail(key);
-    });
+    ["page-handbook", "page-egg-dex", "egg-box-root"].forEach(bindPageLinkRoot);
   }
-
   /* ---------- Vue 家园页：账号请求仍由应用壳做 UID/version 校验 ---------- */
   function loadHome(reuse) {
     if (homePage) { return reuse ? homePage.resume(homeVersion) : homePage.load(); }
@@ -891,65 +664,12 @@
     });
   }
 
-  /* ---------- 炫彩花种 ---------- */
-  var flowerState = { data: null, version: -1 };
-
-  function loadFlowers() {
-    return accountRequests.request("flowers", "/api/flowers").then(function (payload) {
-      if (!payload) { return; }
-      flowerState.data = payload;
-      flowerState.version = payload.version || 0;
-      renderFlowers();
-    }).catch(function (err) { toast("花田加载失败：" + err.message, true); });
-  }
-
-  function flowerCard(r) {
-    var planted = r.planted_at ? new Date(r.planted_at * 1000).toLocaleDateString() : "—";
-    var img = r.icon_url
-      ? '<img src="' + esc(r.icon_url) + '" alt="" loading="lazy" onerror="this.remove()">'
-      : "";
-    return '<div class="fl-card">'
-      + '<span class="pc-avatar">' + esc((r.pet_name || "—").slice(0, 1)) + img + "</span>"
-      + '<div class="fl-info"><b>' + esc(r.pet_name) + "</b>"
-      + '<small>槽位 #' + esc(r.slot_id) + "</small>"
-      + '<span class="muted">' + planted + "</span></div></div>";
-  }
-
-  function renderFlowers() {
-    var payload = flowerState.data;
-    if (!payload) { return; }
-    if (!payload.available) {
-      $("fl-meta").textContent = "等待花田快照（登录或打开花田界面后更新）";
-      $("fl-friend-count").textContent = "—";
-      $("fl-own").innerHTML = "";
-      $("fl-friends").innerHTML = "";
-      $("fl-own-empty").hidden = false;
-      $("fl-friends-empty").hidden = false;
-      return;
-    }
-    $("fl-meta").textContent = "观察快照 #" + payload.version + " · 我的花 " + (payload.own || []).length + " 朵（完整性未确认）";
-    $("fl-own").innerHTML = (payload.own || []).map(flowerCard).join("");
-    $("fl-own-empty").hidden = (payload.own || []).length > 0;
-    $("fl-friends").innerHTML = (payload.friends || []).map(flowerCard).join("");
-    $("fl-friend-count").textContent = (payload.friends || []).length + " 条";
-    $("fl-friends-empty").hidden = (payload.friends || []).length > 0;
-  }
-
-  /* ---------- 炫彩色卡 ---------- */
-
-  function petChip(pet, withLevel) {
-    var mark = '<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/static/icons/sprite.svg#gender-' + (pet.gender === 2 ? "female" : "male") + '"></use></svg>';
-    return '<span class="mm-pet" data-mm="' + pet.gid + '"><img src="' + esc(pet.icon_url)
-      + '" alt="" loading="lazy" onerror="this.remove()">' + mark + esc(pet.name)
-      + (withLevel === false ? "" : '<small>Lv' + pet.level + "</small>") + "</span>" + window.SpriteLensPetPresentation.colorCard(pet.color_card);
-  }
-
   /* ---------- 炫彩色卡（Vue 页，挂载后由页面自己拉数据） ---------- */
   var colorsPage = (function () {
     var mounted = null;
     return {
       load: function () {
-        if (mounted) { mounted.resume(); return; }
+        if (mounted) { mounted.resume(true); return; }
         var root = $("page-colors");
         root.textContent = "正在加载色卡…";
         return import("/static/vue/entry.js").then(function (page) {
@@ -967,15 +687,7 @@
     };
   })();
 
-  var lastImageMode = "portrait";
   document.addEventListener("preferenceschanged", function (event) { if (petFilters) { petFilters.setShortcuts(event.detail.shortcuts); } });
-  document.addEventListener("preferenceschanged", function (event) {
-    var mode = event.detail.pet_image || "portrait";
-    if (mode === lastImageMode) { return; }
-    lastImageMode = mode;
-    if (!petInventory) { return; }
-    petInventory.refreshPresentation();
-  });
 
   /* ---------- 启动（15s 超时 + 自动重试 2 次，与自恢复链协同） ---------- */
   var BOOT_RETRIES = 2;
@@ -996,7 +708,6 @@
         petInventory = inventoryVue.mountPetInventory($("pet-list-root"), TOKEN, {
           account: accountRequests.petContext,
           query: petFilters.query,
-          imageMode: window.SpriteLensAppearance.imageMode,
           fixed: petFilters.setFixed,
           failed: function (message) { toast("宠物数据加载失败：" + message, true); },
           view: function (view) { window.SpriteLensAppearance.view(view); },
@@ -1017,11 +728,10 @@
         var versionNode = $("app-version");
         if (versionNode) { versionNode.textContent = "v" + payload.app.version + " · 纯本地运行"; }
       }
-      renderOverview(payload.overview || {});
       renderCapture(payload.capture || {});
       renderState(payload.state || {});
       renderFeaturePlaceholders();
-      bindMaleMatrixActions();
+      bindPageLinks();
       bindCaptureActions();
       loadIfaces();
       connectPush();

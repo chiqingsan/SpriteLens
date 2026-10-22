@@ -37,8 +37,11 @@ class AccountAvatarCache:
         self._inflight: dict[str, asyncio.Task[tuple[Path | None, float]]] = {}
         self._misses: dict[str, float] = {}
         self._network_retry_after = 0.0
+        self._closed = False
 
     async def resolve(self, asset_name: str) -> Path | None:
+        if self._closed:
+            return None
         match = _AVATAR_NAME.fullmatch(asset_name)
         if match is None:
             return None
@@ -74,6 +77,14 @@ class AccountAvatarCache:
         if retry_after == _NETWORK_COOLDOWN:
             self._network_retry_after = retry_at
         return None
+
+    async def close(self) -> None:
+        """停止接收新请求，并等待已启动的下载线程完成。"""
+        self._closed = True
+        tasks = tuple(self._inflight.values())
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        self._inflight.clear()
 
     def _load_sources(self) -> dict[str, str]:
         try:

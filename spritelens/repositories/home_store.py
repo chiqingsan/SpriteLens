@@ -76,6 +76,7 @@ class HomeStore:
         self._db = database
         self._flush_interval = max(0.05, float(flush_interval))
         self._lock = threading.Lock()
+        self._flush_lock = threading.Lock()
         self._pending: dict[int, HomeSnapshot] = {}
         self._stop = threading.Event()
         self._worker: threading.Thread | None = None
@@ -97,6 +98,9 @@ class HomeStore:
     def load(self, uid: int) -> HomeSnapshot | None:
         if uid <= 0:
             return None
+        # 读取历史账号时必须先把抓包线程已受理的最新快照写入数据库，
+        # 否则 0.5 秒后台窗口会返回上一版甚至空记录。
+        self.flush()
         rows = self._db.query("SELECT snapshot_json FROM home_snapshots WHERE uid = ?", (uid,))
         if not rows:
             return None
@@ -110,23 +114,31 @@ class HomeStore:
             return None
 
     def _flush(self) -> None:
-        with self._lock:
-            pending, self._pending = self._pending, {}
-        if not pending:
-            return
-        now = time.time()
-        try:
-            self._db.execute_many(
-                "INSERT INTO home_snapshots (uid, snapshot_json, updated_at) VALUES (?, ?, ?) "
-                "ON CONFLICT(uid) DO UPDATE SET snapshot_json=excluded.snapshot_json, "
-                "updated_at=excluded.updated_at",
-                [(uid, _encode(snapshot), now) for uid, snapshot in pending.items()],
-            )
-        except sqlite3.Error:
+        with self._flush_lock:
             with self._lock:
-                for uid, snapshot in pending.items():
-                    self._pending.setdefault(uid, snapshot)
-            raise
+                pending, self._pending = self._pending, {}
+            if not pending:
+                return
+            now = time.time()
+            try:
+                self._db.execute_many(
+                    "INSERT INTO home_snapshots (uid, snapshot_json, updated_at) VALUES (?, ?, ?) "
+                    "ON CONFLICT(uid) DO UPDATE SET snapshot_json=excluded.snapshot_json, "
+                    "updated_at=excluded.updated_at",
+                    [(uid, _encode(snapshot), now) for uid, snapshot in pending.items()],
+                )
+            except sqlite3.Error:
+                with self._lock:
+                    for uid, snapshot in pending.items():
+                        self._pending.setdefault(uid, snapshot)
+                raise
+
+    def flush(self) -> None:
+        """同步写完调用前已排队的快照；写入失败向调用者传播。"""
+        while True:
+            self._flush()
+            if not self._has_pending():
+                return
 
     def _has_pending(self) -> bool:
         with self._lock:

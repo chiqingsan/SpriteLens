@@ -6,6 +6,6 @@ export function mountBreedingPlanner(root: HTMLElement, host: PlannerHost) {
   const page = ref<InstanceType<typeof BreedingPlannerPage> | null>(null)
   const app = createApp({ render: () => h(BreedingPlannerPage, { ref: page, host }) })
   app.mount(root)
-  return { load: () => page.value?.load(), pause: () => page.value?.pause(),
+  return { load: () => page.value?.load(), pause: () => page.value?.pause(), flush: () => page.value?.flush(),
     resetAccount: () => page.value?.resetAccount(), unmount: () => app.unmount() }
 }

@@ -41,8 +41,15 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
-    logger = setup_logger(logs_dir(), debug=args.debug)
-    crash_log = install_excepthook(logs_dir())
+    try:
+        log_directory = logs_dir()
+        logger = setup_logger(log_directory, debug=args.debug)
+        crash_log = install_excepthook(log_directory)
+    except OSError as exc:
+        from spritelens.web.run import _fatal
+
+        _fatal("用户数据目录初始化失败", str(exc))
+        return 1
     logger.debug("崩溃日志: %s", crash_log)
 
     if args.smoke_test:
@@ -113,7 +120,7 @@ def _smoke_check_assets() -> int:
     failures.extend(check_frontend_assets(STATIC_DIR / "vue"))
     if not (STATIC_DIR / "account-requests.js").is_file():
         failures.append("前端文件缺失: account-requests.js")
-    for name in ("index.html", "boot.js", "desktop-shell.js", "desktop-shell.css", "ui.js", "app.js", "app.css", "ui.css", "themes.css", "appearance.js", "pet-presentation.js", "icons.js", "icons/sprite.svg", "vue/entry.js"):
+    for name in ("index.html", "boot.js", "desktop-shell.js", "desktop-shell.css", "ui.js", "app.js", "app.css", "ui.css", "themes.css", "appearance.js", "icons.js", "icons/sprite.svg", "vue/entry.js"):
         if not (STATIC_DIR / name).is_file():
             failures.append(f"前端文件缺失: {STATIC_DIR / name}")
 

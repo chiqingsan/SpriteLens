@@ -70,10 +70,6 @@
         <div class="account-uid-row"><span id="role-uid">UID —</span><button id="btn-uid-visibility" class="icon-button" aria-label="隐藏 UID" aria-pressed="false" hidden><svg class="ui-icon" aria-hidden="true"><use href="/static/icons/sprite.svg#eye"></use></svg></button></div>
       </section>
       <nav id="main-nav" aria-label="主导航">
-        <button class="nav-item" data-page="overview" hidden>
-          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/static/icons/sprite.svg#layout-dashboard"></use></svg>
-          概览
-        </button>
         <div class="nav-group" data-nav-group="pet-info">
           <div class="nav-group-title">精灵信息</div>
           <button class="nav-item nav-subitem" data-page="pets">
@@ -139,38 +135,6 @@
         </div>
       </header>
 
-      <!-- 概览 -->
-      <section id="page-overview" class="page" hidden>
-        <div class="stat-grid">
-          <article class="stat-card"><span>宠物总数</span><strong id="ov-total">0</strong></article>
-          <article class="stat-card"><span>满级（60）</span><strong id="ov-maxed">0</strong></article>
-          <article class="stat-card"><span>最高等级</span><strong id="ov-maxlv">0</strong></article>
-          <article class="stat-card"><span>协议事件</span><strong id="ov-events">0</strong></article>
-        </div>
-        <div class="overview-lower">
-          <section class="panel">
-            <div class="panel-head"><h2>系别分布</h2><span class="muted">按主系别统计</span></div>
-            <div id="ov-types" class="type-dist"></div>
-          </section>
-          <div class="overview-side">
-            <section class="panel">
-              <div class="panel-head"><h2>当前账号</h2></div>
-              <p class="info-line" id="ov-account">尚未识别账号</p>
-              <p class="muted" id="ov-account-hint">登录游戏进入世界后自动识别</p>
-            </section>
-            <section class="panel">
-              <div class="panel-head"><h2>采集状态</h2></div>
-              <p class="info-line" id="ov-capture">未启动</p>
-              <p class="muted" id="ov-capture-hint">在「采集与设置」页选择网卡并开始采集</p>
-            </section>
-            <section class="panel">
-              <div class="panel-head"><h2>本地账号</h2><span class="muted">来自本地库（离线可见）</span></div>
-              <div id="ov-accounts" class="account-list"></div>
-            </section>
-          </div>
-        </div>
-      </section>
-
       <!-- 精灵背包（宠物仓库） -->
       <section id="page-pets" class="page active">
         <div class="workspace split">
@@ -214,29 +178,6 @@
         <div id="egg-box-root"></div>
       </section>
 
-      <!-- 种公阵列：性格 × 蛋组覆盖矩阵 -->
-      <section id="page-male-matrix" class="page">
-        <div class="workspace split">
-          <section class="content-panel">
-            <div class="panel-toolbar">
-              <span id="mm-count" class="count-badge">0 只可配种</span>
-              <div class="segmented" id="mm-gender">
-                <button data-gender="all" class="active">全部</button>
-                <button data-gender="male">♂ 公</button>
-                <button data-gender="female">♀ 母</button>
-              </div>
-              <span class="muted">性格 × 蛋组覆盖矩阵——回答"想孵某性格，该找哪个蛋组的宠"</span>
-            </div>
-            <div class="table-wrap">
-              <div id="mm-matrix" class="mm-matrix"></div>
-              <div id="mm-empty" class="empty-hint" hidden>没有带蛋组的宠物：开始采集并进入游戏后自动出现</div>
-            </div>
-          </section>
-          <aside id="mm-detail" class="detail-panel">
-            <div class="empty-hint">点击矩阵格子查看该组合的宠物</div>
-          </aside>
-        </div>
-      </section>
       <!-- 筛选配对由 Vue 独占状态与渲染。 -->
       <section id="page-breeder-library" class="page"><div id="breeder-library-root"></div></section>
       <section id="page-planner" class="page"><div id="breeding-planner-root"></div></section>
@@ -249,49 +190,6 @@
       <section id="page-colors" class="page" data-vue-page>
         <div class="empty-hint">正在加载色卡…</div>
       </section>
-      <!-- 炫彩花种 -->
-      <section id="page-flowers" class="page">
-        <div class="stack">
-          <section class="panel">
-            <div class="panel-head">
-              <h2>我的花田</h2>
-              <span id="fl-meta" class="muted">等待花田快照（登录或打开花田界面后更新）</span>
-            </div>
-            <div id="fl-own" class="fl-grid"></div>
-            <div id="fl-own-empty" class="empty-hint" hidden>花田没有种植记录</div>
-          </section>
-          <section class="panel">
-            <div class="panel-head"><h2>好友花田</h2><span id="fl-friend-count" class="muted"></span></div>
-            <div id="fl-friends" class="fl-grid"></div>
-            <div id="fl-friends-empty" class="empty-hint" hidden>暂无好友花田数据</div>
-          </section>
-        </div>
-      </section>
-
-      <!-- 协议流 -->
-      <section id="page-events" class="page">
-        <div class="workspace split">
-          <section class="content-panel">
-            <div class="panel-toolbar">
-              <span id="event-count" class="count-badge">0 条</span>
-              <span class="muted">最近 500 条（opcode / 方向 / 载荷长度）</span>
-            </div>
-            <div class="table-wrap">
-              <table class="event-table">
-                <thead>
-                  <tr><th>时间</th><th>方向</th><th>opcode</th><th>消息</th><th>载荷</th></tr>
-                </thead>
-                <tbody id="event-rows"></tbody>
-              </table>
-              <div id="event-empty" class="empty-hint">暂无事件：开始采集并进入游戏</div>
-            </div>
-          </section>
-          <aside id="event-detail" class="detail-panel">
-            <div class="empty-hint">点击左侧事件查看解码详情</div>
-          </aside>
-        </div>
-      </section>
-
       <!-- 采集与设置 -->
       <section id="page-capture" class="page">
         <div class="settings-page">
@@ -374,7 +272,6 @@
   <script src="/static/ui.js"></script>
   <script src="/static/appearance.js"></script>
   <script src="/static/icons.js"></script>
-  <script src="/static/pet-presentation.js"></script>
   <script src="/static/account-requests.js"></script>
   <script src="/static/account-card.js"></script>
   <script src="/static/collection-lines-page.js"></script>

@@ -8,13 +8,12 @@ export interface PetInventoryHost {
   account: () => PetAccount; query: () => Record<string, string | number>
   committed: (data: Pets) => void; failed: (message: string) => void
   view: (value: PetView) => void; reset: () => void; fixed: (value: boolean) => void
-  imageMode: () => string
 }
 export function mountPetInventory(root: HTMLElement, token: string, host: PetInventoryHost) {
   const model = usePets(createApiClient(token), host.account, host.query,
     () => { void nextTick(() => { if (model.data.value) host.committed(model.data.value) }) }, host.failed)
   const inventory = ref<InstanceType<typeof PetInventory> | null>(null)
-  const app = createApp({ render: () => h(PetInventory, { ref: inventory, model, imageMode: host.imageMode,
+  const app = createApp({ render: () => h(PetInventory, { ref: inventory, model,
     onView: host.view, onReset: host.reset }) })
   app.mount(root)
   const stop = watch(model.view, value => host.fixed(value === 'point'), { immediate: true, flush: 'sync' })

@@ -1,7 +1,7 @@
 """宠物持久化网关：写回缓存 + 后台批量落盘 + 读取。
 
 为什么异步（实测教训）：抓包回调运行在 MonitorService 锁内，任何同步 IO
-都会阻塞 UI 的 drain_events 与后续帧处理——事件日志每条 flush 在登录突发
+都会阻塞事件消费者的 drain_events 与后续帧处理——事件日志每条 flush 在登录突发
 下净增约 14ms，UI 轮询最长等待 57ms。因此 put() 只并入内存待写表，
 落盘由独立 worker 线程按 flush_interval 批量执行。
 
@@ -287,39 +287,41 @@ class PetStore:
         locations: dict[int, Backpack],
     ) -> int:
         now = time.time()
+        batches: list[tuple[str, list[tuple]]] = []
+        if accounts:
+            batches.append((
+                _UPSERT_ACCOUNT,
+                [(uid, name, level, now, now, avatar_url) for uid, (name, level, avatar_url) in accounts.items()],
+            ))
+        if pets:
+            batches.append((
+                _UPSERT_PET,
+                [
+                    (
+                        uid, pet.gid, pet.conf_id, pet.name, pet.level, pet.exp,
+                        pet.nature, pet.gender, pet.blood_id, pet.talent_rank,
+                        int(pet.is_first_catch), now, now,
+                        _attr_final(pet, "hp"), _attr_final(pet, "atk"),
+                        _attr_final(pet, "spa"), _attr_final(pet, "def"),
+                        _attr_final(pet, "spd"), _attr_final(pet, "spe"),
+                        pet.height, pet.weight, pet.voice, pet.mutation_type,
+                        pet.classis, pet.breakthrough_lv, pet.speciality_id, pet.ball_id,
+                        _attributes_to_json(pet), _skills_to_json(pet), pet.base_conf_id,
+                        pet.colorful_conf_id, pet.glass_type, pet.glass_value, pet.worn_medal_id,
+                        int(pet.is_trial_pet),
+                        int(pet.is_mirror_pet), pet.catch_way, pet.add_time,
+                        json.dumps(pet.awarded_medal_ids) if pet.awarded_medal_ids is not None else None,
+                    )
+                    for (uid, _gid), pet in pets.items()
+                ],
+            ))
+        if locations:
+            batches.append((
+                "INSERT INTO pet_locations (uid, snapshot_json) VALUES (?, ?) ON CONFLICT(uid) DO UPDATE SET snapshot_json = excluded.snapshot_json",
+                [(uid, json.dumps(snapshot.record(), ensure_ascii=False)) for uid, snapshot in locations.items()],
+            ))
         try:
-            if accounts:
-                self._db.execute_many(
-                    _UPSERT_ACCOUNT,
-                    [(uid, name, level, now, now, avatar_url) for uid, (name, level, avatar_url) in accounts.items()],
-                )
-            if pets:
-                self._db.execute_many(
-                    _UPSERT_PET,
-                    [
-                        (
-                            uid, pet.gid, pet.conf_id, pet.name, pet.level, pet.exp,
-                            pet.nature, pet.gender, pet.blood_id, pet.talent_rank,
-                            int(pet.is_first_catch), now, now,
-                            _attr_final(pet, "hp"), _attr_final(pet, "atk"),
-                            _attr_final(pet, "spa"), _attr_final(pet, "def"),
-                            _attr_final(pet, "spd"), _attr_final(pet, "spe"),
-                            pet.height, pet.weight, pet.voice, pet.mutation_type,
-                            pet.classis, pet.breakthrough_lv, pet.speciality_id, pet.ball_id,
-                            _attributes_to_json(pet), _skills_to_json(pet), pet.base_conf_id,
-                            pet.colorful_conf_id, pet.glass_type, pet.glass_value, pet.worn_medal_id,
-                            int(pet.is_trial_pet),
-                            int(pet.is_mirror_pet), pet.catch_way, pet.add_time,
-                            json.dumps(pet.awarded_medal_ids) if pet.awarded_medal_ids is not None else None,
-                        )
-                        for (uid, _gid), pet in pets.items()
-                    ],
-                )
-            if locations:
-                self._db.execute_many(
-                    "INSERT INTO pet_locations (uid, snapshot_json) VALUES (?, ?) ON CONFLICT(uid) DO UPDATE SET snapshot_json = excluded.snapshot_json",
-                    [(uid, json.dumps(snapshot.record(), ensure_ascii=False)) for uid, snapshot in locations.items()],
-                )
+            self._db.execute_batches(batches)
         except sqlite3.Error as exc:
             logger.warning("宠物写库失败，留待下轮重试: %s", exc)
             with self._lock:
@@ -355,28 +357,6 @@ class PetStore:
                     uid, row["gid"], row["name"], exc,
                 )
         return tuple(pets)
-
-    def voice_overrides(self, uid: int) -> dict[int, int]:
-        if uid <= 0:
-            return {}
-        rows = self._db.query("SELECT gid, voice FROM pet_voice_overrides WHERE uid = ?", (uid,))
-        return {int(row["gid"]): int(row["voice"]) for row in rows}
-
-    def set_voice_override(self, uid: int, gid: int, voice: int | None) -> None:
-        if uid <= 0 or gid <= 0:
-            raise ValueError("账号或精灵编号无效")
-        if voice is None:
-            self._db.execute("DELETE FROM pet_voice_overrides WHERE uid = ? AND gid = ?", (uid, gid))
-            return
-        self._db.execute(
-            "INSERT INTO pet_voice_overrides (uid, gid, voice, updated_at) VALUES (?, ?, ?, ?) "
-            "ON CONFLICT(uid, gid) DO UPDATE SET voice = excluded.voice, updated_at = excluded.updated_at",
-            (uid, gid, voice, time.time()),
-        )
-
-    def has_pet(self, uid: int, gid: int) -> bool:
-        self.flush()
-        return bool(self._db.query("SELECT 1 FROM pets WHERE uid = ? AND gid = ?", (uid, gid)))
 
     @staticmethod
     def _pet_from_row(row) -> Pet:

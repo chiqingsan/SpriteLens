@@ -14,7 +14,7 @@ from spritelens.repositories.database import Database
 from spritelens.repositories.egg_store import EggStore
 from spritelens.services.egg_repository import EggBoxRepository
 from spritelens.events import PacketEvent
-from spritelens.web.payloads import egg_box_payload, male_matrix_payload
+from spritelens.web.payloads_catalog import egg_box_payload
 
 
 def _field(no: int, raw: object, children: list[dict] | None = None) -> dict:
@@ -170,14 +170,14 @@ class EggBoxRepositoryTests(unittest.TestCase):
         store = Mock()
         repo = EggBoxRepository(store=store)
         before = repo.version()
-        repo.save_annotations(42, 1, 7, "green", "note", "")
+        repo.save_annotations(42, 1, 7, "green", "note", "", -20)
         self.assertEqual(repo.version(), before + 1)
         repo.save_favorite(42, 1, True)
         self.assertEqual(repo.version(), before + 2)
         store.save_annotations.side_effect = OSError("synthetic disk failure")
         store.save_favorite.side_effect = OSError("synthetic disk failure")
         with self.assertRaises(OSError):
-            repo.save_annotations(42, 1, 0, "", "", "")
+            repo.save_annotations(42, 1, 0, "", "", "", None)
         with self.assertRaises(OSError):
             repo.save_favorite(42, 1, False)
         self.assertEqual(repo.version(), before + 2)
@@ -335,6 +335,10 @@ class EggBoxRepositoryTests(unittest.TestCase):
                 self.assertEqual(got.hatch_seconds, 100)
                 self.assertTrue(got.hatching)
                 self.assertEqual((got.is_precious, got.glass_type, got.glass_value), (True, 1, 1048605))
+                store.save_annotations(101, 7, 0, "", "", "", -20)
+                self.assertEqual(store.annotations(101)[7]["voice_db"], -20)
+                store.save_annotations(101, 7, 0, "", "", "", None)
+                self.assertNotIn(7, store.annotations(101))
                 store.close()
             finally:
                 db.close()
@@ -530,8 +534,8 @@ class EggBoxPayloadTests(unittest.TestCase):
                              [[], ["小不点"], [], [], ["大块头"], []])
 
             voice_annotations = {
-                20: {"voice_tag": "满分"}, 21: {"voice_tag": "婉转声"},
-                22: {"voice_tag": "底分"}, 23: {"voice_tag": "粗嗓门"},
+                20: {"voice_tag": "满分", "voice_db": -20}, 21: {"voice_tag": "婉转声", "voice_db": None},
+                22: {"voice_tag": "底分", "voice_db": 20}, 23: {"voice_tag": "粗嗓门", "voice_db": None},
             }
             voice_entries = tuple(replace(egg, instance_id=index, weight_g=700)
                                   for index in range(20, 24))
@@ -542,6 +546,7 @@ class EggBoxPayloadTests(unittest.TestCase):
             self.assertEqual([row["tags"]["voice"] for row in voice_rows], ["满分", None, "底分", None])
             self.assertEqual([row["tags"]["medals"] for row in voice_rows],
                              [[], ["婉转声"], [], ["粗嗓门"]])
+            self.assertEqual([row["annotations"]["voice_db"] for row in voice_rows], [-20, None, 20, None])
             # 随机配置本身不等于特殊蛋；未知新配置保持未知，不借普通蛋范围。
             random_info = catalog.inventory_egg(310049, 0, 1)
             from spritelens.domain.egg_box import egg_kind
@@ -562,67 +567,6 @@ class EggBoxPayloadTests(unittest.TestCase):
         self.assertEqual(egg_kind(replace(egg, appearance_type=8), 0, 0, True), "colorful")
         self.assertEqual(egg_kind(replace(egg, appearance_type=1), 0, 0, False), "shiny")
         self.assertEqual(egg_kind(replace(egg, is_precious=True), None, 0, False), "special")
-
-class MaleMatrixPayloadTests(unittest.TestCase):
-    def _pet(self, gid, name, nature, gender, base_conf_id):
-        from spritelens.domain.pets import Pet, PetAttribute
-        return Pet(
-            gid=gid, conf_id=2000000 + gid, name=name, level=40, exp=0,
-            nature=nature, gender=gender, blood_id=1, talent_rank=3,
-            is_first_catch=False, base_conf_id=base_conf_id,
-            attributes=(PetAttribute(),) * 6, height=0, weight=0, voice=0, skills=(),
-        )
-
-    def test_matrix_cells(self) -> None:
-        class Repo:
-            def consistent_snapshot(self):
-                return SimpleNamespace(pets=(self._p1, self._p2, self._p3), uid=0, version=0)
-        repo = Repo()
-        repo._p1 = self._pet(1, "喵喵A", 1, 1, 3001)   # 动物组/拟人组
-        repo._p2 = self._pet(2, "喵喵B", 1, 2, 3001)   # 同性格雌性
-        repo._p3 = self._pet(3, "火花", 2, 1, 3003)    # 另一性格，魔力组/巨灵组
-
-        class Static:
-            def species(self, base_id):
-                info = {3001: ("喵喵A-cat", ["动物组", "拟人组"]), 3003: ("火花-cat", ["魔力组", "巨灵组"])}[base_id]
-                from types import SimpleNamespace
-                return SimpleNamespace(egg_groups=info[1])
-            def nature_name(self, nid):
-                return {1: "勤奋", 2: "固执"}[nid]
-            def nature(self, nid):
-                from types import SimpleNamespace
-                return SimpleNamespace(positive_stat="atk", negative_stat="spa" if nid == 2 else None)
-
-        payload = male_matrix_payload(repo, Static())
-        # 每只宠物带 2 个蛋组 → 3 只 × 2 = 6 个格子计数
-        self.assertEqual(payload["matched"], 6)
-        self.assertIn("勤奋", {n["name"] for n in payload["natures"]})
-        cell = payload["cells"]["勤奋|动物组"]
-        self.assertEqual(len(cell), 2)  # 公母各一只（all 模式）
-        self.assertEqual(cell[0]["gid"], 1)  # 同级按 gid 升序
-
-    def test_gender_filter(self) -> None:
-        class Repo:
-            def consistent_snapshot(self):
-                return SimpleNamespace(pets=(self._p1, self._p2), uid=0, version=0)
-        repo = Repo()
-        repo._p1 = self._pet(1, "A", 1, 1, 3001)
-        repo._p2 = self._pet(2, "B", 1, 2, 3001)
-
-        class Static:
-            def species(self, base_id):
-                from types import SimpleNamespace
-                return SimpleNamespace(egg_groups=["动物组"])
-            def nature_name(self, nid):
-                return "勤奋"
-            def nature(self, nid):
-                return None
-
-        males = male_matrix_payload(repo, Static(), gender="male")
-        self.assertEqual(males["matched"], 1)
-        females = male_matrix_payload(repo, Static(), gender="female")
-        self.assertEqual(females["matched"], 1)
-
 
 class ColorCardTests(unittest.TestCase):
     """色卡目录与 glass → 卡号判定。"""
@@ -657,7 +601,7 @@ class ColorCardTests(unittest.TestCase):
         self.assertEqual(catalog.card_id_for(1, 999999), "")
 
     def test_payload_matrix(self) -> None:
-        from spritelens.web.payloads import colors_payload
+        from spritelens.web.payloads_catalog import colors_payload
 
         class Repo:
             def consistent_snapshot(self):

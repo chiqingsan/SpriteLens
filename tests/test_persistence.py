@@ -18,7 +18,7 @@ from spritelens.domain.pets import Pet
 from spritelens.domain.pet_locations import Backpack
 from spritelens.capture.key_store import KeyStore
 from spritelens.protocol.opcodes import OpcodeCatalog
-from spritelens.repositories.database import Database
+from spritelens.repositories.database import Database, DatabaseSchemaError
 from spritelens.repositories.egg_store import EggStore
 from spritelens.repositories.pet_store import PetStore
 from spritelens.repositories.settings import SettingsRepository
@@ -294,13 +294,69 @@ class PetRepositoryPersistenceTest(unittest.TestCase):
         store.close()
         db.close()
 
-# --- 4. 迁移与降级 ----------------------------------------------------
+# --- 4. 数据库基线与损坏恢复 ------------------------------------------
 
 
-class DatabaseMigrationTest(unittest.TestCase):
+class DatabaseBaselineTest(unittest.TestCase):
     def setUp(self):
         self.tmp_path = _make_tmp(self)
         self.db_path = self.tmp_path / "mig.sqlite"
+
+    def test_pet_batch_rolls_back_accounts_and_pets_when_locations_fail(self):
+        import sqlite3
+
+        db = Database(self.db_path)
+        self.addCleanup(db.close)
+        store = PetStore(db, flush_interval=60.0)
+        self.addCleanup(store.close)
+        db.execute("CREATE TRIGGER fail_locations BEFORE INSERT ON pet_locations "
+                   "BEGIN SELECT RAISE(ABORT, 'injected location failure'); END")
+        store.put_account(UID, "account", 1)
+        store.put(UID, [Pet(gid=1, conf_id=1, name="pet", level=1, exp=0, nature=0,
+                            gender=0, blood_id=0, talent_rank=0, is_first_catch=False)])
+        store.put_backpack(UID, Backpack())
+        try:
+            with self.assertRaises(sqlite3.IntegrityError):
+                store.flush()
+            for table in ("accounts", "pets", "pet_locations"):
+                self.assertEqual(db.query(f"SELECT COUNT(*) FROM {table}")[0][0], 0)
+        finally:
+            db.execute("DROP TRIGGER fail_locations")
+        self.assertEqual(store.flush(), 1)
+        for table in ("accounts", "pets", "pet_locations"):
+            self.assertEqual(db.query(f"SELECT COUNT(*) FROM {table}")[0][0], 1)
+
+    def test_egg_batch_rolls_back_slots_and_retries_latest_values(self):
+        import sqlite3
+        from dataclasses import replace
+
+        db = Database(self.db_path)
+        self.addCleanup(db.close)
+        store = EggStore(db, flush_interval=60.0)
+        self.addCleanup(store.close)
+        egg = EggBoxEntry(
+            instance_id=1, egg_conf_id=3001001, pet_conf_id=3001, quantity=1,
+            obtained_at=1, bag_type=8, height_cm=0, weight_g=0,
+            hatch_seconds=0, hatched_seconds=0, hatch_updated_at=0,
+            start_hatch_time=0, category=0, special_egg_conf_id=0,
+            appearance_type=0, extension_type=0,
+        )
+        db.execute("CREATE TRIGGER fail_eggs BEFORE INSERT ON eggs "
+                   "BEGIN SELECT RAISE(ABORT, 'injected egg failure'); END")
+        store.put_hatch_slots(UID, {1})
+        store.put(UID, [egg])
+        try:
+            with self.assertRaises(sqlite3.IntegrityError):
+                store.flush()
+            self.assertEqual(db.query("SELECT * FROM egg_hatch_slots"), [])
+            self.assertEqual(db.query("SELECT * FROM eggs"), [])
+        finally:
+            db.execute("DROP TRIGGER fail_eggs")
+        store.put_hatch_slots(UID, {2})
+        store.put(UID, [replace(egg, quantity=2)])
+        self.assertEqual(store.flush(), 1)
+        self.assertEqual(db.query("SELECT slots_json FROM egg_hatch_slots")[0][0], "[2]")
+        self.assertEqual(db.query("SELECT quantity FROM eggs")[0][0], 2)
 
     def test_corrupt_database_recovered_not_fatal(self):
         """损坏库不阻断启动：自动备份原文件并重建空库（原数据留证）。"""
@@ -361,6 +417,35 @@ class DatabaseMigrationTest(unittest.TestCase):
         finally:
             db.close()
 
+    def test_corrupt_backup_failure_keeps_the_entire_wal_group(self):
+        """主库、WAL 和 SHM 备份中途失败时，三份原件都必须保留。"""
+        bad = self.tmp_path / "group.sqlite"
+        members = {
+            bad: b"broken-main",
+            Path(str(bad) + "-wal"): b"broken-wal",
+            Path(str(bad) + "-shm"): b"broken-shm",
+        }
+        for path, value in members.items():
+            path.write_bytes(value)
+
+        original_replace = Path.replace
+
+        def failing_replace(self: Path, target):  # type: ignore[no-untyped-def]
+            if ".corrupt-" in Path(target).name and Path(target).name.endswith("-wal"):
+                raise OSError("注入：WAL 备份固化失败")
+            return original_replace(self, target)
+
+        Path.replace = failing_replace  # type: ignore[method-assign]
+        try:
+            with self.assertRaises(OSError):
+                Database(bad)
+        finally:
+            Path.replace = original_replace  # type: ignore[method-assign]
+
+        for path, value in members.items():
+            self.assertEqual(path.read_bytes(), value)
+        self.assertEqual(list(self.tmp_path.glob("group.corrupt-*.sqlite*")), [])
+
     def test_access_error_does_not_delete_database(self):
         """非损坏类错误（如访问/锁定失败）不得删除或覆盖原库文件。
 
@@ -402,51 +487,69 @@ class DatabaseMigrationTest(unittest.TestCase):
         self.assertEqual(original_bytes, b"")  # 前置自检：测试开始前文件不存在
         self.assertEqual(list(self.tmp_path.glob("locked.corrupt-*.sqlite")), [])
 
-    def test_v1_database_upgrades_to_v2(self):
-        """已发布的 v1 库（无六维/外观列）能直接升至 v2，历史数据保留。"""
-        import sqlite3
-
-        v1 = self.tmp_path / "v1.sqlite"
-        conn = sqlite3.connect(v1)
-        conn.executescript(
-            """
-            CREATE TABLE accounts (
-                uid INTEGER PRIMARY KEY, name TEXT NOT NULL DEFAULT '',
-                level INTEGER NOT NULL DEFAULT 0, first_seen REAL NOT NULL, last_seen REAL NOT NULL);
-            CREATE TABLE pets (
-                uid INTEGER NOT NULL, gid INTEGER NOT NULL, conf_id INTEGER NOT NULL DEFAULT 0,
-                name TEXT NOT NULL DEFAULT '', level INTEGER NOT NULL DEFAULT 0,
-                exp INTEGER NOT NULL DEFAULT 0, nature INTEGER NOT NULL DEFAULT 0,
-                gender INTEGER NOT NULL DEFAULT 0, blood_id INTEGER NOT NULL DEFAULT 0,
-                talent_rank INTEGER NOT NULL DEFAULT 0, is_first_catch INTEGER NOT NULL DEFAULT 0,
-                first_seen REAL NOT NULL, updated_at REAL NOT NULL, PRIMARY KEY (uid, gid));
-            PRAGMA user_version = 1;
-            """
-        )
-        conn.execute("INSERT INTO accounts VALUES (?, ?, 60, 1.0, 2.0)", (UID, "老账号"))
-        conn.execute(
-            "INSERT INTO pets VALUES (?, 7, 2000671, ?, 30, 100, 11, 2, 4, 4, 1, 1.0, 2.0)",
-            (UID, "波波拉"),
-        )
-        conn.commit()
-        conn.close()
-
-        db = Database(v1)
+    def test_fresh_database_is_created_from_current_baseline(self):
+        db = Database(self.db_path)
         try:
-            self.assertGreaterEqual(db.schema_version, 2)
-            cols = {row["name"] for row in db.query("PRAGMA table_info(pets)")}
-            self.assertIn("attr_hp", cols)
-            self.assertIn("skills_json", cols)
-            # 历史行保留，新列取默认值（旧数据无六维，读取不崩）
-            store = PetStore(db)
-            loaded = store.load(UID)
-            self.assertEqual(len(loaded), 1)
-            self.assertEqual(loaded[0].name, "波波拉")
-            self.assertEqual(loaded[0].attributes, ())
-            self.assertEqual(loaded[0].height, 0)
-            store.close()
+            self.assertEqual(db.schema_version, 1)
+            tables = {
+                row[0]
+                for row in db.query(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+                )
+            }
+            self.assertEqual(
+                tables,
+                {
+                    "accounts", "pets", "eggs", "pet_locations", "egg_hatch_slots",
+                    "egg_annotations", "home_snapshots",
+                },
+            )
+            annotation_columns = {row["name"] for row in db.query("PRAGMA table_info(egg_annotations)")}
+            self.assertEqual(
+                annotation_columns,
+                {"uid", "instance_id", "nature_id", "nest_override", "note", "voice_tag", "voice_db", "is_favorite"},
+            )
         finally:
             db.close()
+
+    def test_old_schema_is_rejected_without_mutating_database(self):
+        import sqlite3
+
+        old = self.tmp_path / "old.sqlite"
+        conn = sqlite3.connect(old)
+        conn.execute("CREATE TABLE legacy (value TEXT)")
+        conn.execute("PRAGMA user_version = 18")
+        conn.commit()
+        conn.close()
+        original = old.read_bytes()
+
+        with self.assertRaises(DatabaseSchemaError):
+            Database(old)
+        self.assertEqual(old.read_bytes(), original)
+
+    def test_incomplete_schema_one_is_rejected_without_mutating_database(self):
+        import sqlite3
+
+        incomplete = self.tmp_path / "incomplete.sqlite"
+        conn = sqlite3.connect(incomplete)
+        conn.execute("CREATE TABLE accounts (uid INTEGER PRIMARY KEY)")
+        conn.execute("PRAGMA user_version = 1")
+        conn.commit()
+        conn.close()
+        original = incomplete.read_bytes()
+
+        with self.assertRaises(DatabaseSchemaError):
+            Database(incomplete)
+        self.assertEqual(incomplete.read_bytes(), original)
+
+    def test_same_columns_without_primary_key_are_rejected(self):
+        db = Database(self.db_path)
+        db.execute("DROP TABLE egg_annotations")
+        db.execute("CREATE TABLE egg_annotations (uid INTEGER, instance_id INTEGER, nature_id INTEGER, "
+                   "nest_override TEXT, note TEXT, voice_tag TEXT, voice_db INTEGER, is_favorite INTEGER)")
+        db.close()
+        with self.assertRaises(DatabaseSchemaError):
+            Database(self.db_path)
 
     def test_extended_fields_round_trip(self):
         """六维/外观/技能写入后能完整读回（含负值声音）。"""
@@ -497,7 +600,7 @@ class DatabaseMigrationTest(unittest.TestCase):
     def test_colorful_glass_fields_round_trip(self):
         """炫彩外观字段（colorful_conf_id/glass_type/glass_value）写入后完整读回。
 
-        回归：这三个字段曾未落库，重启后色卡/花种离线展示全部清零。
+        回归：这三个字段曾未落库，重启后色卡/外观数据会全部清零。
         """
         db = Database(self.db_path)
         store = PetStore(db)
@@ -510,162 +613,6 @@ class DatabaseMigrationTest(unittest.TestCase):
         self.assertEqual(loaded.glass_type, 2)
         self.assertEqual(loaded.glass_value, 5)
         store.close()
-        db.close()
-
-    def test_v3_database_upgrades_to_v4(self):
-        """v3 库（无外观字段列）升级后读写正常，历史数据保留。"""
-        import sqlite3
-
-        v3 = self.tmp_path / "v3.sqlite"
-        conn = sqlite3.connect(v3)
-        conn.executescript(
-            """
-            CREATE TABLE accounts (
-                uid INTEGER PRIMARY KEY, name TEXT NOT NULL DEFAULT '',
-                level INTEGER NOT NULL DEFAULT 0, first_seen REAL NOT NULL, last_seen REAL NOT NULL);
-            CREATE TABLE pets (
-                uid INTEGER NOT NULL, gid INTEGER NOT NULL, conf_id INTEGER NOT NULL DEFAULT 0,
-                name TEXT NOT NULL DEFAULT '', level INTEGER NOT NULL DEFAULT 0,
-                exp INTEGER NOT NULL DEFAULT 0, nature INTEGER NOT NULL DEFAULT 0,
-                gender INTEGER NOT NULL DEFAULT 0, blood_id INTEGER NOT NULL DEFAULT 0,
-                talent_rank INTEGER NOT NULL DEFAULT 0, is_first_catch INTEGER NOT NULL DEFAULT 0,
-                first_seen REAL NOT NULL, updated_at REAL NOT NULL,
-                attr_hp INTEGER NOT NULL DEFAULT 0, attr_atk INTEGER NOT NULL DEFAULT 0,
-                attr_spa INTEGER NOT NULL DEFAULT 0, attr_def INTEGER NOT NULL DEFAULT 0,
-                attr_spd INTEGER NOT NULL DEFAULT 0, attr_spe INTEGER NOT NULL DEFAULT 0,
-                height INTEGER NOT NULL DEFAULT 0, weight INTEGER NOT NULL DEFAULT 0,
-                voice INTEGER NOT NULL DEFAULT 0, mutation_type INTEGER NOT NULL DEFAULT 0,
-                classis INTEGER NOT NULL DEFAULT 0, breakthrough_lv INTEGER NOT NULL DEFAULT 0,
-                speciality_id INTEGER NOT NULL DEFAULT 0, ball_id INTEGER NOT NULL DEFAULT 0,
-                attributes_json TEXT NOT NULL DEFAULT '', skills_json TEXT NOT NULL DEFAULT '',
-                base_conf_id INTEGER NOT NULL DEFAULT 0,
-                PRIMARY KEY (uid, gid));
-            CREATE TABLE eggs (
-                uid INTEGER NOT NULL, instance_id INTEGER NOT NULL,
-                egg_conf_id INTEGER NOT NULL DEFAULT 0, pet_conf_id INTEGER NOT NULL DEFAULT 0,
-                quantity INTEGER NOT NULL DEFAULT 0, obtained_at INTEGER NOT NULL DEFAULT 0,
-                hatching INTEGER NOT NULL DEFAULT 0, detail_json TEXT NOT NULL DEFAULT '',
-                updated_at REAL NOT NULL, PRIMARY KEY (uid, instance_id));
-            PRAGMA user_version = 3;
-            """
-        )
-        conn.execute("INSERT INTO accounts VALUES (?, ?, 60, 1.0, 2.0)", (UID, "老账号"))
-        conn.commit()
-        conn.close()
-
-        db = Database(v3)
-        try:
-            self.assertGreaterEqual(db.schema_version, 4)
-            cols = {row["name"] for row in db.query("PRAGMA table_info(pets)")}
-            self.assertIn("colorful_conf_id", cols)
-            self.assertIn("glass_type", cols)
-            self.assertIn("glass_value", cols)
-            # 旧库无 pets 行也不影响；写入新外观字段可读回
-            store = PetStore(db)
-            store.put(UID, [Pet(gid=5, conf_id=7, name="新宠", level=10, exp=0, nature=0,
-                                gender=0, blood_id=0, talent_rank=0, is_first_catch=False,
-                                colorful_conf_id=5400001, glass_type=1, glass_value=1048605)])
-            store.flush()
-            loaded = store.load(UID)[0]
-            self.assertEqual(loaded.colorful_conf_id, 5400001)
-            self.assertEqual(loaded.glass_value, 1048605)
-            store.close()
-        finally:
-            db.close()
-
-    def test_interrupted_migration_no_longer_blocks_startup(self):
-        """历史半迁移库（列已在但版本号未推进）能自动修复、不再启动崩溃。
-
-        回归：旧迁移逐句自动提交，中断后重跑报
-        `duplicate column name: attr_hp`，应用彻底无法启动。
-        """
-        import sqlite3
-
-        broken = self.tmp_path / "broken.sqlite"
-        conn = sqlite3.connect(broken)
-        conn.executescript(
-            """
-            CREATE TABLE accounts (
-                uid INTEGER PRIMARY KEY, name TEXT NOT NULL DEFAULT '',
-                level INTEGER NOT NULL DEFAULT 0, first_seen REAL NOT NULL, last_seen REAL NOT NULL);
-            CREATE TABLE pets (
-                uid INTEGER NOT NULL, gid INTEGER NOT NULL, conf_id INTEGER NOT NULL DEFAULT 0,
-                name TEXT NOT NULL DEFAULT '', level INTEGER NOT NULL DEFAULT 0,
-                exp INTEGER NOT NULL DEFAULT 0, nature INTEGER NOT NULL DEFAULT 0,
-                gender INTEGER NOT NULL DEFAULT 0, blood_id INTEGER NOT NULL DEFAULT 0,
-                talent_rank INTEGER NOT NULL DEFAULT 0, is_first_catch INTEGER NOT NULL DEFAULT 0,
-                first_seen REAL NOT NULL, updated_at REAL NOT NULL, PRIMARY KEY (uid, gid));
-            PRAGMA user_version = 1;
-            """
-        )
-        # 模拟 v2 迁移中途被打断：第一条列已加上，版本号仍停在 1
-        conn.execute("ALTER TABLE pets ADD COLUMN attr_hp INTEGER NOT NULL DEFAULT 0")
-        conn.commit()
-        conn.close()
-
-        db = Database(broken)  # 旧实现会在此抛 duplicate column name
-        try:
-            self.assertGreaterEqual(db.schema_version, 4)
-            cols = {row["name"] for row in db.query("PRAGMA table_info(pets)")}
-            for name in ("attr_hp", "attr_atk", "colorful_conf_id", "glass_value"):
-                self.assertIn(name, cols)
-        finally:
-            db.close()
-
-    def test_migration_failure_rolls_back_atomically(self):
-        """迁移中途失败整组回滚：不留下「版本未推进但半个迁移已提交」。"""
-        import sqlite3
-
-        bad = self.tmp_path / "bad_mig.sqlite"
-        conn = sqlite3.connect(bad)
-        conn.executescript(
-            """
-            CREATE TABLE accounts (
-                uid INTEGER PRIMARY KEY, name TEXT NOT NULL DEFAULT '',
-                level INTEGER NOT NULL DEFAULT 0, first_seen REAL NOT NULL, last_seen REAL NOT NULL);
-            CREATE TABLE pets (
-                uid INTEGER NOT NULL, gid INTEGER NOT NULL, conf_id INTEGER NOT NULL DEFAULT 0,
-                name TEXT NOT NULL DEFAULT '', level INTEGER NOT NULL DEFAULT 0,
-                exp INTEGER NOT NULL DEFAULT 0, nature INTEGER NOT NULL DEFAULT 0,
-                gender INTEGER NOT NULL DEFAULT 0, blood_id INTEGER NOT NULL DEFAULT 0,
-                talent_rank INTEGER NOT NULL DEFAULT 0, is_first_catch INTEGER NOT NULL DEFAULT 0,
-                first_seen REAL NOT NULL, updated_at REAL NOT NULL, PRIMARY KEY (uid, gid));
-            PRAGMA user_version = 1;
-            """
-        )
-        conn.commit()
-        conn.close()
-
-        # 注入点：先执行一条有效 DDL，再执行必然失败的语句——
-        # 验证有效 DDL 也随整组回滚（不是「跑了就算」）
-        import spritelens.repositories.database as db_mod
-
-        original = db_mod._MIGRATIONS
-        broken = (
-            original[0],
-            (2, (
-                "ALTER TABLE pets ADD COLUMN attr_test INTEGER NOT NULL DEFAULT 0",
-                "SELECT * FROM not_a_table",
-            )),
-        )
-        db_mod._MIGRATIONS = broken
-        try:
-            with self.assertRaises(sqlite3.Error):
-                Database(bad)
-        finally:
-            db_mod._MIGRATIONS = original
-
-        # 注入失败后：版本号未推进、v2 的列全部未留下（原子回滚）
-        conn = sqlite3.connect(bad)
-        cols = {row[1] for row in conn.execute("PRAGMA table_info(pets)")}
-        version = conn.execute("PRAGMA user_version").fetchone()[0]
-        conn.close()
-        self.assertEqual(version, 1)
-        self.assertNotIn("attr_test", cols)
-        self.assertNotIn("attr_hp", cols)
-        # 恢复正常代码库：再次启动可完整升级
-        db = Database(bad)
-        self.assertGreaterEqual(db.schema_version, 4)
         db.close()
 
     def test_execute_many_failure_rolls_back(self):
@@ -701,19 +648,20 @@ class DatabaseMigrationTest(unittest.TestCase):
         # 确定性屏障：旧批次写库时挂起，新批次先提交
         old_gate = threading.Event()
         old_batch_started = threading.Event()
-        real_execute_many = db.execute_many
+        real_execute_batches = db.execute_batches
 
-        def gated_execute_many(sql, seq_of_params):
-            if "INSERT INTO pets" in sql:
-                names = [row[3] for row in seq_of_params]
-                if "旧值" in names:  # 旧批次：挡住直到新批次提交完成
-                    old_batch_started.set()
-                    old_gate.wait(timeout=5)
-                elif "新值" not in names:
-                    raise AssertionError(f"意外的批次: {names}")
-            return real_execute_many(sql, seq_of_params)
+        def gated_execute_batches(batches):
+            for sql, rows in batches:
+                if "INSERT INTO pets" in sql:
+                    names = [row[3] for row in rows]
+                    if "旧值" in names:
+                        old_batch_started.set()
+                        old_gate.wait(timeout=5)
+                    elif "新值" not in names:
+                        raise AssertionError(f"意外的批次: {names}")
+            return real_execute_batches(batches)
 
-        db.execute_many = gated_execute_many  # type: ignore[method-assign]
+        db.execute_batches = gated_execute_batches  # type: ignore[method-assign]
         try:
             # 旧批次被挡住期间 put 仍立即返回（写路径永不等待磁盘）
             store.put(UID, [Pet(gid=1, conf_id=20508, name="旧值", level=20, exp=0, nature=0,
@@ -736,7 +684,7 @@ class DatabaseMigrationTest(unittest.TestCase):
             old_gate.set()
             old_flush.join(timeout=5)
             new_flush.join(timeout=5)
-            db.execute_many = real_execute_many  # type: ignore[method-assign]
+            db.execute_batches = real_execute_batches  # type: ignore[method-assign]
 
         # 最终落库值以新批次为准（旧实现：旧批次后提交，最终值回退为旧值）
         self.assertEqual(store.load(UID)[0].name, "新值")
@@ -753,19 +701,19 @@ class DatabaseMigrationTest(unittest.TestCase):
         store.put(UID, [Pet(gid=1, conf_id=20508, name="v1", level=10, exp=0, nature=0,
                             gender=0, blood_id=0, talent_rank=0, is_first_catch=False)])
         # 注入写库失败：本批回填待写表
-        real_execute_many = db.execute_many
+        real_execute_batches = db.execute_batches
 
-        def failing_execute_many(sql, seq_of_params):
-            if "INSERT INTO pets" in sql:
+        def failing_execute_batches(batches):
+            if any("INSERT INTO pets" in sql for sql, _ in batches):
                 raise sqlite3.OperationalError("注入失败")
-            return real_execute_many(sql, seq_of_params)
+            return real_execute_batches(batches)
 
-        db.execute_many = failing_execute_many  # type: ignore[method-assign]
+        db.execute_batches = failing_execute_batches  # type: ignore[method-assign]
         try:
             with self.assertRaises(sqlite3.OperationalError):
                 store.flush()
         finally:
-            db.execute_many = real_execute_many  # type: ignore[method-assign]
+            db.execute_batches = real_execute_batches  # type: ignore[method-assign]
         self.assertEqual(store.pending_count, 1)
 
         # 失败后写入更新的值：回填用 setdefault，不得把 v1 盖回 v2
@@ -787,15 +735,15 @@ class DatabaseMigrationTest(unittest.TestCase):
             write_started = threading.Event()
             close_done = threading.Event()
             errors: list[BaseException] = []
-            real_execute_many = db.execute_many
+            real_execute_batches = db.execute_batches
 
-            def gated_execute_many(sql, rows):
+            def gated_execute_batches(batches):
                 write_started.set()
                 if not gate.wait(timeout=5):
                     raise TimeoutError("test gate timed out")
-                return real_execute_many(sql, rows)
+                return real_execute_batches(batches)
 
-            db.execute_many = gated_execute_many  # type: ignore[method-assign]
+            db.execute_batches = gated_execute_batches  # type: ignore[method-assign]
             enqueue()
             flush_thread = threading.Thread(target=store.flush)
             flush_thread.start()
@@ -817,7 +765,7 @@ class DatabaseMigrationTest(unittest.TestCase):
                 gate.set()
                 flush_thread.join(timeout=5)
                 close_thread.join(timeout=5)
-                db.execute_many = real_execute_many  # type: ignore[method-assign]
+                db.execute_batches = real_execute_batches  # type: ignore[method-assign]
             self.assertFalse(flush_thread.is_alive(), "显式 flush 未退出")
             self.assertFalse(close_thread.is_alive(), "close 未退出")
             self.assertEqual(errors, [])
@@ -956,27 +904,6 @@ class DatabaseMigrationTest(unittest.TestCase):
         store.close()
         db.close()
 
-    def test_load_persisted_restores_colorful_names(self):
-        """回归（P2）：载入历史宠物时重建炫彩名字学习表。
-
-        旧实现只恢复 colorful_conf_id 字段、不重建 id→名字映射，
-        重启后花田/花种载荷引用该形态时退化成「#130001」。
-        """
-        db = Database(self.db_path)
-        store = PetStore(db)
-        store.put(UID, [Pet(gid=11, conf_id=100, name="菊花梨", level=40, exp=0, nature=0,
-                            gender=0, blood_id=0, talent_rank=0, is_first_catch=False,
-                            colorful_conf_id=130001, glass_type=1, glass_value=7)])
-        store.flush()
-
-        repo = PetRepository(store=store)
-        self.assertIsNone(repo.colorful_name(130001))  # 载入前无学习结果
-        repo.load_persisted(UID)
-        self.assertEqual(repo.colorful_name(130001), "菊花梨")  # 载入即恢复映射
-        store.close()
-        db.close()
-
-
 # --- 5. 组合根装配（含关闭落盘）----------------------------------------
 
 
@@ -990,7 +917,6 @@ class AppContextCloseTest(unittest.TestCase):
         """最小装配：真实 Database + PetStore，事件日志用假对象观察调用。"""
         from spritelens.app_context import AppContext
         from spritelens.protocol.opcodes import OpcodeCatalog
-        from spritelens.view_models import EventsViewModel
 
         db_path = self.tmp_path / "ctx.sqlite"
         database = Database(db_path)
@@ -1004,10 +930,13 @@ class AppContextCloseTest(unittest.TestCase):
         class _FakeEventLog:
             def __init__(self):
                 self.closed = False
+                self.failures = 1
 
             def close(self):
                 self.closed = True
-                raise RuntimeError("注入：事件日志关闭失败")
+                if self.failures:
+                    self.failures -= 1
+                    raise RuntimeError("注入：事件日志关闭失败")
 
         capture_vm = CaptureViewModel(
             monitor=monitor,
@@ -1023,7 +952,6 @@ class AppContextCloseTest(unittest.TestCase):
             monitor=monitor,
             pet_repository=repo,
             capture_vm=capture_vm,
-            events_vm=EventsViewModel(monitor=monitor),
             pet_vm=PetViewModel(repo, static_data=None),
             pet_store=pet_store,
             event_log=_FakeEventLog(),

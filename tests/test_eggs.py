@@ -9,7 +9,7 @@ from pathlib import Path
 
 from spritelens.domain.eggs import EggCatalog
 from spritelens.domain.static_data import StaticData
-from spritelens.web.payloads import egg_dex_payload
+from spritelens.web.payloads_catalog import egg_dex_payload
 
 
 def _sample_data() -> dict:

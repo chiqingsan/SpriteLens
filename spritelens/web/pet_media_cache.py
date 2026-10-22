@@ -39,8 +39,11 @@ class PetMediaCache:
         self._inflight: dict[str, asyncio.Task[tuple[Path | None, float]]] = {}
         self._network_retry_after = 0.0
         self._manifest_lock = Lock()
+        self._closed = False
 
     async def resolve(self, asset_name: str) -> Path | None:
+        if self._closed:
+            return None
         match = _ASSET_NAME.fullmatch(asset_name)
         if match is None:
             return None
@@ -74,6 +77,14 @@ class PetMediaCache:
             if cached is not None:
                 return cached
         return None
+
+    async def close(self) -> None:
+        """停止接收新请求，并等待已启动的下载线程完成。"""
+        self._closed = True
+        tasks = tuple(self._inflight.values())
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        self._inflight.clear()
 
     async def _download_and_remember(
         self, name: str, species_id: str, variant: str, use: str,

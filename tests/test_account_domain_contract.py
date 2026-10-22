@@ -8,11 +8,10 @@ from unittest.mock import Mock, patch
 from spritelens.domain.pet_locations import Backpack
 from spritelens.repositories.egg_store import EggStore
 from spritelens.services.egg_repository import EggBoxRepository
-from spritelens.services.flower_repository import FlowerRepository
 from spritelens.services.home_repository import HomeRepository
 from spritelens.services.pet_repository import PetRepository
 from spritelens.web.account_state import account_domains_payload
-from spritelens.web.payloads_catalog import egg_box_payload, home_payload, flowers_payload
+from spritelens.web.payloads_catalog import egg_box_payload, home_payload
 from tests.test_egg_box import _event, _egg_row, _identity_event, _hatch_event
 from tests.test_home import _resident_event
 from tests import test_home as home_fixtures
@@ -23,18 +22,15 @@ class AccountDomainContractTest(unittest.TestCase):
     def setUp(self) -> None:
         self.egg = EggBoxRepository()
         self.home = HomeRepository()
-        self.flower = FlowerRepository()
-        for repo in (self.egg, self.home, self.flower):
+        for repo in (self.egg, self.home):
             repo.handle_packet(_identity_event(101))
         self.egg.handle_packet(_event(_egg_row(9001)))
         self.egg.handle_packet(_hatch_event([9001]))
         self.home.handle_packet(home_fixtures._scene_event(30001, session_id="s1"))
         self.home.handle_packet(_resident_event(99, "居民 A", session_id="s1"))
-        self.flower.handle_packet(home_fixtures.FlowerTests()._flower_event())
 
     def test_serialization_keeps_captured_owner_after_switch(self) -> None:
-        for repo, build in ((self.egg, egg_box_payload), (self.home, home_payload),
-                            (self.flower, flowers_payload)):
+        for repo, build in ((self.egg, egg_box_payload), (self.home, home_payload)):
             with self.subTest(repo=type(repo).__name__):
                 original = repo.consistent_snapshot
                 before = original()
@@ -54,13 +50,11 @@ class AccountDomainContractTest(unittest.TestCase):
                     self.assertEqual((payload["total"], payload["hatching"]), (1, 1))
                 elif repo is self.home:
                     self.assertEqual(payload["residents"][0]["name"], "居民 A")
-                else:
-                    self.assertEqual(len(payload["own"]), 1)
 
     def test_cross_domain_mismatch_does_not_publish_other_account_count(self) -> None:
         self.egg.handle_packet(_identity_event(202))
         self.egg.handle_packet(_event(_egg_row(9002)))
-        payload = account_domains_payload(101, self.egg, self.home, self.flower)
+        payload = account_domains_payload(101, self.egg, self.home)
         self.assertIsNone(payload["egg_box_total"])
         self.assertFalse(payload["domains"]["egg_box"]["consistent"])
         self.assertEqual(payload["domains"]["egg_box"]["source"], "unknown")
@@ -78,7 +72,7 @@ class AccountDomainContractTest(unittest.TestCase):
         self.assertGreater(payload["version"], 0)
 
     def test_empty_domains_are_unknown_not_complete(self) -> None:
-        payload = account_domains_payload(101, None, None, None)
+        payload = account_domains_payload(101, None, None)
         self.assertIsNone(payload["egg_box_total"])
         for domain in payload["domains"].values():
             self.assertEqual(domain["source"], "unknown")

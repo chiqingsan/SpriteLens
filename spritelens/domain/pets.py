@@ -32,7 +32,7 @@ _NO_BALL_ID = 11
 _NO_SKILL = 12
 _NO_ATTRIBUTE = 14
 _NO_BASE_CONF_ID = 15
-# 炫彩形态 conf_id（130xxx/5400xxx 系，花种帧引用的就是它；实测 210/214 覆盖）
+# 炫彩形态 conf_id（130xxx/5400xxx 系；实测 210/214 覆盖）
 _NO_COLORFUL_CONF_ID = 58
 # glass 外观参数（色卡来源，decode_handbook_glass：field86 子消息 {1:type, 2:value}；
 # 实测 162/266 只携带，普通宠物 type=1/value=1，赛季卡 type=2 值含赛季位）
@@ -117,7 +117,7 @@ class Pet:
     breakthrough_lv: int = 0
     speciality_id: int = 0
     ball_id: int = 0
-    colorful_conf_id: int = 0  # 炫彩形态 id（花种帧按它引用；0=未知）
+    colorful_conf_id: int = 0  # 炫彩形态 id（0=未知）
     glass_type: int = 0  # glass 外观参数（色卡底色维度；0=帧中无）
     glass_value: int = 0  # glass 混色维度
     worn_medal_id: int = 0  # 服务端佩戴奖牌，不从体型阈值推算

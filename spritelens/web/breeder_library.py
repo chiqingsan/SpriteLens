@@ -1,7 +1,6 @@
 """筛选配对的独立鉴权路由及载荷转换。"""
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Mapping
 from math import isfinite
 
@@ -11,6 +10,7 @@ from spritelens.app_context import AppContext
 from spritelens.domain.breeder_library import MARKS, BreederFilters, Candidate
 from spritelens.view_models.breeder_library_vm import PAGE_SIZE, BreederLibraryViewModel, BreederView
 from spritelens.web.pet_media import pet_images
+from spritelens.web.background import run_blocking
 
 
 def parse_filters(query: Mapping[str, str]) -> BreederFilters:
@@ -73,5 +73,5 @@ def register_breeder_routes(app: web.Application, context: AppContext) -> None:
             filters = parse_filters(request.query)
         except ValueError as error:
             return web.json_response({"error": str(error)}, status=400)
-        return web.json_response(await asyncio.to_thread(lambda: breeder_payload(vm.snapshot(filters), context)))
+        return web.json_response(await run_blocking(request, lambda: breeder_payload(vm.snapshot(filters), context)))
     app.router.add_get("/api/breeder-library", get_library)

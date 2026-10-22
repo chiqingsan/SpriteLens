@@ -82,6 +82,17 @@ function changeNest(selected: Exclude<EggNest, ''>) {
 function changeVoiceTag(value: EggBoxVoiceTag) {
   savePatch({ voice_tag: props.annotations.voice_tag === value ? '' : value })
 }
+function updateVoiceDb(event: Event) {
+  const value = (event.currentTarget as HTMLInputElement).value
+  if (value === '') {
+    emit('updateAnnotations', { ...props.annotations, voice_db: null })
+    return
+  }
+  const parsed = Number(value)
+  if (Number.isInteger(parsed) && parsed >= -100 && parsed <= 100) {
+    emit('updateAnnotations', { ...props.annotations, voice_db: parsed })
+  }
+}
 function updateNote(event: Event) {
   emit('updateAnnotations', { ...props.annotations, note: (event.currentTarget as HTMLTextAreaElement).value })
 }
@@ -168,6 +179,13 @@ defineExpose({ focusClose: () => closeButton.value?.focus({ preventScroll: true 
 
   <section class="eggbox-edit-section" aria-labelledby="eggbox-voice-heading">
     <div class="eggbox-section-heading"><h3 id="eggbox-voice-heading">声音标签</h3></div>
+    <label class="eggbox-voice-input">
+      <span>手动声音（dB）</span>
+      <input type="number" min="-100" max="100" step="1" inputmode="numeric"
+        :value="annotations.voice_db ?? ''" placeholder="例如 -20" aria-label="手动声音（dB）"
+        @input="updateVoiceDb" @blur="emit('saveAnnotations')" />
+    </label>
+    <small class="filter-note">只记录这枚蛋的人工声音，不改动精灵抓取声音。</small>
     <div class="eggbox-choice-grid" role="group" aria-label="选择声音标签">
       <button v-for="tag in voiceTagChoices" :key="tag" type="button"
         class="eggbox-choice-option" :class="{ selected: annotations.voice_tag === tag }" :aria-pressed="annotations.voice_tag === tag"

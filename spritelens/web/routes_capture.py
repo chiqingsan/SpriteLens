@@ -13,7 +13,6 @@ from spritelens.web.payloads import pet_summary_payload
 from spritelens.web.account_state import account_domains_payload
 from spritelens.view_models.pet_vm import PetFilters, PetView
 from spritelens.services.capture_service import RecordingCommandError
-from spritelens.web.server_helpers import _as_bool, _as_int
 
 
 class CaptureRoutesMixin:
@@ -142,6 +141,7 @@ class CaptureRoutesMixin:
             "dropped_chunks": snapshot.dropped_chunks,
             "dropped_segments": snapshot.dropped_segments,
             "event_log_dropped": snapshot.event_log_dropped,
+            "event_log_error": snapshot.event_log_error,
             "totals": {
                 "decrypt_ok": snapshot.totals.decrypt_ok,
                 "decrypt_fail": snapshot.totals.decrypt_fail,
@@ -169,11 +169,10 @@ class CaptureRoutesMixin:
         pets = pet_summary_payload(view, ctx.static_data)
         capture = ctx.capture_vm.snapshot()
         return {
-            **account_domains_payload(pets["uid"], ctx.egg_box, ctx.home_repo, ctx.flower_repo),
+            **account_domains_payload(pets["uid"], ctx.egg_box, ctx.home_repo),
             "uid": pets["uid"],
             "pets_version": pets["version"],
             "pets_total": pets["stats"]["total"],
-            "events_total": ctx.events_vm.total_events,
             "identity": pets["identity"],
             "cached_identity": pets["cached_identity"],
             "stats": pets["stats"],
@@ -184,6 +183,8 @@ class CaptureRoutesMixin:
                 "flow_count": capture.flow_count,
                 "any_key": capture.any_key,
                 "last_error": capture.last_error,
+                "event_log_error": capture.event_log_error,
+                "event_log_dropped": capture.event_log_dropped,
                 "decrypt_ok": capture.totals.decrypt_ok,
                 "raw_chunks": capture.totals.raw_chunks,
             },

@@ -83,7 +83,7 @@ class PetFilters:
 
 @dataclass(frozen=True)
 class PetStats:
-    """仓库聚合统计（概览页与页内统计条共用）。"""
+    """仓库聚合统计（页内统计条与 WS 状态共用）。"""
 
     total: int = 0
     maxed: int = 0
@@ -199,7 +199,7 @@ class PetViewModel:
         return self._apply_sort(pets)
 
     def all_pets(self) -> tuple[Pet, ...]:
-        """全部宠物（不筛选；概览页统计用）。"""
+        """全部宠物（不筛选；统计与范围选项使用）。"""
         return self._repository.snapshot()
 
     def filtered_count(self) -> int:
@@ -303,14 +303,6 @@ class PetViewModel:
     def identity(self):
         """当前角色身份（uid/名字/等级）；未识别到返回 None。"""
         return self._repository.identity
-
-    def cached_accounts(self) -> tuple[tuple[int, str], ...]:
-        """本地库里有历史的账号（uid, 名字），供离线时也能加载。"""
-        return self._repository.cached_accounts()
-
-    def cached_account_profiles(self) -> tuple[tuple[int, str, int, str], ...]:
-        """本地历史账号资料，供账号管理 UI 展示。"""
-        return self._repository.cached_account_profiles()
 
     def load_last_account(self) -> int:
         """启动即载入最近账号的历史宠物（离线也能看到上次的数据）。"""
@@ -437,9 +429,6 @@ class PetView:
 
     def stats(self) -> PetStats:
         return self._vm.stats(self._snapshot.pets)
-
-    def cached_accounts(self) -> tuple[tuple[int, str], ...]:
-        return self._vm.cached_accounts()
 
     @property
     def filters(self) -> PetFilters:

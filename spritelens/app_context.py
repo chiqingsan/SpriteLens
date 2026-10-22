@@ -34,12 +34,11 @@ from spritelens.repositories.pet_store import PetStore
 from spritelens.repositories.settings import DEFAULT_CAPTURE_PORT, SettingsRepository
 from spritelens.services.egg_repository import EggBoxRepository
 from spritelens.services.account_selection_service import AccountSelectionService
-from spritelens.services.flower_repository import FlowerRepository
 from spritelens.services.home_repository import HomeRepository
 from spritelens.services.event_logger import EventLogWriter
 from spritelens.services.monitor_service import MonitorService
 from spritelens.services.pet_repository import PetRepository
-from spritelens.view_models import CaptureViewModel, EventsViewModel, PetViewModel
+from spritelens.view_models import CaptureViewModel, PetViewModel
 
 logger = get_logger("app_context")
 
@@ -57,7 +56,6 @@ class AppContext:
     monitor: MonitorService
     pet_repository: PetRepository
     capture_vm: CaptureViewModel
-    events_vm: EventsViewModel
     pet_vm: PetViewModel
     pet_store: PetStore | None = None
     event_log: EventLogWriter | None = None
@@ -67,7 +65,6 @@ class AppContext:
     home_store: HomeStore | None = None
     egg_box: EggBoxRepository | None = None  # 蛋仓聚合（缺失时蛋仓页面空态）
     home_repo: HomeRepository | None = None  # 家园快照（缺失时家园页空态）
-    flower_repo: FlowerRepository | None = None  # 花田快照（缺失时花种页空态）
     account_selection: AccountSelectionService | None = None
     database: Database | None = None  # 组合根持有并负责关闭（R09）
     key_store: KeyStore | None = None  # 会话文件 writer 的生命周期归组合根持有
@@ -105,7 +102,7 @@ class AppContext:
         if self.event_log is not None:
             _try("事件日志", self.event_log.close)
         if self.key_store is not None:
-            self.key_store.close()
+            _try("密钥存储", self.key_store.close)
         store_failures: list[tuple[str, BaseException]] = []
         if self.pet_store is not None:
             try:
@@ -134,10 +131,10 @@ class AppContext:
             except Exception as exc:  # noqa: BLE001 - 保持可重试
                 logger.warning("关闭数据库失败: %s", exc)
                 raise RuntimeError(f"关闭数据库失败: {exc}") from exc
-        self._closed = True
         if failures:
             label, exc = failures[0]
             raise RuntimeError(f"关闭 {label} 失败: {exc}") from exc
+        self._closed = True
 
     _closed: bool = False
 
@@ -218,10 +215,6 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
     if restored_home:
         logger.info("已载入历史家园快照（账号 %s）", display_uid)
 
-    # 花田快照聚合（0x0375）
-    flower_repo = FlowerRepository()
-    monitor.add_packet_listener(flower_repo.handle_packet)
-
     # 蛋仓聚合：订阅协议事件流 + SQLite 持久化（重启不丢，离线可看）
     egg_store = EggStore(database)
     _created(egg_store.close)
@@ -251,10 +244,9 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
         pet_repository=pet_repository,
         egg_box=egg_box,
         home_repo=home_repo,
-        flower_repo=flower_repo,
         capture_running=lambda: capture_vm.snapshot().running,
+        capture_command_scope=capture_vm.command_scope,
     )
-    events_vm = EventsViewModel(monitor=monitor)
     pet_vm = PetViewModel(pet_repository, static_data=static_data)
     context = AppContext(
         settings=settings,
@@ -262,7 +254,6 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
         monitor=monitor,
         pet_repository=pet_repository,
         capture_vm=capture_vm,
-        events_vm=events_vm,
         pet_vm=pet_vm,
         egg_box=egg_box,
         pet_store=pet_store,
@@ -272,7 +263,6 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
         egg_store=egg_store,
         home_store=home_store,
         home_repo=home_repo,
-        flower_repo=flower_repo,
         account_selection=account_selection,
         database=database,
         key_store=key_store,

@@ -30,7 +30,7 @@
 - [reviews/VUE_PET_INVENTORY_VERIFICATION_2026-10-13.md](reviews/VUE_PET_INVENTORY_VERIFICATION_2026-10-13.md) — F03 请求/三视图/分页/箱队迁移、账号失效、槽位语义与原生详情定位桥
 - [reviews/ASSET_SIZE_AUDIT_2026-10-13.md](reviews/ASSET_SIZE_AUDIT_2026-10-13.md) — 素材体积/完全重复/运行引用与压缩副本实测；正式资源尚未修改
 
-方向与决策（按需查阅）：
+当前规格、历史 review 与方向（按需查阅）：
 
 - [reviews/PROJECT_REVIEW_2026-10-12.md](reviews/PROJECT_REVIEW_2026-10-12.md) — `114be08` 全项目初审快照；当前修复状态见路线图
 - [reviews/ARCHITECTURE_FOLLOWUP_2026-10-13.md](reviews/ARCHITECTURE_FOLLOWUP_2026-10-13.md) — `240b94c` 改动复核：录制回归、生命周期/HTTP 缺口与完成范围校正
@@ -41,21 +41,20 @@
 - `ARCHITECTURE_DECISION.md` — 架构决策：目标形态（pywebview + 本地服务 + Web UI）、
   Tauri 评估、阶段划分与量化判据
 - `DANSHEN_FEATURE_SPEC.md` — 蛋神助手功能解剖与 SpriteLens 实施对照（工作文档）
-- `FEATURE_MODULES.md` — 功能模块规划（M1–M16，本地/云端属性、优先级）
-- `DANSHEN_ASSISTANT_ANALYSIS.md` / `COMPETITOR_ANALYSIS.md` — 竞品解剖（蛋神助手、roco_helper）
-- `STACK_EVALUATION.md` / `TECH_EVALUATION.md` / `TAURI_SIZE_EVALUATION.md` — 技术栈与体积专项评估
-
-本轮迭代记录与规格（2026-10-12）：
-
-- 核验记录：`UI_UPGRADE_VERIFICATION.md`（三主题与资源）、
-  `PET_PRESENTATION_VERIFICATION.md`（展示重构）、
-  `BACKPACK_BOX_VERIFICATION.md` / `BACKPACK_UPGRADE_VERIFICATION.md`（真实箱位与背包操作）、
-  `SESSION_RESUME_VERIFICATION.md`（会话接续）
-- 规划与对照：`BACKPACK_PARITY_PLAN.md`（对标清单与迭代计划）、
-  `BACKPACK_UI_COMPARISON.md`（蛋神对照差异）、`PET_CARD_LAYOUT_PLAN.md`（卡片布局细化）
 - `COLLECTION_LINES_SPEC.md` — 双牌产线当前实现、参考规则及待验收边界（F04-U3）
-- 智能配窝规格与当前实现：见上方 `BREEDING_PLANNER_SPEC.md`，保留蛋神历史评分作参考；实施状态见 F04-U5。
-- 资源台账：`RESOURCE_COVERAGE_REPORT.md`（覆盖/缺口/冲突）
+- `BREEDING_PLANNER_SPEC.md` — 智能配窝当前规格、规则边界与待验收范围（F04-U5）
+
+历史依据与验收快照（已移入 `archive/`）：
+
+- 早期架构／竞品／技术评估：`archive/FEATURE_MODULES.md`、
+  `archive/DANSHEN_ASSISTANT_ANALYSIS.md`、`archive/COMPETITOR_ANALYSIS.md`、
+  `archive/STACK_EVALUATION.md`、`archive/TECH_EVALUATION.md`、`archive/TAURI_SIZE_EVALUATION.md`
+- 早期核验记录：`archive/UI_UPGRADE_VERIFICATION.md`、
+  `archive/BACKPACK_BOX_VERIFICATION.md` / `archive/BACKPACK_UPGRADE_VERIFICATION.md`（真实箱位与背包操作）、
+  `archive/SESSION_RESUME_VERIFICATION.md`（会话接续）
+- 早期规划／对照：`archive/BACKPACK_PARITY_PLAN.md`、`archive/BACKPACK_UI_COMPARISON.md`、
+  `archive/PET_CARD_LAYOUT_PLAN.md`、`archive/UI_THEME_PROPOSAL.md`
+- 资源台账：`archive/RESOURCE_COVERAGE_REPORT.md`（覆盖／缺口／冲突）
 
 维护约定：用户可见行为变更 → 更新 README；架构/分层变更 → ARCHITECTURE；
 新增文件 → CODEBASE_MAP；协议观察与排障经验 → PROTOCOL_NOTES；
@@ -66,4 +65,5 @@ UI 视觉/组件规范 → UI_GUIDE；蛋神对标实施进度 → DANSHEN_FEATU
 文档用 LF、不写本机绝对路径。
 
 - [本地 Wiki 补充资料](WIKI_REFERENCE.md)：当前维护说明；来源、离线导入、身份核对与运行边界。
+- [历史文档归档](archive/README.md)：早期分析、计划、快照和验收记录，仅供追溯。
 - [图鉴原型](prototypes/handbook/README.md)：已确认的蛋蛋图鉴清稿与布局验收边界；其他图鉴方案仍在评审。

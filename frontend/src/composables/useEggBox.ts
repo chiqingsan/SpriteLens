@@ -22,7 +22,7 @@ interface AnnotationSaveState {
 
 function sameAnnotations(a: EggBoxAnnotations, b: EggBoxAnnotations) {
   return a.nature_id === b.nature_id && a.nest_override === b.nest_override
-    && a.note === b.note && a.voice_tag === b.voice_tag
+    && a.note === b.note && a.voice_tag === b.voice_tag && a.voice_db === b.voice_db
 }
 
 export function useEggBox(host: EggBoxHost) {
@@ -36,6 +36,7 @@ export function useEggBox(host: EggBoxHost) {
   let generation = 0
   let viewGeneration = 0
   let refreshNeeded = false
+  const saves = new Set<Promise<void>>()
 
   function annotationKey(uid: number, instanceId: number) { return `${uid}:${instanceId}` }
 
@@ -97,7 +98,18 @@ export function useEggBox(host: EggBoxHost) {
     state.viewGeneration = viewGeneration
     if (state.running) return
     state.running = true
-    void drainAnnotations(state)
+    const task = drainAnnotations(state)
+    saves.add(task)
+    void task.finally(() => saves.delete(task))
+  }
+
+  async function flush() {
+    for (const state of annotationStates.values()) {
+      if (state.uid === data.value?.uid && state.dirty) saveAnnotations(state.uid, state.instanceId)
+    }
+    await Promise.all([...saves])
+    const failed = [...annotationStates.values()].find(state => state.error)
+    if (failed) throw new Error(failed.error)
   }
 
   const categories = computed(() => {
@@ -217,5 +229,5 @@ export function useEggBox(host: EggBoxHost) {
   onScopeDispose(pause)
   return { data, loading, error, filters, categories, visibleEggs, selected, selectedId,
     load, resume, pause, resetAccount, select, setFavorite, moveSelection, clearSelection,
-    annotationsFor, annotationErrorFor, updateAnnotations, saveAnnotations }
+    annotationsFor, annotationErrorFor, updateAnnotations, saveAnnotations, flush }
 }

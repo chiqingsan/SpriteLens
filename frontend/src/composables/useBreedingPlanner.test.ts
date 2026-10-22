@@ -101,13 +101,36 @@ describe('配窝请求、恢复和编辑边界', () => {
     expect(model.unsaved.value).toBe(false)
     stop()
   })
-  it('关窗（pagehide）时用 keepalive 请求兜底落盘', async () => {
+  it('退出 flush 等待保存确认，失败时保留未保存状态', async () => {
     const { model, host, stop } = setup()
     await model.load()
-    const flush = vi.fn(() => true); host.flush = flush
     model.draft.value.capacity = 9
-    window.dispatchEvent(new Event('pagehide'))
-    expect(flush).toHaveBeenCalledWith('draft', expect.objectContaining({ capacity: 9 }))
+    const pending = deferred()
+    vi.mocked(host.request).mockReturnValueOnce(pending.promise)
+    const flushing = model.flush()
+    await Promise.resolve(); await Promise.resolve()
+    expect(model.unsaved.value).toBe(true)
+    pending.resolve({ saved: true, revision: 1 })
+    await flushing
+    expect(model.unsaved.value).toBe(false)
+    model.draft.value.capacity = 8
+    vi.mocked(host.request).mockRejectedValueOnce(new Error('磁盘已满'))
+    await expect(model.flush()).rejects.toThrow('磁盘已满')
+    expect(model.unsaved.value).toBe(true)
+    stop()
+  })
+  it('另一窗口保存后自动保存不覆盖，手动确认才基于新版本提交', async () => {
+    const { model, host, stop } = setup()
+    await model.load()
+    model.draft.value.capacity = 9
+    vi.mocked(host.request).mockResolvedValueOnce({ saved: false, revision: 10 })
+    await expect(model.flush()).rejects.toThrow('另一窗口')
+    expect(model.unsaved.value).toBe(true)
+    host.confirmOverwrite = vi.fn(() => true)
+    vi.mocked(host.request).mockResolvedValueOnce({ saved: true, revision: 11 })
+    await model.save()
+    expect(host.confirmOverwrite).toHaveBeenCalledOnce()
+    expect(host.request).toHaveBeenLastCalledWith('draft', expect.objectContaining({ base_revision: 10, revision: 11 }))
     expect(model.unsaved.value).toBe(false)
     stop()
   })

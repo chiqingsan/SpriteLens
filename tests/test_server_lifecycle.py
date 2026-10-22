@@ -138,6 +138,123 @@ class RunWebEntryGuardTest(unittest.TestCase):
             mock.patch.object(run_mod, "_fatal"),
         ]
 
+    def test_explicit_abandon_exits_without_entering_cleanup(self):
+        import spritelens.web.run as run_mod
+
+        context, server, guard = mock.Mock(), mock.Mock(), mock.Mock()
+        force_exit = mock.Mock()
+        patches = [
+            *self._patch_common(run_mod),
+            mock.patch.object(run_mod, "SingleInstanceGuard", return_value=guard),
+            mock.patch.object(run_mod, "build_app_context", return_value=context),
+            mock.patch.object(run_mod, "LocalServer", return_value=server),
+            mock.patch.object(run_mod, "_run_window", return_value=False),
+            mock.patch.object(run_mod.os, "_exit", force_exit),
+        ]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+        self.assertEqual(run_mod.run_web(), 1)
+        force_exit.assert_called_once_with(1)
+        context.close.assert_not_called()
+        server.stop.assert_not_called()
+        guard.close.assert_not_called()
+
+    def test_successful_window_close_keeps_normal_cleanup(self):
+        import spritelens.web.run as run_mod
+
+        context, server, guard, force_exit = mock.Mock(), mock.Mock(), mock.Mock(), mock.Mock()
+        patches = [
+            *self._patch_common(run_mod),
+            mock.patch.object(run_mod, "SingleInstanceGuard", return_value=guard),
+            mock.patch.object(run_mod, "build_app_context", return_value=context),
+            mock.patch.object(run_mod, "LocalServer", return_value=server),
+            mock.patch.object(run_mod, "_run_window", return_value=True),
+            mock.patch.object(run_mod.os, "_exit", force_exit),
+        ]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+        self.assertEqual(run_mod.run_web(), 0)
+        force_exit.assert_not_called()
+        server.stop.assert_called_once()
+        context.close.assert_called_once()
+        guard.close.assert_called_once()
+
+    def test_explicit_abandon_terminates_process_with_blocked_request_worker(self):
+        """使用真实 to_thread 工作线程；不能用 Mock(_exit) 验证进程退出。"""
+        import subprocess
+        import sys
+        import textwrap
+        from pathlib import Path
+
+        script = textwrap.dedent('''
+            import asyncio
+            import threading
+            from unittest.mock import Mock, patch
+            import spritelens.web.run as run
+            from spritelens.web.server import LocalServer
+
+            blocked = threading.Event()
+            def request():
+                blocked.set()
+                threading.Event().wait()
+
+            def worker():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                server = object.__new__(LocalServer)
+                server._blocking_tasks = set()
+                loop.create_task(server._run_blocking(request))
+                loop.run_forever()
+
+            threading.Thread(target=worker, daemon=True).start()
+            assert blocked.wait(2)
+            print("request blocked", flush=True)
+            context, server, guard = Mock(), Mock(), Mock()
+            def forbidden(*args, **kwargs):
+                print("unexpected cleanup", flush=True)
+                threading.Event().wait()
+            server.stop.side_effect = forbidden
+            context.close.side_effect = forbidden
+            with patch.object(run, "setup_logger"), \\
+                 patch.object(run, "logs_dir", return_value="unused"), \\
+                 patch.object(run, "_enable_dpi_awareness"), \\
+                 patch.object(run, "_set_app_user_model_id"), \\
+                 patch("spritelens.system.webview_guard.ensure_webview2", return_value=True), \\
+                 patch.object(run, "SingleInstanceGuard", return_value=guard), \\
+                 patch.object(run, "build_app_context", return_value=context), \\
+                 patch.object(run, "LocalServer", return_value=server), \\
+                 patch.object(run, "_run_window", return_value=False):
+                run.run_web()
+            print("unexpected normal return", flush=True)
+        ''')
+        child = subprocess.run([sys.executable, "-c", script],
+                               cwd=Path(__file__).resolve().parents[1],
+                               capture_output=True, text=True, timeout=8)
+        self.assertEqual(child.returncode, 1, child.stderr)
+        self.assertEqual(child.stdout.strip(), "request blocked", child.stderr)
+
+    def test_unavailable_data_directory_is_reported_before_startup(self):
+        import spritelens.web.run as run_mod
+
+        with mock.patch.object(run_mod, "logs_dir", side_effect=PermissionError("denied")), \
+             mock.patch.object(run_mod, "_fatal") as fatal, \
+             mock.patch.object(run_mod, "SingleInstanceGuard") as guard:
+            self.assertEqual(run_mod.run_web(), 1)
+        fatal.assert_called_once_with("用户数据目录初始化失败", "denied")
+        guard.assert_not_called()
+
+    def test_main_reports_directory_failure_before_logger_is_available(self):
+        import spritelens.main as main_mod
+
+        with mock.patch.object(main_mod, "logs_dir", side_effect=PermissionError("denied")), \
+             mock.patch("spritelens.web.run._fatal") as fatal, \
+             mock.patch.object(main_mod, "setup_logger") as setup:
+            self.assertEqual(main_mod.main([]), 1)
+        fatal.assert_called_once_with("用户数据目录初始化失败", "denied")
+        setup.assert_not_called()
+
     def test_guard_released_when_build_fails(self):
         """装配抛异常：guard 被释放、弹出可读失败提示、返回码 1。"""
         import spritelens.web.run as run_mod

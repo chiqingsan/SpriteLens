@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+from spritelens.web.payloads_catalog import type_color_for
+
 from spritelens.domain.pets import Pet
 from spritelens.domain.static_data import StaticData
 from spritelens.view_models.pet_vm import SORT_KEYS, PetView, PetViewModel
@@ -255,7 +257,7 @@ def pets_payload(
 
 
 def pet_summary_payload(vm: PetView, static: StaticData | None) -> dict:
-    """同一宠物快照的归属、身份与统计，供概览和 WS/REST state 共用。"""
+    """同一宠物快照的归属、身份与统计，供 WS/REST state 共用。"""
     stats = vm.stats()
     identity = vm.identity
     cached = vm.cached_identity
@@ -280,25 +282,3 @@ def pet_summary_payload(vm: PetView, static: StaticData | None) -> dict:
             ],
         },
     }
-
-
-def overview_payload(vm: PetView, static: StaticData | None) -> dict:
-    """概览载荷：快照内身份/统计 + 独立静态表状态与历史账号列表。"""
-    return {
-        **pet_summary_payload(vm, static),
-        "static_ready": bool(static is not None and static.available),
-        "accounts": [{"uid": uid, "name": name} for uid, name in vm.cached_accounts()],
-    }
-
-# -- 图鉴/蛋/家园/花田/色卡域已拆至 payloads_catalog.py（阶段1.4）--------
-# 旧导入路径兼容：from spritelens.web.payloads import handbook_payload 等
-from spritelens.web.payloads_catalog import (  # noqa: E402,F401
-    colors_payload,
-    egg_box_payload,
-    egg_dex_payload,
-    flowers_payload,
-    handbook_payload,
-    home_payload,
-    male_matrix_payload,
-    type_color_for,
-)

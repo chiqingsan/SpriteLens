@@ -23,8 +23,8 @@ from spritelens.protocol.opcodes import OpcodeCatalog
 from spritelens.repositories.settings import SettingsRepository
 from spritelens.services.monitor_service import MonitorService
 from spritelens.services.pet_repository import PetRepository
-from spritelens.view_models import CaptureViewModel, EventsViewModel, PetViewModel
-from spritelens.web.payloads import handbook_payload
+from spritelens.view_models import CaptureViewModel, PetViewModel
+from spritelens.web.payloads_catalog import handbook_payload
 from spritelens.web.server import LocalServer
 
 
@@ -73,7 +73,6 @@ def _make_context(tmp: Path, pets: tuple[Pet, ...] = ()) -> AppContext:
         monitor=monitor,
         pet_repository=repository,
         capture_vm=capture_vm,
-        events_vm=EventsViewModel(monitor=monitor),
         pet_vm=PetViewModel(repository, static_data=None),
     )
 
@@ -183,7 +182,13 @@ class LocalServerTest(unittest.TestCase):
         request = urllib.request.Request(f"http://127.0.0.1:{self.server.port}/")
         with urllib.request.urlopen(request, timeout=5) as response:
             self.assertEqual(response.status, 200)
-            self.assertIn("小洛探探", response.read().decode("utf-8"))
+            body = response.read().decode("utf-8")
+            self.assertIn("小洛探探", body)
+            self.assertNotIn("page-events", body)
+        status, _ = _http_get(
+            f"http://127.0.0.1:{self.server.port}/api/events", token=self.server.token
+        )
+        self.assertEqual(status, 404)
 
     def test_pets_query_does_not_pollute_shared_vm(self):
         """GET /api/pets 不写共享 VM：请求后 bootstrap/其他客户端不受影响（R08）。

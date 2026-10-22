@@ -36,7 +36,7 @@ class BreederLibraryViewModel:
 
     def snapshot(self, filters: BreederFilters) -> BreederView:
         inventory = self._repository.consistent_snapshot()
-        pool = candidates(inventory.pets, self._static, self._repository.voice_overrides(inventory.uid)) if self._static else ()
+        pool = candidates(inventory.pets, self._static) if self._static else ()
         by_id = {row.pet.gid: row for row in pool}
         male, female = by_id.get(filters.male), by_id.get(filters.female)
         male = male if male and male.pet.gender == 1 else None

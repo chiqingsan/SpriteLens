@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+from contextlib import nullcontext
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -14,7 +15,6 @@ from spritelens.repositories.egg_store import EggStore
 from spritelens.repositories.home_store import HomeStore
 from spritelens.repositories.pet_store import PetStore
 from spritelens.services.egg_repository import EggBoxRepository
-from spritelens.services.flower_repository import FlowerRepository
 from spritelens.services.home_repository import HomeRepository
 from spritelens.services.pet_repository import PetRepository
 
@@ -51,8 +51,8 @@ class AccountSelectionService:
         pet_repository: PetRepository,
         egg_box: EggBoxRepository,
         home_repo: HomeRepository,
-        flower_repo: FlowerRepository,
         capture_running: Callable[[], bool],
+        capture_command_scope: Callable[[], object] | None = None,
     ) -> None:
         self._pet_store = pet_store
         self._egg_store = egg_store
@@ -60,8 +60,8 @@ class AccountSelectionService:
         self._pet_repository = pet_repository
         self._egg_box = egg_box
         self._home_repo = home_repo
-        self._flower_repo = flower_repo
         self._capture_running = capture_running
+        self._capture_command_scope = capture_command_scope or nullcontext
         self._lock = threading.Lock()
 
     def accounts_payload(self) -> dict:
@@ -91,31 +91,33 @@ class AccountSelectionService:
         if uid <= 0:
             raise ValueError("账号 uid 必须是正整数")
         with self._lock:
-            if self._capture_running():
-                raise AccountSwitchBusy("请先停止采集后再切换账号")
-            profile = next(
-                (item for item in self._pet_repository.cached_account_profiles() if item[0] == uid),
-                None,
-            )
-            if profile is None:
-                raise AccountNotFound("本地不存在该账号")
+            # 采集服务的命令锁覆盖整个「检查、读取、应用」窗口；否则
+            # start/stop 可在读取期间插入，历史快照会与实时会话混合。
+            with self._capture_command_scope():
+                if self._capture_running():
+                    raise AccountSwitchBusy("请先停止采集后再切换账号")
+                profile = next(
+                    (item for item in self._pet_repository.cached_account_profiles() if item[0] == uid),
+                    None,
+                )
+                if profile is None:
+                    raise AccountNotFound("本地不存在该账号")
 
-            # 所有读取都在应用内存前完成；任一 Store 抛错时，当前账号仍保持不变。
-            staged = AccountSelection(
-                profile=profile,
-                pets=self._pet_store.load(uid),
-                backpack=self._pet_store.load_backpack(uid),
-                eggs=self._egg_store.load(uid),
-                hatch_slots=self._egg_store.load_hatch_slots(uid),
-                home=self._home_store.load(uid),
-            )
+                # 所有读取都在应用内存前完成；任一 Store 抛错时，当前账号仍保持不变。
+                staged = AccountSelection(
+                    profile=profile,
+                    pets=self._pet_store.load(uid),
+                    backpack=self._pet_store.load_backpack(uid),
+                    eggs=self._egg_store.load(uid),
+                    hatch_slots=self._egg_store.load_hatch_slots(uid),
+                    home=self._home_store.load(uid),
+                )
 
-            self._pet_repository.select_historical_account(
-                uid, staged.profile, staged.pets, staged.backpack
-            )
-            self._egg_box.select_historical_account(uid, staged.eggs, staged.hatch_slots)
-            self._home_repo.select_historical_account(uid, staged.home)
-            self._flower_repo.select_historical_account(uid)
+                self._pet_repository.select_historical_account(
+                    uid, staged.profile, staged.pets, staged.backpack
+                )
+                self._egg_box.select_historical_account(uid, staged.eggs, staged.hatch_slots)
+                self._home_repo.select_historical_account(uid, staged.home)
 
 
 __all__ = [

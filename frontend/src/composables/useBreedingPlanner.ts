@@ -4,8 +4,7 @@ import { parseContext, parseResult, parseSaved, type Draft, type Mode, type Plac
 export interface PlannerHost {
   request(path: string, body?: unknown): Promise<unknown | null>
   cancel(): void; context(): { uid: number | null; version: number; generation: number }; openPet(gid: string): void
-  /** 关窗兜底落盘：异步请求会随 WebView 关闭被丢弃，故用 keepalive 请求同步送出；返回是否已交给浏览器。 */
-  flush?(path: string, body: unknown): boolean
+  confirmOverwrite?(): boolean
 }
 function empty(mode: Mode): Draft {
   return { mode, goals: [], selected: [], participation: 'best', capacity: 10, academy: false, placements: [], approved: [],
@@ -36,6 +35,9 @@ export function useBreedingPlanner(host: PlannerHost) {
   const restored = reactive({ target: false, selected: false })
   const historyRevision = ref(0), busy = ref(''), error = ref(''), notice = ref(''), revision = ref(0), errorAction = ref<'' | 'save' | 'load'>('')
   const savedKeys = reactive<Record<Mode, string>>({ target: '', selected: '' })
+  const savedRevisions: Record<Mode, number> = { target: 0, selected: 0 }
+  const conflicts: Record<Mode, number | null> = { target: null, selected: null }
+  const saveQueues: Record<Mode, Promise<void>> = { target: Promise.resolve(), selected: Promise.resolve() }
   let generation = 0, loadedUid: number | null = null, suppress = false
   let autoTimer: ReturnType<typeof setTimeout> | null = null, autoSaving = false, autoPending = false, autoRetry = 0
   const draft = computed(() => drafts[mode.value]), result = computed(() => results[mode.value])
@@ -60,8 +62,9 @@ export function useBreedingPlanner(host: PlannerHost) {
     scheduleAutosave()
   }, { deep: true, flush: 'sync' })
 
-  function body() { return { ...copy(draft.value), uid: context.value?.uid, version: context.value?.version,
+  function bodyFor(entry: Mode) { return { ...copy(drafts[entry]), uid: context.value?.uid, version: context.value?.version,
     catalog_version: context.value?.catalog_version, revision: revision.value } }
+  function body() { return bodyFor(mode.value) }
   function current(ticket: number, uid: number | undefined) { return ticket === generation && host.context().uid === uid }
   async function load(force = false) {
     const outer = host.context()
@@ -87,6 +90,11 @@ export function useBreedingPlanner(host: PlannerHost) {
             const savedDraft = parseSaved(payload.draft)
             suppress = true; drafts[entry] = copy(savedDraft); suppress = false
             dirty[entry] = true
+            const savedRevision = (payload.draft as { revision?: unknown }).revision
+            if (typeof savedRevision === 'number' && Number.isSafeInteger(savedRevision)) {
+              revision.value = Math.max(revision.value, savedRevision)
+              savedRevisions[entry] = savedRevision
+            }
           }
           restored[entry] = true
           savedKeys[entry] = snapshotKey(drafts[entry])
@@ -171,12 +179,38 @@ export function useBreedingPlanner(host: PlannerHost) {
     } catch (e) { if (ticket === generation) error.value = (e as Error).message }
     finally { if (ticket === generation) { busy.value = ''; if (unsaved.value) scheduleAutosave() } }
   }
+  function persist(entry: Mode, snapshot: ReturnType<typeof body>) {
+    const task = saveQueues[entry].then(async () => {
+      if (context.value?.uid !== snapshot.uid) throw new Error('账号已变化，旧草稿未保存。')
+      if (conflicts[entry] !== null) throw new Error('另一窗口已修改草稿；点击「保存草稿」确认是否覆盖。')
+      const base = savedRevisions[entry]
+      const response = await host.request('draft', { ...snapshot, base_revision: base,
+        revision: Math.max(snapshot.revision, base + 1) })
+      if (!response) throw new Error('草稿保存被中断，请重试。')
+      if (context.value?.uid !== snapshot.uid) return
+      const value = response as { saved?: boolean; revision?: number }
+      if (value.saved === false) {
+        conflicts[entry] = value.revision ?? base
+        throw new Error('另一窗口已修改草稿；点击「保存草稿」确认是否覆盖。')
+      }
+      savedRevisions[entry] = value.revision ?? Math.max(snapshot.revision, base + 1)
+      savedKeys[entry] = snapshotKey(snapshot)
+    })
+    saveQueues[entry] = task.catch(() => {}) // 失败由调用者显示，后续显式重试仍可排队。
+    return task
+  }
   async function save() {
-    const snapshot = body(), ticket = ++generation, entry = mode.value
+    const entry = mode.value
+    if (conflicts[entry] !== null) {
+      if (!host.confirmOverwrite?.()) return
+      savedRevisions[entry] = conflicts[entry]!
+      conflicts[entry] = null
+    }
+    const snapshot = body(), ticket = ++generation
     busy.value = 'saving'; error.value = ''; errorAction.value = ''
     try {
-      const response = await host.request('draft', snapshot)
-      if (response && current(ticket, snapshot.uid)) { savedKeys[entry] = snapshotKey(snapshot); notice.value = '当前入口草稿已保存。' }
+      await persist(entry, snapshot)
+      if (current(ticket, snapshot.uid)) notice.value = '当前入口草稿已保存。'
     } catch (e) { if (ticket === generation) { error.value = (e as Error).message; errorAction.value = 'save' } }
     finally { if (ticket === generation) busy.value = '' }
   }
@@ -197,38 +231,42 @@ export function useBreedingPlanner(host: PlannerHost) {
         autoPending = false
         if (busy.value || !context.value?.uid || !unsaved.value) return
         const snapshot = body(), entry = mode.value, uid = context.value.uid
-        const response = await host.request('draft', snapshot)
-        // 切号后放弃这次结果。
-        if (context.value?.uid !== uid) return
-        // 空响应＝请求被 host.cancel() 取消（草稿每次改动都会取消在途请求）。
-        // 不能就此当作已保存：有界重试，仍失败才提示手动保存，否则改动会静默丢失。
-        if (!response) {
-          if (autoRetry < AUTOSAVE_RETRIES) {
+        try {
+          await persist(entry, snapshot)
+        } catch (cause) {
+          if (context.value?.uid !== uid) return
+          if ((cause as Error).message.includes('被中断') && autoRetry < AUTOSAVE_RETRIES) {
             autoRetry++
             if (autoTimer !== null) clearTimeout(autoTimer)
             autoTimer = setTimeout(() => { autoTimer = null; void autosave() }, AUTOSAVE_DELAY)
-          } else {
-            error.value = '草稿自动保存被中断，请点「保存草稿」重试。'
-            errorAction.value = 'save'
+            return
           }
-          return
+          throw cause
         }
+        if (context.value?.uid !== uid) return
         autoRetry = 0
-        savedKeys[entry] = snapshotKey(snapshot)
       } while (autoPending)
     } catch (e) { error.value = (e as Error).message; errorAction.value = 'save' }
     finally { autoSaving = false }
   }
-  /** 关窗兜底：异步请求会随 WebView 关闭被丢弃，改用 host.flush 的 keepalive 请求送出。 */
-  function flushOnHide() {
+  /** 原生关闭握手等待服务端确认，两个入口都保存后才允许退出。 */
+  async function flush() {
     if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null }
-    if (!unsaved.value) return
-    const snapshot = body()
-    if (host.flush && host.flush('draft', snapshot)) savedKeys[mode.value] = snapshotKey(snapshot)
+    if (!context.value?.uid) return
+    try {
+      for (const entry of ['target', 'selected'] as const) {
+        await saveQueues[entry]
+        if (!restored[entry]) continue
+        const snapshot = bodyFor(entry)
+        if (snapshotKey(snapshot) !== savedKeys[entry]) await persist(entry, snapshot)
+      }
+      if (errorAction.value === 'save') { error.value = ''; errorAction.value = '' }
+    } catch (cause) {
+      error.value = (cause as Error).message; errorAction.value = 'save'
+      throw cause
+    }
   }
-  if (typeof window !== 'undefined') window.addEventListener('pagehide', flushOnHide)
   onScopeDispose(() => {
-    if (typeof window !== 'undefined') window.removeEventListener('pagehide', flushOnHide)
     if (autoTimer !== null) { clearTimeout(autoTimer); autoTimer = null; void autosave() }
   })
   function changeMode(value: Mode) { pause(); mode.value = value; error.value = ''; notice.value = ''; void load() }
@@ -246,6 +284,7 @@ export function useBreedingPlanner(host: PlannerHost) {
       originals[entry] = []
       restored[entry] = false
       savedKeys[entry] = ''
+      savedRevisions[entry] = 0; conflicts[entry] = null
     }
     suppress = false; context.value = null; loadedUid = null; error.value = ''; notice.value = ''; errorAction.value = ''; historyRevision.value++
   }
@@ -302,5 +341,5 @@ export function useBreedingPlanner(host: PlannerHost) {
     scheduleAutosave()
   }
   return { context, mode, draft, result, plan, parents, dirty, edited, busy, error, errorAction, notice, revision, unsaved,
-    canGenerate, canUndo, canRedo, canRestore, load, refresh, run, save, changeMode, pause, resetAccount, edit, undo, choosePlan, restorePlan, clearPlan }
+    canGenerate, canUndo, canRedo, canRestore, load, refresh, run, save, flush, changeMode, pause, resetAccount, edit, undo, choosePlan, restorePlan, clearPlan }
 }

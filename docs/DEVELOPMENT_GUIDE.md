@@ -40,7 +40,7 @@ app_context 是装配根；capture 可依赖 protocol，domain 不应依赖 serv
 ```
 
 - `web/server.py`：本地服务路由与鉴权；只做「解析请求 → 调 VM → 序列化」，
-  业务逻辑一律不进路由函数；`asyncio.to_thread` 包裹同步业务调用
+  业务逻辑一律不进路由函数；同步业务调用、载荷和 JSON 编码经服务端受控后台 runner 执行，路由不得自行创建未跟踪任务
 - `web/payloads.py` / `web/payloads_catalog.py`：业务对象/VM 快照 → JSON；按功能域维护前端契约，
   不依赖 aiohttp 与 pywebview，可被测试直接驱动。当前 capture/state 载荷仍在 routes_capture mixin 中，
   后续修改该域时收口为可独立验收的转换，不继续增加隐式宿主依赖
@@ -81,7 +81,7 @@ web（aiohttp/pywebview）；protocol 不反向依赖 services/capture；线程�
 
 ## 前端约定（Vue 3 演进，现有 web/static 渐进迁移）
 
-Vue 3 + TypeScript strict + Vite 已落地，蛋图鉴已迁移，其余生产页面仍为原生 JS。
+Vue 3 + TypeScript strict + Vite 已落地；图鉴、蛋仓、家园、色卡、产线、配对、智能配窝和宠物页已迁移，原生 JS 仅保留应用壳及采集设置。协议流页面已删除，事件日志由 `EventLogWriter` 写入本地 JSONL 供排查。
 源码/demo/打包先 npm ci + tools/frontend.py build；命令与生成文件所有权见 [前端开发](FRONTEND_DEVELOPMENT.md)。
 工程、导航/状态、测试和发布边界见 [VUE3_MIGRATION](VUE3_MIGRATION.md)；按路线图逐页迁移，
 不要再把“零框架零构建”作为新增功能约束，也不要同时扩大原生实现和 Vue 实现。
@@ -91,7 +91,8 @@ Vue 3 + TypeScript strict + Vite 已落地，蛋图鉴已迁移，其余生产�
   硬编码界面色值。系别色/天赋阶色属于业务常量，由 `domain/display.py` 经
   payloads 下发（前端不复制色表）
 - **组件与类型**：新工程使用 Vue SFC / Composition API / script setup，TS strict；公共载荷与 WS 类型集中定义，
-  不用 any 或强制断言跳过接口检查。Pinia 管应用共享状态，页面筛选/选择/详情保留局部
+  不用 any 或强制断言跳过接口检查。当前应用共享状态由原生壳提供；Pinia 业务 store 尚未落地，
+  全壳迁移前不建立第二份账号/采集状态。页面筛选/选择/详情保留局部
 - **构建与分发**：npm 锁文件 + npm ci，Vite 先构建到暂存目录；校验后发布 HTML/JS/CSS。
   不清空现有图片目录，不分发 Node、node_modules 或 source map；构建前置与过期产物检查必须进入发布门禁
 - **DOM 与转义**：Vue 使用模板插值/属性绑定；v-html 限于经过安全转换的明确场景。
@@ -113,13 +114,16 @@ Vue 3 + TypeScript strict + Vite 已落地，蛋图鉴已迁移，其余生产�
 
 ## 持久化约定
 
-- 新增业务域数据：在 `repositories/database.py` 的 `_MIGRATIONS` **追加**
-  `(版本号, SQL 语句组)`（不得修改已发布条目，历史库需能逐级升上来），
-  并新建同构 Store（参考 `pet_store.py` / `egg_store.py`）。
-- 迁移语句整组单事务执行，失败必须整体回滚（不得留下「列已存在但版本号
-  没推进」的半迁移库）；`ADD COLUMN` 类语句按「列已存在即跳过」容错。
+- 新增业务域数据：直接修改 `repositories/database.py` 的 schema 1 基线 DDL，
+  并新建同构 Store（参考 `pet_store.py` / `egg_store.py`）。当前是破坏性开发，
+  不为旧本地数据库追加兼容迁移；改表后删除/备份本地数据库再重建，需保留的数据
+  通过显式导出/导入处理。
+- 基线初始化必须在单事务内完成，失败整体回滚；schema 版本不匹配或结构不完整时
+  快速失败并保留原文件，不自动修复旧结构。
 - 写路径必须无 IO：抓包线程内的调用只允许并入内存待写表/队列；落盘交给
   worker 线程批量执行（登录突发实测：同步 flush 会让轮询等待 57ms）。
+- 同一 Store 批次的关联表使用 `Database.execute_batches()` 在一个事务内提交；失败整体回滚并回填全部待写数据。
+  配置读取错误必须向上传播，不能以空配置继续写回；原子替换成功后才更新配置缓存。
 - 账号维度数据：uid 变化（真切换）才清该域内存快照；同 uid 重复身份帧与
   离线加载账号登录不算切换——判定统一走 `services/account_tracker.py`。
 - 改表结构后跑 `tests.test_persistence`；损坏恢复路径已覆盖（备份重建）。
@@ -137,7 +141,8 @@ Store 并发批次顺序、坏库备份失败保护与坏行隔离已有修复�
   不同，会全部找不到。`project_root()` 已覆盖源码态 / PyInstaller `_MEIPASS` /
   Nuitka-frozen 三条分支（`tests/test_paths.py` 保留打包路径回归）
 - **用户数据**（配置/日志/SQLite/录制）走 `data_root()`，与打包状态无关；
-  打包后仍写 `%LOCALAPPDATA%`，绝不写进安装目录（Program Files 无写权限）
+  打包后仍写 `%LOCALAPPDATA%`，绝不写进安装目录（Program Files 无写权限）。
+  目录不可用必须明确报错，禁止静默切到临时目录而分裂数据。
 - 包内自带的静态前端（`web/static/`）用 `Path(__file__).parent / "static"` 定位，
   打包器会把整个包目录搬走，这是唯一允许不经过 `project_root()` 的场景
 - **图标**：源图为 `resources/icon_source.png`（好奇版头像，保留背景、大椭圆高光与眼底绿色亮面）。
@@ -180,7 +185,7 @@ Store 并发批次顺序、坏库备份失败保护与坏行隔离已有修复�
 
 - 文档、文案、样式、图标和简单展示：检查 diff，布局变化按需目视验收；Vue 源码变化运行构建，不新增自动化测试。
 - 普通局部行为：复用相关测试；没有现成用例时按风险人工验证，不要求为每次改动新增测试。
-- 只保留关键数据规则、协议解析、持久化/迁移/损坏恢复、账号/快照与请求时序、鉴权、保存失败和线程/资源生命周期的回归。真实高风险缺陷缺少覆盖时才补最小用例。
+- 只保留关键数据规则、协议解析、持久化基线/损坏恢复、账号/快照与请求时序、鉴权、保存失败和线程/资源生命周期的回归。真实高风险缺陷缺少覆盖时才补最小用例。
 - 同一行为只在合适的一层验证；不测试简单 getter、直接委托、框架保证、私有结构、固定 DOM 或像素值，不追求覆盖率和测试数量。
 
 ### 验证命令
@@ -215,7 +220,7 @@ Store 并发批次顺序、坏库备份失败保护与坏行隔离已有修复�
 - 文件级新增/移动 → `docs/CODEBASE_MAP.md`（新增文件必须同步本表）
 - 协议结论与排障 → `docs/PROTOCOL_NOTES.md`
 - UI 视觉/组件规范 → `docs/UI_GUIDE.md`；蛋神对标实施状态 → `docs/DANSHEN_FEATURE_SPEC.md`
-- 竞品分析与功能规划 → `docs/COMPETITOR_ANALYSIS.md` / `docs/FEATURE_MODULES.md`
+- 竞品分析与功能规划 → `docs/archive/COMPETITOR_ANALYSIS.md` / `docs/archive/FEATURE_MODULES.md`
 - 开发约定（本文件）随实践更新：踩过的坑要写进来，避免重复犯
 - 待办、优先级与验收 → `docs/ROADMAP.md`；带日期的审查证据 → `docs/reviews/`
 - 新文档写明状态、读者、用途；当前入口不重复维护历史评估数字或多份任务状态

@@ -7,7 +7,7 @@ import PetBoxNavigation from './PetBoxNavigation.vue'
 import PetPageNavigation from './PetPageNavigation.vue'
 import UiIcon from './UiIcon.vue'
 import PetDetailPanel from './PetDetailPanel.vue'
-const { model } = defineProps<{ model: PetsModel; imageMode: () => string }>()
+const { model } = defineProps<{ model: PetsModel }>()
 const { view, data, busy, error, box, teams, pets, page, selected } = model
 const emit = defineEmits<{ select: [gid: number, element: HTMLElement]; close: [preserve?: boolean]; view: [value: PetView]; reset: [] }>()
 const wrap = ref<HTMLElement | null>(null)
@@ -62,13 +62,13 @@ defineExpose({ setBox, reveal, closeDetail, openDetail: () => { if (selected.val
   <PetPageNavigation v-show="view === 'card' && !!pets.length" :model="model" @select="setPage" @teams="openTeams"></PetPageNavigation>
   <div ref="wrap" class="table-wrap" :aria-busy="busy">
     <div id="pet-grid" class="pet-grid" :class="{ 'point-grid game-box-grid': view === 'point' || view === 'card', 'box-fill-grid': (view === 'point' && !teams) || view === 'card' }" :aria-busy="busy">
-      <PetSlots v-if="view === 'point'" :slots="model.slots.value" :pets="model.byGid.value" :selected="selected" :teams="teams" :active-team="data?.backpack.active_team || 0" :image-mode="imageMode()" @select="select"></PetSlots>
-      <PetSlots v-if="view === 'card'" :slots="model.cardSlots.value" :pets="model.byGid.value" :selected="selected" :teams="false" :active-team="0" :image-mode="imageMode()" @select="select"></PetSlots>
+      <PetSlots v-if="view === 'point'" :slots="model.slots.value" :pets="model.byGid.value" :selected="selected" :teams="teams" :active-team="data?.backpack.active_team || 0" @select="select"></PetSlots>
+      <PetSlots v-if="view === 'card'" :slots="model.cardSlots.value" :pets="model.byGid.value" :selected="selected" :teams="false" :active-team="0" @select="select"></PetSlots>
     </div>
     <div id="pet-empty" class="empty-hint" role="status" :hidden="!empty && !error">
       <p id="pet-empty-copy">{{ error ? '精灵数据加载失败：' + error : emptyText }}</p>
       <div class="button-row"><button v-if="error" id="btn-pets-retry" class="ghost-button small" @click="model.load(false)"><UiIcon name="refresh"></UiIcon>重试</button><button id="btn-empty-reset" class="ghost-button small" :hidden="!!error || view === 'point' || !!pets.length || !data?.total" @click="emit('reset')"><UiIcon name="filter-off"></UiIcon>清除筛选</button></div>
     </div>
   </div>
-  <PetDetailPanel :model="model" :open="detailOpen" :enabled="model.visible.value" :trigger="trigger" :image-mode="imageMode()" @close="closeDetail()" @locate="locate"></PetDetailPanel>
+  <PetDetailPanel :model="model" :open="detailOpen" :enabled="model.visible.value" :trigger="trigger" @close="closeDetail()" @locate="locate"></PetDetailPanel>
 </template>

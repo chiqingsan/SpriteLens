@@ -1,14 +1,14 @@
-/* 外观与浏览器调试设置；图片模式由背包使用现有载荷重新绘制。 */
+/* 外观与浏览器调试设置。 */
 (function () {
   "use strict";
-  var preferences = { theme: "miaomiao", pet_view: "point", pet_image: "portrait", fields: { groups: true, height: true, weight: true, voice: true, positions: false }, shortcuts: [], home_orders: {} };
+  var preferences = { theme: "miaomiao", pet_view: "point", fields: { groups: true, height: true, weight: true, voice: true, positions: false }, shortcuts: [], home_orders: {} };
   var saveQueue = Promise.resolve();
   var save = null;
   var notify = null;
   var openBrowser = null;
 
   function apply(value) {
-    preferences = Object.assign({}, value, { pet_image: "portrait" });
+    preferences = Object.assign({}, value);
     document.documentElement.dataset.theme = preferences.theme;
     Object.keys(preferences.fields).forEach(function (field) {
       document.getElementById("page-pets").classList.toggle("hide-pet-" + field, !preferences.fields[field]);
@@ -23,7 +23,6 @@
 
   function update(changes) {
     var draft = { theme: changes.theme || preferences.theme, pet_view: changes.pet_view || preferences.pet_view,
-      pet_image: "portrait",
       fields: Object.assign({}, preferences.fields, changes.fields || {}), shortcuts: changes.shortcuts || preferences.shortcuts || [],
       home_orders: changes.home_orders || preferences.home_orders || {} };
     apply(draft);
@@ -63,22 +62,8 @@
   });
 
   window.SpriteLensAppearance = {
-    imageMode: function () { return "portrait"; },
     initialize: function (value, persist, toast, open) { save = persist; notify = toast; openBrowser = open; apply(value); },
     view: function (view) { update({ pet_view: view }); },
-    shortcuts: function (items) { return update({ shortcuts: items }); },
-    ranges: function (title, ranges, positions) {
-      function esc(text) { var node = document.createElement("span"); node.textContent = text; return node.innerHTML; }
-      var content = ["height", "weight"].map(function (field) {
-        var position = positions && positions[field];
-        var extra = "";
-        if (position && position.ratio !== null) {
-          extra = position.status === "within" ? " · 范围位置 " + Math.round(position.ratio * 100) + "%" : " · 超出参考范围";
-        }
-        var meter = position && position.ratio !== null ? '<div class="reference-track" role="img" aria-label="' + (field === "height" ? "身高" : "体重") + extra + '"><i style="left:' + (Math.max(0, Math.min(1, position.ratio)) * 100) + '%"></i></div>' : '';
-        return '<div class="info-line">' + (field === "height" ? "身高 " : "体重 ") + esc((ranges || {})[field] || "暂无数据") + extra + '</div>' + meter;
-      }).join("");
-      return '<div class="detail-section"><h3>' + esc(title) + '</h3>' + content + '</div>';
-    }
+    shortcuts: function (items) { return update({ shortcuts: items }); }
   };
 })();

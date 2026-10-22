@@ -1,20 +1,15 @@
 """JSON 配置仓库：网卡选择、端口等少量运行设置。
 
 新项目设置项很少，JSON 文件比 meow toolkit 的 SQLite KV 更合适，
-且允许用户手工编辑；脏值一律归一为默认（不抛错中断启动）。
+且允许用户手工编辑；文件读取失败必须暴露，不能以空配置覆盖已有草稿。
 """
 
 from __future__ import annotations
 
 import json
-import logging
 import threading
 from pathlib import Path
 from typing import Any
-
-from spritelens.logs import get_logger
-
-logger = get_logger("settings")
 
 DEFAULT_CAPTURE_PORT = 8195
 
@@ -40,25 +35,21 @@ class SettingsRepository:
         if self._loaded:
             return self._cache
         try:
-            if self._path.is_file():
-                data = json.loads(self._path.read_text(encoding="utf-8"))
-                if isinstance(data, dict):
-                    self._cache = data
-        except (OSError, json.JSONDecodeError) as exc:
-            logger.warning("配置读取失败，使用默认值: %s", exc)
+            data = json.loads(self._path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            data = {}
+        if not isinstance(data, dict):
+            raise ValueError(f"配置文件必须是 JSON 对象：{self._path}")
+        self._cache = data
         self._loaded = True
         return self._cache
 
-    def _save_locked(self) -> None:
-        try:
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self._path.with_suffix(".json.tmp")
-            tmp.write_text(
-                json.dumps(self._cache, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-            )
-            tmp.replace(self._path)
-        except OSError as exc:
-            logger.warning("配置写入失败: %s", exc)
+    def _save_locked(self, pending: dict[str, Any]) -> None:
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self._path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(pending, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        tmp.replace(self._path)
+        self._cache = pending
 
     def get_str(self, key: str, default: str = "") -> str:
         with self._lock:
@@ -78,11 +69,7 @@ class SettingsRepository:
         with self._lock:
             value = transform(self._load().get(key))
             pending = {**self._cache, key: value}
-            self._path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self._path.with_suffix(".json.tmp")
-            tmp.write_text(json.dumps(pending, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-            tmp.replace(self._path)
-            self._cache = pending
+            self._save_locked(pending)
             return value
 
     def get_bool(self, key: str, default: bool = False) -> bool:
@@ -114,15 +101,11 @@ class SettingsRepository:
     def set_window_geometry(self, *, width: int, height: int, maximized: bool,
                             x: int | None = None, y: int | None = None) -> None:
         with self._lock:
-            self._load()
-            self._cache.update({"window.width": int(width), "window.height": int(height),
-                                "window.maximized": bool(maximized)})
+            pending = {**self._load(), "window.width": int(width), "window.height": int(height),
+                       "window.maximized": bool(maximized)}
             if x is not None and y is not None:
-                self._cache.update({"window.x": int(x), "window.y": int(y)})
-            self._save_locked()
+                pending.update({"window.x": int(x), "window.y": int(y)})
+            self._save_locked(pending)
 
     def set(self, key: str, value: Any) -> None:
-        with self._lock:
-            self._load()
-            self._cache[key] = value
-            self._save_locked()
+        self.set_checked(key, value)

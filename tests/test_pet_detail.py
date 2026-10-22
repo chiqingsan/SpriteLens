@@ -75,30 +75,6 @@ class PetDetailTest(unittest.TestCase):
             finally:
                 store.close(); db.close()
 
-    def test_v9_migration_preserves_unknown_and_round_trip(self):
-        from spritelens.repositories.database import _MIGRATIONS
-        import sqlite3
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / 'data.sqlite'
-            conn = sqlite3.connect(path)
-            for version, statements in _MIGRATIONS:
-                if version > 9: break
-                for statement in statements: conn.execute(statement)
-                conn.execute('PRAGMA user_version=' + str(version))
-            conn.execute("INSERT INTO pets (uid, gid, name, first_seen, updated_at) VALUES (101, 3, '旧记录', 0, 0)")
-            conn.commit(); conn.close()
-            db = Database(path); store = PetStore(db, flush_interval=100)
-            try:
-                store.put(101, [self.pet, replace(self.pet, gid=2, awarded_medal_ids=())]); store.flush()
-                self.assertEqual([pet.awarded_medal_ids for pet in store.load(101)], [None, (), None])
-            finally:
-                store.close(); db.close()
-            db = Database(path); store = PetStore(db, flush_interval=100)
-            try:
-                self.assertEqual([pet.awarded_medal_ids for pet in store.load(101)], [None, (), None])
-            finally:
-                store.close(); db.close()
-
     def test_payload_bonus_measurements_and_branch_edges(self):
         static = load_static_data(Path('data/static'))
         pet = replace(self.pet, attributes=(PetAttribute(base_value=40, talent_add=9, effort_add=3),),

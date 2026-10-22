@@ -26,7 +26,6 @@ from spritelens.app_context import AppContext
 from spritelens.capture.key_store import KeyStore
 from spritelens.domain.color_cards import ColorCatalog
 from spritelens.domain.egg_box import EggBoxEntry
-from spritelens.domain.flowers import FlowerRecord, FlowerSnapshot
 from spritelens.domain.eggs import EggCatalog
 from spritelens.domain.identity import PlayerIdentity
 from spritelens.domain.pets import Pet, PetAttribute, PetSkill
@@ -39,11 +38,10 @@ from spritelens.protocol.schema import load_library
 from spritelens.repositories.settings import SettingsRepository
 from spritelens.domain.home import HomeFurniture, HomeResident, HomeSnapshot
 from spritelens.services.egg_repository import EggBoxRepository
-from spritelens.services.flower_repository import FlowerRepository
 from spritelens.services.home_repository import HomeRepository
 from spritelens.services.monitor_service import MonitorService
 from spritelens.services.pet_repository import PetRepository
-from spritelens.view_models import CaptureViewModel, EventsViewModel, PetViewModel
+from spritelens.view_models import CaptureViewModel, PetViewModel
 from spritelens.web.server import LocalServer
 
 _SAMPLE = (
@@ -52,26 +50,6 @@ _SAMPLE = (
     ("皇家狮鹫", 3469, 58), ("治愈兔", 3081, 44), ("机械方方", 3200, 39), ("乖乖鹄", 3344, 31),
     ("护主犬", 3070, 1),
 )
-
-
-def _demo_flowers() -> FlowerRepository:
-    repo = FlowerRepository()
-    repo._account.observe(PlayerIdentity(101384922, "话绵雨", 60))
-    repo._snapshot = FlowerSnapshot(
-        own=tuple(
-            FlowerRecord(slot_id=20128 + i, slot_index=i, pet_conf_id=conf,
-                         planted_at=1791748800, height=0, weight=0, voice=0, owner="self")
-            for i, conf in enumerate((130308, 130311, 140149, 5400470, 130156, 130169))
-        ),
-        friends=tuple(
-            FlowerRecord(slot_id=65516 + i, slot_index=i, pet_conf_id=conf,
-                         planted_at=1791748800, height=403695 + i, weight=675368, voice=64,
-                         owner="friend")
-            for i, conf in enumerate((130310, 130312, 1200492, 5400469))
-        ),
-    )
-    repo._version += 1
-    return repo
 
 
 def _demo_home() -> HomeRepository:
@@ -194,13 +172,11 @@ def build_demo_context(tmp: Path, count: int) -> AppContext:
         monitor=monitor,
         pet_repository=repository,
         capture_vm=capture_vm,
-        events_vm=EventsViewModel(monitor=monitor),
         pet_vm=PetViewModel(repository, static_data=static),
         egg_catalog=catalog,
         color_catalog=ColorCatalog(static_dir()),
         egg_box=egg_box,
         home_repo=_demo_home(),
-        flower_repo=_demo_flowers(),
     )
 
 

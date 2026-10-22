@@ -134,18 +134,6 @@
       "sha256": "d9c39bf1ce00d10694015d9d736ae6006a7e7b2f0df776dd206e1058a9a700a7"
     },
     {
-      "name": "flower",
-      "source": "Tabler Icons",
-      "url": "https://tabler.io/icons/icon/flower",
-      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/flower.svg",
-      "license": "MIT",
-      "search_tags": [
-        "flower",
-        "seed"
-      ],
-      "sha256": "fc0e05fd927e64dd04b35fdb0332ad9e09771d3a9add0a38bb9d9eb67efa3536"
-    },
-    {
       "name": "activity",
       "source": "Tabler Icons",
       "url": "https://tabler.io/icons/icon/activity",

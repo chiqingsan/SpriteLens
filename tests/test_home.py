@@ -320,7 +320,6 @@ class HomePayloadTests(unittest.TestCase):
                   base_conf_id=10001, height=123, weight=456, voice=-45)
         pets = Mock()
         pets.consistent_snapshot.return_value = SimpleNamespace(uid=134509467, pets=(pet,))
-        pets.voice_overrides.return_value = {}
         static = Mock()
         static.species.return_value = SimpleNamespace(
             name="护主犬", egg_groups=("野兽组",),
@@ -345,14 +344,13 @@ class HomePayloadTests(unittest.TestCase):
         self.assertEqual((resident["egg_name"], resident["egg_icon_url"]),
                          ("护主犬蛋", "/static/egg-icons/80001.png"))
 
-    def test_manual_zero_voice_is_a_known_value_and_missing_voice_is_null(self) -> None:
+    def test_captured_voice_is_used_and_missing_voice_is_null(self) -> None:
         repo = _ready_repo()
         repo.handle_packet(_nested_home_event())
         pet = Pet(70001, 10001, "护主犬", 56, 0, 3, 2, 0, 0, False,
                   base_conf_id=10001, voice=-45)
         pets = Mock()
         pets.consistent_snapshot.return_value = SimpleNamespace(uid=134509467, pets=(pet,))
-        pets.voice_overrides.return_value = {70001: 0}
         static = Mock()
         static.species.return_value = SimpleNamespace(
             base_conf_id=10001, name="护主犬", egg_groups=("野兽组",),
@@ -360,13 +358,10 @@ class HomePayloadTests(unittest.TestCase):
         )
         static.nature_name.return_value = "勇敢"
         resident = home_payload(repo, static, pets)["residents"][0]
-        self.assertEqual(resident["voice"], 0)
+        self.assertEqual(resident["voice"], -45)
         self.assertEqual(resident["height_pct"], None)
 
-        pets.voice_overrides.return_value = {}
-        pets.consistent_snapshot.return_value = SimpleNamespace(
-            uid=134509467, pets=(replace(pet, voice=0),)
-        )
+        pets.consistent_snapshot.return_value = SimpleNamespace(uid=134509467, pets=(replace(pet, voice=0),))
         self.assertIsNone(home_payload(repo, static, pets)["residents"][0]["voice"])
 
     def test_pair_predictions_use_nature_rules_and_average_parent_voices(self) -> None:
@@ -383,7 +378,6 @@ class HomePayloadTests(unittest.TestCase):
             Pet(70001, 123, "母本", 56, 0, 1, 2, 0, 0, False, base_conf_id=10001, voice=-45),
             Pet(70002, 124, "父本", 56, 0, 2, 1, 0, 0, False, base_conf_id=10002, voice=-35),
         ))
-        pets.voice_overrides.return_value = {}
         static = Mock()
         static.species.side_effect = lambda base_id: SimpleNamespace(
             name="精灵", egg_groups=("野兽组",),
@@ -463,66 +457,6 @@ class HomeRepositoryTests(unittest.TestCase):
         repo.handle_packet(_nested_home_event(owner_uid=202, session_id="s2"))
         self.assertIsNotNone(repo.snapshot())
 
-
-class FlowerTests(unittest.TestCase):
-    """0x0375 花田帧提取（按真实帧结构构造）。"""
-
-    def _flower_event(self) -> PacketEvent:
-        # 实测层级：field2/field3 各一个节点，children 为重复 field1 子消息
-        own = {"no": 2, "name": "f2", "type": "", "value": "", "raw": None, "children": [
-            {"no": 1, "name": "f1", "type": "", "value": "", "raw": None, "children": [
-                {"no": 1, "name": "f1", "type": "", "value": "20131", "raw": 20131},
-                {"no": 3, "name": "f3", "type": "", "value": "4", "raw": 4},
-                {"no": 10, "name": "f10", "type": "", "value": "1791748800", "raw": 1791748800},
-                {"no": 13, "name": "f13", "type": "", "value": "130308", "raw": 130308},
-                {"no": 19, "name": "f19", "type": "", "value": "1", "raw": 1},
-            ]},
-        ]}
-        friend = {"no": 3, "name": "f3", "type": "", "value": "", "raw": None, "children": [
-            {"no": 1, "name": "f1", "type": "", "value": "", "raw": None, "children": [
-                {"no": 1, "name": "f1", "type": "", "value": "65516", "raw": 65516},
-                {"no": 13, "name": "f13", "type": "", "value": "130310", "raw": 130310},
-                {"no": 14, "name": "f14", "type": "", "value": "", "raw": None, "children": [
-                    {"no": 1, "name": "h", "type": "", "value": "403695", "raw": 403695},
-                    {"no": 2, "name": "w", "type": "", "value": "675368", "raw": 675368},
-                    {"no": 3, "name": "v", "type": "", "value": "64", "raw": 64},
-                ]},
-            ]},
-        ]}
-        return PacketEvent(
-            ts=0.0, session_id="s", direction="s2c", opcode=0x0375, opcode_name="x", payload_len=0,
-            decoded=[
-                {"no": 1, "name": "ok", "type": "", "value": "", "raw": None, "children": [
-                    {"no": 1, "name": "code", "type": "", "value": "0", "raw": 0}]},
-                own, friend,
-            ],
-        )
-
-    def test_extract(self) -> None:
-        from spritelens.domain.flowers import extract_flowers
-        snap = extract_flowers(self._flower_event())
-        self.assertIsNotNone(snap)
-        self.assertEqual(len(snap.own), 1)
-        self.assertEqual(snap.own[0].slot_id, 20131)
-        self.assertEqual(snap.own[0].pet_conf_id, 130308)
-        self.assertEqual(len(snap.friends), 1)
-        self.assertEqual(snap.friends[0].height, 403695)
-        self.assertEqual(snap.friends[0].owner, "friend")
-
-    def test_repo_and_payload(self) -> None:
-        from spritelens.services.flower_repository import FlowerRepository
-        from spritelens.web.payloads import flowers_payload
-        repo = FlowerRepository()
-        repo.handle_packet(self._flower_event())
-        payload = flowers_payload(repo, None, None)
-        self.assertTrue(payload["available"])
-        self.assertEqual(payload["own"][0]["pet_name"], "#130308")
-        self.assertEqual(payload["friends"][0]["owner"], "friend")
-
-    def test_non_flower_ignored(self) -> None:
-        from spritelens.domain.flowers import extract_flowers
-        self.assertIsNone(extract_flowers(
-            PacketEvent(0.0, "s", "s2c", 0x0376, "x", 0, [])))
 
 
 if __name__ == "__main__":

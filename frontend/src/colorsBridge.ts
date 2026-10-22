@@ -17,7 +17,7 @@ export function mountColors(root: HTMLElement, token: string, host: ColorsHost =
   ready.value = true
   const stop = watchEffect(() => { if (page.value?.error) host.failed?.(page.value.error) })
   return {
-    load: () => page.value?.load(), resume: () => page.value?.resume(), pause: () => page.value?.pause(),
+    load: () => page.value?.load(), resume: (force = false) => page.value?.resume(force), pause: () => page.value?.pause(),
     resetAccount: () => page.value?.resetAccount(), unmount: () => { stop(); app.unmount() },
   }
 }

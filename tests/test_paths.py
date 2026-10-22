@@ -4,6 +4,7 @@ import importlib
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import spritelens.paths as paths
 
@@ -68,6 +69,15 @@ class IntentionalHomeTest(unittest.TestCase):
     def test_data_root_is_not_bundle_root(self):
         self.assertNotEqual(paths.data_root(), paths.project_root())
         self.assertTrue(paths.data_root().is_dir())
+
+    def test_unavailable_directory_never_switches_storage_location(self):
+        target = r"C:\unavailable\SpriteLens"
+        with patch.dict("os.environ", {"SPRITELENS_DATA_ROOT": target}), \
+             patch.object(Path, "mkdir", side_effect=PermissionError("denied")) as mkdir:
+            with self.assertRaisesRegex(OSError, "用户数据目录不可用") as caught:
+                paths.data_root()
+        self.assertIn(target, str(caught.exception))
+        mkdir.assert_called_once()
 
 
 if __name__ == "__main__":

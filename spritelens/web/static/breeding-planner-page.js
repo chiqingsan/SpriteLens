@@ -19,6 +19,7 @@
           });
         },
         pause: pause,
+        flush: function () { return page ? page.flush() : Promise.resolve(); },
         resetAccount: function () { pause(); if (page) { page.resetAccount(); } },
         unmount: function () { pause(); if (page) { page.unmount(); page = null; } }
       };

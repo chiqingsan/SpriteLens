@@ -3,7 +3,7 @@
 文件按天分片（eventlog_YYYYMMDD.jsonl），含完整 decoded 字段树。
 
 写入策略（实测教训）：抓包回调运行在 MonitorService 锁内，同步 flush()
-在登录突发下让 UI 的 drain_events 最长等 57ms，chunk 队列随之面临过载。
+在登录突发下让事件消费者的 drain_events 最长等 57ms，chunk 队列随之面临过载。
 因此 handle_packet 只把事件放进有界队列（无 IO），由后台 worker 线程
 批量落盘；队列满时丢新事件并计数（丢日志不阻塞采集主链路）。
 
@@ -51,7 +51,11 @@ class EventLogWriter:
         self._count = 0
         self._dropped = 0
         self._failed = False
+        self._error = ""
         self._closed = threading.Event()
+        self._close_lock = threading.Lock()
+        self._close_enqueued = False
+        self._close_complete = False
         self._close_join_timeout = max(0.0, float(close_join_timeout))
         self._queue: queue.Queue = queue.Queue(maxsize=max(1, int(queue_max)))
         self._worker = threading.Thread(
@@ -75,10 +79,19 @@ class EventLogWriter:
         with self._lock:
             return self._file.name if self._file is not None else None
 
+    @property
+    def error(self) -> str:
+        with self._lock:
+            return self._error
+
     def handle_packet(self, event: PacketEvent) -> None:
         """抓包线程回调：只入队（无 IO 不等待），worker 负责序列化与落盘。"""
-        if self._closed.is_set() or self._failed:
+        if self._closed.is_set():
             return
+        with self._lock:
+            if self._failed:
+                self._dropped += 1
+                return
         try:
             self._queue.put_nowait(event)
         except queue.Full:
@@ -88,13 +101,18 @@ class EventLogWriter:
                     logger.warning("事件日志队列满，累计丢弃 %d 条", self._dropped)
 
     def flush(self, timeout: float = 5.0) -> None:
-        """等此前全部事件落盘（close 与测试用；超时返回不阻塞退出）。"""
+        """等待此前事件写入；失败或超时必须向调用者报告。"""
+        if self.error:
+            raise OSError(self.error)
         barrier = _Barrier()
         try:
             self._queue.put(barrier, timeout=timeout)
         except queue.Full:
-            return
-        barrier.done.wait(timeout)
+            raise TimeoutError("事件日志队列未在保存预算内排空")
+        if not barrier.done.wait(timeout):
+            raise TimeoutError("事件日志未在保存预算内写完")
+        if self.error:
+            raise OSError(self.error)
 
     # -- worker ---------------------------------------------------------
     def _run(self) -> None:
@@ -133,6 +151,10 @@ class EventLogWriter:
     def _write_batch(self, events: list[PacketEvent]) -> None:
         if not events:
             return
+        with self._lock:
+            if self._failed:
+                self._dropped += len(events)
+                return
         try:
             file = self._open_day_file()
             written = 0
@@ -145,7 +167,10 @@ class EventLogWriter:
             file.flush()  # 复盘场景要求及时可见（崩溃/强退后不丢）
         except OSError as exc:
             logger.warning("事件日志写入失败，停止记录: %s", exc)
-            self._failed = True
+            with self._lock:
+                self._failed = True
+                self._error = f"事件日志已停止记录：{exc}；请修复存储问题后重启程序"
+                self._dropped += len(events)  # 本批次未确认完整写入。
             self._close_owned_file()
             return
         with self._lock:
@@ -170,9 +195,15 @@ class EventLogWriter:
     def _close_owned_file(self) -> None:
         """关闭日志文件（仅限 worker 线程调用——文件句柄由 worker 独占）。"""
         with self._lock:
-            if self._file is not None:
-                self._file.close()
-                self._file = None
+            file, self._file = self._file, None
+        if file is not None:
+            try:
+                file.close()
+            except OSError as exc:
+                logger.warning("事件日志文件关闭失败: %s", exc)
+                with self._lock:
+                    self._failed = True
+                    self._error = self._error or f"事件日志文件关闭失败：{exc}；请修复存储后重启程序"
 
     def close(self) -> None:
         """停止 worker 并做最后落盘（幂等；退出路径唯一）。
@@ -181,24 +212,31 @@ class EventLogWriter:
         close——worker 正在写的那条日志会抛 ValueError 且丢失（已复现）。
         超时情况下句柄留待进程退出由 OS 回收，比丢日志安全。
         """
-        if self._closed.is_set():
-            return
-        self._closed.set()
-        # 哨兵排在已入队事件之后：worker 先写完再退出
-        try:
-            self._queue.put(_QUEUE_SENTINEL, timeout=1.0)
-        except queue.Full:
-            try:
-                self._queue.get_nowait()  # 丢最旧一条腾位
-            except queue.Empty:
-                pass
-            try:
-                self._queue.put_nowait(_QUEUE_SENTINEL)
-            except queue.Full:
-                pass
+        with self._close_lock:
+            if self._close_complete:
+                if self.error:
+                    raise OSError(self.error)
+                return
+            self._closed.set()
+            # 哨兵只入队一次；join 超时后下一次 close 继续等待同一 worker。
+            if not self._close_enqueued:
+                try:
+                    self._queue.put(_QUEUE_SENTINEL, timeout=1.0)
+                except queue.Full:
+                    try:
+                        self._queue.get_nowait()  # 丢最旧一条腾位
+                    except queue.Empty:
+                        pass
+                    self._queue.put(_QUEUE_SENTINEL, timeout=1.0)
+                self._close_enqueued = True
         self._worker.join(timeout=self._close_join_timeout)
         if self._worker.is_alive():
             logger.warning("事件日志 worker 未在超时内退出，文件句柄留给进程回收")
+            raise TimeoutError("事件日志 worker 未在关闭预算内完成")
+        with self._close_lock:
+            self._close_complete = True
+        if self.error:
+            raise OSError(self.error)
 
 
 def _serialize(event: PacketEvent) -> str | None:

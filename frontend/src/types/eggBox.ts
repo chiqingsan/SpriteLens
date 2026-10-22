@@ -15,6 +15,7 @@ export interface EggBoxAnnotations {
   nest_override: EggNest
   note: string
   voice_tag: EggBoxVoiceTag
+  voice_db: number | null
 }
 export interface EggBoxTags { nature: string; weight: string | null; voice: string | null; medals: string[]; nest: string }
 export interface EggBoxSaveAnnotations extends EggBoxAnnotations { uid: number; instance_id: number }
@@ -97,6 +98,7 @@ function isAnnotations(value: unknown): value is EggBoxAnnotations {
     && string(value.note)
     && (value.voice_tag === '' || value.voice_tag === '婉转声' || value.voice_tag === '满分'
       || value.voice_tag === '粗嗓门' || value.voice_tag === '底分')
+    && (value.voice_db === null || safeInteger(value.voice_db) && value.voice_db >= -100 && value.voice_db <= 100)
 }
 
 function isTags(value: unknown): value is EggBoxTags {

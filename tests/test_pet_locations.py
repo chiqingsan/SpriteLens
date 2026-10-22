@@ -274,7 +274,7 @@ class LocationTest(unittest.TestCase):
         self.assertEqual(payload["pets"][0]["location"]["slot"], 2)
         self.assertEqual(len(payload["backpack"]["boxes"][1]["slots"]), 30)
 
-    def test_empty_box_survives_restart_without_pets_and_old_format_is_partial(self):
+    def test_empty_box_survives_restart_without_pets_and_old_format_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             db = Database(Path(temporary) / "db.sqlite")
             store = PetStore(db, flush_interval=60)
@@ -286,9 +286,8 @@ class LocationTest(unittest.TestCase):
             self.assertTrue(repo.backpack().boxes[8].historical)
             self.assertIsNone(repo.identity)
             store.close(); db.close()
-        restored = Backpack.restore([[1, 2, 3]])
-        self.assertEqual(restored.boxes[2].slots.count(None), 29)
-        self.assertTrue(restored.boxes[2].historical)
+        with self.assertRaises(ValueError):
+            Backpack.restore([[1, 2, 3]])
 
     def test_account_switch_clears_empty_box_metadata(self):
         repo = PetRepository()
@@ -387,8 +386,13 @@ class LocationTest(unittest.TestCase):
                         async with session.get(f"http://127.0.0.1:{server.port}/api/pets", headers={"X-Local-Token": "role-test"}) as response:
                             row = (await response.json())["pets"][0]
                             self.assertEqual(row["location"]["column"], 3)
-                            self.assertEqual(row["worn_medal_id"], 1010)
                             self.assertTrue(row["is_colorful"])
+                        async with session.get(
+                            f"http://127.0.0.1:{server.port}/api/pets/26925?uid=123&version=0",
+                            headers={"X-Local-Token": "role-test"},
+                        ) as response:
+                            detail = (await response.json())["pet"]
+                            self.assertEqual(detail["worn_medal_id"], 1010)
             try:
                 asyncio.run(verify())
             finally:

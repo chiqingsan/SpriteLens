@@ -19,6 +19,7 @@ export function mountEggBox(root: HTMLElement, host: EggBoxHost) {
   const app = createApp({ render: () => h(EggBoxPage, { ref: page, host }) })
   app.mount(root)
   return {
+    flush: () => page.value?.flush(),
     load: () => page.value?.load(),
     resume: (version: number) => page.value?.resume(version),
     pause: () => page.value?.pause(),

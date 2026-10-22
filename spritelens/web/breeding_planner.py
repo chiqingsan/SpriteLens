@@ -1,7 +1,6 @@
 """智能配窝鉴权 API，严格校验外部草稿并在工作线程计算。"""
 from __future__ import annotations
 
-import asyncio
 import re
 from dataclasses import asdict
 from math import isfinite
@@ -12,6 +11,7 @@ from spritelens.domain.breeding_planner import GEOMETRY_VERSION, RULE_VERSION, G
 from spritelens.services.breeding_planner_service import BreedingPlannerService, StalePlannerInput
 from spritelens.view_models.breeding_planner_vm import BreedingPlannerViewModel
 from spritelens.web.pet_media import pet_images
+from spritelens.web.background import run_blocking
 
 
 def parse_draft(value: dict) -> Request:
@@ -70,7 +70,7 @@ def register_planner_routes(app: web.Application, context) -> None:
     vm = BreedingPlannerViewModel(service)
 
     async def get_context(request):
-        payload = await asyncio.to_thread(vm.context)
+        payload = await run_blocking(request, vm.context)
         for row in payload["parents"]:
             row["icon_url"] = pet_images(row.pop("base_id"), row["is_shiny"])["portrait_url"]
         return web.json_response(payload)
@@ -84,18 +84,27 @@ def register_planner_routes(app: web.Application, context) -> None:
             if body.get("catalog_version") != service.catalog_version:
                 raise StalePlannerInput("目录版本已变化，请刷新资料后重新评估草稿")
             if request.match_info["action"] == "draft":
+                if type(body.get("base_revision")) is not int or body["base_revision"] < 0:
+                    raise ValueError("缺少有效草稿保存版本，请刷新窗口")
                 try:
-                    await asyncio.to_thread(service.save_draft, body["uid"], body["version"], draft.mode, {**body, "schema_version": 1})
+                    saved = await run_blocking(
+                        request,
+                        service.save_draft, body["uid"], body["version"], draft.mode,
+                        body["revision"], {**body, "schema_version": 1},
+                        base_revision=body["base_revision"],
+                    )
                 except OSError as error:
                     return web.json_response({"error": f"草稿保存失败：{error}"}, status=500)
-                return web.json_response({"uid": body["uid"], "version": body["version"], "saved": True, "revision": body["revision"]})
+                latest = await run_blocking(request, service.load_draft, body["uid"], draft.mode)
+                return web.json_response({"uid": body["uid"], "version": body["version"], "saved": saved,
+                                          "revision": body["revision"] if saved else latest["revision"] if latest else 0})
             if draft.mode == "target" and not draft.goals or draft.mode == "selected" and not draft.selected:
                 raise ValueError("请先添加目标蛋或选择参与精灵")
             # 目标只能使用真实繁育映射，目录性格必须存在。
-            catalog = await asyncio.to_thread(vm.context)
+            catalog = await run_blocking(request, vm.context)
             if any(g.egg_key not in {e["egg_key"] for e in catalog["eggs"]} or g.nature_id and g.nature_id not in {n["id"] for n in catalog["natures"]} for g in draft.goals):
                 raise ValueError("目标蛋或性格不在当前可繁育目录中")
-            result = await asyncio.to_thread(service.calculate, body["uid"], body["version"], draft, request.match_info["action"])
+            result = await run_blocking(request, service.calculate, body["uid"], body["version"], draft, request.match_info["action"])
             return web.json_response({**result, "revision": body["revision"]})
         except StalePlannerInput as error:
             return web.json_response({"error": str(error)}, status=409)
@@ -106,8 +115,8 @@ def register_planner_routes(app: web.Application, context) -> None:
         mode = request.query.get("mode", "target")
         if mode not in ("target", "selected"):
             return web.json_response({"error": "无效入口"}, status=400)
-        inventory = await asyncio.to_thread(context.pet_repository.consistent_snapshot)
-        value = await asyncio.to_thread(service.load_draft, inventory.uid, mode)
+        inventory = await run_blocking(request, context.pet_repository.consistent_snapshot)
+        value = await run_blocking(request, service.load_draft, inventory.uid, mode)
         try:
             if value is not None:
                 if not isinstance(value, dict) or value.get("schema_version") != 1 or value.get("uid") != inventory.uid or value.get("mode") != mode:

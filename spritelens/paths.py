@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import os
 import sys
-import tempfile
 from pathlib import Path
 
 import spritelens
@@ -19,7 +18,7 @@ _DATA_ROOT_ENV = "SPRITELENS_DATA_ROOT"
 
 
 def data_root() -> Path:
-    """返回数据根目录，保证存在；创建失败时降级到系统临时目录。"""
+    """返回指定用户数据目录；不可用时明确失败，不切换存储位置。"""
     raw = os.environ.get(_DATA_ROOT_ENV)
     if raw:
         root = Path(raw)
@@ -31,11 +30,8 @@ def data_root() -> Path:
     try:
         root.mkdir(parents=True, exist_ok=True)
         return root
-    except OSError:
-        # 只读环境（如部分企业策略）下退到临时目录，保证工具仍可运行
-        fallback = Path(tempfile.gettempdir()) / spritelens.APP_NAME.lower()
-        fallback.mkdir(parents=True, exist_ok=True)
-        return fallback
+    except OSError as exc:
+        raise OSError(f"用户数据目录不可用：{root}；请检查路径和权限") from exc
 
 
 def config_path() -> Path:

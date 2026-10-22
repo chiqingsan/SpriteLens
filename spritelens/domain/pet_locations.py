@@ -47,11 +47,8 @@ class Backpack:
 
     @classmethod
     def restore(cls, raw) -> Backpack:
-        if isinstance(raw, list):  # 兼容上一版只保存已知 gid 的位置列表。
-            locations = {gid: PetLocation(box, slot) for gid, box, slot in raw
-                         if type(gid) is int and gid > 0 and type(box) is int and box > 0
-                         and type(slot) is int and 1 <= slot <= 30}
-            return cls.from_locations(locations)
+        if not isinstance(raw, dict) or raw.get("version") != 2:
+            raise ValueError("箱位快照不是当前 version 2 格式")
         boxes = {}
         if isinstance(raw, dict) and raw.get("version") == 2:
             for entry in raw.get("boxes", []):

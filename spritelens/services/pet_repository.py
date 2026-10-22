@@ -46,7 +46,6 @@ class PetRepository:
         self._pets: dict[int, Pet] = {}
         self._locations: dict[int, PetLocation] = {}
         self._backpack = Backpack()
-        self._colorful_names: dict[int, str] = {}
         self._version = 0
         self._store = store
         self._account = AccountTracker()
@@ -55,13 +54,7 @@ class PetRepository:
 
     def handle_packet(self, event: PacketEvent) -> None:
         """PacketEvent 监听回调：先认身份，再提取宠物并合并（新的覆盖旧的）。"""
-        # 炫彩形态名字学习：花种帧按 colorful_conf_id（130xxx 系）引用宠物，
-        # 图鉴静态表不含该体系，只能从宠物帧的 (field58, name) 对现场学习。
-        # 该表是全局学习结果（与账号无关），账号切换时不清空。
         pets = extract_pets(event, include_non_owned=True)
-        for pet in pets:
-            if not pet.is_trial_pet and not pet.is_mirror_pet and pet.colorful_conf_id > 0 and pet.name:
-                self._colorful_names.setdefault(pet.colorful_conf_id, pet.name)
         # 身份跟踪无条件进行（无 store 的回放场景同样要防跨账号混合）
         identity = extract_identity(event)
         if identity is not None:
@@ -137,11 +130,6 @@ class PetRepository:
         if self._store is not None and uid > 0:
             self._store.put(uid, merged)
 
-    def colorful_name(self, conf_id: int) -> str | None:
-        """炫彩形态 id → 宠物名（协议学习表；未见过返回 None）。"""
-        with self._lock:
-            return self._colorful_names.get(conf_id)
-
     def snapshot(self) -> tuple[Pet, ...]:
         """当前全部宠物（按 gid 排序）；UI 按版本号判断是否需要重建表。"""
         with self._lock:
@@ -197,9 +185,7 @@ class PetRepository:
     def load_persisted(self, uid: int) -> int:
         """载入历史宠物（只补缺失的 gid，不覆盖本次会话已收到的新数据）。
 
-        同时用历史宠物的 (colorful_conf_id, name) 重建炫彩名字学习表——
-        花种帧按该 id 引用宠物，重启后若只恢复字段不恢复映射，花田载荷
-        会退化成「#130001」。返回补入的条数；uid 无效或无 store 时不做任何事。
+        返回补入的条数；uid 无效或无 store 时不做任何事。
         """
         if self._store is None or uid <= 0:
             return 0
@@ -234,8 +220,6 @@ class PetRepository:
             self._backpack = Backpack(boxes, teams, current.active_team or backpack.active_team)
             self._locations = self._backpack.locations()
             for pet in loaded:
-                if not pet.is_trial_pet and not pet.is_mirror_pet and pet.colorful_conf_id > 0 and pet.name:
-                    self._colorful_names.setdefault(pet.colorful_conf_id, pet.name)
                 if pet.gid in existing:
                     continue
                 self._pets[pet.gid] = pet
@@ -276,31 +260,7 @@ class PetRepository:
             self._backpack = Backpack(dict(backpack.boxes), backpack.teams, backpack.active_team)
             self._locations = self._backpack.locations()
             self._medals = None
-            for pet in pets:
-                if pet.colorful_conf_id > 0 and pet.name:
-                    self._colorful_names.setdefault(pet.colorful_conf_id, pet.name)
             self._version += 1
-
-    def save_voice_override(self, uid: int, gid: int, voice: int | None) -> bool:
-        """保存已有宠物的声音修正；返回目标是否属于指定账号。"""
-        if self._store is None or not self._store.has_pet(uid, gid):
-            return False
-        with self._lock:
-            self._store.set_voice_override(uid, gid, voice)
-            self._version += 1
-        return True
-
-    def voice_overrides(self, uid: int) -> dict[int, int]:
-        """读取指定账号的手动声音值；无存储时没有覆盖值。"""
-        if self._store is None or uid <= 0:
-            return {}
-        return self._store.voice_overrides(uid)
-
-    def breeding_snapshot(self) -> tuple[PetRepoSnapshot, dict[int, int]]:
-        """同一版本的个体与声音修正；避免规划读取期间修正值和版本错位。"""
-        with self._lock:
-            inventory = self.consistent_snapshot()
-            return inventory, self.voice_overrides(inventory.uid)
 
     def load_last_account(self) -> int:
         """载入最近账号的历史宠物；返回补入条数。"""

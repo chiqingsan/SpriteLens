@@ -127,28 +127,14 @@ class EggStore:
         pending_slots: dict[int, frozenset[int]],
     ) -> int:
         now = time.time()
-        slots_error: sqlite3.Error | None = None
+        batches: list[tuple[str, list[tuple]]] = []
         if pending_slots:
-            try:
-                self._db.execute_many(
-                    "INSERT INTO egg_hatch_slots (uid, slots_json, collected_at) VALUES (?, ?, ?)"
-                    " ON CONFLICT(uid) DO UPDATE SET slots_json = excluded.slots_json,"
-                    " collected_at = excluded.collected_at",
-                    [
-                        (uid, json.dumps(sorted(slots)), now)
-                        for uid, slots in pending_slots.items()
-                    ],
-                )
-            except sqlite3.Error as exc:
-                logger.warning("孵化槽快照写库失败，留待下轮重试: %s", exc)
-                with self._lock:
-                    for uid, slots in pending_slots.items():
-                        self._pending_slots.setdefault(uid, slots)
-                slots_error = exc
-        if not pending:
-            if slots_error is not None:
-                raise slots_error
-            return 0
+            batches.append((
+                "INSERT INTO egg_hatch_slots (uid, slots_json, collected_at) VALUES (?, ?, ?)"
+                " ON CONFLICT(uid) DO UPDATE SET slots_json = excluded.slots_json,"
+                " collected_at = excluded.collected_at",
+                [(uid, json.dumps(sorted(slots)), now) for uid, slots in pending_slots.items()],
+            ))
         rows = [
             (
                 uid,
@@ -165,17 +151,18 @@ class EggStore:
             for (uid, _iid), egg in pending.items()
         ]
         try:
-            self._db.execute_many(_UPSERT_EGG, rows)
+            batches.append((_UPSERT_EGG, rows))
+            self._db.execute_batches(batches)
         except sqlite3.Error as exc:
             logger.warning("蛋仓写库失败，留待下轮重试: %s", exc)
             with self._lock:
+                for uid, slots in pending_slots.items():
+                    self._pending_slots.setdefault(uid, slots)
                 for key, egg in pending.items():  # 新值优先：不覆盖期间已合并的新数据
                     self._pending.setdefault(key, egg)
             raise
         with self._lock:
             self._written += len(rows)
-        if slots_error is not None:
-            raise slots_error
         return len(rows)
 
     # -- 读取 ----------------------------------------------------------
@@ -186,15 +173,11 @@ class EggStore:
         该行并留定位日志，不阻断其余合法数据。
         """
         self.flush()
-        try:
-            rows = self._db.query(
-                "SELECT instance_id, egg_conf_id, pet_conf_id, quantity, obtained_at,"
-                " hatching, detail_json, home_egg FROM eggs WHERE uid = ? ORDER BY obtained_at, instance_id",
-                (uid,),
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("蛋仓读取失败: %s", exc)
-            return ()
+        rows = self._db.query(
+            "SELECT instance_id, egg_conf_id, pet_conf_id, quantity, obtained_at,"
+            " hatching, detail_json, home_egg FROM eggs WHERE uid = ? ORDER BY obtained_at, instance_id",
+            (uid,),
+        )
         out: list[EggBoxEntry] = []
         for row in rows:
             try:
@@ -237,11 +220,11 @@ class EggStore:
             home_egg=bool(row["home_egg"]),
         )
 
-    def annotations(self, uid: int) -> dict[int, dict[str, int | str | bool]]:
+    def annotations(self, uid: int) -> dict[int, dict[str, int | str | bool | None]]:
         if uid <= 0:
             return {}
         rows = self._db.query(
-            "SELECT instance_id, nature_id, nest_override, note, voice_tag, is_favorite "
+            "SELECT instance_id, nature_id, nest_override, note, voice_tag, voice_db, is_favorite "
             "FROM egg_annotations WHERE uid = ?",
             (uid,),
         )
@@ -251,21 +234,22 @@ class EggStore:
                 "nest_override": str(row["nest_override"]),
                 "note": str(row["note"]),
                 "voice_tag": str(row["voice_tag"]),
+                "voice_db": int(row["voice_db"]) if row["voice_db"] is not None else None,
                 "is_favorite": bool(row["is_favorite"]),
             }
             for row in rows
         }
 
     def save_annotations(self, uid: int, instance_id: int, nature_id: int, nest_override: str,
-                         note: str, voice_tag: str) -> None:
+                         note: str, voice_tag: str, voice_db: int | None) -> None:
         if uid <= 0 or instance_id <= 0:
             raise ValueError("账号或蛋编号无效")
         self.flush()
         if not self._db.query("SELECT 1 FROM eggs WHERE uid = ? AND instance_id = ?", (uid, instance_id)):
             raise KeyError(instance_id)
-        if not nature_id and not nest_override and not note and not voice_tag:
+        if not nature_id and not nest_override and not note and not voice_tag and voice_db is None:
             self._db.execute(
-                "UPDATE egg_annotations SET nature_id = 0, nest_override = '', note = '', voice_tag = '' "
+                "UPDATE egg_annotations SET nature_id = 0, nest_override = '', note = '', voice_tag = '', voice_db = NULL "
                 "WHERE uid = ? AND instance_id = ?", (uid, instance_id)
             )
             self._db.execute(
@@ -274,12 +258,12 @@ class EggStore:
             )
             return
         self._db.execute(
-            "INSERT INTO egg_annotations (uid, instance_id, nature_id, nest_override, pet_gid, note, voice_tag) "
-            "VALUES (?, ?, ?, ?, 0, ?, ?) "
+            "INSERT INTO egg_annotations (uid, instance_id, nature_id, nest_override, note, voice_tag, voice_db) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(uid, instance_id) DO UPDATE SET nature_id = excluded.nature_id, "
-            "nest_override = excluded.nest_override, pet_gid = 0, note = excluded.note, "
-            "voice_tag = excluded.voice_tag",
-            (uid, instance_id, nature_id, nest_override, note, voice_tag),
+            "nest_override = excluded.nest_override, note = excluded.note, "
+            "voice_tag = excluded.voice_tag, voice_db = excluded.voice_db",
+            (uid, instance_id, nature_id, nest_override, note, voice_tag, voice_db),
         )
 
     def save_favorite(self, uid: int, instance_id: int, favorite: bool) -> None:
@@ -296,20 +280,16 @@ class EggStore:
         if not favorite:
             self._db.execute(
                 "DELETE FROM egg_annotations WHERE uid = ? AND instance_id = ? AND nature_id = 0 "
-                "AND nest_override = '' AND note = '' AND voice_tag = '' AND is_favorite = 0",
+                "AND nest_override = '' AND note = '' AND voice_tag = '' AND voice_db IS NULL AND is_favorite = 0",
                 (uid, instance_id),
             )
 
     def load_latest(self) -> tuple[int, tuple[EggBoxEntry, ...]]:
         """最近活跃账号的蛋仓快照（离线展示用）。"""
         self.flush()
-        try:
-            rows = self._db.query(
-                "SELECT uid, MAX(updated_at) AS recent FROM eggs GROUP BY uid ORDER BY recent DESC LIMIT 1"
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("蛋仓账号查询失败: %s", exc)
-            return 0, ()
+        rows = self._db.query(
+            "SELECT uid, MAX(updated_at) AS recent FROM eggs GROUP BY uid ORDER BY recent DESC LIMIT 1"
+        )
         if not rows:
             return 0, ()
         uid = int(rows[0]["uid"])

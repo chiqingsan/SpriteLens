@@ -66,8 +66,7 @@ class Pool:
     egg_names: dict[str, str] = field(default_factory=dict)
 
 
-def build_pool(pets: tuple[Pet, ...], static: StaticData, eggs: EggCatalog,
-               overrides: dict[int, int]) -> Pool:
+def build_pool(pets: tuple[Pet, ...], static: StaticData, eggs: EggCatalog) -> Pool:
     accepted, issues = [], []
     # 保留已知有效蛋组；显式不可繁育与有效组共存属于资料冲突。
     for pet in pets:
@@ -81,7 +80,7 @@ def build_pool(pets: tuple[Pet, ...], static: StaticData, eggs: EggCatalog,
             continue
         if not groups:
             continue
-        voice = overrides.get(pet.gid, pet.voice if pet.voice else None)
+        voice = pet.voice if pet.voice else None
         nature = static.nature(pet.nature)
         accepted.append(Candidate(pet, species, nature.name if nature else "", groups,
                                   species.chain_members, tuple(pet_marks(replace(pet, voice=voice or 0), species.weight_range)),

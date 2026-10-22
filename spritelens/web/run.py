@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import os
 import threading
 import webbrowser
 
@@ -36,9 +37,15 @@ def run_web(*, open_browser: bool = False) -> int:
     资源保护（D07）：guard 获取后所有步骤（WebView2 预检、装配、
     server 构造与启动、等待/窗口）都在统一 finally 覆盖内；任一步失败
     时，已创建的部分资源（context/server）随 finally 清理，guard 一定
-    释放。支持只创建部分资源的退出。
+    释放。支持只创建部分资源的退出。唯一例外是用户明确放弃保存：
+    直接终止进程，由 OS 回收句柄，避免解释器等待阻塞的请求线程。
     """
-    setup_logger(logs_dir())
+    try:
+        log_directory = logs_dir()
+        setup_logger(log_directory)
+    except OSError as exc:
+        _fatal("用户数据目录初始化失败", str(exc))
+        return 1
     _enable_dpi_awareness()
     _set_app_user_model_id()
 
@@ -50,46 +57,55 @@ def run_web(*, open_browser: bool = False) -> int:
 
     context = None
     server = None
+    exit_code = 0
+    abandoned = False
     try:
         # 开壳前预检测 WebView2：缺失时弹原生对话框引导安装，避免白屏式失败
         from spritelens.system.webview_guard import ensure_webview2
 
-        if not ensure_webview2(logs_dir()):
+        if not ensure_webview2(log_directory):
             logger.warning("WebView2 不可用，已按用户选择退出")
-            return 1
+            exit_code = 1
+        else:
+            try:
+                context = build_app_context()
+            except Exception as exc:  # noqa: BLE001 - 装配失败给出可读提示
+                logger.exception("应用初始化失败")
+                _fatal("应用初始化失败", f"{exc}\n\n日志目录：{log_directory}")
+                exit_code = 1
 
-        try:
-            context = build_app_context()
-        except Exception as exc:  # noqa: BLE001 - 装配失败给出可读提示
-            logger.exception("应用初始化失败")
-            _fatal("应用初始化失败", f"{exc}\n\n日志目录：{logs_dir()}")
-            return 1
+            if exit_code == 0:
+                server = LocalServer(context)
+                try:
+                    server.start()
+                except Exception as exc:  # noqa: BLE001 - 端口/绑定失败直接给出可读提示
+                    logger.exception("本地服务启动失败")
+                    _fatal("本地服务启动失败", f"{exc}\n\n日志目录：{log_directory}")
+                    exit_code = 1
 
-        server = LocalServer(context)
-        try:
-            server.start()
-        except Exception as exc:  # noqa: BLE001 - 端口/绑定失败直接给出可读提示
-            logger.exception("本地服务启动失败")
-            _fatal("本地服务启动失败", f"{exc}\n\n日志目录：{logs_dir()}")
-            return 1
-
-        logger.info("Web 界面入口: %s", f"http://{server.host}:{server.port}/")
-
-        if open_browser:
-            # 调试模式：用系统浏览器打开，便于 DevTools（pywebview 也可开，但外置更省事）
-            webbrowser.open(server.url)
-            _wait_until_interrupted(server)
-            return 0
-
-        try:
-            _run_window(server, guard)
-        except Exception as exc:  # noqa: BLE001 - WebView2 缺失等环境问题
-            logger.error("窗口创建失败: %s", exc)
-            _fatal("窗口创建失败", f"{WEBVIEW2_HINT}\n\n原始错误：{exc}\n日志目录：{logs_dir()}")
-            return 1
-        return 0
+            if exit_code == 0:
+                logger.info("Web 界面入口: %s", f"http://{server.host}:{server.port}/")
+                if open_browser:
+                    # 调试模式：用系统浏览器打开，便于 DevTools（pywebview 也可开，但外置更省事）
+                    webbrowser.open(server.url)
+                    _wait_until_interrupted(server)
+                else:
+                    try:
+                        if _run_window(server, guard) is False:
+                            abandoned = True
+                            exit_code = 1
+                    except Exception as exc:  # noqa: BLE001 - WebView2 缺失等环境问题
+                        logger.error("窗口创建失败: %s", exc)
+                        _fatal("窗口创建失败", f"{WEBVIEW2_HINT}\n\n原始错误：{exc}\n日志目录：{log_directory}")
+                        exit_code = 1
     finally:
-        _shutdown(server, context, guard)
+        if abandoned:
+            # 仅用于用户明确放弃。解释器退出还会 join to_thread 的线程池，
+            # 即使跳过 context.close 也可能卡住；由 OS 回收窗口、锁与句柄。
+            os._exit(1)
+        elif not _shutdown(server, context, guard):
+            exit_code = 1
+    return exit_code
 
 
 def _fatal(title: str, message: str) -> None:
@@ -164,13 +180,14 @@ def _apply_window_icons(hwnd: int, icon_path: str) -> None:
         user32.SendMessageW(hwnd, WM_SETICON, icon_type, handle)
 
 
-def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> None:
+def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> bool:
     """开 pywebview 窗口并阻塞到用户关闭它。"""
     import webview
 
     from spritelens.system.window_geometry import initial_window_size
     from spritelens.web.desktop_shell import WindowControls
     from spritelens.web.startup_cover import StartupCover
+    from spritelens.web.close_coordinator import CloseCoordinator
 
     settings = server._context.settings
     saved = settings.window_geometry()
@@ -196,12 +213,8 @@ def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> None:
     )
     position = (saved["x"], saved["y"]) if saved and saved["x"] is not None else None
     controls = WindowControls(window, position)
-    def save_geometry() -> None:
-        try:
-            settings.set_window_geometry(**controls.get_window_geometry(), maximized=False)
-        except Exception as exc:  # noqa: BLE001 - 几何保存失败不阻断退出
-            logger.warning("窗口几何保存失败: %s", exc)
-    window.events.closing += save_geometry
+    close_coordinator = CloseCoordinator(window, server._context, get_geometry=controls.get_window_geometry)
+    window.events.closing += close_coordinator.request_close
     window.expose(controls.minimize, controls.toggle_maximize, controls.close,
                   controls.get_window_state, controls.resize_window)
     window.events.before_show += controls.install_native_frame
@@ -244,6 +257,7 @@ def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> None:
     finally:
         if stop_flag is not None:
             stop_flag.set()
+    return not close_coordinator.abandoned
 
 
 def _late_init(window, icon_path: str) -> None:
@@ -299,7 +313,7 @@ def _wait_until_interrupted(server: "LocalServer") -> None:
         pass
 
 
-def _shutdown(server: "LocalServer | None", context, guard: SingleInstanceGuard) -> None:
+def _shutdown(server: "LocalServer | None", context, guard: SingleInstanceGuard) -> bool:
     """退出清理（S02/D07）：逐项尝试、单项失败不跳过其余，守卫最后释放。
 
     支持只创建了部分资源（server/context 为 None）的退出；
@@ -330,6 +344,7 @@ def _shutdown(server: "LocalServer | None", context, guard: SingleInstanceGuard)
         label, exc = failures[0]
         logger.error("退出清理存在失败项（首项 %s）: %s", label, exc)
     logger.info("Web 界面已退出")
+    return not failures
 
 
 from spritelens.web.server import LocalServer  # noqa: E402 - 放尾部避免循环导入困扰

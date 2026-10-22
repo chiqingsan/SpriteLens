@@ -21,7 +21,7 @@ from spritelens.logs import get_logger
 from spritelens.repositories.settings import SettingsRepository
 from spritelens.services.capture_service import CaptureService
 from spritelens.services.monitor_service import MonitorService
-from spritelens.services.session_tracker import SessionStats, Totals
+from spritelens.services.session_tracker import Totals
 from spritelens.system.environment import (
     NpcapReport,
     check_npcap,
@@ -73,6 +73,7 @@ class CaptureSnapshot:
     dropped_chunks: int = 0  # 队列过载丢弃的 chunk 数（下游处理不及时）
     dropped_segments: int = 0  # 重组层丢弃的乱序段数（pending 超限）
     event_log_dropped: int = 0  # 事件日志队列满丢弃的条数（磁盘跟不上）
+    event_log_error: str = ""
 
 
 class CaptureViewModel:
@@ -226,6 +227,10 @@ class CaptureViewModel:
     def stop(self) -> None:
         self._service.stop()
 
+    def command_scope(self):
+        """账号切换等组合命令使用采集服务的同一所有权边界。"""
+        return self._service.command_scope()
+
     @property
     def is_running(self) -> bool:
         return self._monitor.is_running
@@ -364,6 +369,7 @@ class CaptureViewModel:
                 if self._event_log is not None and hasattr(self._event_log, "dropped_count")
                 else 0
             ),
+            event_log_error=self._event_log.error if self._event_log is not None else "",
         )
 
 
