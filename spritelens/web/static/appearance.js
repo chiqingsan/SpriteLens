@@ -8,23 +8,22 @@
   var openBrowser = null;
 
   function apply(value) {
-    preferences = value;
-    document.documentElement.dataset.theme = value.theme;
-    document.getElementById("pet-image-mode").value = value.pet_image || "portrait";
-    Object.keys(value.fields).forEach(function (field) {
-      document.getElementById("page-pets").classList.toggle("hide-pet-" + field, !value.fields[field]);
+    preferences = Object.assign({}, value, { pet_image: "portrait" });
+    document.documentElement.dataset.theme = preferences.theme;
+    Object.keys(preferences.fields).forEach(function (field) {
+      document.getElementById("page-pets").classList.toggle("hide-pet-" + field, !preferences.fields[field]);
       var input = document.querySelector('[data-pet-field="' + field + '"]');
-      if (input) { input.checked = value.fields[field]; }
+      if (input) { input.checked = preferences.fields[field]; }
     });
     document.querySelectorAll("[data-theme-choice]").forEach(function (button) {
-      button.setAttribute("aria-pressed", String(button.dataset.themeChoice === value.theme));
+      button.setAttribute("aria-pressed", String(button.dataset.themeChoice === preferences.theme));
     });
-    document.dispatchEvent(new CustomEvent("preferenceschanged", { detail: value }));
+    document.dispatchEvent(new CustomEvent("preferenceschanged", { detail: preferences }));
   }
 
   function update(changes) {
     var draft = { theme: changes.theme || preferences.theme, pet_view: changes.pet_view || preferences.pet_view,
-      pet_image: changes.pet_image || preferences.pet_image || "portrait",
+      pet_image: "portrait",
       fields: Object.assign({}, preferences.fields, changes.fields || {}), shortcuts: changes.shortcuts || preferences.shortcuts || [],
       home_orders: changes.home_orders || preferences.home_orders || {} };
     apply(draft);
@@ -51,8 +50,6 @@
   });
   document.getElementById("btn-theme-default").addEventListener("click", function () { update({ theme: "miaomiao" }); });
 
-  document.getElementById("pet-image-mode").addEventListener("change", function () { update({ pet_image: this.value }); });
-
   document.getElementById("btn-open-browser").addEventListener("click", async function () {
     this.disabled = true;
     try {
@@ -66,7 +63,7 @@
   });
 
   window.SpriteLensAppearance = {
-    imageMode: function () { return preferences.pet_image || "portrait"; },
+    imageMode: function () { return "portrait"; },
     initialize: function (value, persist, toast, open) { save = persist; notify = toast; openBrowser = open; apply(value); },
     view: function (view) { update({ pet_view: view }); },
     shortcuts: function (items) { return update({ shortcuts: items }); },

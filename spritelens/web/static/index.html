@@ -294,97 +294,74 @@
 
       <!-- 采集与设置 -->
       <section id="page-capture" class="page">
-        <div class="stack">
-          <section class="panel appearance-panel">
-            <div class="panel-head"><h2>外观</h2><button id="btn-theme-default" class="ghost-button small">恢复喵喵默认主题</button></div>
-            <div class="appearance-row">
-              <div class="appearance-copy"><strong>界面主题</strong><p class="muted">选择后立即应用。</p></div>
-              <div class="theme-choices" role="group" aria-label="界面主题">
-                <button class="theme-choice theme-miaomiao" data-theme-choice="miaomiao" aria-pressed="true">喵喵</button>
-                <button class="theme-choice theme-huohua" data-theme-choice="huohua" aria-pressed="false">火花</button>
-                <button class="theme-choice theme-shuilanlan" data-theme-choice="shuilanlan" aria-pressed="false">水蓝蓝</button>
+        <div class="settings-page">
+          <header class="settings-header">
+            <div>
+              <h1>偏好设置</h1>
+              <p class="settings-lede">外观、采集和诊断都在这里，修改后会自动保存。</p>
+            </div>
+            <div class="settings-local-state"><span class="settings-state-dot" aria-hidden="true"></span><span>本地自动保存</span></div>
+          </header>
+
+          <div class="settings-list">
+            <section id="settings-appearance" class="settings-group">
+              <div class="settings-group-head"><div><h2>外观</h2><p class="muted">调整工作台的颜色。</p></div><button id="btn-theme-default" class="ghost-button small">恢复默认</button></div>
+              <div class="settings-row settings-row-theme">
+                <div class="settings-row-copy"><strong>界面主题</strong><span>选择后立即应用到所有页面。</span></div>
+                <div class="theme-choices" role="group" aria-label="界面主题">
+                  <button class="theme-choice theme-miaomiao" data-theme-choice="miaomiao" aria-pressed="true"><i aria-hidden="true"></i><span>喵喵</span></button>
+                  <button class="theme-choice theme-huohua" data-theme-choice="huohua" aria-pressed="false"><i aria-hidden="true"></i><span>火花</span></button>
+                  <button class="theme-choice theme-shuilanlan" data-theme-choice="shuilanlan" aria-pressed="false"><i aria-hidden="true"></i><span>水蓝蓝</span></button>
+                </div>
               </div>
-            </div>
-            <div class="appearance-row">
-              <div class="appearance-copy"><strong>精灵图片</strong><p class="muted">背包与详情使用同一种图片，切换后立即生效。</p></div>
-              <label class="pet-image-choice">显示方式<select id="pet-image-mode"><option value="portrait">精灵头像（默认）</option><option value="artwork">全身图</option></select></label>
-            </div>
-            <p id="appearance-status" role="status" class="muted">主题、背包视图与显示选项自动保存到本机。</p>
-          </section>
+              <p id="appearance-status" role="status" class="settings-status muted">主题与显示选项自动保存到本机。</p>
+            </section>
 
-          <section class="panel">
-            <div class="panel-head"><h2>界面调试</h2></div>
-            <div class="appearance-row">
-              <div class="appearance-copy"><strong>在浏览器中查看界面</strong><p class="muted">打开当前本地页面，按 F12 使用开发者工具检查布局。调试时请保持软件运行。</p></div>
-              <button id="btn-open-browser" type="button" class="ghost-button">在浏览器中打开</button>
-            </div>
-          </section>
+            <section id="settings-capture" class="settings-group">
+              <div class="settings-group-head"><div><h2>采集</h2><p class="muted">选择采集环境和启动行为。</p></div><span class="status-pill">只读旁听</span></div>
+              <div class="settings-row settings-row-note"><div class="settings-row-copy"><strong>游戏连接</strong><span>开始采集后进入游戏；若已登录，请返回登录界面再进入。</span></div></div>
+              <section id="npcap-banner" class="banner warn" hidden>
+                <div class="banner-copy">
+                  <strong id="npcap-title">抓包环境未就绪</strong>
+                  <p id="npcap-message"></p>
+                  <div id="npcap-progress" class="progress-bar" hidden><i></i></div>
+                </div>
+                <div class="banner-actions">
+                  <button id="btn-npcap-install" class="primary-button small">一键安装 Npcap</button>
+                  <button id="btn-rsc" class="ghost-button small" hidden>一键禁用 RSC</button>
+                  <button id="btn-recheck" class="ghost-button small">重新检测</button>
+                </div>
+              </section>
+              <div class="settings-row">
+                <div class="settings-row-copy"><strong>抓包网卡</strong><span>不确定时保持默认路由网卡。</span></div>
+                <label class="settings-control"><span class="sr-only">抓包网卡</span><select id="c-iface"><option value="">（默认路由网卡）</option></select></label>
+              </div>
+              <label class="settings-row settings-row-check"><span class="settings-row-copy"><strong>打开即采集</strong><span>应用启动时自动开始采集。</span></span><input id="c-autostart" type="checkbox"></label>
+              <label class="settings-row settings-row-check"><span class="settings-row-copy"><strong>启动时自动录制</strong><span>应用启动时同时保存原始流。</span></span><input id="c-record" type="checkbox"></label>
+              <div class="settings-actions"><button id="btn-capture-start" class="primary-button">开始采集</button><button id="btn-capture-stop" class="ghost-button">停止采集</button><button id="btn-record-toggle" class="ghost-button">开始录制</button></div>
+              <p id="capture-hint" class="settings-hint muted"></p>
+            </section>
 
-          <section class="panel">
-            <div class="panel-head"><h2>连接游戏</h2><span class="muted">首次使用按以下顺序操作</span></div>
-            <ol class="capture-steps"><li>检查采集环境</li><li>开始采集</li><li>登录游戏进入世界</li><li>自动同步精灵数据</li></ol>
-            <p class="muted">如果开始采集前游戏已登录，请退回登录界面再进入。网卡不确定时保持默认。</p>
-          </section>
-          <section id="npcap-banner" class="banner warn" hidden>
-            <div class="banner-copy">
-              <strong id="npcap-title">抓包环境未就绪</strong>
-              <p id="npcap-message"></p>
-              <div id="npcap-progress" class="progress-bar" hidden><i></i></div>
-            </div>
-            <div class="banner-actions">
-              <button id="btn-npcap-install" class="primary-button small">一键安装 Npcap</button>
-              <button id="btn-rsc" class="ghost-button small" hidden>一键禁用 RSC</button>
-              <button id="btn-recheck" class="ghost-button small">重新检测</button>
-            </div>
-          </section>
-
-          <section class="panel">
-            <div class="panel-head"><h2>采集控制</h2><span class="muted">抓包只读旁听，不修改报文</span></div>
-            <div class="form-grid">
-              <label class="field">
-                <span>抓包网卡</span>
-                <select id="c-iface"><option value="">（默认路由网卡）</option></select>
-              </label>
-              <label class="check-row">
-                <input id="c-autostart" type="checkbox"><span>打开即采集（启动时自动开始）</span>
-              </label>
-              <label class="check-row">
-                <input id="c-record" type="checkbox"><span>启动时自动录制原始流</span>
-              </label>
-            </div>
-            <div class="button-row">
-              <button id="btn-capture-start" class="primary-button">开始采集</button>
-              <button id="btn-capture-stop" class="ghost-button">停止采集</button>
-              <button id="btn-record-toggle" class="ghost-button">切换录制</button>
-            </div>
-            <p id="capture-hint" class="muted"></p>
-          </section>
-
-          <details class="panel advanced-settings">
-            <summary>高级设置与采集诊断</summary>
-          <section class="panel">
-            <div class="panel-head"><h2>手动密钥</h2><span class="muted">连接早于采集时用来续解；支持 16 字节 ASCII（32 hex 字符）</span></div>
-            <div class="button-row">
-              <input id="c-key" type="text" class="grow" placeholder="粘贴密钥文本">
-              <button id="btn-key-apply" class="ghost-button">应用密钥</button>
-            </div>
-            <p id="key-message" class="muted"></p>
-          </section>
-
-          <section class="panel">
-            <div class="panel-head"><h2>会话与统计</h2><span id="capture-stats" class="muted"></span></div>
-            <div class="table-wrap short">
-              <table class="event-table">
-                <thead><tr><th>会话</th><th>密钥</th><th>数据帧</th></tr></thead>
-                <tbody id="session-rows"></tbody>
-              </table>
-            </div>
-          </section>
-          </details>
-          <section class="panel">
-            <div class="panel-head"><h2>关于</h2></div>
-            <p class="muted" id="about-line">SpriteLens 小洛探探 · 纯本地数据观测 · 不做云同步/账号/交易市场</p>
-          </section>
+            <section id="settings-debug" class="settings-group">
+              <div class="settings-group-head"><div><h2>诊断</h2><p class="muted">遇到布局或采集问题时，从这里打开检查工具。</p></div></div>
+              <div class="settings-row">
+                <div class="settings-row-copy"><strong>浏览器调试</strong><span>打开当前页面，使用 F12 检查布局；调试时请保持软件运行。</span></div>
+                <button id="btn-open-browser" type="button" class="ghost-button">在浏览器中打开</button>
+              </div>
+              <details class="advanced-settings">
+                <summary><span><strong>高级诊断</strong><small>手动密钥、会话和采集统计</small></span><svg class="ui-icon" aria-hidden="true"><use href="/static/icons/sprite.svg#chevron-right"></use></svg></summary>
+                <section class="settings-diagnostic-block">
+                  <div class="subsection-heading"><strong>手动密钥</strong><span class="muted">支持 16 字节 ASCII（32 hex 字符）</span></div>
+                  <div class="button-row"><label class="sr-only" for="c-key">密钥文本</label><input id="c-key" type="text" class="grow" placeholder="粘贴密钥文本"><button id="btn-key-apply" class="ghost-button">应用密钥</button></div>
+                  <p id="key-message" class="muted"></p>
+                </section>
+                <section class="settings-diagnostic-block">
+                  <div class="subsection-heading"><strong>会话与统计</strong><span id="capture-stats" class="muted"></span></div>
+                  <div class="table-wrap short"><table class="event-table"><thead><tr><th>会话</th><th>密钥</th><th>数据帧</th></tr></thead><tbody id="session-rows"></tbody></table></div>
+                </section>
+              </details>
+            </section>
+          </div>
         </div>
       </section>
     </main>

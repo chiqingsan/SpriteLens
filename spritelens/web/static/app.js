@@ -502,6 +502,7 @@
     renderInstallProgress(payload.install || {});
     $("c-record").checked = !!payload.recording_requested;
     if ($("c-autostart")) { $("c-autostart").checked = payload.autostart !== false; }
+    $("btn-record-toggle").textContent = payload.recording ? "停止录制" : "开始录制";
 
     var ifaceSelect = $("c-iface");
     if (!ifaceSelect.dataset.value || ifaceSelect.value !== payload.iface) {
