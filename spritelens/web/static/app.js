@@ -826,9 +826,8 @@
     document.getElementById("page-colors").addEventListener("click", function (event) {
       var chip = event.target.closest("[data-mm]");
       if (!chip) { return; }
-      switchPage("pets");
-      petFilters.search(String(chip.dataset.mm));
-      loadPets();
+      petFilters.reset();
+      switchPage("pets", String(chip.dataset.mm));
     });
     document.getElementById("page-breeder-library").addEventListener("click", function (event) {
       var chip = event.target.closest("[data-mm]");

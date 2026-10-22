@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 153" fill="none">
+  <defs>
+    <clipPath id="card"><rect width="280" height="153" rx="30"/></clipPath>
+    <path id="spark" d="M0-20C3-6 6-3 15 0 6 3 3 6 0 20-3 6-6 3-15 0-6-3-3-6 0-20Z"/>
+  </defs>
+  <g clip-path="url(#card)">
+    <path fill="#f7c64b" d="M0 0h280v153H0z"/>
+    <path fill="#372451" d="M0 83C46 60 84 60 124 82c37 21 73 22 106-7 18-15 34-19 50-18v96H0Z"/>
+    <circle cx="142" cy="74" r="36" fill="#fff4ce"/>
+    <path fill="#f7c64b" d="M153 39a36 36 0 0 0 0 70 36 36 0 1 1 0-70Z"/>
+    <g fill="#fff4ce">
+      <use href="#spark" transform="translate(45 50) scale(.8)"/>
+      <use href="#spark" transform="translate(231 50) scale(.95)"/>
+      <use href="#spark" transform="translate(75 112) scale(.5)"/>
+      <use href="#spark" transform="translate(202 115) scale(.6)"/>
+      <circle cx="91" cy="28" r="3"/><circle cx="184" cy="30" r="3"/>
+    </g>
+  </g>
+</svg>
