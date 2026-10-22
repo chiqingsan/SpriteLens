@@ -23,9 +23,9 @@ timestamp_format = "%H%M"
 # GUI 程序：隐藏控制台窗口。
 windowed = true
 
-# 抓包需要 Npcap 驱动；驱动安装由程序内引导（UAC 提权），
-# exe 本身不请求管理员权限（避免每次启动弹 UAC）。
-uac_admin = false
+# 抓包需要 Npcap 驱动；发布 exe 启动时以管理员权限运行并触发 UAC，
+# 便于安装驱动和执行需要提权的采集操作。源码启动与测试不受此配置影响。
+uac_admin = true
 
 # 产物形态：单文件 exe（体积换便携）。
 onefile = true

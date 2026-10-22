@@ -1,13 +1,12 @@
 """Npcap 环境检测与安装引导。
 
-一键安装的边界：只做「下载官方安装器 + UAC 提权拉起安装向导」，
+一键安装的边界：只做「下载官方安装器 + 等待官方安装向导完成」，
 不静默安装、不改系统设置——许可条款与安装选项由用户在官方向导中确认
 （务必保持默认勾选 WinPcap API-compatible Mode）。
 """
 
 from __future__ import annotations
 
-import ctypes
 import os
 import re
 import subprocess
@@ -27,6 +26,8 @@ _NPCAP_PATH_CANDIDATES = (
     r"C:\Windows\System32\wpcap.dll",
 )
 _DOWNLOAD_CHUNK = 64 * 1024
+_POWERSHELL_EXE = "powershell.exe"
+_MANUAL_INSTALL_URL = "https://npcap.com/#download"
 
 
 @dataclass(frozen=True)
@@ -86,7 +87,7 @@ def check_npcap(
         installed=False,
         wpcap_path=None,
         message="未检测到 Npcap（抓包驱动），无法采集网络流量。可点击「一键安装」，"
-        "或到 https://npcap.com 手动下载（安装时勾选 WinPcap API-compatible Mode）。",
+        f"或到 {_MANUAL_INSTALL_URL} 手动下载（安装时勾选 WinPcap API-compatible Mode）。",
     )
 
 
@@ -179,7 +180,7 @@ def resolve_latest_installer(*, timeout: float = 15.0) -> tuple[str, str]:
         html = resp.read().decode("utf-8", errors="replace")
     version = parse_dist_page(html)
     if version is None:
-        raise RuntimeError("无法从 npcap.com 解析最新版本，请手动安装")
+        raise RuntimeError(f"无法从 npcap.com 解析最新版本，请到 {_MANUAL_INSTALL_URL} 手动安装")
     return f"{NPCAP_DIST_URL}npcap-{version}.exe", version
 
 
@@ -190,34 +191,149 @@ def download_installer(
     progress_cb=None,
     timeout: float = 30.0,
 ) -> Path:
-    """下载安装器到 dest_dir；progress_cb(0.0~1.0) 可选。返回文件路径。"""
+    """下载安装器到 dest_dir；PowerShell 失败时回退 urllib。"""
     dest_dir.mkdir(parents=True, exist_ok=True)
     filename = url.rsplit("/", 1)[-1]
     dest = dest_dir / filename
+    tmp = dest.with_suffix(dest.suffix + ".part")
     logger.info("下载 Npcap 安装器: %s", url)
+    try:
+        if progress_cb:
+            progress_cb(0.0)
+        _download_with_powershell(url, tmp, timeout=timeout)
+        _validate_installer(tmp)
+        tmp.replace(dest)
+        if progress_cb:
+            progress_cb(1.0)
+        logger.info("Npcap 安装器下载完成（PowerShell）: %s (%d 字节)", dest, dest.stat().st_size)
+        return dest
+    except Exception as powershell_exc:  # noqa: BLE001 - fallback is the contract
+        _remove_partial(tmp)
+        logger.warning("PowerShell 下载 Npcap 失败，回退 Python: %s", powershell_exc)
+
+    try:
+        result = _download_with_python(
+            url,
+            dest,
+            tmp,
+            progress_cb=progress_cb,
+            timeout=timeout,
+        )
+        logger.info("Npcap 安装器下载完成（Python）: %s (%d 字节)", result, result.stat().st_size)
+        return result
+    except Exception as python_exc:  # noqa: BLE001 - expose both paths to the user
+        _remove_partial(tmp)
+        raise RuntimeError(
+            "PowerShell 与 Python 下载均失败："
+            f"{python_exc}。请到 {_MANUAL_INSTALL_URL} 手动下载安装。"
+        ) from python_exc
+
+
+def _download_with_powershell(url: str, tmp: Path, *, timeout: float) -> None:
+    """用 PowerShell 写入 .part；校验和原子移动由 Python 完成。"""
+    script = (
+        "$ErrorActionPreference='Stop'; "
+        "$ProgressPreference='SilentlyContinue'; "
+        f"Invoke-WebRequest -UseBasicParsing -Uri {_ps_quote(url)} "
+        f"-OutFile {_ps_quote(str(tmp))}"
+    )
+    subprocess.run(
+        [_POWERSHELL_EXE, "-NoProfile", "-NonInteractive", "-Command", script],
+        capture_output=True,
+        timeout=timeout,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=True,
+        **_no_window_kwargs(),
+    )
+
+
+def _download_with_python(
+    url: str,
+    dest: Path,
+    tmp: Path,
+    *,
+    progress_cb=None,
+    timeout: float,
+) -> Path:
     req = urllib.request.Request(url, headers={"User-Agent": "SpriteLens/1.0"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        total = int(resp.headers.get("Content-Length") or 0)
-        tmp = dest.with_suffix(dest.suffix + ".part")
-        done = 0
-        with tmp.open("wb") as fh:
-            while True:
-                chunk = resp.read(_DOWNLOAD_CHUNK)
-                if not chunk:
-                    break
-                fh.write(chunk)
-                done += len(chunk)
-                if progress_cb and total:
-                    progress_cb(min(1.0, done / total))
-    tmp.replace(dest)
-    logger.info("Npcap 安装器下载完成: %s (%d 字节)", dest, done)
-    return dest
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            total = int(resp.headers.get("Content-Length") or 0)
+            done = 0
+            with tmp.open("wb") as fh:
+                while True:
+                    chunk = resp.read(_DOWNLOAD_CHUNK)
+                    if not chunk:
+                        break
+                    fh.write(chunk)
+                    done += len(chunk)
+                    if progress_cb and total:
+                        progress_cb(min(1.0, done / total))
+        _validate_installer(tmp)
+        tmp.replace(dest)
+        if progress_cb:
+            progress_cb(1.0)
+        return dest
+    finally:
+        _remove_partial(tmp)
 
 
-def launch_installer(path: Path) -> None:
-    """UAC 提权拉起官方安装向导（异步返回，向导自行运行）。"""
+def _validate_installer(path: Path) -> None:
+    """拒绝空文件和非 Windows PE，避免把错误页交给安装器。"""
+    if not path.is_file() or path.stat().st_size <= 0:
+        raise RuntimeError("下载文件为空或不存在")
+    with path.open("rb") as fh:
+        if fh.read(2) != b"MZ":
+            raise RuntimeError("下载文件不是 Windows PE 安装器")
+
+
+def _remove_partial(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        logger.debug("无法删除不完整安装器: %s", path, exc_info=True)
+
+
+def _ps_quote(value: str) -> str:
+    """PowerShell 单引号字符串转义（路径和 URL 均来自本地/官方源）。"""
+    return "'" + value.replace("'", "''") + "'"
+
+
+def launch_installer(path: Path) -> int | None:
+    """运行官方安装向导并等待退出；PowerShell 失败时回退原生进程。"""
     if not path.is_file():
         raise RuntimeError(f"安装器不存在: {path}")
-    rc = ctypes.windll.shell32.ShellExecuteW(None, "runas", str(path), None, None, 1)
-    if rc <= 32:
-        raise RuntimeError(f"安装向导拉起失败（用户取消或权限拒绝），代码 {rc}")
+    _validate_installer(path)
+    try:
+        return _launch_with_powershell(path)
+    except (OSError, ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        logger.warning("PowerShell 启动 Npcap 安装器失败，回退原生进程: %s", exc)
+    try:
+        completed = subprocess.run([str(path)], check=False)
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(f"安装向导拉起失败：{exc}") from exc
+    return completed.returncode
+
+
+def _launch_with_powershell(path: Path) -> int | None:
+    script = (
+        "$ErrorActionPreference='Stop'; "
+        f"$process=Start-Process -FilePath {_ps_quote(str(path))} -Wait -PassThru; "
+        "Write-Output ('SPRITELENS_EXIT:' + $process.ExitCode)"
+    )
+    completed = subprocess.run(
+        [_POWERSHELL_EXE, "-NoProfile", "-NonInteractive", "-Command", script],
+        capture_output=True,
+        timeout=None,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=True,
+        **_no_window_kwargs(),
+    )
+    for line in (completed.stdout or "").splitlines():
+        if line.startswith("SPRITELENS_EXIT:"):
+            return int(line.split(":", 1)[1].strip())
+    return None

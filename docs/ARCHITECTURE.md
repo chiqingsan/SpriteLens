@@ -170,6 +170,11 @@ UI 的 `drain_events` 与后续帧处理——实测事件日志每条 `flush()`
   `MAX_HISTORY_BYTES`=256KB 供重传比对）。流关闭（FIN/RST）与空闲超时
   （30min）都会释放重组器，并经同一队列**保序**向协议层投递关闭事件——
   残余数据先于会话释放处理，嗅探线程不等待协议层锁。
+- **Npcap 安装引导**：`CaptureViewModel` 只编排状态，`system/environment.py` 负责外部边界。
+  版本解析失败或 PowerShell 下载失败时先回退 Python `urllib`；每条路径都写入 `.part`，只在
+  非空且以 `MZ` 开头的 PE 通过校验后原子落盘。两条路径都失败不启动安装器，并返回官方手动
+  下载地址。启动优先使用 PowerShell `Start-Process -Wait`，失败才使用原生进程；安装器退出后
+  进入 `checking` 并重新执行完整 Npcap 检测，成功为 `completed`，失败为 `failed`，不自动重启。
 - **MITM 代理（预留）**：实现同一协议即可整体替换。socket 直读天然有序，
   无需重组——这正是重组放在接入层而非协议层的原因。
 

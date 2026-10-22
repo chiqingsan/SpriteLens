@@ -288,11 +288,18 @@ class LocalServerTest(unittest.TestCase):
         status, payload = _http_get(f"{base}/api/capture", token=self.server.token)
         self.assertEqual(status, 200)
         self.assertIn("environment", payload)
+        self.assertEqual(payload["install"]["phase"], "idle")
         self.assertFalse(payload["running"])
         # 静默丢数据的可见信号（队列过载/重组超限/日志队列满）
         for key in ("dropped_chunks", "dropped_segments", "event_log_dropped"):
             self.assertIn(key, payload)
             self.assertEqual(payload[key], 0)
+
+        state = self.server._state_payload()
+        self.assertEqual(state["install"]["phase"], "idle")
+        self.server._context.capture_vm._set_install("checking", "正在检测", None)
+        state = self.server._state_payload()
+        self.assertEqual(state["install"]["phase"], "checking")
 
         status, payload = _http_post(f"{base}/api/capture/iface", self.server.token, {"name": ""})
         self.assertEqual(status, 200)

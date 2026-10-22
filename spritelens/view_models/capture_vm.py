@@ -42,7 +42,7 @@ AUTOSTART_SETTING_KEY = "capture.autostart"
 class InstallState:
     """一键安装流程的只读状态。"""
 
-    phase: str  # idle/resolving/downloading/launching/launched/failed
+    phase: str  # idle/resolving/downloading/launching/checking/completed/failed
     message: str
     progress: float | None
 
@@ -278,7 +278,7 @@ class CaptureViewModel:
                 if self._npcap_report.rsc_enabled:
                     self._set_install("failed", "RSC 仍未禁用（UAC 被取消或命令失败），请手动执行", None)
                 else:
-                    self._set_install("launched", "RSC 已禁用，抓包环境正常（无需重启）", None)
+                    self._set_install("completed", "RSC 已禁用，抓包环境正常（无需重启）", None)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("禁用 RSC 失败: %s", exc)
                 self._set_install("failed", f"禁用 RSC 失败：{exc}", None)
@@ -319,19 +319,23 @@ class CaptureViewModel:
                 self._set_install("downloading", f"正在下载 npcap-{version}…", value)
 
             dest = self._downloader(url, self._installer_dir, progress_cb=on_progress)
-            self._set_install("launching", "安装包下载完成，正在打开安装向导…", None)
-            self._launcher(dest)
+            self._set_install("launching", "安装包下载完成，正在运行安装向导…", None)
+            exit_code = self._launcher(dest)
+            self._set_install("checking", "安装器已退出，正在重新检测 Npcap…", None)
+            report = self.refresh_environment()
+            if not report.installed:
+                suffix = f"（安装器退出代码 {exit_code}）" if exit_code not in (None, 0) else ""
+                raise RuntimeError(f"安装器已退出但仍未检测到 Npcap{suffix}")
             self._set_install(
-                "launched",
-                "安装向导已打开：按向导完成安装（保持默认勾选 WinPcap API-compatible Mode），"
-                "完成后点击「重新检测」，然后重启 SpriteLens。",
+                "completed",
+                "Npcap 安装完成，抓包环境已就绪；如采集未恢复，请重启 SpriteLens。",
                 None,
             )
         except Exception as exc:  # noqa: BLE001 - 安装引导失败转用户可读消息
             logger.warning("Npcap 一键安装失败: %s", exc)
             self._set_install(
                 "failed",
-                f"一键安装失败：{exc}。请到 https://npcap.com 手动下载安装。",
+                f"一键安装失败：{exc}。请到 https://npcap.com/#download 手动下载安装。",
                 None,
             )
         finally:

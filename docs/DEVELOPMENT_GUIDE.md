@@ -150,6 +150,10 @@ Store 并发批次顺序、坏库备份失败保护与坏行隔离已有修复�
   `resources/app.ico` 与 `spritelens/web/static/favicon.png`，源图与产物随仓库提交。
   窗口标题栏、任务栏、Alt-Tab、桌面快捷方式与 exe 共用 ICO；浏览器标签页与页面品牌标识共用 PNG。
 - **打包**：`build.bat` / `python build.py`（配置在 `build_config.toml`）。
+  发布配置启用 `uac_admin = true`，Nuitka 生成的 exe 启动时会触发 UAC，以便采集和 Npcap
+  安装流程获得管理员权限；源码 `start.bat`、单元测试和开发服务器不强制提权。Npcap 安装
+  首选 `powershell.exe -NoProfile -NonInteractive` 下载官方安装器，失败后回退 Python `urllib`；
+  安装器退出后自动检测，不自动重启程序，两条下载路径都失败时显示官方手动安装地址。
   **不要排除 scapy 的任何子模块**——scapy 内部动态 import 多，静态排除会
   在打包产物里才暴露为运行时失败（实测排除 `as_resolvers` 让网卡枚举直接挂）
 - **包内非 Python 资源必须显式附带**：`spritelens/web/static/`（前端 HTML/CSS/JS

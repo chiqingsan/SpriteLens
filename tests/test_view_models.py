@@ -5,6 +5,7 @@ import threading
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from spritelens.capture.base import StreamChunk
 from spritelens.capture.key_store import KeyStore
@@ -368,6 +369,153 @@ class CaptureViewModelTest(unittest.TestCase):
         vm.set_autostart(False)
         self.assertFalse(vm.start_if_autostart())
         self.assertFalse(monitor.is_running)
+
+    def test_npcap_install_waits_then_checks_and_completes(self):
+        installer = self.tmp_path / "npcap.exe"
+        installer.write_bytes(b"MZinstaller")
+        launcher_called = threading.Event()
+
+        def downloader(url, dest_dir, *, progress_cb):
+            launcher_called.set()
+            progress_cb(1.0)
+            return installer
+
+        vm, _monitor = _make_vm(
+            self.tmp_path,
+            resolver=lambda: ("https://npcap.com/dist/npcap-1.0.exe", "1.0"),
+            downloader=downloader,
+            launcher=lambda path: 0,
+        )
+        vm._npcap_report = NpcapReport(False, None, "未安装")
+        installed = NpcapReport(True, str(installer), "已安装")
+        with mock.patch.object(vm, "refresh_environment", return_value=installed) as refresh:
+            vm.start_npcap_install()
+            deadline = time.monotonic() + 5
+            while vm.install_state().phase not in {"completed", "failed"}:
+                if time.monotonic() >= deadline:
+                    self.fail(f"安装流程未结束: {vm.install_state()}")
+                time.sleep(0.01)
+
+        self.assertTrue(launcher_called.is_set())
+        self.assertEqual(vm.install_state().phase, "completed")
+        refresh.assert_called_once_with()
+        self.assertIn("已就绪", vm.install_state().message)
+
+    def test_npcap_install_enters_checking_after_installer_exits(self):
+        installer = self.tmp_path / "npcap.exe"
+        installer.write_bytes(b"MZinstaller")
+        checking_seen = threading.Event()
+
+        vm, _monitor = _make_vm(
+            self.tmp_path,
+            resolver=lambda: ("https://npcap.com/dist/npcap-1.0.exe", "1.0"),
+            downloader=lambda url, dest_dir, *, progress_cb: installer,
+            launcher=lambda path: 0,
+        )
+        vm._npcap_report = NpcapReport(False, None, "未安装")
+
+        def observe_check():
+            checking_seen.set()
+            self.assertEqual(vm.install_state().phase, "checking")
+            return NpcapReport(True, str(installer), "已安装")
+
+        with mock.patch.object(vm, "refresh_environment", side_effect=observe_check):
+            vm.start_npcap_install()
+            self.assertTrue(checking_seen.wait(timeout=5))
+            deadline = time.monotonic() + 5
+            while vm.install_state().phase != "completed":
+                if time.monotonic() >= deadline:
+                    self.fail(f"安装流程未完成: {vm.install_state()}")
+                time.sleep(0.01)
+
+    def test_npcap_install_detection_failure_is_failed(self):
+        installer = self.tmp_path / "npcap.exe"
+        installer.write_bytes(b"MZinstaller")
+        vm, _monitor = _make_vm(
+            self.tmp_path,
+            resolver=lambda: ("https://npcap.com/dist/npcap-1.0.exe", "1.0"),
+            downloader=lambda url, dest_dir, *, progress_cb: installer,
+            launcher=lambda path: 1,
+        )
+        vm._npcap_report = NpcapReport(False, None, "未安装")
+        with mock.patch.object(
+            vm,
+            "refresh_environment",
+            return_value=NpcapReport(False, None, "仍未安装"),
+        ):
+            vm.start_npcap_install()
+            deadline = time.monotonic() + 5
+            while vm.install_state().phase not in {"completed", "failed"}:
+                if time.monotonic() >= deadline:
+                    self.fail(f"安装流程未结束: {vm.install_state()}")
+                time.sleep(0.01)
+        self.assertEqual(vm.install_state().phase, "failed")
+        self.assertIn("仍未检测到", vm.install_state().message)
+
+    def test_npcap_install_launcher_cancel_is_failed(self):
+        installer = self.tmp_path / "npcap.exe"
+        installer.write_bytes(b"MZinstaller")
+
+        def canceled_launcher(path):
+            raise RuntimeError("用户取消安装向导")
+
+        vm, _monitor = _make_vm(
+            self.tmp_path,
+            resolver=lambda: ("https://npcap.com/dist/npcap-1.0.exe", "1.0"),
+            downloader=lambda url, dest_dir, *, progress_cb: installer,
+            launcher=canceled_launcher,
+        )
+        vm._npcap_report = NpcapReport(False, None, "未安装")
+        vm.start_npcap_install()
+        deadline = time.monotonic() + 5
+        while vm.install_state().phase not in {"completed", "failed"}:
+            if time.monotonic() >= deadline:
+                self.fail(f"安装流程未结束: {vm.install_state()}")
+            time.sleep(0.01)
+        self.assertEqual(vm.install_state().phase, "failed")
+        self.assertIn("用户取消", vm.install_state().message)
+
+    def test_npcap_install_concurrent_clicks_start_one_flow(self):
+        installer = self.tmp_path / "npcap.exe"
+        installer.write_bytes(b"MZinstaller")
+        download_started = threading.Event()
+        release_download = threading.Event()
+        launch_count = 0
+        count_lock = threading.Lock()
+
+        def downloader(url, dest_dir, *, progress_cb):
+            download_started.set()
+            release_download.wait(timeout=5)
+            return installer
+
+        def launcher(path):
+            nonlocal launch_count
+            with count_lock:
+                launch_count += 1
+            return 0
+
+        vm, _monitor = _make_vm(
+            self.tmp_path,
+            resolver=lambda: ("https://npcap.com/dist/npcap-1.0.exe", "1.0"),
+            downloader=downloader,
+            launcher=launcher,
+        )
+        vm._npcap_report = NpcapReport(False, None, "未安装")
+        with mock.patch.object(
+            vm,
+            "refresh_environment",
+            return_value=NpcapReport(True, str(installer), "已安装"),
+        ):
+            vm.start_npcap_install()
+            self.assertTrue(download_started.wait(timeout=5))
+            vm.start_npcap_install()
+            release_download.set()
+            deadline = time.monotonic() + 5
+            while vm.install_state().phase not in {"completed", "failed"}:
+                if time.monotonic() >= deadline:
+                    self.fail(f"安装流程未结束: {vm.install_state()}")
+                time.sleep(0.01)
+        self.assertEqual(launch_count, 1)
 
 
 if __name__ == "__main__":

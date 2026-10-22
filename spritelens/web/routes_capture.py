@@ -168,6 +168,7 @@ class CaptureRoutesMixin:
             view = ctx.pet_vm.view_with(PetFilters())
         pets = pet_summary_payload(view, ctx.static_data)
         capture = ctx.capture_vm.snapshot()
+        install = ctx.capture_vm.install_state()
         return {
             **account_domains_payload(pets["uid"], ctx.egg_box, ctx.home_repo),
             "uid": pets["uid"],
@@ -191,6 +192,13 @@ class CaptureRoutesMixin:
             # 环境探测在启动路径上异步进行（RSC 检查约 1.8s）；
             # 探测完成后 report 变化 → 此载荷变化 → WS 推送 → 横幅自动刷新
             "environment": self._environment_payload(),
+            # Npcap 安装器在后台下载/提权；状态也要进入 WS，页面才能自动显示
+            # 下载进度、安装向导已打开或失败，而不是停留在点击瞬间的状态。
+            "install": {
+                "phase": install.phase,
+                "message": install.message,
+                "progress": install.progress,
+            },
         }
 
     def _environment_payload(self) -> dict:

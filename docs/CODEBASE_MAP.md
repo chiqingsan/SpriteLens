@@ -79,7 +79,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `capture/npcap_source.py` | scapy AsyncSniffer 接入（轻量回调 + 队列 + worker 投递；FIN/RST/空闲淘汰释放流，关闭事件经队列保序） |
 | `capture/nic_rank.py` | 活跃网卡识别与排序（Get-NetAdapter Status=Up → 设备列表前置） |
 | `capture/key_store.py` | 密钥解析与持久化：latest.key + session.json v1（flow/密钥/身份/服务端序号，原子写，损坏即弃） |
-| `system/environment.py` | Npcap 检测、官方版本解析、下载、UAC 拉起安装向导 |
+| `system/environment.py` | Npcap 检测与 RSC 处理、官方版本解析；PowerShell 首选下载、Python 回退、PE 校验、等待安装器退出 |
 | `system/webview_guard.py` | WebView2 运行时预检测（注册表/env）+ 缺失时原生对话框引导安装 |
 | `system/window_geometry.py` | 初始窗口尺寸：工作区 + 系统 DPI 缩放适配（fit_window 纯函数） |
 | `system/single_instance.py` | 单实例控制：命名互斥锁 + 唤醒事件 + Win32 强制置顶 |
@@ -184,8 +184,9 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `test_crash_log.py` | pythonw 主线程/后台线程崩溃落盘 |
 | `test_paths.py` | 打包态资源定位：源码/frozen/_MEIPASS 三分支、数据目录不受打包影响 |
 | `test_web_server.py` | REST/WS 鉴权、启动回收、请求串扰、采集输入/写失败与图鉴筛选 |
+| `test_build.py` | Nuitka 发布命令包含管理员权限开关 |
 | `test_browser_open.py` | 设置页浏览器调试入口：鉴权、当前服务 URL 与浏览器打开失败 |
-| `test_environment.py` | 启动 quick 探测不调用慢 RSC 检查、Npcap 版本数字排序 |
+| `test_environment.py` | 启动 quick 探测不调用慢 RSC 检查、Npcap 版本数字排序、PowerShell/Python 下载回退与安装器等待 |
 | `test_event_logger.py` | 异步落盘、关闭 flush、过载计数与关闭超时所有权 |
 
 ## 三主题与资源补齐（2026-10-12）

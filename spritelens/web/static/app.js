@@ -240,6 +240,16 @@
     if (!observed.accepted) { return; }
     if (observed.changed) { resetAccountViews(); }
     var capture = payload.capture || {};
+    if (payload.environment) {
+      renderEnvBanner(payload.environment);
+      state.capture = state.capture || {};
+      state.capture.environment = payload.environment;
+    }
+    if (payload.install) {
+      renderInstallProgress(payload.install);
+      state.capture = state.capture || {};
+      state.capture.install = payload.install;
+    }
     setPill("pill-listen", "采集：" + (capture.running ? "进行中" : "未启动"), capture.running ? "ok" : "idle");
     setPill("pill-key", "密钥：" + (capture.any_key ? "已获取" : "未获取"), capture.any_key ? "ok" : "warn");
     setPill("pill-record", "录制：" + (capture.recording ? "开" : "关"), capture.recording ? "ok" : "idle");
@@ -343,6 +353,8 @@
     $("npcap-banner").hidden = !needBanner;
     $("npcap-title").textContent = !env.installed ? "未检测到 Npcap 抓包驱动" : "网卡 RSC 未禁用";
     $("npcap-message").textContent = env.message || "";
+    $("npcap-steps").hidden = !!env.installed;
+    $("npcap-manual-link").hidden = !!env.installed;
     // 按钮可见性按问题类型区分（RSC 只能装完 Npcap 后处理）
     $("btn-npcap-install").hidden = !!env.installed;
     $("btn-rsc").hidden = !(env.installed && rscIssue);
@@ -378,9 +390,12 @@
   function renderInstallProgress(install) {
     var bar = $("npcap-progress");
     var hint = $("capture-hint");
+    var installButton = $("btn-npcap-install");
     if (!install || install.phase === "idle") {
       bar.hidden = true;
       hint.textContent = "";
+      installButton.disabled = false;
+      installButton.textContent = "一键安装 Npcap";
       return;
     }
     var text = install.message || "";
@@ -388,11 +403,23 @@
     if (install.phase === "failed") {
       tone = "（失败）";
       bar.hidden = true;
-    } else if (install.phase === "launched") {
+      installButton.disabled = false;
+      installButton.textContent = "重试安装 Npcap";
+    } else if (install.phase === "completed") {
       tone = "";
       bar.hidden = true;
+      installButton.disabled = false;
+      installButton.textContent = "重新打开安装流程";
+    } else if (install.phase === "checking") {
+      bar.hidden = false;
+      installButton.disabled = true;
+      installButton.textContent = "正在检测 Npcap…";
+      bar.classList.add("indeterminate");
+      bar.querySelector("i").style.width = "";
     } else {
       bar.hidden = false;
+      installButton.disabled = true;
+      installButton.textContent = "安装处理中…";
       if (install.progress === null || install.progress === undefined) {
         bar.classList.add("indeterminate");
         bar.querySelector("i").style.width = "";

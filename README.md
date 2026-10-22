@@ -114,9 +114,10 @@
 ## 安装
 
 1. **Npcap 抓包驱动（必需）**：程序启动时会自动检测，未安装时采集页顶部会出现
-   引导横幅，点「一键安装 Npcap」即可（自动从 npcap.com 官方下载最新安装器并
-   提权打开安装向导；向导中保持默认勾选 *Install Npcap in WinPcap API-compatible
-   Mode*，装完点「重新检测」并重启小洛探探）。也可到 [npcap.com](https://npcap.com) 手动安装。
+   引导横幅，按页面三步完成：点「一键安装 Npcap」下载并运行官方安装器；向导中保持默认勾选
+   *WinPcap Compatible Mode*（WinPcap API-compatible Mode）。PowerShell 是首选下载通道，失败时
+   自动回退 Python 内置下载；安装器退出后页面会自动检测并提示结果，不会自动重启小洛探探。
+   两种下载方式都失败时，请打开 [Npcap 官方下载页](https://npcap.com/#download) 手动安装。
 2. Python 3.12+（开发基线 3.12）
 3. 安装依赖：
 
@@ -129,6 +130,9 @@ python -m venv .venv
 回项目根运行 `.venv/Scripts/python.exe -B tools/frontend.py build`。已打包程序无需 Node。
 完整命令见 [前端开发](docs/FRONTEND_DEVELOPMENT.md)。图鉴、蛋仓、家园、色卡、产线、配对、智能配窝和宠物页已迁 Vue，支持加载/错误重试、
 筛选空态、键盘详情；孵化时长条件表示“至少”，切页返回重新加载默认筛选。
+
+发布包按 `build_config.toml` 以管理员权限启动，每次启动可能触发 Windows UAC；源码 `start.bat`
+和测试环境不强制提权。
 
 ## 使用
 

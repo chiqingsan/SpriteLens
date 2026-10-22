@@ -222,6 +222,12 @@
                 <div class="banner-copy">
                   <strong id="npcap-title">抓包环境未就绪</strong>
                   <p id="npcap-message"></p>
+                  <ol id="npcap-steps" class="capture-steps" hidden>
+                    <li><strong>下载并运行</strong> 点击“一键安装 Npcap”，或打开官网手动下载安装器。</li>
+                    <li><strong>保留兼容模式</strong> 安装向导中保持勾选 <em>WinPcap Compatible Mode</em>（WinPcap API-compatible Mode）。</li>
+                    <li><strong>自动确认</strong> 安装器退出后页面会自动检测；若采集未恢复，再重启 SpriteLens。</li>
+                  </ol>
+                  <a id="npcap-manual-link" class="settings-hint" href="https://npcap.com/#download" target="_blank" rel="noreferrer">打开 Npcap 官方下载页</a>
                   <div id="npcap-progress" class="progress-bar" hidden><i></i></div>
                 </div>
                 <div class="banner-actions">
