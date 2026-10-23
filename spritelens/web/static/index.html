@@ -216,37 +216,7 @@
             </section>
 
             <section id="settings-capture" class="settings-group">
-              <div class="settings-group-head"><div><h2>采集</h2><p class="muted">选择采集环境和启动行为。</p></div><span class="status-pill">只读旁听</span></div>
               <div id="capture-diagnostics-root"></div>
-              <div class="settings-row settings-row-note"><div class="settings-row-copy"><strong>游戏连接</strong><span>开始采集后进入游戏；若已登录，请返回登录界面再进入。</span></div></div>
-              <section id="npcap-banner" class="banner warn" hidden>
-                <div class="banner-copy">
-                  <strong id="npcap-title">抓包环境未就绪</strong>
-                  <p id="npcap-message"></p>
-                  <ol id="npcap-steps" class="capture-steps" hidden>
-                    <li><strong>下载并运行</strong> 点击“一键安装 Npcap”，或打开官网手动下载安装器。</li>
-                    <li><strong>保留兼容模式</strong> 安装向导中保持勾选 <em>WinPcap Compatible Mode</em>（WinPcap API-compatible Mode）。</li>
-                    <li><strong>自动确认</strong> 安装器退出后页面会自动检测；若采集未恢复，再重启 SpriteLens。</li>
-                  </ol>
-                  <a id="npcap-manual-link" class="settings-hint" href="https://npcap.com/#download" target="_blank" rel="noreferrer">打开 Npcap 官方下载页</a>
-                  <div id="npcap-progress" class="progress-bar" hidden><i></i></div>
-                </div>
-                <div class="banner-actions">
-                  <button id="btn-npcap-install" class="primary-button small">一键安装 Npcap</button>
-                  <button id="btn-rsc" class="ghost-button small" hidden>一键禁用 RSC</button>
-                  <button id="btn-recheck" class="ghost-button small">重新检测</button>
-                </div>
-              </section>
-              <label class="settings-row settings-row-check"><span class="settings-row-copy"><strong>打开即采集</strong><span>应用启动时自动开始采集。</span></span><input id="c-autostart" type="checkbox"></label>
-              <div class="settings-row">
-                <div class="settings-row-copy"><strong>游戏启动跟随</strong><span>游戏启动时自动开启轻量后台监听，游戏关闭后自动退出；游戏进程识别已内置。</span></div>
-                <span id="c-game-auto-status" class="status-pill idle">当前状态：未跟随</span>
-              </div>
-              <div class="settings-actions"><button id="btn-game-auto-follow" class="primary-button">跟随启动</button><button id="btn-game-auto-unfollow" class="ghost-button">取消跟随</button></div>
-              <p id="c-game-auto-guidance" class="settings-hint muted"></p>
-              <label class="settings-row settings-row-check"><span class="settings-row-copy"><strong>启动时自动录制</strong><span>应用启动时同时保存原始流。</span></span><input id="c-record" type="checkbox"></label>
-              <div class="settings-actions"><button id="btn-capture-start" class="primary-button">开始采集</button><button id="btn-capture-stop" class="ghost-button">停止采集</button><button id="btn-record-toggle" class="ghost-button">开始录制</button></div>
-              <p id="capture-hint" class="settings-hint muted"></p>
             </section>
 
             <section id="settings-debug" class="settings-group">
@@ -255,18 +225,6 @@
                 <div class="settings-row-copy"><strong>浏览器调试</strong><span>打开当前页面，使用 F12 检查布局；调试时请保持软件运行。</span></div>
                 <button id="btn-open-browser" type="button" class="ghost-button">在浏览器中打开</button>
               </div>
-              <details class="advanced-settings">
-                <summary><span><strong>高级诊断</strong><small>手动密钥、会话和采集统计</small></span><svg class="ui-icon" aria-hidden="true"><use href="/static/icons/sprite.svg#chevron-right"></use></svg></summary>
-                <section class="settings-diagnostic-block">
-                  <div class="subsection-heading"><strong>手动密钥</strong><span class="muted">支持 16 字节 ASCII（32 hex 字符）</span></div>
-                  <div class="button-row"><label class="sr-only" for="c-key">密钥文本</label><input id="c-key" type="text" class="grow" placeholder="粘贴密钥文本"><button id="btn-key-apply" class="ghost-button">应用密钥</button></div>
-                  <p id="key-message" class="muted"></p>
-                </section>
-                <section class="settings-diagnostic-block">
-                  <div class="subsection-heading"><strong>会话与统计</strong><span id="capture-stats" class="muted"></span></div>
-                  <div class="table-wrap short"><table class="event-table"><thead><tr><th>会话</th><th>密钥</th><th>数据帧</th></tr></thead><tbody id="session-rows"></tbody></table></div>
-                </section>
-              </details>
             </section>
 
             <section id="settings-about" class="settings-group">

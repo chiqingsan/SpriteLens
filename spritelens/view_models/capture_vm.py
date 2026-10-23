@@ -19,6 +19,7 @@ from spritelens.capture.key_store import KeyStore
 from spritelens.capture.npcap_source import NpcapCaptureSource
 from spritelens.logs import get_logger
 from spritelens.repositories.settings import SettingsRepository
+from spritelens.services.scene_repository import SceneRepository
 from spritelens.services.capture_service import CaptureService
 from spritelens.services.monitor_service import MonitorService
 from spritelens.services.session_tracker import Totals
@@ -99,6 +100,7 @@ class CaptureViewModel:
         launcher=None,
         environment_probe: callable | None = None,
         probe_environment: bool = True,
+        scene_repository: SceneRepository | None = None,
     ) -> None:
         self._monitor = monitor
         self._settings = settings
@@ -119,6 +121,7 @@ class CaptureViewModel:
         # 运行时职责收口到服务（命令锁/接入层/录制/密钥）
         self._service = CaptureService(
             monitor=monitor,
+            scene_repository=scene_repository,
             keys_dir=keys_dir,
             recordings_dir=recordings_dir,
             port=port,

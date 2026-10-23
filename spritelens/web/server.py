@@ -46,6 +46,7 @@ from spritelens.web.payloads_catalog import (
 from spritelens.web.pet_media_cache import PetMediaCache
 from spritelens.web.account_avatar_cache import AccountAvatarCache
 from spritelens.web.background import RUN_BLOCKING
+from spritelens.web.nearby import register_nearby_routes
 from spritelens.web.routes_capture import CaptureRoutesMixin
 from spritelens.web.routes_accounts import AccountRoutesMixin
 from spritelens.web.collection_lines import register_collection_routes
@@ -335,6 +336,7 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         app.router.add_post("/api/egg-box/annotations", self._api_save_egg_annotations)
         app.router.add_post("/api/egg-box/favorite", self._api_save_egg_favorite)
         app.router.add_get("/api/home", self._api_home)
+        register_nearby_routes(app, self._context.scene_repository)
         register_collection_routes(app, self._context)
         register_breeder_routes(app, self._context)
         register_planner_routes(app, self._context)

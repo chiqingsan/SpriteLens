@@ -212,6 +212,7 @@ class CaptureRoutesMixin:
         pets = pet_summary_payload(view, ctx.static_data)
         capture = ctx.capture_vm.snapshot()
         install = ctx.capture_vm.install_state()
+        nearby = ctx.scene_repository.snapshot() if ctx.scene_repository is not None else None
         return {
             **account_domains_payload(pets["uid"], ctx.egg_box, ctx.home_repo),
             "uid": pets["uid"],
@@ -220,6 +221,7 @@ class CaptureRoutesMixin:
             "identity": pets["identity"],
             "cached_identity": pets["cached_identity"],
             "stats": pets["stats"],
+            "nearby": {"uid": str(nearby.uid), "version": nearby.version, "phase": nearby.phase} if nearby is not None else None,
             "capture": self._capture_payload(capture),
             # 环境探测在启动路径上异步进行（RSC 检查约 1.8s）；
             # 探测完成后 report 变化 → 此载荷变化 → WS 推送 → 横幅自动刷新

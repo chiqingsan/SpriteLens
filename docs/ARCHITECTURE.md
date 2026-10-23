@@ -380,3 +380,7 @@ StaticData 组合只读 WikiReference，从随包 data/static/wiki_reference.jso
 按游戏物种 ID 和名称核对，不覆盖基础目录，也不依赖玩家仓库。
 图鉴 REST 仅在 details=1 时展开技能、特性、进化与获取资料；Vue 负责详情请求失效和章节展示。
 导入只在开发维护期执行，运行时不访问 Wiki。来源与失败边界见 [本地 Wiki 资料](WIKI_REFERENCE.md)。
+
+## C02 场景观察边界
+
+场景实体与背包、家园分域：`domain/scene` 纯提取，`SceneRepository` 单锁维护临时 uid/session/scene/version 快照，组合根订阅既有 MonitorService。管线的关闭/SYN/回收通知只执行内存失效；采集命令服务在同一命令锁内负责新源启动前和停止确认后的观察重置，历史账号选择成功后也清空观察。接口由独立 `web/nearby` 提供，只读、无额外 WS、无持久化；现有 WS 仅推版本摘要。完整性始终标未知/部分，协议证据与现场缺口见 [场景观察规格](SCENE_OBSERVATIONS.md)。

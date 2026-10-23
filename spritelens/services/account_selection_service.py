@@ -17,6 +17,7 @@ from spritelens.repositories.pet_store import PetStore
 from spritelens.services.egg_repository import EggBoxRepository
 from spritelens.services.home_repository import HomeRepository
 from spritelens.services.pet_repository import PetRepository
+from spritelens.services.scene_repository import SceneRepository
 
 
 class AccountSwitchBusy(Exception):
@@ -53,7 +54,9 @@ class AccountSelectionService:
         home_repo: HomeRepository,
         capture_running: Callable[[], bool],
         capture_command_scope: Callable[[], object] | None = None,
+        scene_repository: SceneRepository | None = None,
     ) -> None:
+        self._scene_repository = scene_repository
         self._pet_store = pet_store
         self._egg_store = egg_store
         self._home_store = home_store
@@ -118,6 +121,8 @@ class AccountSelectionService:
                 )
                 self._egg_box.select_historical_account(uid, staged.eggs, staged.hatch_slots)
                 self._home_repo.select_historical_account(uid, staged.home)
+                if self._scene_repository is not None:
+                    self._scene_repository.reset("historical_account", uid=uid)
 
 
 __all__ = [

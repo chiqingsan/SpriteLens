@@ -292,12 +292,10 @@
     if (observed.changed) { resetAccountViews(); }
     var capture = payload.capture || {};
     if (payload.environment) {
-      renderEnvBanner(payload.environment);
       state.capture = state.capture || {};
       state.capture.environment = payload.environment;
     }
     if (payload.install) {
-      renderInstallProgress(payload.install);
       state.capture = state.capture || {};
       state.capture.install = payload.install;
     }
@@ -329,8 +327,6 @@
         toggle.dataset.running = String(running);
       }
     }
-    $("btn-capture-start").disabled = !!capture.running;
-    $("btn-capture-stop").disabled = !capture.running;
 
     // 蛋仓有新数据且当前在蛋仓页 → 自动刷新（版本号变化才触发）
     var homeRefreshNeeded = false;
@@ -347,7 +343,6 @@
 
     renderRole(payload.identity, payload.cached_identity);
     if (state.page === "capture") {
-      renderCaptureSummary(payload.capture || {});
       if (captureDiagnostics) { captureDiagnostics.update(payload.capture); }
     }
     var version = payload.pets_version;
@@ -413,26 +408,9 @@
   })();
 
   /* ---------- 采集与设置 ---------- */
-  // 横幅语义：仅在「未装 Npcap」或「RSC 开启」时显示。
-  // 环境探测异步进行，WS state 载荷里也带 environment，探测完成后横幅自动刷新。
-  function renderEnvBanner(env) {
-    env = env || {};
-    var rscIssue = !!env.rsc_enabled;
-    var needBanner = !env.installed || rscIssue;
-    $("npcap-banner").hidden = !needBanner;
-    $("npcap-title").textContent = !env.installed ? "未检测到 Npcap 抓包驱动" : "网卡 RSC 未禁用";
-    $("npcap-message").textContent = env.message || "";
-    $("npcap-steps").hidden = !!env.installed;
-    $("npcap-manual-link").hidden = !!env.installed;
-    // 按钮可见性按问题类型区分（RSC 只能装完 Npcap 后处理）
-    $("btn-npcap-install").hidden = !!env.installed;
-    $("btn-rsc").hidden = !(env.installed && rscIssue);
-  }
-
   function renderCapture(payload) {
     state.capture = payload;
     if (captureDiagnostics) { captureDiagnostics.update(payload); }
-    renderEnvBanner(payload.environment);
 
     var toggle = $("btn-toggle");
     if (toggle) {
@@ -445,94 +423,6 @@
       toggle.onclick = running ? doStop : doStart;
     }
 
-    renderInstallProgress(payload.install || {});
-    $("c-record").checked = !!payload.recording_requested;
-    if ($("c-autostart")) { $("c-autostart").checked = payload.autostart !== false; }
-    var automation = payload.automation || {};
-    var followingGame = automation.enabled === true;
-    var automationStatus = $("c-game-auto-status");
-    if (automationStatus) {
-      var automationText = followingGame ? "当前状态：跟随启动" : "当前状态：未跟随";
-      var automationClass = "status-pill " + (followingGame ? "ok" : "idle");
-      if (automationStatus.textContent !== automationText) { automationStatus.textContent = automationText; }
-      if (automationStatus.className !== automationClass) { automationStatus.className = automationClass; }
-    }
-    if ($("btn-game-auto-follow")) { $("btn-game-auto-follow").disabled = followingGame; }
-    if ($("btn-game-auto-unfollow")) { $("btn-game-auto-unfollow").disabled = !followingGame; }
-    if ($("c-game-auto-guidance")) { $("c-game-auto-guidance").textContent = automation.audit_guidance || ""; }
-    $("btn-record-toggle").textContent = payload.recording ? "停止录制" : "开始录制";
-
-    renderCaptureSummary(payload);
-  }
-
-  /* 安装/提权流程状态：确定进度画进度条，不确定进度走滑动动画 */
-  function renderInstallProgress(install) {
-    var bar = $("npcap-progress");
-    var hint = $("capture-hint");
-    var installButton = $("btn-npcap-install");
-    if (!install || install.phase === "idle") {
-      bar.hidden = true;
-      hint.textContent = "";
-      installButton.disabled = false;
-      installButton.textContent = "一键安装 Npcap";
-      return;
-    }
-    var text = install.message || "";
-    var tone = "";
-    if (install.phase === "failed") {
-      tone = "（失败）";
-      bar.hidden = true;
-      installButton.disabled = false;
-      installButton.textContent = "重试安装 Npcap";
-    } else if (install.phase === "completed") {
-      tone = "";
-      bar.hidden = true;
-      installButton.disabled = false;
-      installButton.textContent = "重新打开安装流程";
-    } else if (install.phase === "checking") {
-      bar.hidden = false;
-      installButton.disabled = true;
-      installButton.textContent = "正在检测 Npcap…";
-      bar.classList.add("indeterminate");
-      bar.querySelector("i").style.width = "";
-    } else {
-      bar.hidden = false;
-      installButton.disabled = true;
-      installButton.textContent = "安装处理中…";
-      if (install.progress === null || install.progress === undefined) {
-        bar.classList.add("indeterminate");
-        bar.querySelector("i").style.width = "";
-      } else {
-        bar.classList.remove("indeterminate");
-        bar.querySelector("i").style.width = Math.round(install.progress * 100) + "%";
-      }
-    }
-    hint.textContent = text + tone;
-  }
-
-  function renderCaptureSummary(payload) {
-    var totals = payload.totals || {};
-    var sessions = payload.sessions || [];
-    var dropped = (payload.dropped_chunks || 0) + (payload.dropped_segments || 0)
-      + (payload.event_log_dropped || 0);
-    var stats = "累计观察：原始流 " + (totals.raw_chunks || 0) + " 段 / "
-      + (totals.raw_bytes || 0) + " 字节 · 解密成功 " + (totals.decrypt_ok || 0)
-      + " · 缺密钥 " + (totals.key_miss || 0) + " · 会话 " + sessions.length
-      + (dropped > 0 ? " · 丢弃 " + dropped + " 段" : "")
-      + (payload.event_log_name ? " · 事件日志 " + payload.event_log_name : "")
-      + (payload.event_log_error ? " · " + payload.event_log_error : "");
-    if ($("capture-stats").textContent !== stats) { $("capture-stats").textContent = stats; }
-    var sessionSignature = JSON.stringify(sessions.map(function (item) {
-      return [item.session_id, !!item.has_key, item.data_frames];
-    }));
-    var rows = $("session-rows");
-    if (rows.dataset.signature === sessionSignature) { return; }
-    rows.innerHTML = sessions.length ? sessions.map(function (item) {
-      return "<tr><td>" + esc(item.session_id) + "</td>"
-        + '<td>' + (item.has_key ? '<svg class="ui-icon" viewBox="0 0 24 24" aria-label="已获取"><use href="/static/icons/sprite.svg#circle-check"></use></svg>' : "—") + "</td>"
-        + '<td class="col-gid">' + item.data_frames + "</td></tr>";
-    }).join("") : '<tr><td colspan="3" class="muted">暂无会话</td></tr>';
-    rows.dataset.signature = sessionSignature;
   }
 
   function loadCapture() {
@@ -541,11 +431,7 @@
     return import("/static/vue/entry.js").then(function (page) {
       if (generation !== captureDiagnosticsGeneration || state.page !== "capture") { return; }
       captureDiagnostics = page.mountCaptureDiagnostics($("capture-diagnostics-root"), {
-        request: api, publish: renderCapture,
-        advanced: function () {
-          var details = document.querySelector("#settings-debug details");
-          details.open = true; details.querySelector("summary").focus(); details.scrollIntoView({ block: "nearest" });
-        }
+        request: api, publish: renderCapture
       });
     }).catch(function (err) {
       if (generation === captureDiagnosticsGeneration && state.page === "capture") {
@@ -555,43 +441,6 @@
   }
 
   function bindCaptureActions() {
-    $("btn-capture-start").addEventListener("click", doStart);
-    $("btn-capture-stop").addEventListener("click", doStop);
-    $("btn-record-toggle").addEventListener("click", function () {
-      var enabled = !(state.capture && state.capture.recording);
-      api("/api/capture/recording", { method: "POST", body: { enabled: enabled } })
-        .then(function (payload) { renderCapture(payload); toast(enabled ? "已开始录制" : "已停止录制"); })
-        .catch(function (err) { toast("录制切换失败：" + err.message, true); });
-    });
-    $("c-record").addEventListener("change", function (event) {
-      api("/api/capture/recording", { method: "POST", body: { enabled: event.target.checked } })
-        .then(function (payload) { renderCapture(payload); })
-        .catch(function (err) { toast("设置失败：" + err.message, true); });
-    });
-    if ($("c-autostart")) {
-      $("c-autostart").addEventListener("change", function (event) {
-        api("/api/capture/autostart", { method: "POST", body: { enabled: event.target.checked } })
-          .then(function (payload) {
-            renderCapture(payload);
-            toast(event.target.checked ? "已开启「打开即采集」" : "已关闭「打开即采集」");
-          })
-          .catch(function (err) { toast("设置失败：" + err.message, true); });
-      });
-    }
-    function setGameAutoFollow(enabled) {
-        api("/api/capture/automation", {
-          method: "POST", body: { enabled: enabled }
-        }).then(function (payload) {
-          renderCapture(payload);
-          toast(enabled ? "已开启跟随游戏启动" : "已取消跟随游戏启动");
-        }).catch(function (err) { toast("自动监听设置失败：" + err.message, true); });
-    }
-    if ($("btn-game-auto-follow")) {
-      $("btn-game-auto-follow").addEventListener("click", function () { setGameAutoFollow(true); });
-    }
-    if ($("btn-game-auto-unfollow")) {
-      $("btn-game-auto-unfollow").addEventListener("click", function () { setGameAutoFollow(false); });
-    }
     if ($("btn-copy-qq-group")) {
       $("btn-copy-qq-group").addEventListener("click", function () {
         var button = this;
@@ -623,37 +472,6 @@
         });
       });
     }
-    $("btn-key-apply").addEventListener("click", function () {
-      var text = $("c-key").value.trim();
-      if (!text) { toast("请先粘贴密钥文本", true); return; }
-      api("/api/capture/key", { method: "POST", body: { text: text } }).then(function (payload) {
-        $("key-message").textContent = payload.message || "";
-        toast(payload.message || "密钥已应用");
-      }).catch(function (err) {
-        $("key-message").textContent = err.message;
-        toast("密钥无效：" + err.message, true);
-      });
-    });
-    $("btn-npcap-install").addEventListener("click", function () {
-      api("/api/capture/npcap/install", { method: "POST" }).then(function (payload) {
-        renderCapture(payload);
-        toast("已开始下载 Npcap 安装器");
-      }).catch(function (err) { toast("启动安装失败：" + err.message, true); });
-    });
-    $("btn-rsc").addEventListener("click", function () {
-      api("/api/capture/rsc", { method: "POST" }).then(function (payload) {
-        renderCapture(payload);
-        toast("已发起禁用 RSC（请在 UAC 弹窗中确认）");
-      }).catch(function (err) { toast("禁用失败：" + err.message, true); });
-    });
-    $("btn-recheck").addEventListener("click", function () {
-      var button = $("btn-recheck");
-      if (button.disabled) { return; }
-      button.disabled = true;
-      api("/api/capture/environment", { method: "POST" }).then(function (payload) {
-        renderCapture(payload); toast("环境检测完成");
-      }).catch(function (err) { toast(err.message, true); }).finally(function () { button.disabled = false; });
-    });
   }
 
   /* 切换按钮的中间态：启动/停止都耗时（Npcap 开销），禁用+琥珀脉冲过渡 */

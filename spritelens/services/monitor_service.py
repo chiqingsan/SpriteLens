@@ -83,6 +83,7 @@ class MonitorService:
         if self._preset_key is None and self._checkpoint is not None:
             self._preset_key = self._checkpoint.key
         self._packet_listeners: list[Callable[[PacketEvent], None]] = []
+        self._session_close_listeners: list[Callable[[str], None]] = []
         self._last_sweep = 0.0
         # 实例属性绑定回调，供接入层以 SourceCallback 协议持有
         self.on_chunk: SourceCallback = self._handle_chunk
@@ -91,6 +92,11 @@ class MonitorService:
         """注册业务监听（应用层语义化入口）；回调异常不影响管线。"""
         with self._lock:
             self._packet_listeners.append(callback)
+
+    def add_session_close_listener(self, callback: Callable[[str], None]) -> None:
+        """场景观察随流关闭/SYN/会话回收失效；回调只操作内存。"""
+        with self._lock:
+            self._session_close_listeners.append(callback)
 
     # -- 生命周期 ------------------------------------------------------
     def bind(self, source: CaptureSource) -> None:
@@ -142,6 +148,8 @@ class MonitorService:
         """
         with self._lock:
             removed = self._sessions.pop(session_id, None)
+            for callback in self._session_close_listeners:
+                callback(session_id)
             if self._checkpoint is not None and self._checkpoint.flow_id == session_id:
                 self._checkpoint = replace(self._checkpoint, identity=None)
                 self._key_store.save_session(self._checkpoint)
@@ -189,6 +197,8 @@ class MonitorService:
         ]
         for session_id in stale:
             del self._sessions[session_id]
+            for callback in self._session_close_listeners:
+                callback(session_id)
             self._tracker.drop(session_id)
         if stale:
             logger.info("回收空闲会话 %d 个（超时 %ds）", len(stale), SESSION_IDLE_SECONDS)
@@ -198,6 +208,8 @@ class MonitorService:
         while len(self._sessions) > MAX_SESSIONS:
             oldest = min(self._sessions, key=lambda sid: self._sessions[sid].last_activity)
             del self._sessions[oldest]
+            for callback in self._session_close_listeners:
+                callback(oldest)
             self._tracker.drop(oldest)
 
     # -- 帧处理 --------------------------------------------------------
@@ -205,6 +217,8 @@ class MonitorService:
         self, session_id: str, direction: str, frame: GcpFrame, state: _SessionState, key: bytes | None
     ) -> None:
         if frame.command == CMD_SYN:
+            for callback in self._session_close_listeners:
+                callback(session_id)
             state.resume_checked = True
             state.identity = None
             if self._checkpoint is not None and self._checkpoint.flow_id == session_id:

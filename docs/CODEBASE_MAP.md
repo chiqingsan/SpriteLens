@@ -299,9 +299,19 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | 文件 | 职责 |
 | --- | --- |
 | `spritelens/view_models/capture_diagnostics.py` | 采集快照与环境报告的纯诊断判断，不把累计观察当成当前连接健康 |
-| `frontend/src/components/CaptureDiagnostics.vue` | 设置页内向导，命令互斥、网卡选择、错误展示与卸载后响应失效 |
+| `frontend/src/components/CaptureDiagnostics.vue` | 完整采集设置分组：统一状态/诊断、网卡/启动/跟随/录制、内联手动密钥/会话/统计、命令互斥及卸载后响应失效 |
 | `frontend/src/captureDiagnosticsBridge.ts` | 原生设置壳的 Vue 挂载/状态传递/卸载接口 |
 | `frontend/src/types/captureDiagnostics.ts` | 诊断 DTO、动作及网卡响应边界校验 |
 | `tests/test_capture_diagnostics.py` | 诊断语义、探测互斥/失败保留报告及鉴权接口回归 |
 | `frontend/src/components/CaptureDiagnostics.test.ts` | 重复请求、失败重试、卸载后响应与非法 DTO 回归 |
 | `docs/CAPTURE_DIAGNOSTICS.md` | C01 当前功能规格及维护边界 |
+
+## C02 场景观察
+
+| 文件 | 职责 |
+| --- | --- |
+| `spritelens/domain/scene.py` | 场景 NPC 字段、原始坐标、未知值及离开 ID 的纯提取 |
+| `spritelens/services/scene_repository.py` | 账号/会话/场景归属、有限实体集合与一致观察快照；无持久化 |
+| `spritelens/web/nearby.py` | 只读附近观察载荷与鉴权路由，ID 字符串化，不导出会话地址 |
+| `tests/test_scene.py` | 场景生命周期、契约、装配/停止和加密分段流录制回放回归 |
+| `docs/SCENE_OBSERVATIONS.md` | 当前字段证据、只读接口、失败分支与待验收范围 |

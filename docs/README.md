@@ -5,6 +5,8 @@
 
 [采集向导与健康诊断](CAPTURE_DIAGNOSTICS.md) — C01 当前操作、诊断语义和接口边界；任务状态见路线图。
 
+[场景实体观察快照](SCENE_OBSERVATIONS.md) — C02 当前协议证据、接口与待验收边界。
+
 阅读顺序：
 
 1. `../README.md` — 安装与使用

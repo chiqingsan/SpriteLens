@@ -35,6 +35,7 @@ from spritelens.repositories.settings import DEFAULT_CAPTURE_PORT, SettingsRepos
 from spritelens.services.egg_repository import EggBoxRepository
 from spritelens.services.account_selection_service import AccountSelectionService
 from spritelens.services.home_repository import HomeRepository
+from spritelens.services.scene_repository import SceneRepository
 from spritelens.services.event_logger import EventLogWriter
 from spritelens.services.game_capture_automation import GameCaptureAutomation
 from spritelens.services.monitor_service import MonitorService
@@ -70,6 +71,7 @@ class AppContext:
     game_automation: GameCaptureAutomation | None = None
     database: Database | None = None  # 组合根持有并负责关闭（R09）
     key_store: KeyStore | None = None  # 会话文件 writer 的生命周期归组合根持有
+    scene_repository: SceneRepository | None = None
     _capture_stopped: bool = False
 
     def close(self) -> None:
@@ -228,6 +230,9 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
         if restored_eggs:
             logger.info("已载入历史蛋仓 %d 枚（来自本地库）", restored_eggs)
 
+    scene_repository = SceneRepository()
+    monitor.add_packet_listener(scene_repository.handle_packet)
+    monitor.add_session_close_listener(scene_repository.session_closed)
     capture_vm = CaptureViewModel(
         monitor=monitor,
         settings=settings,
@@ -236,6 +241,7 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
         port=settings.get_int("capture.port", DEFAULT_CAPTURE_PORT, lo=1, hi=65535),
         key_store=key_store,
         event_log=event_log,
+        scene_repository=scene_repository,
     )
     # autostart 之后失败也必须停源（D01）：capture 停机在逆序回滚里先于
     # 存储关闭执行；未启动时 stop 幂等（recorder/monitor 各自处理空态）
@@ -247,6 +253,7 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
         pet_repository=pet_repository,
         egg_box=egg_box,
         home_repo=home_repo,
+        scene_repository=scene_repository,
         capture_running=lambda: capture_vm.snapshot().running,
         capture_command_scope=capture_vm.command_scope,
     )
@@ -267,6 +274,7 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
         home_store=home_store,
         home_repo=home_repo,
         account_selection=account_selection,
+        scene_repository=scene_repository,
         game_automation=game_automation,
         database=database,
         key_store=key_store,

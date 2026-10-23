@@ -22,6 +22,7 @@ from spritelens.capture.key_store import KeyStore, parse_key_text
 from spritelens.capture.npcap_source import NpcapCaptureSource
 from spritelens.logs import get_logger
 from spritelens.recording.recorder import StreamRecorder
+from spritelens.services.scene_repository import SceneRepository
 from spritelens.services.monitor_service import MonitorService
 
 logger = get_logger("capture_service")
@@ -63,7 +64,9 @@ class CaptureService:
         extra_ports: tuple[int, ...] = (),
         iface: str | None = None,
         recording_wanted: bool = False,
+        scene_repository: SceneRepository | None = None,
     ) -> None:
+        self._scene_repository = scene_repository
         self._monitor = monitor
         self._key_store = key_store or KeyStore(keys_dir)
         self._recorder = StreamRecorder()
@@ -116,6 +119,8 @@ class CaptureService:
                     logger.warning("拒绝重启：%s", self._last_error)
                     return
             self._last_error = ""
+            if self._scene_repository is not None:
+                self._scene_repository.reset("awaiting_identity")
             source = NpcapCaptureSource(
                 self._port,
                 on_chunk=self._tee_chunk,
@@ -181,6 +186,8 @@ class CaptureService:
                 source.is_stale_worker_active() or source.has_unfinished_sniffer()
             ):
                 raise TimeoutError("采集线程尚未退出，保留资源并等待重试停止")
+            if self._scene_repository is not None:
+                self._scene_repository.reset("stopped")
             if recording_error is not None:
                 raise recording_error
 

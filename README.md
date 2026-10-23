@@ -24,7 +24,7 @@
 - 被动采集 8195 端口流量（Npcap 旁听，BPF 内核过滤）
 - **打开即采集**：启动程序自动开始采集（采集页可关闭该开关）
 - 自动捕获 0x1002 下发的会话密钥（支持 16 字节 ASCII / 32 位 hex 手动注入，重启续解）
-- **采集向导与健康诊断**：设置页按环境、网卡/端口、采集和解密分步检查，显示依据与下一步操作；支持实际环境重检、刷新/选择网卡和高级诊断跳转。累计观察与当前连接健康分别说明，检测失败保留旧报告并可重试。详见 [使用与诊断语义](docs/CAPTURE_DIAGNOSTICS.md)。
+- **采集向导与健康诊断**：设置页将连接状态、网卡/端口、启动偏好、游戏跟随和录制统一展示；正常诊断收起，异常原位展开，支持环境重检和高级诊断跳转。累计观察与当前连接健康分别说明，检测失败保留旧报告并可重试。详见 [使用与诊断语义](docs/CAPTURE_DIAGNOSTICS.md)。
 - 事件日志：采集事件异步写入本地 JSONL，保留 opcode、方向、载荷长度和完整解码树，供离线排查
 - **精灵图鉴**：1060 种本地静态资料，无需采集即可查询。支持名称/编号、系别、阶段、蛋组筛选；
   桌面布局对齐蛋神 1.2.0：左侧 5×3 卡片分页，右侧常驻紧凑详情，默认选中首条；
@@ -269,6 +269,7 @@ exe 放在哪都不影响配置与历史数据。
 - [docs/README.md](docs/README.md) 文档索引（全部文档的阅读顺序与用途）
 - [docs/DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md) 开发规范
 - [docs/AI_CONTEXT.md](docs/AI_CONTEXT.md) 开发者与 AI 协作入口
+- [docs/SCENE_OBSERVATIONS.md](docs/SCENE_OBSERVATIONS.md) C02 场景观察接口与验收边界（当前无附近页面）
 - [docs/ROADMAP.md](docs/ROADMAP.md) 健壮性、可维护性与架构演进路线
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 架构与协议说明
 - [docs/ARCHITECTURE_DECISION.md](docs/ARCHITECTURE_DECISION.md) 架构决策（含 Tauri 评估与 Web 化路线）

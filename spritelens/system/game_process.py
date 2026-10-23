@@ -189,6 +189,7 @@ def _run_schtasks(arguments: list[str]) -> None:
 def _run_schtasks_direct(arguments: list[str]) -> None:
     result = subprocess.run(
         ["schtasks.exe", *arguments],
+        creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -259,6 +260,7 @@ def _enable_process_creation_audit() -> None:
             f"/subcategory:{PROCESS_CREATION_AUDIT_SUBCATEGORY}",
             "/success:enable",
         ],
+        creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -333,6 +335,7 @@ def remove_game_trigger() -> None:
 def _task_exists() -> bool:
     result = subprocess.run(
         ["schtasks.exe", "/Query", "/TN", GAME_TASK_NAME],
+        creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         capture_output=True,
         text=True,
         encoding="utf-8",

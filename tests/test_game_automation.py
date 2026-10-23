@@ -40,6 +40,18 @@ class GameProcessTests(unittest.TestCase):
 
         elevated.assert_called_once_with(["/Delete", "/TN", "SpriteLens.GameCapture", "/F"])
 
+    @unittest.skipUnless(game_process.os.name == "nt", "Windows 子进程窗口策略")
+    def test_direct_system_commands_do_not_create_console_windows(self):
+        result = game_process.subprocess.CompletedProcess([], 0, "", "")
+        with patch.object(game_process.subprocess, "run", return_value=result) as run:
+            game_process._run_schtasks_direct(["/Delete", "/TN", "synthetic", "/F"])
+            game_process._enable_process_creation_audit()
+            self.assertTrue(game_process._task_exists())
+        self.assertEqual(run.call_count, 3)
+        for call in run.call_args_list:
+            self.assertEqual(call.kwargs["creationflags"], game_process.subprocess.CREATE_NO_WINDOW)
+            self.assertTrue(call.kwargs["capture_output"])
+
     def test_powershell_literal_escapes_single_quotes(self):
         self.assertEqual(_powershell_literal(r"C:\Game's Data\task.xml"), r"'C:\Game''s Data\task.xml'")
 
