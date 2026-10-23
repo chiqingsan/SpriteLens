@@ -48,6 +48,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 |---|---|
 | `docs/AI_CONTEXT.md` | 新开发者/AI快速上下文与当前风险导航 |
 | `docs/ROADMAP.md` | 已落实范围、待办顺序与验收；唯一持续任务状态入口 |
+| `docs/archive/ROCO_RESOURCES_ANALYSIS.md` | `roco_resources` 解包/逆向报告的功能对照、参考路径和候选实施清单；不代表当前已实现 |
 | `docs/HOME_IMPLEMENTATION_PLAN.md` | Luna6 家园编码规格、数据边界和逐切片验收；不代表修复已完成 |
 | `docs/VUE3_MIGRATION.md` | 已确认的 Vue 前端工程/接口/状态与渐进迁移决策；不代表已实现 |
 | `docs/reviews/PROJECT_REVIEW_2026-10-12.md` | 基于114be08的审查快照、复现证据与资源/文档风险；不代表已修复 |
@@ -292,3 +293,15 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `tests/test_breeding_planner.py` / `frontend/src/composables/useBreedingPlanner.test.ts` | 配对/迭代/搜索、共享母本、锁定、声音一致性、鉴权/保存和请求时序回归 |
 | `tests/test_close_coordinator.py` | 页面确认前不销毁窗口、存储失败保留窗口与显式放弃分支 |
 | `tests/test_asset_cache_lifecycle.py` | 真实 to_thread 下载未完成时关闭必须等待 |
+
+## C01 采集向导
+
+| 文件 | 职责 |
+| --- | --- |
+| `spritelens/view_models/capture_diagnostics.py` | 采集快照与环境报告的纯诊断判断，不把累计观察当成当前连接健康 |
+| `frontend/src/components/CaptureDiagnostics.vue` | 设置页内向导，命令互斥、网卡选择、错误展示与卸载后响应失效 |
+| `frontend/src/captureDiagnosticsBridge.ts` | 原生设置壳的 Vue 挂载/状态传递/卸载接口 |
+| `frontend/src/types/captureDiagnostics.ts` | 诊断 DTO、动作及网卡响应边界校验 |
+| `tests/test_capture_diagnostics.py` | 诊断语义、探测互斥/失败保留报告及鉴权接口回归 |
+| `frontend/src/components/CaptureDiagnostics.test.ts` | 重复请求、失败重试、卸载后响应与非法 DTO 回归 |
+| `docs/CAPTURE_DIAGNOSTICS.md` | C01 当前功能规格及维护边界 |

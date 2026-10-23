@@ -56,7 +56,7 @@ def build() -> int:
     entry = manifest["src/main.ts"]
     # 稳定入口由旧壳动态 import，媒体继续使用现有 /static 路径。
     # 新增页面桥必须同步登记在这里：漏登记时壳只会在浏览器里报「xxx is not a function」。
-    mounts = ("mount", "mountEggBox", "mountHome", "mountCollectionLines",
+    mounts = ("mountCaptureDiagnostics", "mount", "mountEggBox", "mountHome", "mountCollectionLines",
               "mountBreederLibrary", "mountBreedingPlanner", "mountPetFilters",
               "mountPetInventory", "mountHandbook", "mountColors")
     styles = sorted({name for chunk in manifest.values() for name in chunk.get("css", [])})

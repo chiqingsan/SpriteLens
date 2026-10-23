@@ -9,6 +9,9 @@ from __future__ import annotations
 
 from aiohttp import web
 
+from spritelens.view_models.capture_diagnostics import capture_diagnostics
+from spritelens.capture.base import SourceError
+from spritelens.view_models.capture_vm import CaptureSnapshot, EnvironmentBusyError
 from spritelens.web.payloads import pet_summary_payload
 from spritelens.web.account_state import account_domains_payload
 from spritelens.view_models.pet_vm import PetFilters, PetView
@@ -21,8 +24,20 @@ class CaptureRoutesMixin:
     async def _api_capture(self, request: web.Request) -> web.Response:
         return web.json_response(self._capture_payload())
 
+    async def _api_capture_environment(self, request: web.Request) -> web.Response:
+        try:
+            await self._run_blocking(self._context.capture_vm.refresh_environment)
+        except EnvironmentBusyError as exc:
+            return web.json_response({"error": str(exc)}, status=409)
+        except Exception as exc:
+            return web.json_response({"error": f"环境重新检测失败：{exc}"}, status=500)
+        return web.json_response(self._capture_payload())
+
     async def _api_capture_ifaces(self, request: web.Request) -> web.Response:
-        ifaces = await self._run_blocking(self._context.capture_vm.refresh_ifaces)
+        try:
+            ifaces = await self._run_blocking(self._context.capture_vm.refresh_ifaces)
+        except SourceError as exc:
+            return web.json_response({"error": f"网卡枚举失败：{exc}"}, status=500)
         # 活跃网卡排前面（PowerShell 查询在开销时执行；失败则保持原序）
         from spritelens.capture.nic_rank import rank_ifaces
 
@@ -137,12 +152,19 @@ class CaptureRoutesMixin:
         return web.json_response(self._state_payload())
 
     # -- 状态载荷 ------------------------------------------------------
-    def _capture_payload(self) -> dict:
+    def _capture_payload(self, snapshot: CaptureSnapshot | None = None) -> dict:
         ctx = self._context
         vm = ctx.capture_vm
-        snapshot = vm.snapshot()
+        if snapshot is None:
+            snapshot = vm.snapshot()
         install = vm.install_state()
         return {
+            "decrypt_ok": snapshot.totals.decrypt_ok,
+            "raw_chunks": snapshot.totals.raw_chunks,
+            "port": vm.port,
+            "diagnostics": capture_diagnostics(snapshot, vm.environment_report(), port=vm.port,
+                extra_ports=vm.extra_ports, environment_error=vm.environment_error,
+                environment_checking=vm.environment_checking),
             "running": snapshot.running,
             "iface": snapshot.iface,
             "extra_ports": list(vm.extra_ports),
@@ -198,18 +220,7 @@ class CaptureRoutesMixin:
             "identity": pets["identity"],
             "cached_identity": pets["cached_identity"],
             "stats": pets["stats"],
-            "capture": {
-                "running": capture.running,
-                "recording": capture.recording,
-                "recorded_chunks": capture.recorded_chunks,
-                "flow_count": capture.flow_count,
-                "any_key": capture.any_key,
-                "last_error": capture.last_error,
-                "event_log_error": capture.event_log_error,
-                "event_log_dropped": capture.event_log_dropped,
-                "decrypt_ok": capture.totals.decrypt_ok,
-                "raw_chunks": capture.totals.raw_chunks,
-            },
+            "capture": self._capture_payload(capture),
             # 环境探测在启动路径上异步进行（RSC 检查约 1.8s）；
             # 探测完成后 report 变化 → 此载荷变化 → WS 推送 → 横幅自动刷新
             "environment": self._environment_payload(),
@@ -226,6 +237,8 @@ class CaptureRoutesMixin:
         """环境报告 → JSON（/api/capture 与 WS state 推送共用一份契约）。"""
         report = self._context.capture_vm.environment_report()
         return {
+            "checking": self._context.capture_vm.environment_checking,
+            "refresh_error": self._context.capture_vm.environment_error,
             "installed": report.installed,
             "message": report.message,
             "rsc_enabled": report.rsc_enabled,

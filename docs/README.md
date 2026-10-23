@@ -3,6 +3,8 @@
 状态：当前文档总入口。读者：用户、维护者、开发者与 AI 协作者。
 当前事实以代码与维护文档为准；路线图区分已落实范围与待办，带日期的核验/审查只代表当时证据。
 
+[采集向导与健康诊断](CAPTURE_DIAGNOSTICS.md) — C01 当前操作、诊断语义和接口边界；任务状态见路线图。
+
 阅读顺序：
 
 1. `../README.md` — 安装与使用
@@ -52,6 +54,7 @@
 - 早期核验记录：`archive/UI_UPGRADE_VERIFICATION.md`、
   `archive/BACKPACK_BOX_VERIFICATION.md` / `archive/BACKPACK_UPGRADE_VERIFICATION.md`（真实箱位与背包操作）、
   `archive/SESSION_RESUME_VERIFICATION.md`（会话接续）
+- [ROCO 资源解包报告功能分析](archive/ROCO_RESOURCES_ANALYSIS.md) — 外部解包报告的参考路径、功能适配清单和附近精灵实施顺序；不代表当前已实现
 - 早期规划／对照：`archive/BACKPACK_PARITY_PLAN.md`、`archive/BACKPACK_UI_COMPARISON.md`、
   `archive/PET_CARD_LAYOUT_PLAN.md`、`archive/UI_THEME_PROPOSAL.md`
 - 资源台账：`archive/RESOURCE_COVERAGE_REPORT.md`（覆盖／缺口／冲突）

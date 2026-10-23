@@ -217,6 +217,7 @@
 
             <section id="settings-capture" class="settings-group">
               <div class="settings-group-head"><div><h2>采集</h2><p class="muted">选择采集环境和启动行为。</p></div><span class="status-pill">只读旁听</span></div>
+              <div id="capture-diagnostics-root"></div>
               <div class="settings-row settings-row-note"><div class="settings-row-copy"><strong>游戏连接</strong><span>开始采集后进入游戏；若已登录，请返回登录界面再进入。</span></div></div>
               <section id="npcap-banner" class="banner warn" hidden>
                 <div class="banner-copy">
@@ -236,10 +237,6 @@
                   <button id="btn-recheck" class="ghost-button small">重新检测</button>
                 </div>
               </section>
-              <div class="settings-row">
-                <div class="settings-row-copy"><strong>抓包网卡</strong><span>不确定时保持默认路由网卡。</span></div>
-                <label class="settings-control"><span class="sr-only">抓包网卡</span><select id="c-iface"><option value="">（默认路由网卡）</option></select></label>
-              </div>
               <label class="settings-row settings-row-check"><span class="settings-row-copy"><strong>打开即采集</strong><span>应用启动时自动开始采集。</span></span><input id="c-autostart" type="checkbox"></label>
               <div class="settings-row">
                 <div class="settings-row-copy"><strong>游戏启动跟随</strong><span>游戏启动时自动开启轻量后台监听，游戏关闭后自动退出；游戏进程识别已内置。</span></div>

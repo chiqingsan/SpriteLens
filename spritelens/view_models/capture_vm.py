@@ -38,6 +38,10 @@ RECORD_SETTING_KEY = "capture.record_on_start"
 AUTOSTART_SETTING_KEY = "capture.autostart"
 
 
+class EnvironmentBusyError(RuntimeError):
+    """环境检测已有执行者。"""
+
+
 @dataclass(frozen=True)
 class InstallState:
     """一键安装流程的只读状态。"""
@@ -110,6 +114,7 @@ class CaptureViewModel:
             part = part.strip()
             if part.isdigit() and int(part) != port and int(part) not in ports:
                 ports.append(int(part))
+        self._port = port
         self._extra_ports = tuple(ports)
         # 运行时职责收口到服务（命令锁/接入层/录制/密钥）
         self._service = CaptureService(
@@ -129,6 +134,8 @@ class CaptureViewModel:
         )
         # 快速检查（毫秒级）：只查驱动文件存在性，installed 立即可用，
         # autostart 不必等探测；RSC 检查（PowerShell 实测约 1.8s）随后异步补齐。
+        self._environment_lock = threading.Lock()
+        self._environment_error = ""
         self._npcap_report = check_npcap(quick=True)
         self._install_phase = "idle"
         self._install_message = ""
@@ -145,24 +152,22 @@ class CaptureViewModel:
         if probe_environment:
             threading.Thread(
                 target=self._probe_environment,
-                args=(self._environment_probe,),
                 name="npcap-probe",
                 daemon=True,
             ).start()
 
     # -- 环境探测 --------------------------------------------------------
-    def _probe_environment(self, probe) -> None:
+    def _probe_environment(self) -> None:
         """后台执行完整环境检查（含 RSC 的 PowerShell 探测），完成后替换占位报告。
 
         为什么不在这里触发 autostart：autostart 只依赖 installed 字段，
         快速检查（毫秒级）已经能给出正确结论，装配路径无需等探测。
         """
         try:
-            report = probe()
+            self.refresh_environment()
         except Exception:  # noqa: BLE001 - 探测失败不影响其他功能
             logger.exception("环境探测失败")
             return
-        self._npcap_report = report
 
     # -- 网卡 ----------------------------------------------------------
     def refresh_ifaces(self) -> list[tuple[str, str]]:
@@ -170,7 +175,7 @@ class CaptureViewModel:
             self._ifaces = NpcapCaptureSource.list_ifaces()
         except SourceError as exc:
             self._set_error(str(exc))
-            self._ifaces = []
+            raise
         return list(self._ifaces)
 
     @property
@@ -258,10 +263,32 @@ class CaptureViewModel:
     def environment_report(self) -> NpcapReport:
         return self._npcap_report
 
+    @property
+    def port(self) -> int:
+        return self._port
+
+    @property
+    def environment_checking(self) -> bool:
+        return self._environment_lock.locked()
+
+    @property
+    def environment_error(self) -> str:
+        return self._environment_error
+
     def refresh_environment(self) -> NpcapReport:
-        """安装完成后重新检测；检测结果供页面横幅渲染。"""
-        self._npcap_report = check_npcap()
-        return self._npcap_report
+        """显式检测失败保留旧报告；重复请求不并发执行系统探测。"""
+        if not self._environment_lock.acquire(blocking=False):
+            raise EnvironmentBusyError("环境检测正在进行，请稍后重试")
+        try:
+            report = self._environment_probe()
+            self._npcap_report = report
+            self._environment_error = ""
+            return report
+        except Exception as exc:
+            self._environment_error = str(exc)
+            raise
+        finally:
+            self._environment_lock.release()
 
     def start_disable_rsc(self) -> None:
         """一键禁用 RSC（UAC 提权）；完成后重新检测环境。"""
@@ -274,7 +301,7 @@ class CaptureViewModel:
         def worker() -> None:
             try:
                 disable_rsc(adapter)
-                self._npcap_report = check_npcap()
+                self.refresh_environment()
                 if self._npcap_report.rsc_enabled:
                     self._set_install("failed", "RSC 仍未禁用（UAC 被取消或命令失败），请手动执行", None)
                 else:

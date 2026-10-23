@@ -340,6 +340,7 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         register_planner_routes(app, self._context)
         app.router.add_get("/api/colors", self._api_colors)
         app.router.add_get("/api/capture", self._api_capture)
+        app.router.add_post("/api/capture/environment", self._api_capture_environment)
         app.router.add_get("/api/capture/ifaces", self._api_capture_ifaces)
         app.router.add_post("/api/capture/iface", self._api_capture_iface)
         app.router.add_post("/api/capture/start", self._api_capture_start)

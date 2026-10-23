@@ -66,6 +66,8 @@
   var eggBoxPage = null;
   var eggBoxPageGeneration = 0;
   var eggBoxVersion = -1;
+  var captureDiagnostics = null;
+  var captureDiagnosticsGeneration = 0;
   var homePage = null;
   var homePageGeneration = 0;
   var homeVersion = -1;
@@ -93,6 +95,8 @@
     openPet: function (gid) { petFilters.reset(); switchPage("pets", gid); }
   });
   window.addEventListener("pagehide", function () {
+    captureDiagnosticsGeneration++;
+    if (captureDiagnostics) { captureDiagnostics.unmount(); captureDiagnostics = null; }
     eggBoxPageGeneration++;
     homePageGeneration++;
     collectionLines.unmount();
@@ -188,6 +192,10 @@
     if (name === "pets" || name === "egg-box") { $("page-" + name).classList.add("page-cached"); }
     if (state.page === "egg-box" && name !== "egg-box") { pauseEggBoxPage(); }
     else { accountRequests.cancel(state.page); }
+    if (state.page === "capture") {
+      captureDiagnosticsGeneration++;
+      if (captureDiagnostics) { captureDiagnostics.unmount(); captureDiagnostics = null; }
+    }
     if (state.page === "home" && name !== "home" && homePage) { homePage.pause(); }
     if (state.page === "collection-lines") { collectionLines.pause(); }
     if (state.page === "planner") { breedingPlanner.pause(); }
@@ -338,7 +346,10 @@
     }
 
     renderRole(payload.identity, payload.cached_identity);
-    if (state.page === "capture") { renderCaptureSummary(payload.capture || {}); }
+    if (state.page === "capture") {
+      renderCaptureSummary(payload.capture || {});
+      if (captureDiagnostics) { captureDiagnostics.update(payload.capture); }
+    }
     var version = payload.pets_version;
     if (version !== undefined && version !== state._petsVersion) {
       state._petsVersion = version;
@@ -420,6 +431,7 @@
 
   function renderCapture(payload) {
     state.capture = payload;
+    if (captureDiagnostics) { captureDiagnostics.update(payload); }
     renderEnvBanner(payload.environment);
 
     var toggle = $("btn-toggle");
@@ -450,10 +462,6 @@
     if ($("c-game-auto-guidance")) { $("c-game-auto-guidance").textContent = automation.audit_guidance || ""; }
     $("btn-record-toggle").textContent = payload.recording ? "停止录制" : "开始录制";
 
-    var ifaceSelect = $("c-iface");
-    if (!ifaceSelect.dataset.value || ifaceSelect.value !== payload.iface) {
-      ifaceSelect.dataset.value = payload.iface || "";
-    }
     renderCaptureSummary(payload);
   }
 
@@ -507,7 +515,7 @@
     var sessions = payload.sessions || [];
     var dropped = (payload.dropped_chunks || 0) + (payload.dropped_segments || 0)
       + (payload.event_log_dropped || 0);
-    var stats = "原始流 " + (totals.raw_chunks || 0) + " 段 / "
+    var stats = "累计观察：原始流 " + (totals.raw_chunks || 0) + " 段 / "
       + (totals.raw_bytes || 0) + " 字节 · 解密成功 " + (totals.decrypt_ok || 0)
       + " · 缺密钥 " + (totals.key_miss || 0) + " · 会话 " + sessions.length
       + (dropped > 0 ? " · 丢弃 " + dropped + " 段" : "")
@@ -528,19 +536,22 @@
   }
 
   function loadCapture() {
-    return api("/api/capture").then(renderCapture).catch(function () {});
-  }
-
-  function loadIfaces() {
-    return api("/api/capture/ifaces").then(function (payload) {
-      var select = $("c-iface");
-      var current = state.capture ? state.capture.iface : "";
-      select.innerHTML = '<option value="">（默认路由网卡）</option>'
-        + (payload.ifaces || []).map(function (item) {
-          return '<option value="' + esc(item.name) + '">' + esc(item.description || item.name) + "</option>";
-        }).join("");
-      select.value = current || "";
-    }).catch(function () {});
+    if (captureDiagnostics) { return; }
+    var generation = ++captureDiagnosticsGeneration;
+    return import("/static/vue/entry.js").then(function (page) {
+      if (generation !== captureDiagnosticsGeneration || state.page !== "capture") { return; }
+      captureDiagnostics = page.mountCaptureDiagnostics($("capture-diagnostics-root"), {
+        request: api, publish: renderCapture,
+        advanced: function () {
+          var details = document.querySelector("#settings-debug details");
+          details.open = true; details.querySelector("summary").focus(); details.scrollIntoView({ block: "nearest" });
+        }
+      });
+    }).catch(function (err) {
+      if (generation === captureDiagnosticsGeneration && state.page === "capture") {
+        $("capture-diagnostics-root").textContent = "诊断加载失败：" + err.message + "；请重新进入设置页重试。";
+      }
+    });
   }
 
   function bindCaptureActions() {
@@ -551,12 +562,6 @@
       api("/api/capture/recording", { method: "POST", body: { enabled: enabled } })
         .then(function (payload) { renderCapture(payload); toast(enabled ? "已开始录制" : "已停止录制"); })
         .catch(function (err) { toast("录制切换失败：" + err.message, true); });
-    });
-    $("c-iface").addEventListener("change", function () {
-      var choice = $("c-iface").value;
-      api("/api/capture/iface", { method: "POST", body: { name: choice } })
-        .then(function (payload) { renderCapture(payload); toast(choice ? "已选择网卡（下次启动生效）" : "已用默认路由网卡"); })
-        .catch(function (err) { toast("网卡设置失败：" + err.message, true); });
     });
     $("c-record").addEventListener("change", function (event) {
       api("/api/capture/recording", { method: "POST", body: { enabled: event.target.checked } })
@@ -642,7 +647,12 @@
       }).catch(function (err) { toast("禁用失败：" + err.message, true); });
     });
     $("btn-recheck").addEventListener("click", function () {
-      loadCapture().then(function () { toast("已重新检测"); });
+      var button = $("btn-recheck");
+      if (button.disabled) { return; }
+      button.disabled = true;
+      api("/api/capture/environment", { method: "POST" }).then(function (payload) {
+        renderCapture(payload); toast("环境检测完成");
+      }).catch(function (err) { toast(err.message, true); }).finally(function () { button.disabled = false; });
     });
   }
 
@@ -898,7 +908,6 @@
       renderFeaturePlaceholders();
       bindPageLinks();
       bindCaptureActions();
-      loadIfaces();
       connectPush();
       switchPage("pets");
       if (window.__spritelensBoot) { window.__spritelensBoot.ready(); }

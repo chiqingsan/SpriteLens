@@ -1,3 +1,4 @@
+export { mountCaptureDiagnostics } from './captureDiagnosticsBridge'
 import { createApp, h, ref } from 'vue'
 import { createPinia } from 'pinia'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
