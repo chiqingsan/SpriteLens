@@ -101,16 +101,12 @@ class CaptureRoutesMixin:
         try:
             body = await self._json_body(request)
             enabled = self._require_bool(body, "enabled")
-            process_name = body.get("process_name")
-            if not isinstance(process_name, str):
-                raise ValueError("字段 process_name 必须是字符串")
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=400)
         try:
             await self._run_blocking(
                 self._context.game_automation.configure,
                 enabled=enabled,
-                process_name=process_name,
             )
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=400)

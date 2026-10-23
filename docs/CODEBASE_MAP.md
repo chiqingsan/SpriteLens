@@ -105,7 +105,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `repositories/settings.py` | JSON 配置仓库（读取失败阻止写回、替换成功才更新缓存、字段归一、窗口几何） |
 | `services/monitor_service.py` | 采集管线编排：字节流 → 帧 → 解密 → 解码 → PacketEvent；会话释放/空闲回收/硬上限 |
 | `services/capture_service.py` | 采集运行服务：接入层创建与生命周期、录制 tee、手动密钥、副作用命令串行化（阶段1.3 自 capture_vm 抽出） |
-| `services/game_capture_automation.py` | 游戏进程自动监听设置：保存进程名、安装/移除 4688 触发任务 |
+| `services/game_capture_automation.py` | 游戏进程自动监听设置：保存跟随状态、安装/移除 4688 触发任务 |
 | `services/session_tracker.py` | 会话表（LRU，支持 drop）与全局统计 |
 | `services/account_tracker.py` | 账号切换判定；display_uid 是已加载/实时归属，写路径 uid 不变（同 uid 重复帧/离线加载登录不算切换） |
 | `services/account_selection_service.py` | 本地历史账号列表与跨宠物/蛋仓/家园的串行历史切换 |
@@ -177,7 +177,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `test_desktop_shell.py` | DPI/工作区适配、保存的宽高比例与多屏位置恢复 |
 | `test_app_icons.py` | 窗口大小图标消息、64 位句柄与图标加载失败回归 |
 | `test_single_instance.py` | 单实例互斥锁唯一性、唤醒事件投递与消费、close 幂等 |
-| `test_game_automation.py` | 游戏进程名、4688 触发任务 XML、自动监听配置与运行时交接文件 |
+| `test_game_automation.py` | 内置游戏进程名、4688 触发任务 XML、跟随状态配置与运行时交接文件 |
 | `test_persistence.py` | 身份识别（NPC 不误取）、写库/重开/加载、跨账号隔离、schema 1 基线结构与旧库拒绝、外观字段往返、彩名恢复、损坏恢复 |
 | `test_settings.py` | 配置读取失败/非法 JSON 阻止写回，原子替换失败保持磁盘与内存原值 |
 | `test_view_models.py` | 手动密钥、采集/录制命令串行化、配置/录制失败与自动采集开关 |

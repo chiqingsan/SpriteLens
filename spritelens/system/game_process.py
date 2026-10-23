@@ -22,7 +22,7 @@ from spritelens.paths import project_root
 logger = get_logger("game_process")
 
 GAME_PROCESS_AUDIT_GUIDANCE = (
-    "保存时会自动请求管理员权限并开启 Windows 进程创建审计（事件 4688）；"
+    "启用「跟随启动」时会自动请求管理员权限并开启 Windows 进程创建审计（事件 4688）；"
     "如果电脑的组策略禁止修改，请在本地安全策略中手动开启。"
 )
 DEFAULT_GAME_PROCESS_NAME = "NRC-Win64-Shipping.exe"

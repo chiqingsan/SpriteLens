@@ -68,17 +68,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.replay:
         return _run_replay(args.replay, logger)
     if args.background:
-        from spritelens.repositories.settings import SettingsRepository
-        from spritelens.paths import config_path
-        from spritelens.services.game_capture_automation import GAME_AUTOMATION_SETTING_KEY
+        from spritelens.system.game_process import DEFAULT_GAME_PROCESS_NAME
 
-        process_name = args.process_name
-        if not process_name:
-            raw = SettingsRepository(config_path()).get_value(GAME_AUTOMATION_SETTING_KEY, {})
-            process_name = raw.get("process_name", "") if isinstance(raw, dict) else ""
         from spritelens.web.background_run import run_background
 
-        return run_background(process_name)
+        return run_background(args.process_name or DEFAULT_GAME_PROCESS_NAME)
 
     # 唯一界面：Web（pywebview 窗口 + 本地服务）
     from spritelens.web.run import run_web

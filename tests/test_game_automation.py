@@ -75,34 +75,37 @@ class AutomationServiceTests(unittest.TestCase):
             removed = Mock()
             service = GameCaptureAutomation(settings, install=installed.append, remove=removed)
 
-            result = service.configure(enabled=True, process_name="RocoWorld.exe")
+            result = service.configure(enabled=True)
 
-            self.assertEqual(installed, ["RocoWorld.exe"])
+            self.assertEqual(installed, [DEFAULT_GAME_PROCESS_NAME])
             self.assertFalse(removed.called)
             self.assertTrue(result["enabled"])
-            self.assertEqual(service.snapshot()["process_name"], "RocoWorld.exe")
+            self.assertEqual(service.snapshot()["process_name"], DEFAULT_GAME_PROCESS_NAME)
 
-    def test_enable_requires_process_name(self):
+    def test_saved_process_name_is_ignored(self):
         with tempfile.TemporaryDirectory() as directory:
             settings = SettingsRepository(Path(directory) / "config.json")
+            settings.set_checked("capture.game_automation", {"enabled": True, "process_name": "RocoWorld.exe"})
             install = Mock()
             service = GameCaptureAutomation(settings, install=install, remove=Mock())
-            with self.assertRaises(ValueError):
-                service.configure(enabled=True, process_name="")
-            install.assert_not_called()
 
-    def test_disable_removes_task_and_keeps_name(self):
+            result = service.snapshot()
+
+            self.assertTrue(result["enabled"])
+            self.assertEqual(result["process_name"], DEFAULT_GAME_PROCESS_NAME)
+
+    def test_disable_removes_task_and_uses_builtin_name(self):
         with tempfile.TemporaryDirectory() as directory:
             settings = SettingsRepository(Path(directory) / "config.json")
             settings.set_checked("capture.game_automation", {"enabled": True, "process_name": "RocoWorld.exe"})
             remove = Mock()
             service = GameCaptureAutomation(settings, install=Mock(), remove=remove)
 
-            result = service.configure(enabled=False, process_name="RocoWorld.exe")
+            result = service.configure(enabled=False)
 
             remove.assert_called_once_with()
             self.assertFalse(result["enabled"])
-            self.assertEqual(result["process_name"], "RocoWorld.exe")
+            self.assertEqual(result["process_name"], DEFAULT_GAME_PROCESS_NAME)
 
 
 class RuntimeSessionTests(unittest.TestCase):

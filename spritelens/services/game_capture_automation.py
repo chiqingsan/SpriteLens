@@ -12,7 +12,6 @@ from spritelens.system.game_process import (
     GAME_TASK_NAME,
     DEFAULT_GAME_PROCESS_NAME,
     install_game_trigger,
-    normalize_process_name,
     remove_game_trigger,
 )
 
@@ -23,14 +22,7 @@ logger = get_logger("game_capture_automation")
 def _normalize(raw: Any) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raw = {}
-    process_name = raw.get("process_name", DEFAULT_GAME_PROCESS_NAME)
-    if not isinstance(process_name, str):
-        process_name = ""
-    try:
-        process_name = normalize_process_name(process_name) if process_name else ""
-    except ValueError:
-        process_name = ""
-    return {"enabled": raw.get("enabled") is True and bool(process_name), "process_name": process_name}
+    return {"enabled": raw.get("enabled") is True, "process_name": DEFAULT_GAME_PROCESS_NAME}
 
 
 class GameCaptureAutomation:
@@ -55,17 +47,14 @@ class GameCaptureAutomation:
             "audit_guidance": GAME_PROCESS_AUDIT_GUIDANCE,
         }
 
-    def configure(self, *, enabled: bool, process_name: str) -> dict[str, Any]:
+    def configure(self, *, enabled: bool) -> dict[str, Any]:
         if type(enabled) is not bool:
             raise ValueError("字段 enabled 必须是布尔值")
-        normalized_name = normalize_process_name(process_name) if process_name.strip() else ""
         previous = _normalize(self._settings.get_value(GAME_AUTOMATION_SETTING_KEY, {}))
-        next_value = {"enabled": enabled and bool(normalized_name), "process_name": normalized_name}
-        if enabled and not normalized_name:
-            raise ValueError("启用自动监听前必须填写游戏进程名")
+        next_value = {"enabled": enabled}
 
         if enabled:
-            self._install(normalized_name)
+            self._install(DEFAULT_GAME_PROCESS_NAME)
         else:
             self._remove()
         try:
@@ -74,7 +63,7 @@ class GameCaptureAutomation:
             # 配置写失败时尽量恢复任务与原配置的对应关系；原始异常继续上抛。
             try:
                 if previous["enabled"]:
-                    self._install(previous["process_name"])
+                    self._install(DEFAULT_GAME_PROCESS_NAME)
                 else:
                     self._remove()
             except Exception as rollback_error:  # 回滚失败不能覆盖原始保存错误，但必须留痕
