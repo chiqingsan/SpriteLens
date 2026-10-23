@@ -1,4 +1,0 @@
-{"probe": "external_flush_close_timeout_retry", "store": "pet", "close_error": "TimeoutError", "elapsed_seconds": 5.0, "database_retained": true, "flush_errors": [], "rows_after_retry": 1, "worker_alive": false}
-{"probe": "external_flush_close_timeout_retry", "store": "egg", "close_error": "TimeoutError", "elapsed_seconds": 5.01, "database_retained": true, "flush_errors": [], "rows_after_retry": 1, "worker_alive": false}
-{"probe": "checkpoint_flush_close_barriers", "timeout_errors": ["TimeoutError", "TimeoutError"], "same_writer": true, "writer_alive": false, "persisted_sequence": 10}
-{"probe": "replay_waits_writer", "blocked_until_write_finished": true, "results": [0], "writer_alive": false, "closed": true}

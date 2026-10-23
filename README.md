@@ -220,15 +220,23 @@ API 与 WebSocket 均校验。数据只在本机流动，不对外发送。
 
 # 打包（首次会下载 MinGW 编译器，耗时较长）
 .venv\Scripts\python.exe build.py
-# 或双击 build.bat
+# 或双击 build.bat，在菜单中选择普通构建、dry-run 或修改项目版本号
 
 # 只打印命令不编译
 .venv\Scripts\python.exe build.py --dry-run
+
+# 命令行读取/修改项目版本号
+.venv\Scripts\python.exe build.py --get-version
+.venv\Scripts\python.exe build.py --set-version 0.2.0
 ```
 
 产物在 `build\SpriteLens_<版本>.exe`。早期约22MB的测量发生在本轮资源扩充前，
 当前体积需重新构建后实测。打包选项（含带哪些资源、
 排除哪些库）都在 `build_config.toml` 里改，不写死在脚本中。
+
+`build_config.toml` 默认使用 `backend_c_flags = ["-mno-gfni"]`，用于规避
+Nuitka onefile 外层启动器在部分 AMD CPU 上因 GFNI 指令触发的启动崩溃；除非已经
+在目标 AMD 机器上重新验证，否则不要删除该兼容参数。
 
 > **杀毒软件会干扰打包**：Nuitka 后处理阶段用微软 `rc.exe` 写 exe 图标与
 > 版本信息，产生 `build/RCX*.tmp`。部分杀软（实测火绒）会把该临时文件误报

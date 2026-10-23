@@ -143,13 +143,24 @@ class Database:
             self.path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = self._open_or_recover()
         try:
-            with self._lock:
-                self._initialize_schema_locked()
-                self._conn.execute("PRAGMA journal_mode=WAL")
-                self._conn.execute("PRAGMA synchronous=NORMAL")
+            self._configure_connection()
+        except DatabaseSchemaError as exc:
+            self._conn.close()
+            self._rebuild_unsupported_schema(exc)
+            try:
+                self._configure_connection()
+            except Exception:
+                self._conn.close()
+                raise
         except Exception:
             self._conn.close()
             raise
+
+    def _configure_connection(self) -> None:
+        with self._lock:
+            self._initialize_schema_locked()
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA synchronous=NORMAL")
 
     def _open_or_recover(self) -> sqlite3.Connection:
         """打开库；文件损坏时备份原文件并重建（不阻断启动，原数据留证）。
@@ -188,12 +199,12 @@ class Database:
             except Exception:  # noqa: BLE001 - 关闭失败不影响重建
                 pass
             if str(self.path) != ":memory:" and self.path.exists():
-                backup = self.path.with_suffix(f".corrupt-{int(time.time())}.sqlite")
+                backup = self._next_backup_path("corrupt")
                 try:
                     for source, temporary in preserved_sidecars:
                         if not source.exists() and temporary.exists():
                             temporary.replace(source)
-                    self._backup_corrupt_group(backup)
+                    self._backup_database_group(backup)
                     logger.warning("原库已备份到: %s", backup)
                 finally:
                     for _source, temporary in preserved_sidecars:
@@ -205,7 +216,33 @@ class Database:
         conn.row_factory = sqlite3.Row
         return conn
 
-    def _backup_corrupt_group(self, backup: Path) -> None:
+    def _rebuild_unsupported_schema(self, error: DatabaseSchemaError) -> None:
+        """备份不兼容的本地库并创建当前基线，不尝试迁移历史结构。"""
+        if str(self.path) == ":memory:":
+            self._conn = sqlite3.connect(":memory:", check_same_thread=False)
+            self._conn.row_factory = sqlite3.Row
+            logger.warning("内存数据库结构不兼容，已重建当前基线: %s", error)
+            return
+
+        backup = self._next_backup_path("incompatible")
+        self._backup_database_group(backup)
+        self._conn = self._open_or_recover()
+        logger.warning("数据库结构不兼容，原库已备份到 %s，已重建当前基线: %s", backup, error)
+
+    def _next_backup_path(self, label: str) -> Path:
+        """返回不会覆盖已有主库或 sidecar 备份的路径。"""
+        stamp = int(time.time())
+        candidate = self.path.with_suffix(f".{label}-{stamp}.sqlite")
+        index = 1
+        while any(
+            path.exists()
+            for path in (candidate, Path(str(candidate) + "-wal"), Path(str(candidate) + "-shm"))
+        ):
+            candidate = self.path.with_suffix(f".{label}-{stamp}-{index}.sqlite")
+            index += 1
+        return candidate
+
+    def _backup_database_group(self, backup: Path) -> None:
         """完整备份主库及 sidecar，失败时恢复原路径后再抛错。
 
         SQLite 的 WAL/SHM 必须与主库一起保留。逐个移动会在中途失败时

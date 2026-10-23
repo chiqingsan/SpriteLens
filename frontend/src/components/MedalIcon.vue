@@ -10,7 +10,7 @@ const id = computed(() => markIds[props.name] ?? null)
   <img
     v-if="id"
     class="medal-icon"
-    :src="`/static/medal-icons/mark-${id}.png`"
+    :src="`/static/medal-icons/mark-${id}.webp`"
     :alt="name"
     :title="`${name}${source ? ` · ${source === 'worn' ? '当前佩戴' : '数值参考'}` : ''}`"
     loading="lazy"

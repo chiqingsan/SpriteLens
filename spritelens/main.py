@@ -112,7 +112,7 @@ def _smoke_check_assets() -> int:
     }
     for label, path in required_dirs.items():
         if path.is_dir():
-            print(f"[smoke] {label}: {path} ✓")
+            print(f"[smoke] {label}: {path} [ok]")
         else:
             failures.append(f"{label}缺失: {path}")
 

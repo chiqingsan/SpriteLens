@@ -51,7 +51,7 @@ watch(() => model.active.value, active => {
 </section>
   <details class="filter-section" style="order: 2">
 <summary>奖牌<small>{{ selectedMedals.map(id => options.medals?.find(item => item.id === id)?.name || id).join('、') || '不限' }}</small></summary>
-    <div class="chip-group medal-choices"><button v-for="item in options.medals" :key="item.id" class="chip" :class="{ active: selectedMedals.includes(item.id) }" :aria-pressed="selectedMedals.includes(item.id)" @click="model.medal(item.id)"><img v-if="item.id" :src="`/static/medal-icons/${item.id}.png`" alt="" @error="($event.target as HTMLImageElement).hidden = true"><span>{{ item.name }}</span></button></div>
+    <div class="chip-group medal-choices"><button v-for="item in options.medals" :key="item.id" class="chip" :class="{ active: selectedMedals.includes(item.id) }" :aria-pressed="selectedMedals.includes(item.id)" @click="model.medal(item.id)"><img v-if="item.id" :src="`/static/medal-icons/${item.id}.webp`" alt="" @error="($event.target as HTMLImageElement).hidden = true"><span>{{ item.name }}</span></button></div>
     <button v-if="selectedMedals.length || filters.pool.includes('medal')" class="text-button filter-clear" @click="model.patch({ medal: 0, medals: [], marks: [], pool: filters.pool.filter(item => item !== 'medal') })">清除奖牌</button>
   </details>
   <details class="filter-section" style="order: 3">

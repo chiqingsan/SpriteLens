@@ -37,7 +37,7 @@ function date(value: number) {
       </div>
       <div class="eggbox-card-heading">
         <EggBoxArtwork :egg="egg" size="card" />
-        <strong class="eggbox-card-name" :title="egg.egg_name"><span class="eggbox-card-name-text">{{ egg.egg_name }}</span><img v-if="egg.egg_kind === 'shiny'" class="eggbox-card-shiny-icon" src="/static/rarity/shiny-fit.png" alt="异色" title="异色蛋"></strong>
+        <strong class="eggbox-card-name" :title="egg.egg_name"><span class="eggbox-card-name-text">{{ egg.egg_name }}</span><img v-if="egg.egg_kind === 'shiny'" class="eggbox-card-shiny-icon" src="/static/rarity/shiny-fit.webp" alt="异色" title="异色蛋"></strong>
       </div>
       <div class="eggbox-card-labels" aria-label="蛋标签">
         <div v-if="cardTags.length" class="eggbox-card-tag-row" :class="{ 'eggbox-card-tag-row--dense': cardTags.length > 3 }">

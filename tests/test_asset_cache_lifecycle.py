@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 import tempfile
 import threading
@@ -11,6 +12,31 @@ from spritelens.web.pet_media_cache import PetMediaCache
 
 
 class AssetCacheLifecycleTest(unittest.TestCase):
+    def test_cache_manifest_records_resource_version(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            resource_manifest = root / "pet_media_manifest.json"
+            resource_manifest.write_text(
+                json.dumps({"schema_version": 1, "resource_version": "test-2026-10"}),
+                encoding="utf-8",
+            )
+            cache = PetMediaCache(root, root / "cache", resource_manifest)
+            cache._cache_dir.mkdir()
+            cache._record_source(
+                "1-normal-portrait.webp",
+                "https://game.gtimg.cn/example.png",
+                b"source",
+                b"output",
+                (1, 1),
+                (256, 256),
+            )
+
+            manifest = json.loads(
+                (root / "cache" / "manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(manifest["schema_version"], 2)
+            self.assertEqual(manifest["resource_version"], "test-2026-10")
+
     def test_close_waits_for_actual_download_threads(self) -> None:
         async def run(cache_type, root):
             (root / "account-avatars").mkdir(exist_ok=True)

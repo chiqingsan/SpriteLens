@@ -480,7 +480,7 @@ class EggBoxPayloadTests(unittest.TestCase):
             self.assertEqual(payload["total"], 1)
             row = payload["eggs"][0]
             self.assertEqual(row["egg_name"], "喵喵蛋")
-            self.assertEqual(row["icon_url"], "/static/egg-icons/107001.png")
+            self.assertEqual(row["icon_url"], "/static/egg-icons/107001.webp")
             self.assertEqual(row["fallback_icon_url"], "")
             self.assertEqual(row["egg_kind"], "regular")
             self.assertEqual(payload["total_quantity"], 1)
@@ -517,7 +517,7 @@ class EggBoxPayloadTests(unittest.TestCase):
             self.assertEqual(row["species_name"], "测试精灵")
             self.assertEqual(row["chain_names"], ["测试精灵", "罗隐"])
             self.assertEqual(row["egg_kind"], "shiny")
-            self.assertEqual(row["icon_url"], "/static/egg-icons/108001.png")
+            self.assertEqual(row["icon_url"], "/static/egg-icons/108001.webp")
             self.assertEqual(row["egg_group_names"], ["动物组"])
             self.assertEqual(row["measurement_ranges"]["height_cm"], {"min": 30, "max": 40})
             extreme_weights = tuple(

@@ -26,6 +26,9 @@ tests/fixtures/recordings/
 build/
 nuitka-crash-report.xml
 
+# 本机验收、反汇编和设计预览产物
+/output/
+
 # GUI 截图校验产物（guishot）
 .guishot/
 .guishot_demo.log

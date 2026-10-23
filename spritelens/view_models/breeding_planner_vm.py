@@ -32,7 +32,7 @@ class BreedingPlannerViewModel:
                         if (member := self.service.static.species(member_id)) is not None
                     ]
                     targets[egg.egg_key] = {"egg_key": egg.egg_key, "name": egg.egg_name, "groups": egg.egg_group_names,
-                                            "base_id": egg.base_id, "icon_url": f"/static/egg-icons/{egg.egg_item_id}.png",
+                                            "base_id": egg.base_id, "icon_url": f"/static/egg-icons/{egg.egg_item_id}.webp",
                                             "chain_names": chain_names}
         return {"uid": inventory.uid, "version": inventory.version, "available": pool is not None,
                 "source": "observed" if inventory.identity else "history", "pet_count": len(inventory.pets),

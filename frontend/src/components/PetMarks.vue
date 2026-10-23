@@ -18,14 +18,14 @@ function medalId(mark: MedalMark) { return { '大': 1001, '小': 1002, '粗': 10
 function title(mark: MedalMark) { return mark.name + (mark.source === 'reference' ? ' · 体型/声音参考标记' : ' · 当前佩戴') }
 </script>
 <template>
-  <span v-if="(!kind || kind === 'all' || kind === 'rarity') && (pet.is_shiny || pet.is_colorful)" class="pet-rarity" :title="label"><img v-if="!failed[rarity]" :src="'/static/rarity/' + rarity + '-fit.png'" :alt="label" @error="failed[rarity] = true"><template v-else>{{ label }}</template></span>
+  <span v-if="(!kind || kind === 'all' || kind === 'rarity') && (pet.is_shiny || pet.is_colorful)" class="pet-rarity" :title="label"><img v-if="!failed[rarity]" :src="'/static/rarity/' + rarity + '-fit.webp'" :alt="label" @error="failed[rarity] = true"><template v-else>{{ label }}</template></span>
   <span v-if="(!kind || kind === 'all' || kind === 'card') && cardValid && pet.color_card" class="pet-color-card" role="img" :aria-label="pet.color_card.name + ' · ' + pet.color_card.particle_name" :title="pet.color_card.name + ' · ' + pet.color_card.particle_name">
-    <img v-if="special && !failed['card-' + pet.color_card.card_id]" :src="'/static/color-cards/' + pet.color_card.card_id + '.png'" alt="" @error="failed['card-' + pet.color_card.card_id] = true">
-    <template v-if="!special"><svg viewBox="0 0 100 60" preserveAspectRatio="none" aria-hidden="true"><rect width="100" height="60" :fill="pet.color_card.mix_color"></rect><path d="M0 30 Q25 12 50 30 T100 30 V60 H0 Z" :fill="pet.color_card.base_color"></path></svg><img v-if="pattern && !failed['pattern-' + pattern]" :src="'/static/color-cards/pattern_' + pattern + '.png'" alt="" @error="failed['pattern-' + pattern] = true"></template>
+    <img v-if="special && !failed['card-' + pet.color_card.card_id]" :src="'/static/color-cards/' + pet.color_card.card_id + '.webp'" alt="" @error="failed['card-' + pet.color_card.card_id] = true">
+    <template v-if="!special"><svg viewBox="0 0 100 60" preserveAspectRatio="none" aria-hidden="true"><rect width="100" height="60" :fill="pet.color_card.mix_color"></rect><path d="M0 30 Q25 12 50 30 T100 30 V60 H0 Z" :fill="pet.color_card.base_color"></path></svg><img v-if="pattern && !failed['pattern-' + pattern]" :src="'/static/color-cards/pattern_' + pattern + '.webp'" alt="" @error="failed['pattern-' + pattern] = true"></template>
   </span>
   <template v-if="!kind || kind === 'all' || kind === 'medals'">
     <span v-for="(mark, index) in marks" :key="mark?.label || index" :class="{ 'point-medal-slot': slots }">
-      <span v-if="mark" class="pet-medal" :class="{ 'has-icon': medalId(mark) && !failed[mark.label] }" :title="title(mark)"><span>{{ mark.label }}</span><img v-if="medalId(mark) && !failed[mark.label]" :src="'/static/medal-icons/mark-' + medalId(mark) + '.png'" :alt="mark.name" @error="failed[mark.label] = true"></span>
+      <span v-if="mark" class="pet-medal" :class="{ 'has-icon': medalId(mark) && !failed[mark.label] }" :title="title(mark)"><span>{{ mark.label }}</span><img v-if="medalId(mark) && !failed[mark.label]" :src="'/static/medal-icons/mark-' + medalId(mark) + '.webp'" :alt="mark.name" @error="failed[mark.label] = true"></span>
     </span>
   </template>
 </template>

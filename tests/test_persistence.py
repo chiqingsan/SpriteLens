@@ -18,7 +18,7 @@ from spritelens.domain.pets import Pet
 from spritelens.domain.pet_locations import Backpack
 from spritelens.capture.key_store import KeyStore
 from spritelens.protocol.opcodes import OpcodeCatalog
-from spritelens.repositories.database import Database, DatabaseSchemaError
+from spritelens.repositories.database import Database
 from spritelens.repositories.egg_store import EggStore
 from spritelens.repositories.pet_store import PetStore
 from spritelens.repositories.settings import SettingsRepository
@@ -512,7 +512,7 @@ class DatabaseBaselineTest(unittest.TestCase):
         finally:
             db.close()
 
-    def test_old_schema_is_rejected_without_mutating_database(self):
+    def test_old_schema_is_backed_up_and_rebuilt(self):
         import sqlite3
 
         old = self.tmp_path / "old.sqlite"
@@ -523,11 +523,20 @@ class DatabaseBaselineTest(unittest.TestCase):
         conn.close()
         original = old.read_bytes()
 
-        with self.assertRaises(DatabaseSchemaError):
-            Database(old)
-        self.assertEqual(old.read_bytes(), original)
+        db = Database(old)
+        try:
+            self.assertEqual(db.schema_version, 1)
+        finally:
+            db.close()
 
-    def test_incomplete_schema_one_is_rejected_without_mutating_database(self):
+        backups = list(self.tmp_path.glob("old.incompatible-*.sqlite"))
+        self.assertEqual(len(backups), 1, "不兼容库应被备份")
+        self.assertEqual(backups[0].read_bytes(), original)
+        with sqlite3.connect(backups[0]) as backup:
+            self.assertEqual(backup.execute("PRAGMA user_version").fetchone()[0], 18)
+            self.assertEqual(backup.execute("SELECT name FROM sqlite_master WHERE name = 'legacy'").fetchone()[0], "legacy")
+
+    def test_incomplete_schema_one_is_backed_up_and_rebuilt(self):
         import sqlite3
 
         incomplete = self.tmp_path / "incomplete.sqlite"
@@ -536,11 +545,43 @@ class DatabaseBaselineTest(unittest.TestCase):
         conn.execute("PRAGMA user_version = 1")
         conn.commit()
         conn.close()
-        original = incomplete.read_bytes()
 
-        with self.assertRaises(DatabaseSchemaError):
-            Database(incomplete)
-        self.assertEqual(incomplete.read_bytes(), original)
+        db = Database(incomplete)
+        try:
+            self.assertEqual(db.schema_version, 1)
+            self.assertEqual(db.query("SELECT COUNT(*) FROM accounts")[0][0], 0)
+        finally:
+            db.close()
+
+        self.assertEqual(len(list(self.tmp_path.glob("incomplete.incompatible-*.sqlite"))), 1)
+
+    def test_incompatible_backup_failure_keeps_original_file(self):
+        import sqlite3
+
+        old = self.tmp_path / "old.sqlite"
+        conn = sqlite3.connect(old)
+        conn.execute("CREATE TABLE legacy (value TEXT)")
+        conn.execute("PRAGMA user_version = 18")
+        conn.commit()
+        conn.close()
+        original = old.read_bytes()
+
+        original_replace = Path.replace
+
+        def failing_replace(self: Path, target):  # type: ignore[no-untyped-def]
+            if ".incompatible-" in Path(target).name:
+                raise OSError("注入：不兼容库备份目标不可写")
+            return original_replace(self, target)
+
+        Path.replace = failing_replace  # type: ignore[method-assign]
+        try:
+            with self.assertRaises(OSError):
+                Database(old)
+        finally:
+            Path.replace = original_replace  # type: ignore[method-assign]
+
+        self.assertEqual(old.read_bytes(), original)
+        self.assertEqual(list(self.tmp_path.glob("old.incompatible-*.sqlite*")), [])
 
     def test_same_columns_without_primary_key_are_rejected(self):
         db = Database(self.db_path)
@@ -548,8 +589,12 @@ class DatabaseBaselineTest(unittest.TestCase):
         db.execute("CREATE TABLE egg_annotations (uid INTEGER, instance_id INTEGER, nature_id INTEGER, "
                    "nest_override TEXT, note TEXT, voice_tag TEXT, voice_db INTEGER, is_favorite INTEGER)")
         db.close()
-        with self.assertRaises(DatabaseSchemaError):
-            Database(self.db_path)
+        rebuilt = Database(self.db_path)
+        try:
+            self.assertEqual(rebuilt.schema_version, 1)
+        finally:
+            rebuilt.close()
+        self.assertEqual(len(list(self.tmp_path.glob("mig.incompatible-*.sqlite"))), 1)
 
     def test_extended_fields_round_trip(self):
         """六维/外观/技能写入后能完整读回（含负值声音）。"""

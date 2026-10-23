@@ -116,10 +116,10 @@ Vue 3 + TypeScript strict + Vite 已落地；图鉴、蛋仓、家园、色卡�
 
 - 新增业务域数据：直接修改 `repositories/database.py` 的 schema 1 基线 DDL，
   并新建同构 Store（参考 `pet_store.py` / `egg_store.py`）。当前是破坏性开发，
-  不为旧本地数据库追加兼容迁移；改表后删除/备份本地数据库再重建，需保留的数据
+  不为旧本地数据库追加兼容迁移；改表后启动时先备份本地数据库再重建，需保留的数据
   通过显式导出/导入处理。
 - 基线初始化必须在单事务内完成，失败整体回滚；schema 版本不匹配或结构不完整时
-  快速失败并保留原文件，不自动修复旧结构。
+  先完整备份主库及 WAL/SHM，再重建当前基线，不尝试迁移旧结构；备份失败必须保留原文件并报错。
 - 写路径必须无 IO：抓包线程内的调用只允许并入内存待写表/队列；落盘交给
   worker 线程批量执行（登录突发实测：同步 flush 会让轮询等待 57ms）。
 - 同一 Store 批次的关联表使用 `Database.execute_batches()` 在一个事务内提交；失败整体回滚并回填全部待写数据。
@@ -150,6 +150,12 @@ Store 并发批次顺序、坏库备份失败保护与坏行隔离已有修复�
   `resources/app.ico` 与 `spritelens/web/static/favicon.png`，源图与产物随仓库提交。
   窗口标题栏、任务栏、Alt-Tab、桌面快捷方式与 exe 共用 ICO；浏览器标签页与页面品牌标识共用 PNG。
 - **打包**：`build.bat` / `python build.py`（配置在 `build_config.toml`）。
+  `build.bat` 无参数时进入构建菜单，可选择普通构建、dry-run 或修改项目版本号；
+  版本源文件是 `spritelens/__init__.py`，也可用 `build.py --get-version` /
+  `build.py --set-version VERSION` 直接操作。`build_config.toml` 保留
+  `backend_c_flags = ["-mno-gfni"]`，用于规避 Nuitka onefile 外层启动器在部分
+  AMD CPU 上因 GFNI 指令触发的入口非法指令崩溃；扩大到禁用 AVX/AVX2 前必须有
+  目标机器的复现证据。
   发布配置启用 `uac_admin = true`，Nuitka 生成的 exe 启动时会触发 UAC，以便采集和 Npcap
   安装流程获得管理员权限；源码 `start.bat`、单元测试和开发服务器不强制提权。Npcap 安装
   首选 `powershell.exe -NoProfile -NonInteractive` 下载官方安装器，失败后回退 Python `urllib`；

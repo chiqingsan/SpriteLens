@@ -35,6 +35,10 @@ remove_output = true
 assume_yes_for_downloads = true
 mingw64 = true
 
+# Nuitka onefile 外层启动器在部分构建链上可能带入 GFNI 指令；关闭该指令
+# 可避免部分 AMD CPU 在程序入口阶段触发非法指令崩溃，同时保留其它指令集能力。
+backend_c_flags = ["-mno-gfni"]
+
 show_progress = true
 show_memory = false
 
@@ -72,12 +76,28 @@ include_modules = [
 # 而 --smoke-test / --replay 等非 GUI 路径不加载静态资源，测不出来。
 include_data_dirs = [
   "data/schemas=data/schemas",
-  "data/static=data/static",
   "spritelens/web/static=spritelens/web/static",
 ]
 
-# 仅图标是运行资源；resources 下的 wiki/source 候选素材不进入发布包。
+# data/static 中的导入报告与来源台账仅供开发工具使用，不进入发布包。
+# 显式列出运行时表，避免把开发期元数据一起塞进单文件 exe。
 include_data_files = [
+  "data/static/color_cards.json=data/static/color_cards.json",
+  "data/static/egg_descriptions.json=data/static/egg_descriptions.json",
+  "data/static/egg_inventory.json=data/static/egg_inventory.json",
+  "data/static/eggs.json=data/static/eggs.json",
+  "data/static/medals.json=data/static/medals.json",
+  "data/static/natures.json=data/static/natures.json",
+  "data/static/pet_media.json=data/static/pet_media.json",
+  "data/static/pet_media_manifest.json=data/static/pet_media_manifest.json",
+  "data/static/skills.json=data/static/skills.json",
+  "data/static/specialities.json=data/static/specialities.json",
+  "data/static/species.json=data/static/species.json",
+  "data/static/type_chart.json=data/static/type_chart.json",
+  "data/static/types.json=data/static/types.json",
+  "data/static/wiki_reference.json=data/static/wiki_reference.json",
+
+  # 仅图标是运行资源；resources 下的 wiki/source 候选素材不进入发布包。
   "resources/app.ico=resources/app.ico",
 ]
 
@@ -98,6 +118,9 @@ nofollow_imports = [
   "pandas",
   "scipy",
   "notebook",
+  "PIL._avif",
+  "PIL.AvifImagePlugin",
+  "zstandard",
 ]
 
 # 额外原样传给 Nuitka 的参数。

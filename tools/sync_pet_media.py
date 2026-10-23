@@ -5,7 +5,6 @@ import argparse
 import hashlib
 import io
 import json
-import shutil
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -18,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 def sync_rarity(web: Path) -> list[dict]:
     """统一稀有标记透明留白，保留原图及比例。"""
     resources = []
-    for original in sorted((web / "rarity").glob("*.png")):
+    for original in sorted((web / "rarity").glob("*.webp")):
         if original.stem.endswith("-fit"):
             continue
         with Image.open(original) as image:
@@ -30,8 +29,8 @@ def sync_rarity(web: Path) -> list[dict]:
             image = image.resize((max(1, round(image.width * scale)), max(1, round(image.height * scale))), Image.Resampling.LANCZOS)
             canvas = Image.new("RGBA", (64, 64))
             canvas.paste(image, ((64 - image.width) // 2, (64 - image.height) // 2))
-            target = original.with_name(original.stem + "-fit.png")
-            canvas.save(target)
+            target = original.with_name(original.stem + "-fit.webp")
+            canvas.save(target, "WEBP", lossless=True, method=4)
         resources.append({"key": "rarity-fit/" + original.name,
                           "sourceLocal": "/static/rarity/" + original.name,
                           "sha256": hashlib.sha256(original.read_bytes()).hexdigest(),
@@ -55,10 +54,10 @@ def sync_medals(source: Path, web: Path) -> list[dict]:
             image.thumbnail((128, 128))
             normalized = Image.new("RGBA", (128, 128))
             normalized.paste(image, ((128 - image.width) // 2, (128 - image.height) // 2))
-            normalized.save(target / f"mark-{medal_id}.png")
-        resources.append({"key": f"medal-icons/mark-{medal_id}.png", "name": name,
+            normalized.save(target / f"mark-{medal_id}.webp", "WEBP", lossless=True, method=4)
+        resources.append({"key": f"medal-icons/mark-{medal_id}.webp", "name": name,
                           "sha256": hashlib.sha256(origin.read_bytes()).hexdigest(),
-                          "local": f"/static/medal-icons/mark-{medal_id}.png",
+                          "local": f"/static/medal-icons/mark-{medal_id}.webp",
                           "transform": "alpha bounds crop + centered 128px canvas"})
     (target / "mark-sources.json").write_text(json.dumps({"source": source.name, "resources": resources}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return resources
@@ -139,15 +138,27 @@ def sync(source: Path, root: Path = ROOT) -> dict:
         target.mkdir(exist_ok=True)
         for name in names:
             origin = assets / folder / name
-            shutil.copyfile(origin, target / name)
+            destination = target / (Path(name).stem + ".webp")
+            with Image.open(origin) as image:
+                image.convert("RGBA").save(destination, "WEBP", lossless=True, method=4)
             sources.append({"key": folder + "/" + name, "sha256": hashlib.sha256(origin.read_bytes()).hexdigest(),
-                            "local": "/static/" + target.name + "/" + name})
+                            "local": "/static/" + target.name + "/" + destination.name})
     sources.extend(sync_rarity(web))
     sources.extend(sync_medals(source, web))
     report = {"source": source.name, "manifest_version": manifest.get("resourceVersion"),
               "species_total": len(species), "portrait_species": len(index), "missing_mirrors": missing,
               "without_portrait": sorted(set(species) - set(index), key=int), "resources": sources}
-    for name, data in (("pet_media.json", index), ("pet_media_report.json", report)):
+    resource_manifest = {
+        "schema_version": 1,
+        "resource_version": str(manifest.get("resourceVersion") or "unknown"),
+        "source_host": "game.gtimg.cn",
+        "source_path": "/images/rocom/rocodata/jingling/{id}/{file}",
+        "output_format": "webp",
+        "output_dimensions": {"portrait": [256, 256], "artwork": [512, 512]},
+    }
+    for name, data in (("pet_media.json", index),
+                       ("pet_media_manifest.json", resource_manifest),
+                       ("pet_media_report.json", report)):
         (root / "data/static" / name).write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
     return {"species_total": len(species), "portrait_species": len(index), "missing": len(missing)}
 

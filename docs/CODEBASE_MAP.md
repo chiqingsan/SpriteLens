@@ -96,7 +96,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `domain/home.py` | 家园语义层：0x014A 双布局快照 + 0x0413/0x0414 已识别增量 → 居民/物种/家具/窝位/配对/场景蛋 |
 | `domain/home_breeding.py` | 家园关系过期时，按巢穴边缘距离及已知性别/蛋组生成候选 |
 | `domain/display.py` | 展示常量：系别配色、六维标签、天赋阶配色（框架无关） |
-| `repositories/database.py` | SQLite 底座：schema 1 完整基线初始化与结构校验；旧 schema/退役列快速失败，不做运行时兼容迁移；真损坏按主库/WAL/SHM 成组备份，备份失败保留原文件 |
+| `repositories/database.py` | SQLite 底座：schema 1 完整基线初始化与结构校验；旧 schema/不兼容结构先按主库/WAL/SHM 成组备份再重建，不做运行时兼容迁移；备份失败保留原文件 |
 | `repositories/pet_store.py` | 宠物持久化网关：write-behind 批量落盘 + 读取（适配器模式） |
 | `repositories/egg_store.py` | 蛋仓持久化网关：write-behind 批量落盘，按 uid 读取蛋、孵化槽与性格/蛋窝/声音标签/手动声音标注 |
 | `repositories/settings.py` | JSON 配置仓库（读取失败阻止写回、替换成功才更新缓存、字段归一、窗口几何） |

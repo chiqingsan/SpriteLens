@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import os
 import re
 import shutil
@@ -22,6 +23,14 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parent
 DEFAULT_CONFIG = PROJECT_ROOT / "build_config.toml"
 VERSION_INIT_FILE = PROJECT_ROOT / "spritelens" / "__init__.py"
+VERSION_FORMAT_PATTERN = re.compile(r"^\d+\.\d+(?:\.\d+)?(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?$")
+BACKEND_FLAG_ENV_KEYS = {
+    "backend_cpp_flags": "CPPFLAGS",
+    "backend_c_flags": "CFLAGS",
+    "backend_cc_flags": "CCFLAGS",
+    "backend_cxx_flags": "CXXFLAGS",
+    "backend_ld_flags": "LDFLAGS",
+}
 
 
 def configure_stdio_encoding() -> None:
@@ -61,12 +70,90 @@ def resolve_project_path(value: str, field_name: str, *, must_exist: bool = True
 
 
 def load_project_version(init_file: Path = VERSION_INIT_FILE) -> str:
-    """从 spritelens/__init__.py 读 __version__（不 import，避免副作用）。"""
-    text = init_file.read_text(encoding="utf-8")
-    matched = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', text, re.M)
-    if not matched:
-        raise SystemExit(f"未在 {init_file} 找到 __version__")
-    return matched.group(1)
+    """从 spritelens/__init__.py 解析 __version__，不 import 应用代码。"""
+    try:
+        source = init_file.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+    except (OSError, SyntaxError) as exc:
+        raise RuntimeError(f"无法读取版本号: {init_file}") from exc
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "__version__":
+                    value = ast.literal_eval(node.value)
+                    if isinstance(value, str):
+                        return value
+    raise RuntimeError(f"未在 {init_file} 找到字符串 __version__")
+
+
+def normalize_version_input(raw: str) -> str:
+    """规范化版本号；允许 v 前缀，拒绝不能用于产物命名的字符。"""
+    value = str(raw).strip()
+    if value[:1] in {"v", "V"}:
+        value = value[1:].strip()
+    if not value:
+        return ""
+    if not VERSION_FORMAT_PATTERN.match(value):
+        raise ValueError(f"版本号格式无效: {raw!r}；示例: 0.2 / 0.2.0 / 0.2.0-rc.1")
+    return value
+
+
+def set_project_version(new_version: str, *, init_file: Path = VERSION_INIT_FILE) -> str:
+    """更新 spritelens/__init__.py 中的 __version__，返回旧版本号。"""
+    old_version = load_project_version(init_file)
+    text = init_file.read_bytes().decode("utf-8")
+    pattern = re.compile(r"(?m)^(__version__\s*=\s*)(['\"])[^'\"]*\2")
+    new_text, replaced = pattern.subn(
+        lambda match: f"{match.group(1)}{match.group(2)}{new_version}{match.group(2)}",
+        text,
+        count=1,
+    )
+    if replaced != 1:
+        raise RuntimeError(f"无法定位 __version__ 赋值行: {init_file}")
+    if new_text != text:
+        init_file.write_bytes(new_text.encode("utf-8"))
+    return old_version
+
+
+def prompt_project_version(current_version: str) -> str | None:
+    """交互式读取新版本号；空输入取消。"""
+    print(f"当前版本号: {current_version}")
+    print("示例: 0.2 / 0.2.0 / 0.2.0-rc.1（直接回车取消）")
+    while True:
+        print("新的版本号: ", end="", flush=True)
+        try:
+            raw = input()
+        except EOFError:
+            return None
+        try:
+            value = normalize_version_input(raw)
+        except ValueError as exc:
+            print(exc)
+            continue
+        return value or None
+
+
+def run_version_update(raw_version: str) -> int:
+    """执行 --set-version；不带值时进入交互输入。"""
+    current_version = load_project_version()
+    if raw_version:
+        try:
+            new_version = normalize_version_input(raw_version)
+        except ValueError as exc:
+            print(exc)
+            return 1
+    else:
+        new_version = prompt_project_version(current_version)
+        if new_version is None:
+            print("已取消修改版本号。")
+            return 0
+    if new_version == current_version:
+        print(f"版本号未变化: {current_version}")
+        return 0
+    old_version = set_project_version(new_version)
+    print(f"版本号已修改: {old_version} -> {new_version}")
+    print(f"文件: {VERSION_INIT_FILE}")
+    return 0
 
 
 def windows_version_string(version: str) -> str:
@@ -172,6 +259,13 @@ def build_environment(config: dict[str, Any]) -> dict[str, str]:
     # Windows onefile：Zig 的 C23 #embed 可能复用过期对象，改用 COFF 嵌入
     if os.name == "nt" and as_bool(config, "onefile", True):
         env.setdefault("NUITKA_RESOURCE_MODE", "coff_obj")
+    for config_key, env_key in BACKEND_FLAG_ENV_KEYS.items():
+        flags = as_list(config, config_key)
+        if flags:
+            additions = " ".join(flag.strip() for flag in flags if flag.strip())
+            if additions:
+                existing = env.get(env_key, "").strip()
+                env[env_key] = f"{existing} {additions}".strip()
     return env
 
 
@@ -198,12 +292,69 @@ def print_summary(config: dict[str, Any], version: str) -> None:
         print(f"[build] 附带资源: {item}")
 
 
+MENU_BUILD_ARGS = {
+    "1": "--config build_config.toml",
+    "2": "--config build_config.toml --dry-run",
+}
+
+
+def run_interactive_menu() -> int:
+    """显示打包菜单；文案走 stderr，最后只向 stdout 输出构建参数。"""
+    while True:
+        print("Build target / 构建目标:", file=sys.stderr)
+        print(f"  Current version / 当前版本: {load_project_version()}", file=sys.stderr)
+        print("  1. Normal build / 普通构建", file=sys.stderr)
+        print("  2. Normal build dry-run / 普通构建预演", file=sys.stderr)
+        print("  3. Change project version / 修改项目版本号", file=sys.stderr)
+        print("  0. Cancel / 取消", file=sys.stderr)
+        print(file=sys.stderr)
+        print("Enter choice number / 输入选项编号: ", file=sys.stderr, end="", flush=True)
+        try:
+            raw = input().strip()
+        except EOFError:
+            return 1
+        if raw == "0":
+            return 1
+        if raw == "3":
+            from contextlib import redirect_stdout
+
+            with redirect_stdout(sys.stderr):
+                run_version_update("")
+            print(file=sys.stderr)
+            continue
+        build_args = MENU_BUILD_ARGS.get(raw)
+        if build_args is None:
+            print("Invalid choice / 无效选项.", file=sys.stderr)
+            print(file=sys.stderr)
+            continue
+        print(build_args)
+        return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     configure_stdio_encoding()
     parser = argparse.ArgumentParser(description="Nuitka 打包 SpriteLens")
     parser.add_argument("--config", default=str(DEFAULT_CONFIG), help="配置文件路径")
     parser.add_argument("--dry-run", action="store_true", help="只打印命令，不编译")
+    parser.add_argument("--get-version", action="store_true", help="打印当前项目版本号后退出")
+    parser.add_argument("--menu", action="store_true", help="显示交互式打包菜单")
+    parser.add_argument(
+        "--set-version",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="VERSION",
+        help="修改 spritelens/__init__.py 中的版本号；不带值时进入交互输入",
+    )
     args = parser.parse_args(argv)
+
+    if args.get_version:
+        print(load_project_version())
+        return 0
+    if args.menu:
+        return run_interactive_menu()
+    if args.set_version is not None:
+        return run_version_update(args.set_version)
 
     from tools.frontend import check
     failures = check()
@@ -220,6 +371,10 @@ def main(argv: list[str] | None = None) -> int:
 
     printable = " ".join(f'"{part}"' if " " in part else part for part in command)
     print(f"[build] 命令:\n{printable}\n")
+    for env_key in BACKEND_FLAG_ENV_KEYS.values():
+        original = os.environ.get(env_key, "")
+        if env.get(env_key, "") != original:
+            print(f"[build] {env_key}={env[env_key]}")
 
     if args.dry_run:
         print("[build] --dry-run：未执行编译")

@@ -26,14 +26,21 @@ _MAX_DOWNLOAD_BYTES = 8 * 1024 * 1024
 _DOWNLOAD_TIMEOUT = 3
 _NOT_FOUND_COOLDOWN = 6 * 60 * 60
 _NETWORK_COOLDOWN = 60
+_CACHE_MANIFEST_SCHEMA_VERSION = 2
+_LEGACY_RESOURCE_VERSION = "legacy"
+_RESOURCE_HOST = "game.gtimg.cn"
+_RESOURCE_PATH = "/images/rocom/rocodata/jingling/{id}/{file}"
 
 
 class PetMediaCache:
     """从内置资源开始服务，缺失时尝试腾讯 CDN 并持久化到用户缓存。"""
 
-    def __init__(self, static_dir: Path, cache_dir: Path) -> None:
+    def __init__(
+        self, static_dir: Path, cache_dir: Path, resource_manifest: Path | None = None,
+    ) -> None:
         self._static_dir = static_dir
         self._cache_dir = cache_dir
+        self._resource_version, self._resource_path = self._load_resource_policy(resource_manifest)
         self._downloads = asyncio.Semaphore(3)
         self._misses: dict[str, float] = {}
         self._inflight: dict[str, asyncio.Task[tuple[Path | None, float]]] = {}
@@ -109,10 +116,29 @@ class PetMediaCache:
         cached = self._cache_dir / name
         return cached if cached.is_file() else None
 
+    def _load_resource_policy(self, path: Path | None) -> tuple[str, str]:
+        if path is None or not path.is_file():
+            return _LEGACY_RESOURCE_VERSION, _RESOURCE_PATH
+        try:
+            manifest = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            logger.warning("读取精灵资源版本清单失败：%s", exc)
+            return _LEGACY_RESOURCE_VERSION, _RESOURCE_PATH
+        if not isinstance(manifest, dict):
+            return _LEGACY_RESOURCE_VERSION, _RESOURCE_PATH
+        version = str(manifest.get("resource_version") or _LEGACY_RESOURCE_VERSION)
+        source_host = manifest.get("source_host")
+        source_path = manifest.get("source_path")
+        if source_host != _RESOURCE_HOST or not isinstance(source_path, str):
+            return version, _RESOURCE_PATH
+        if "{id}" not in source_path or "{file}" not in source_path or not source_path.startswith("/"):
+            return version, _RESOURCE_PATH
+        return version, source_path
+
     def _download(self, species_id: str, variant: str, use: str) -> tuple[Path | None, float]:
         image_name = {("normal", "portrait"): "icon.png", ("normal", "artwork"): "image.png",
                       ("shiny", "portrait"): "icon_yise.png", ("shiny", "artwork"): "image_yise.png"}[(variant, use)]
-        url = f"https://game.gtimg.cn/images/rocom/rocodata/jingling/{species_id}/{image_name}"
+        url = f"https://{_RESOURCE_HOST}{self._resource_path.format(id=species_id, file=image_name)}"
         request = Request(url, headers={"User-Agent": "SpriteLens resource cache"})
         try:
             with urlopen(request, timeout=_DOWNLOAD_TIMEOUT) as response:
@@ -167,7 +193,15 @@ class PetMediaCache:
                 manifest = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {"schema_version": 1, "assets": {}}
             except (OSError, ValueError) as exc:
                 logger.warning("读取精灵图片缓存清单失败，将重新生成：%s", exc)
-                manifest = {"schema_version": 1, "assets": {}}
+                manifest = {"schema_version": _CACHE_MANIFEST_SCHEMA_VERSION,
+                            "resource_version": self._resource_version, "assets": {}}
+            if not isinstance(manifest, dict):
+                manifest = {"schema_version": _CACHE_MANIFEST_SCHEMA_VERSION,
+                            "resource_version": self._resource_version, "assets": {}}
+            manifest["schema_version"] = _CACHE_MANIFEST_SCHEMA_VERSION
+            manifest["resource_version"] = self._resource_version
+            if not isinstance(manifest.get("assets"), dict):
+                manifest["assets"] = {}
             manifest["assets"][name] = {
                 "source_url": url,
                 "sha256_source": sha256(source).hexdigest(),

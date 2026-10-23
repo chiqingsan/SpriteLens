@@ -238,7 +238,7 @@ def pets_payload(
         payload["options"] = {
             "natures": [{"id": i, "name": n} for i, n in vm.nature_options()],
             "types": list(vm.type_options()),
-            "type_icons": {info.name: f"/static/type-icons/type-{key}.png" for key, info in static.type_items()} if static else {},
+            "type_icons": {info.name: f"/static/type-icons/type-{key}.webp" for key, info in static.type_items()} if static else {},
             "egg_groups": list(vm.egg_group_options()),
             "sorts": [{"key": k, "label": label} for k, label in SORT_KEYS],
             "talent_max": vm.talent_rank_max(),

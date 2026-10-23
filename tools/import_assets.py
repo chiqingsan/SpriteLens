@@ -85,7 +85,9 @@ def import_type_icons(danshen: Path | None) -> dict:
     with Image.open(TYPE_ICON_DIR / "sprite-0.webp") as atlas:
         for type_id, sprite_id in sprite_ids.items():
             x, width, height = regions[sprite_id]
-            atlas.crop((-x, 0, -x + width, height)).save(TYPE_ICON_DIR / f"type-{type_id}.png")
+            atlas.crop((-x, 0, -x + width, height)).save(
+                TYPE_ICON_DIR / f"type-{type_id}.webp", "WEBP", lossless=True, method=4
+            )
     return {"copied": copied, "derived": len(sprite_ids), "type_to_sprite": sprite_ids}
 
 

@@ -8,7 +8,7 @@ describe('MedalIcon', () => {
     const wrapper = mount(MedalIcon, { props: { name: '婉转声', source: 'worn' } })
 
     const image = wrapper.get('img')
-    expect(image.attributes('src')).toBe('/static/medal-icons/mark-1026.png')
+    expect(image.attributes('src')).toBe('/static/medal-icons/mark-1026.webp')
     expect(image.attributes('alt')).toBe('婉转声')
     expect(image.attributes('title')).toContain('当前佩戴')
   })

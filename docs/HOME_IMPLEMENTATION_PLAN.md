@@ -18,7 +18,7 @@
 - 游戏场景提供 `layEggCouples`，一个母本可有多个父本。距离算法只产生候选，不替代有效的游戏配对。
 
 证据定位：解包产物 `home_scene.pyc` 的 `decode_home_scene` 原源码行 218–305；`web_runtime.pyc` 的 `CollectorService.home_info` 行 1506–1536；`webui/feature-pages.js` 的 `homePets`、`homePairingModel`、`homeMapMarkup`；`webui/home-breeding.js`。
-本机详细证据在 `output/home-analysis-20261016/REPORT.md`、`sample-summary.json` 和反汇编文件中；这些是分析辅助，不是测试运行依赖。日志的 bytes 字段经过有损 JSON 转换，不能当作原始字节录制。
+本机详细证据曾保存在分析辅助目录中，但该目录不是测试运行依赖，现已从工作树清理。日志的 bytes 字段经过有损 JSON 转换，不能当作原始字节录制。
 
 ## 2. 编码前准备
 

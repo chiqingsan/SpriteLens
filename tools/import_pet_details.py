@@ -16,9 +16,10 @@
 from __future__ import annotations
 
 import json
-import shutil
 import sys
 from pathlib import Path
+
+from PIL import Image
 
 REPO = Path(__file__).resolve().parent.parent
 STATIC = REPO / "data" / "static"
@@ -88,7 +89,8 @@ def import_medals(src: Path) -> str:
     icons.mkdir(parents=True, exist_ok=True)
     copied = 0
     for png in (src / "assets" / "medals").glob("*.png"):
-        shutil.copyfile(png, icons / png.name)
+        with Image.open(png) as image:
+            image.convert("RGBA").save(icons / (png.stem + ".webp"), "WEBP", lossless=True, method=4)
         copied += 1
     return f"medals.json: {len(medals)} 条 + {copied} 个图标"
 
@@ -98,7 +100,8 @@ def import_egg_icons(src: Path) -> str:
     icons.mkdir(parents=True, exist_ok=True)
     copied = 0
     for png in (src / "assets" / "items" / "bag").glob("*.png"):
-        shutil.copyfile(png, icons / png.name)
+        with Image.open(png) as image:
+            image.convert("RGBA").save(icons / (png.stem + ".webp"), "WEBP", lossless=True, method=4)
         copied += 1
     return f"egg-icons: {copied} 个蛋图标"
 

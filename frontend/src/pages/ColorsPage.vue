@@ -221,7 +221,7 @@ onMounted(() => { if (props.active) void resume(); else pause() })
           <div class="matrix-cell matrix-axis top left">混色<br>×<br>底色</div>
           <div v-for="base in matrixAxis.base" :key="'top-' + base.name" class="matrix-cell matrix-axis top">
             <div class="axis-label">
-              <img v-if="base.name === '黑白'" class="axis-card-preview" src="/static/color-cards/1000.png" alt="黑白色卡">
+              <img v-if="base.name === '黑白'" class="axis-card-preview" src="/static/color-cards/1000.webp" alt="黑白色卡">
               <img v-else-if="base.name === '赛季'" class="axis-card-preview" src="/static/color-cards/season-category.svg" alt="赛季色卡分类">
               <span v-else :style="{ background: base.hex }"></span>
               <b>{{ base.name }}</b>
@@ -230,7 +230,7 @@ onMounted(() => { if (props.active) void resume(); else pause() })
           <template v-for="mix in matrixAxis.mix" :key="'row-' + mix.name">
             <div class="matrix-cell matrix-axis left">
               <div class="axis-label">
-                <img v-if="specialAxisCards.has(mix.name)" class="axis-card-preview" :src="`/static/color-cards/${specialAxisCards.get(mix.name)}.png`" :alt="displayMixName(mix.name) + '色卡'">
+              <img v-if="specialAxisCards.has(mix.name)" class="axis-card-preview" :src="`/static/color-cards/${specialAxisCards.get(mix.name)}.webp`" :alt="displayMixName(mix.name) + '色卡'">
                 <span v-else :style="{ background: mix.hex }"></span>
                 <b>{{ displayMixName(mix.name) }}</b>
               </div>

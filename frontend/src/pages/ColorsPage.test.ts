@@ -88,7 +88,7 @@ describe('色卡页面蛋神式矩阵布局', () => {
     expect(cells[0]!.classes()).toContain('selected')
     expect(wrapper.find('.selection-owners').text()).toContain('宠物1001')
     expect(wrapper.find('.inspector-pet').attributes('data-mm')).toBe('1001')
-    expect(wrapper.find('.inspector-pet-face img').attributes('src')).toContain('pattern_sparkle_four.png')
+    expect(wrapper.find('.inspector-pet-face img').attributes('src')).toContain('pattern_sparkle_four.webp')
     expect(cells[0]!.find('.color-cell-owners').exists()).toBe(false)
     expect(wrapper.find('.colors-selection').text()).toContain('红底 · 蓝混')
     await wrapper.find('.color-main-tabs button:nth-child(2)').trigger('click')

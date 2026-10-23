@@ -8,10 +8,10 @@ const pattern = computed(() => ({ 1: 'sparkle_four', 2: 'heart', 3: 'diamond', 4
 const painted = computed(() => /^#[0-9a-f]{6}$/i.test(props.baseColor) && /^#[0-9a-f]{6}$/i.test(props.mixColor))
 </script>
 <template>
-  <img v-if="special && !failed.card" :src="`/static/color-cards/${String(props.cardId).toLowerCase()}.png`" alt="" @error="failed.card = true">
+  <img v-if="special && !failed.card" :src="`/static/color-cards/${String(props.cardId).toLowerCase()}.webp`" alt="" @error="failed.card = true">
   <template v-else>
     <svg viewBox="0 0 100 60" preserveAspectRatio="none" aria-hidden="true"><rect width="100" height="60" :fill="mixColor"></rect><path d="M0 30 Q25 12 50 30 T100 30 V60 H0 Z" :fill="baseColor"></path></svg>
-    <img v-if="pattern && !failed[pattern]" :src="`/static/color-cards/pattern_${pattern}.png`" alt="" @error="failed[pattern] = true">
+  <img v-if="pattern && !failed[pattern]" :src="`/static/color-cards/pattern_${pattern}.webp`" alt="" @error="failed[pattern] = true">
   </template>
 </template>
 <style scoped>

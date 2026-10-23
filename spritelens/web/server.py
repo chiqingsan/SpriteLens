@@ -30,7 +30,7 @@ from aiohttp import WSMsgType, web
 
 from spritelens.app_context import AppContext
 from spritelens.logs import get_logger
-from spritelens.paths import data_root
+from spritelens.paths import data_root, static_dir as static_data_dir
 from spritelens.view_models.ui_preferences import UIPreferencesViewModel
 from spritelens.web.payloads import (
     pet_row,
@@ -297,7 +297,11 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
             logger.debug("半成品 runner 清理异常: %s", exc)
 
     async def _start_async(self) -> None:
-        self._pet_media_cache = PetMediaCache(self._static_dir, data_root() / "pet-media-cache")
+        self._pet_media_cache = PetMediaCache(
+            self._static_dir,
+            data_root() / "pet-media-cache",
+            static_data_dir() / "pet_media_manifest.json",
+        )
         self._account_avatar_cache = AccountAvatarCache(
             self._static_dir, data_root() / "account-avatar-cache"
         )

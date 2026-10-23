@@ -61,7 +61,7 @@ def _handbook_egg(catalog: EggCatalog | None, key: str) -> dict | None:
         "egg_conf_id": egg.egg_conf_id,
         "name": egg.egg_name or egg.name,
         "species_name": egg.name,
-        "icon_url": f"/static/egg-icons/{egg.egg_item_id}.png" if egg.egg_item_id else "",
+        "icon_url": f"/static/egg-icons/{egg.egg_item_id}.webp" if egg.egg_item_id else "",
         "hatch_hours": round(egg.hatch_seconds / 3600, 1),
         "hatch_label": egg.hatch_label,
         "egg_groups": list(egg.egg_group_names),
@@ -162,7 +162,7 @@ def handbook_payload(
     stages_seen: set[int] = set()
     egg_groups_seen: set[str] = set()
     type_icons = {
-        info.name: f"/static/type-icons/type-{type_id}.png"
+        info.name: f"/static/type-icons/type-{type_id}.webp"
         for type_id, info in static.type_items()
     }
     for key, info in catalog_items:
@@ -446,7 +446,7 @@ def home_payload(home_repo, static: StaticData | None, pet_repository=None, egg_
             "weight_pct": weight_position["ratio"],
             "medals": pet_marks(effective_pet, species.weight_range if species else (0, 0)) if effective_pet else [],
             "egg_name": egg.egg_name if egg is not None else "",
-            "egg_icon_url": f"/static/egg-icons/{egg.egg_item_id}.png" if egg and egg.egg_item_id else "",
+            "egg_icon_url": f"/static/egg-icons/{egg.egg_item_id}.webp" if egg and egg.egg_item_id else "",
             "egg_weight_range": {"min": egg.weight_low, "max": egg.weight_high}
             if egg is not None and egg.weight_high > egg.weight_low else None,
             "egg_groups": list(species.egg_groups) if species is not None else [],
@@ -617,7 +617,7 @@ def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_o
                 "description": info.description if info else "",
                 "description_source": info.description_source if info else "",
                 "icon_url": (
-                    f"/static/egg-icons/{info.icon_item_id}.png"
+                    f"/static/egg-icons/{info.icon_item_id}.webp"
                     if info is not None and info.icon_item_id
                     else ""
                 ),
@@ -682,7 +682,7 @@ def egg_dex_payload(
     """蛋图鉴载荷：蛋目录静态数据 + 可选筛选（搜索/蛋组/蛋类型/孵化时长下限）。"""
     entries = catalog.entries() if catalog is not None else ()
     type_icons = {
-        info.name: f"/static/type-icons/type-{type_id}.png"
+        info.name: f"/static/type-icons/type-{type_id}.webp"
         for type_id, info in static.type_items()
     } if static is not None else {}
     keyword = search.strip().lower()
@@ -712,7 +712,7 @@ def egg_dex_payload(
                 "base_id": info.base_id,
                 "icon_url": species_icon_url(info.base_id) if info.base_id else "",
                 "egg_icon_url": (
-                    f"/static/egg-icons/{info.egg_item_id}.png" if info.egg_item_id else ""
+                    f"/static/egg-icons/{info.egg_item_id}.webp" if info.egg_item_id else ""
                 ),
                 "handbook_no": info.handbook_no,
                 "dex_no": info.dex_no,

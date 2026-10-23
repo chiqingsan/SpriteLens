@@ -38,11 +38,11 @@ def detail_payload(pet: Pet, static: StaticData | None, egg_catalog=None) -> dic
         "speciality_name": static.speciality_name(pet.speciality_id) if static and pet.speciality_id else
                            f"特性 #{pet.speciality_id}" if pet.speciality_id else "特性未知",
         "acquisition_name": ACQUISITION_NAMES.get(pet.catch_way, f"方式 #{pet.catch_way}" if pet.catch_way else "未采集"),
-        "types": [{"name": name, "icon_url": f"/static/type-icons/type-{key}.png"}
+        "types": [{"name": name, "icon_url": f"/static/type-icons/type-{key}.webp"}
                   for key, info in static.type_items() if species and key in species.types
                   for name in [info.name]] if static else [],
         "measurements": measurements, "egg_limits": egg_limits,
         "evolution": {"nodes": nodes, "edges": edges},
         "awarded_medals": [{"id": key, "name": static.medal_name(key) if static else f"奖牌 #{key}",
-                            "icon_url": f"/static/medal-icons/{key}.png"} for key in medal_ids] if medal_ids is not None else None,
+                            "icon_url": f"/static/medal-icons/{key}.webp"} for key in medal_ids] if medal_ids is not None else None,
     }

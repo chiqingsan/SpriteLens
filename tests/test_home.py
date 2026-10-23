@@ -342,7 +342,7 @@ class HomePayloadTests(unittest.TestCase):
         )
         resident = home_payload(repo, static, pets, catalog)["residents"][0]
         self.assertEqual((resident["egg_name"], resident["egg_icon_url"]),
-                         ("护主犬蛋", "/static/egg-icons/80001.png"))
+                         ("护主犬蛋", "/static/egg-icons/80001.webp"))
 
     def test_captured_voice_is_used_and_missing_voice_is_null(self) -> None:
         repo = _ready_repo()

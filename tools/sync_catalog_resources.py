@@ -111,8 +111,8 @@ def sync(source: Path, root: Path, download: bool) -> dict:
     items = {str(x.get("resourceId")): x for x in resources if x.get("use") == "item"}
     jobs = [(web / "pets" / f"{key}.webp", portraits.get(key), "pet", key)
             for key in species if not (web / "pets" / f"{key}.webp").is_file()]
-    jobs += [(web / "egg-icons" / f"{e['egg_item_id']}.png", items.get(str(e["egg_item_id"])), "egg", str(e["egg_item_id"]))
-             for e in eggs["eggs"] if e.get("egg_item_id") and not (web / "egg-icons" / f"{e['egg_item_id']}.png").is_file()]
+    jobs += [(web / "egg-icons" / f"{e['egg_item_id']}.webp", items.get(str(e["egg_item_id"])), "egg", str(e["egg_item_id"]))
+             for e in eggs["eggs"] if e.get("egg_item_id") and not (web / "egg-icons" / f"{e['egg_item_id']}.webp").is_file()]
 
     def fetch(job: tuple) -> dict:
         dest, resource, kind, key = job
@@ -140,7 +140,7 @@ def sync(source: Path, root: Path, download: bool) -> dict:
                 image.thumbnail((128, 128), Image.Resampling.LANCZOS)
                 image.save(dest, "WEBP", quality=88, method=4)
             else:
-                image.save(dest, "PNG")
+                image.save(dest, "WEBP", lossless=True, method=4)
             return {**record, "status": "imported", "sha256_source": digest}
         except Exception as exc:
             return {**record, "status": "missing", "reason": str(exc)}
@@ -165,7 +165,7 @@ def sync(source: Path, root: Path, download: bool) -> dict:
         "coverage": {"species": len(species), "height_ranges": sum(valid_range(x.get("height_range")) for x in species.values()),
                      "weight_ranges": sum(valid_range(x.get("weight_range")) for x in species.values()),
                      "eggs": len(eggs["eggs"]), "egg_base_aliases": len(eggs["egg_base_index"]),
-                     "pet_images": len(list((web / "pets").glob("*.webp"))), "egg_images": len(list((web / "egg-icons").glob("*.png")))},
+                     "pet_images": len(list((web / "pets").glob("*.webp"))), "egg_images": len(list((web / "egg-icons").glob("*.webp")))},
     }
     write(previous, report)
     return report

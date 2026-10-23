@@ -26,8 +26,13 @@ export function usePets(api: ApiClient, account: () => PetAccount, query: () => 
   const cards = computed(() => pets.value.slice((page.value - 1) * 30, page.value * 30))
   const slots = computed(() => teams.value ? (data.value?.backpack.teams || []).flatMap(team => team.slots) : box.value?.slots || [])
   const byGid = computed(() => new Map(pets.value.map(pet => [pet.gid, pet])))
-  // 自定义排序视图：把当前页宠物包成全 matched 槽位，复用箱位卡片渲染与键盘导航，无中间空位。
-  const cardSlots = computed(() => cards.value.map(pet => ({ gid: pet.gid, state: 'matched' as const })))
+  // 自定义排序视图：当前页宠物占前部槽位，末页剩余位置复用箱位的空槽展示。
+  const cardSlots = computed(() => [
+    ...cards.value.map(pet => ({ gid: pet.gid, state: 'matched' as const })),
+    ...(cards.value.length
+      ? Array.from({ length: 30 - cards.value.length }, () => ({ gid: 0, state: 'empty' as const }))
+      : []),
+  ])
   function commit(payload: ReturnType<typeof parsePets>, key = queryKey()) {
     if (data.value && (data.value.uid !== payload.uid || data.value.version !== payload.version)) {
       invalidateDetail()
