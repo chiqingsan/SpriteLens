@@ -48,6 +48,8 @@
 .eggbox-category.active { border-color: var(--teal); background: var(--teal); color: var(--white); font-weight: 700; }
 .eggbox-category.active span { color: inherit; opacity: .82; }
 .eggbox-list-scroll { flex: 1; min-height: 0; overflow: auto; padding: var(--space-4); scrollbar-width: thin; scrollbar-color: var(--teal-bright) var(--surface-1); }
+.eggbox-list-scroll.is-empty { display: grid; place-items: center; align-content: center; }
+.eggbox-list-scroll.is-empty > .empty-hint { width: 100%; }
 #page-egg-box .eggbox-list-scroll::-webkit-scrollbar { display: block; width: 8px; height: 8px; }
 #page-egg-box .eggbox-list-scroll::-webkit-scrollbar-track { border-radius: 999px; background: var(--surface-1); }
 #page-egg-box .eggbox-list-scroll::-webkit-scrollbar-thumb { border: 2px solid var(--surface-1); border-radius: 999px; background: var(--teal-bright); }

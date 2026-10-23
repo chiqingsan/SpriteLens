@@ -17,7 +17,7 @@ let focusedGid: string | undefined
 onBeforeUpdate(() => { focusedGid = wrap.value?.contains(document.activeElement) ? (document.activeElement as HTMLElement).dataset.gid : undefined })
 onUpdated(() => { if (focusedGid) wrap.value?.querySelector<HTMLElement>(`[data-gid="${focusedGid}"]`)?.focus({ preventScroll: true }) })
 const empty = computed(() => view.value === 'point' ? teams.value ? !data.value?.backpack.teams.length : !box.value : !pets.value.length)
-const emptyText = computed(() => view.value === 'point'
+const emptyText = computed(() => busy.value && !data.value ? '正在加载精灵背包…' : view.value === 'point'
   ? teams.value ? '尚未采集出战队伍，登录游戏后同步。' : data.value?.backpack.boxes.length ? '已采集的箱子均为空箱，可切换出战背包查看队伍。' : '尚未采集游戏箱表。登录游戏后同步，可切换自定义排序查看已采集精灵。'
   : data.value?.total ? '没有符合筛选条件的精灵，可清除筛选后查看全部。' : '暂无精灵数据：开始采集后登录游戏，等待数据同步。')
 function select(gid: number, element: HTMLElement | null) { selected.value = gid; trigger.value = element; detailOpen.value = true; if (element) emit('select', gid, element) }
@@ -60,12 +60,13 @@ defineExpose({ setBox, reveal, closeDetail, openDetail: () => { if (selected.val
   <Teleport to="#pet-count-root"><span id="pet-count" class="count-badge" role="status">{{ data ? '命中 ' + (data?.shown || 0) + ' / ' + (data?.total || 0) + ' 只' : error ? '加载失败' : '加载中…' }}</span></Teleport>
   <PetBoxNavigation v-show="view === 'point'" :model="model" @select="setBox"></PetBoxNavigation>
   <PetPageNavigation v-show="view === 'card' && !!pets.length" :model="model" @select="setPage" @teams="openTeams"></PetPageNavigation>
-  <div ref="wrap" class="table-wrap" :aria-busy="busy">
+  <div ref="wrap" class="table-wrap" :class="{ 'pet-empty-state': empty && (!busy || !data) }" :aria-busy="busy">
     <div id="pet-grid" class="pet-grid" :class="{ 'point-grid game-box-grid': view === 'point' || view === 'card', 'box-fill-grid': (view === 'point' && !teams) || view === 'card' }" :aria-busy="busy">
       <PetSlots v-if="view === 'point'" :slots="model.slots.value" :pets="model.byGid.value" :selected="selected" :teams="teams" :active-team="data?.backpack.active_team || 0" @select="select"></PetSlots>
       <PetSlots v-if="view === 'card'" :slots="model.cardSlots.value" :pets="model.byGid.value" :selected="selected" :teams="false" :active-team="0" @select="select"></PetSlots>
     </div>
     <div id="pet-empty" class="empty-hint" role="status" :hidden="!empty && !error">
+      <UiIcon :name="error ? 'search' : busy && !data ? 'clock' : 'layout-grid'" />
       <p id="pet-empty-copy">{{ error ? '精灵数据加载失败：' + error : emptyText }}</p>
       <div class="button-row"><button v-if="error" id="btn-pets-retry" class="ghost-button small" @click="model.load(false)"><UiIcon name="refresh"></UiIcon>重试</button><button id="btn-empty-reset" class="ghost-button small" :hidden="!!error || view === 'point' || !!pets.length || !data?.total" @click="emit('reset')"><UiIcon name="filter-off"></UiIcon>清除筛选</button></div>
     </div>

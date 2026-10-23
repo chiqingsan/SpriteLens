@@ -258,6 +258,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 #page-egg-dex .workspace.split { grid-template-columns: minmax(0, 1fr) 340px; }
 #page-pets { padding: var(--space-4); }
 #page-handbook { padding: var(--space-4); }
+#page-egg-dex { padding: var(--space-4); }
+#page-colors { padding: var(--space-4); }
 
 .panel {
   background: var(--panel);

@@ -310,7 +310,7 @@ onMounted(() => { if (props.active) void resume(); else pause() })
 </template>
 
 <style scoped>
-.colors-page { max-width: none; height: 100%; min-width: 0; min-height: 0; overflow: hidden; padding: var(--space-4); }
+.colors-page { max-width: none; height: 100%; min-width: 0; min-height: 0; overflow: hidden; padding: 0; }
 .colors-page .panel { margin-bottom: 0; box-shadow: none; }
 .colors-workspace { display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100%; padding: 0; overflow: hidden; }
 .color-toolbar { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 10px; min-width: 0; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line-soft); overflow: visible; }
@@ -402,7 +402,7 @@ onMounted(() => { if (props.active) void resume(); else pause() })
 .special-record-group .bl-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); min-height: 30px; }
 .empty-hint { color: var(--muted); font-size: var(--fs-2xs); }
 @media (max-width: 960px) {
-  .colors-page { padding: var(--space-3); }
+  .colors-page { padding: 0; }
   .color-toolbar { padding: var(--space-3) var(--space-4); }
   .color-filters { flex-basis: 200px; }
   .colors-split { grid-template-columns: minmax(0, 1fr) 280px; }

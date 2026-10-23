@@ -26,6 +26,7 @@
 .breeder-column.gender-1 > header .breeder-column-title > .ui-icon { color: var(--male-ink); }
 .breeder-column.gender-2 > header .breeder-column-title > .ui-icon { color: var(--female-ink); }
 .breeder-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); grid-auto-rows: max-content; align-content: start; align-items: start; gap: var(--space-3); flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 0 var(--space-4) var(--space-4); }
+.breeder-grid:has(> .breeder-empty:only-child) { align-content: center; }
 .breeder-card { position: relative; min-width: 0; border: 1px solid var(--male); border-radius: var(--radius-md); background: var(--egg-card-surface); overflow: hidden; }
 .breeder-card.gender-2 { border-color: var(--female); }
 .breeder-card:hover { border-color: var(--teal-bright); }

@@ -259,7 +259,7 @@ defineExpose({
         </button>
       </nav>
 
-      <div ref="listViewport" class="eggbox-list-scroll">
+      <div ref="listViewport" class="eggbox-list-scroll" :class="{ 'is-empty': !model.visibleEggs.value.length }">
         <div v-if="model.loading.value && !model.data.value" class="empty-hint" role="status"><UiIcon name="clock" />正在加载蛋仓…</div>
         <div v-else-if="model.error.value" class="empty-hint" role="alert">
           <UiIcon name="search" />蛋仓加载失败：{{ model.error.value }}
