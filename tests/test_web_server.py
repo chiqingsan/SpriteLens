@@ -200,7 +200,11 @@ class LocalServerTest(unittest.TestCase):
             )
         self.assertEqual(status, 200)
         self.assertEqual(payload, {"ok": True})
-        opened.assert_called_once_with("https://qun.qq.com/join/1057031552", new=2)
+        opened.assert_called_once_with(
+            "https://qm.qq.com/cgi-bin/qm/qr?k=RD4TmYWeZmHX5jQDPlbO0iZkNbDzprrP"
+            "&jump_from=webapi&authKey=nhf6qrpsOxIAydLdyaEWvP3Y+Sbv5bdEs8Vvqbx7lpfRXYD9Vb+iGsBHhEsuUUtS",
+            new=2,
+        )
 
     def test_pets_query_does_not_pollute_shared_vm(self):
         """GET /api/pets 不写共享 VM：请求后 bootstrap/其他客户端不受影响（R08）。

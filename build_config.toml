@@ -17,8 +17,8 @@ version = ""
 file_version = ""
 
 # 打包产物名称模板。可用变量：app_name、version、timestamp。
-output_name_template = "{app_name}_{version}"
-timestamp_format = "%H%M"
+output_name_template = "{app_name}_{version}_{timestamp}"
+# timestamp 为当前 Unix 时间戳秒数的后四位，例如 1234。
 
 # GUI 程序：隐藏控制台窗口。
 windowed = true

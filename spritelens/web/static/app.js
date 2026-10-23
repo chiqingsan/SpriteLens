@@ -176,6 +176,7 @@
     page: "boot",
     capture: null
   };
+  var autoRefreshes = Object.create(null);
 
   /* ---------- 导航 ---------- */
   function switchPage(name, revealGid) {
@@ -237,8 +238,31 @@
 
   function setPill(id, text, tone) {
     var node = $(id);
-    node.textContent = text;
-    node.className = "status-pill " + (tone || "idle");
+    var className = "status-pill " + (tone || "idle");
+    if (node.textContent !== text) { node.textContent = text; }
+    if (node.className !== className) { node.className = className; }
+  }
+
+  function queueAutoRefresh(key, loader, active) {
+    var job = autoRefreshes[key];
+    if (!job) { job = autoRefreshes[key] = { pending: false, promise: null }; }
+    job.pending = true;
+    if (job.promise || !active()) { return; }
+
+    job.pending = false;
+    var promise = Promise.resolve(loader());
+    job.promise = promise;
+    promise.then(function () {
+      if (job.promise !== promise) { return; }
+      job.promise = null;
+      if (job.pending && active()) { queueAutoRefresh(key, loader, active); }
+      else if (!active()) { job.pending = false; }
+    }, function () {
+      if (job.promise !== promise) { return; }
+      job.promise = null;
+      if (job.pending && active()) { queueAutoRefresh(key, loader, active); }
+      else if (!active()) { job.pending = false; }
+    });
   }
 
   function resetAccountViews() {
@@ -284,41 +308,56 @@
         message = "已收到游戏数据；重新进入游戏可确认本次角色";
       }
     }
-    $("capture-message").textContent = message;
+    if ($("capture-message").textContent !== message) { $("capture-message").textContent = message; }
 
     // 采集按钮保持主色；固定图标与宽度避免状态更新时跳动。
     var toggle = $("btn-toggle");
     if (toggle) {
       var running = !!capture.running;
-      toggle.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="/static/icons/sprite.svg#' + (running ? 'square' : 'player-play') + '"></use></svg>' + (running ? "停止采集" : "开始采集");
-      toggle.classList.toggle("stop-button", running);
-      toggle.onclick = running ? doStop : doStart;
+      if (toggle.dataset.running !== String(running)) {
+        toggle.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="/static/icons/sprite.svg#' + (running ? 'square' : 'player-play') + '"></use></svg>' + (running ? "停止采集" : "开始采集");
+        toggle.classList.toggle("stop-button", running);
+        toggle.onclick = running ? doStop : doStart;
+        toggle.dataset.running = String(running);
+      }
     }
     $("btn-capture-start").disabled = !!capture.running;
     $("btn-capture-stop").disabled = !capture.running;
 
     // 蛋仓有新数据且当前在蛋仓页 → 自动刷新（版本号变化才触发）
+    var homeRefreshNeeded = false;
     if (payload.egg_box_version !== undefined && payload.egg_box_version !== eggBoxVersion) {
       eggBoxVersion = payload.egg_box_version;
-      if (state.page === "egg-box") { loadEggBoxPage(); }
+      if (state.page === "egg-box") {
+        queueAutoRefresh("egg-box-version", function () { return loadEggBoxPage(); }, function () { return state.page === "egg-box"; });
+      }
     }
     if (payload.home_version !== undefined && payload.home_version !== homeVersion) {
       homeVersion = payload.home_version;
-      if (state.page === "home") { loadHome(true); }
+      homeRefreshNeeded = state.page === "home";
     }
 
     renderRole(payload.identity, payload.cached_identity);
     if (state.page === "capture") { renderCaptureSummary(payload.capture || {}); }
-    if (payload.environment) { renderEnvBanner(payload.environment); }
     var version = payload.pets_version;
     if (version !== undefined && version !== state._petsVersion) {
       state._petsVersion = version;
-      var refresh = { pets: loadPets,
-        "breeder-library": function () { return breederLibrary.load(); }, colors: function () { return colorsPage.load(); } };
-      if (refresh[state.page]) { refresh[state.page](false); }
-      if (state.page === "home") { loadHome(false); }
-      if (state.page === "collection-lines") { collectionLines.load(); }
-      if (state.page === "planner") { breedingPlanner.load(); }
+      var page = state.page;
+      var refresh = {
+        pets: function () { return loadPets(false); },
+        "breeder-library": function () { return breederLibrary.load(); },
+        colors: function () { return colorsPage.load(); },
+        home: function () { return loadHome(false); },
+        "collection-lines": function () { return collectionLines.load(); },
+        planner: function () { return breedingPlanner.load(); }
+      };
+      if (refresh[page]) {
+        if (page === "home") { homeRefreshNeeded = true; }
+        else { queueAutoRefresh("pets-version-" + page, refresh[page], function () { return state.page === page; }); }
+      }
+    }
+    if (homeRefreshNeeded) {
+      queueAutoRefresh("home-version", function () { return loadHome(false); }, function () { return state.page === "home"; });
     }
   }
 
@@ -388,6 +427,7 @@
       var running = !!payload.running;
       toggle.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="/static/icons/sprite.svg#' + (running ? 'square' : 'player-play') + '"></use></svg>' + (running ? "停止采集" : "开始采集");
       toggle.classList.toggle("stop-button", running);
+      toggle.dataset.running = String(running);
       toggle.classList.remove("toggle-busy");
       toggle.disabled = false;
       toggle.onclick = running ? doStop : doStart;
@@ -400,8 +440,10 @@
     var followingGame = automation.enabled === true;
     var automationStatus = $("c-game-auto-status");
     if (automationStatus) {
-      automationStatus.textContent = followingGame ? "当前状态：跟随启动" : "当前状态：未跟随";
-      automationStatus.className = "status-pill " + (followingGame ? "ok" : "idle");
+      var automationText = followingGame ? "当前状态：跟随启动" : "当前状态：未跟随";
+      var automationClass = "status-pill " + (followingGame ? "ok" : "idle");
+      if (automationStatus.textContent !== automationText) { automationStatus.textContent = automationText; }
+      if (automationStatus.className !== automationClass) { automationStatus.className = automationClass; }
     }
     if ($("btn-game-auto-follow")) { $("btn-game-auto-follow").disabled = followingGame; }
     if ($("btn-game-auto-unfollow")) { $("btn-game-auto-unfollow").disabled = !followingGame; }
@@ -465,17 +507,24 @@
     var sessions = payload.sessions || [];
     var dropped = (payload.dropped_chunks || 0) + (payload.dropped_segments || 0)
       + (payload.event_log_dropped || 0);
-    $("capture-stats").textContent = "原始流 " + (totals.raw_chunks || 0) + " 段 / "
+    var stats = "原始流 " + (totals.raw_chunks || 0) + " 段 / "
       + (totals.raw_bytes || 0) + " 字节 · 解密成功 " + (totals.decrypt_ok || 0)
       + " · 缺密钥 " + (totals.key_miss || 0) + " · 会话 " + sessions.length
       + (dropped > 0 ? " · 丢弃 " + dropped + " 段" : "")
       + (payload.event_log_name ? " · 事件日志 " + payload.event_log_name : "")
       + (payload.event_log_error ? " · " + payload.event_log_error : "");
-    $("session-rows").innerHTML = sessions.length ? sessions.map(function (item) {
+    if ($("capture-stats").textContent !== stats) { $("capture-stats").textContent = stats; }
+    var sessionSignature = JSON.stringify(sessions.map(function (item) {
+      return [item.session_id, !!item.has_key, item.data_frames];
+    }));
+    var rows = $("session-rows");
+    if (rows.dataset.signature === sessionSignature) { return; }
+    rows.innerHTML = sessions.length ? sessions.map(function (item) {
       return "<tr><td>" + esc(item.session_id) + "</td>"
         + '<td>' + (item.has_key ? '<svg class="ui-icon" viewBox="0 0 24 24" aria-label="已获取"><use href="/static/icons/sprite.svg#circle-check"></use></svg>' : "—") + "</td>"
         + '<td class="col-gid">' + item.data_frames + "</td></tr>";
     }).join("") : '<tr><td colspan="3" class="muted">暂无会话</td></tr>';
+    rows.dataset.signature = sessionSignature;
   }
 
   function loadCapture() {
@@ -555,10 +604,15 @@
       $("btn-join-qq-group").addEventListener("click", function () {
         var button = this;
         button.disabled = true;
-        api("/api/ui/open-qq-group", { method: "POST" }).then(function () {
-          toast("已打开QQ群加入页面");
+        var copied = true;
+        copyText(QQ_GROUP_NUMBER).catch(function () {
+          copied = false;
+        }).then(function () {
+          return api("/api/ui/open-qq-group", { method: "POST" });
+        }).then(function () {
+          toast(copied ? "群号已复制，已打开 QQ 加群邀请" : "已打开 QQ 加群邀请，请按页面提示操作");
         }).catch(function (err) {
-          toast("打开QQ群失败：" + err.message, true);
+          toast("打开 QQ 加群页失败：" + err.message, true);
         }).then(function () {
           button.disabled = false;
         });
@@ -633,10 +687,25 @@
     var socket;
     try { socket = new WebSocket(url); } catch (e) { return; }
 
+    var pendingPayload = null;
+    var renderScheduled = false;
+    function scheduleRender(payload) {
+      pendingPayload = payload;
+      if (renderScheduled) { return; }
+      renderScheduled = true;
+      var render = function () {
+        renderScheduled = false;
+        var latest = pendingPayload;
+        pendingPayload = null;
+        if (latest) { renderState(latest); }
+      };
+      if (typeof window.requestAnimationFrame === "function") { window.requestAnimationFrame(render); }
+      else { setTimeout(render, 0); }
+    }
     socket.onmessage = function (event) {
       var payload;
       try { payload = JSON.parse(event.data); } catch (e) { return; }
-      renderState(payload);
+      scheduleRender(payload);
     };
     socket.onclose = function () { setTimeout(connectPush, 1500); };
     socket.onerror = function () { try { socket.close(); } catch (e) {} };

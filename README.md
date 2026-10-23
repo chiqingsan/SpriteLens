@@ -246,7 +246,7 @@ API 与 WebSocket 均校验。数据只在本机流动，不对外发送。
 .venv\Scripts\python.exe build.py --set-version 0.2.0
 ```
 
-产物在 `build\SpriteLens_<版本>.exe`。早期约22MB的测量发生在本轮资源扩充前，
+产物在 `build\SpriteLens_<版本>_<时间戳后四位>.exe`，例如 `SpriteLens_1.0.0_1234.exe`；若同名文件已存在，会自动追加 `-2`、`-3`，避免覆盖。早期约22MB的测量发生在本轮资源扩充前，
 当前体积需重新构建后实测。打包选项（含带哪些资源、
 排除哪些库）都在 `build_config.toml` 里改，不写死在脚本中。
 

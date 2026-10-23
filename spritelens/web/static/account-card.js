@@ -21,6 +21,7 @@
   var uidButton = document.getElementById("btn-uid-visibility");
   var avatar = document.getElementById("role-avatar");
   var avatarFallback = document.getElementById("role-avatar-fallback");
+  var renderedRoleKey = null;
 
   function icon(name, className) {
     var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -211,20 +212,28 @@
     },
     render: function (identity, cached) {
       role = identity || cached;
-      document.getElementById("role-name").textContent = role ? role.name || "未命名账号" : "尚未识别账号";
-      document.getElementById("role-label").textContent = role ? "Lv" + (role.level || "—") : "登录游戏后识别";
-      card.classList.toggle("account-empty", !role);
-      selectedUid = role ? Number(role.uid) : selectedUid;
       // 实时 self_info 可能没有名片头像；同一账号的历史缓存仍是可信头像来源。
       var cachedAvatar = identity && cached && Number(identity.uid) === Number(cached.uid) ? cached.avatar_url : "";
       var source = validAvatar(role && role.avatar_url) || validAvatar(cachedAvatar);
+      var roleKey = JSON.stringify([role && role.uid, role && role.name, role && role.level, source]);
+      if (roleKey === renderedRoleKey) { return; }
+      renderedRoleKey = roleKey;
+      var name = role ? role.name || "未命名账号" : "尚未识别账号";
+      var label = role ? "Lv" + (role.level || "—") : "登录游戏后识别";
+      var nameNode = document.getElementById("role-name");
+      var labelNode = document.getElementById("role-label");
+      if (nameNode.textContent !== name) { nameNode.textContent = name; }
+      if (labelNode.textContent !== label) { labelNode.textContent = label; }
+      card.classList.toggle("account-empty", !role);
+      var previousUid = selectedUid;
+      selectedUid = role ? Number(role.uid) : selectedUid;
       if ((avatar.getAttribute("src") || "") !== source) {
         avatar.hidden = !source;
         avatarFallback.hidden = !!source;
         if (source) { avatar.src = source; } else { avatar.removeAttribute("src"); }
       }
       showUid();
-      if (information.open && accountData) { renderAccountList(); }
+      if (information.open && accountData && previousUid !== selectedUid) { renderAccountList(); }
     }
   };
 })();

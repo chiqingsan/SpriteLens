@@ -16,6 +16,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -164,18 +165,46 @@ def windows_version_string(version: str) -> str:
     return ".".join(parts)
 
 
-def build_output_name(config: dict[str, Any], version: str) -> str:
-    template = str(config.get("output_name_template") or "{app_name}_{version}")
+def build_timestamp(*, now_seconds: int | None = None) -> str:
+    """取 Unix 时间戳秒数的后四位，保持产物名短且固定四位。"""
+    seconds = int(time.time()) if now_seconds is None else int(now_seconds)
+    return f"{seconds % 10000:04d}"
+
+
+def build_output_name(
+    config: dict[str, Any], version: str, *, timestamp: str | None = None
+) -> str:
+    template = str(config.get("output_name_template") or "{app_name}_{version}_{timestamp}")
     return template.format(
         app_name=config.get("app_name", "app"),
         version=version,
-        timestamp="0",
+        timestamp=timestamp if timestamp is not None else build_timestamp(),
     )
 
 
-def build_command(config: dict[str, Any], *, version: str) -> list[str]:
+def available_output_name(
+    config: dict[str, Any],
+    version: str,
+    *,
+    timestamp: str,
+    output_dir: Path,
+    suffix: str,
+) -> str:
+    """文件名优先使用时间戳；已存在时追加序号，避免覆盖旧产物。"""
+    base_name = build_output_name(config, version, timestamp=timestamp)
+    candidate = base_name
+    index = 2
+    while (output_dir / f"{candidate}{suffix}").exists():
+        candidate = f"{base_name}-{index}"
+        index += 1
+    return candidate
+
+
+def build_command(
+    config: dict[str, Any], *, version: str, timestamp: str | None = None
+) -> list[str]:
     app_name = str(config.get("app_name") or "app")
-    output_name = build_output_name(config, version)
+    output_name = build_output_name(config, version, timestamp=timestamp)
     entry = resolve_project_path(str(config.get("entry") or "main.py"), "entry")
 
     command: list[str] = [sys.executable, "-m", "nuitka"]
@@ -366,7 +395,13 @@ def main(argv: list[str] | None = None) -> int:
     check_environment(config)
     print_summary(config, version)
 
-    command = build_command(config, version=version)
+    output_dir = resolve_project_path(str(config.get("output_dir", "build")), "output_dir", must_exist=False)
+    suffix = ".exe" if os.name == "nt" else ""
+    timestamp = build_timestamp()
+    output_name = available_output_name(
+        config, version, timestamp=timestamp, output_dir=output_dir, suffix=suffix
+    )
+    command = build_command(config, version=version, timestamp=timestamp)
     env = build_environment(config)
 
     printable = " ".join(f'"{part}"' if " " in part else part for part in command)
@@ -386,9 +421,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[build] 失败，退出码 {proc.returncode}")
         return proc.returncode
 
-    output_dir = resolve_project_path(str(config.get("output_dir", "build")), "output_dir", must_exist=False)
-    suffix = ".exe" if os.name == "nt" else ""
-    exe = output_dir / f"{build_output_name(config, version)}{suffix}"
+    exe = output_dir / f"{output_name}{suffix}"
     if exe.is_file():
         size_mb = exe.stat().st_size / 1024 / 1024
         print(f"[build] 完成: {exe} ({size_mb:.1f} MB)")

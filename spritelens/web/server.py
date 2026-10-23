@@ -54,7 +54,10 @@ from spritelens.web.breeding_planner import register_planner_routes
 
 logger = get_logger("web")
 QQ_GROUP_NUMBER = "1057031552"
-QQ_GROUP_JOIN_URL = f"https://qun.qq.com/join/{QQ_GROUP_NUMBER}"
+QQ_GROUP_JOIN_URL = (
+    "https://qm.qq.com/cgi-bin/qm/qr?k=RD4TmYWeZmHX5jQDPlbO0iZkNbDzprrP&jump_from=webapi"
+    "&authKey=nhf6qrpsOxIAydLdyaEWvP3Y+Sbv5bdEs8Vvqbx7lpfRXYD9Vb+iGsBHhEsuUUtS"
+)
 
 
 def _app_version() -> str:
@@ -528,7 +531,7 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
             opened = False
         if not opened:
             return web.json_response(
-                {"error": "无法打开 QQ 群加入页面，请复制群号后在 QQ 中搜索"}, status=503
+                {"error": "无法打开 QQ 加群页面，请复制群号后在 QQ 中搜索"}, status=503
             )
         return web.json_response({"ok": True})
 

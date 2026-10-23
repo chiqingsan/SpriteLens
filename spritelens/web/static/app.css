@@ -82,7 +82,7 @@ button, input, select { font: inherit; color: inherit; }
 button { border: 0; cursor: pointer; }
 
 /* 动效层：交互组件统一过渡；hover 抬升、active 按压、focus 描边 */
-button, .nav-item, .filter-chip, .status-pill, .hb-card {
+button, .nav-item, .filter-chip, .hb-card {
   transition:
     transform var(--motion-fast) var(--motion-ease),
     box-shadow var(--motion-base) var(--motion-ease),
