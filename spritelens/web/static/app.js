@@ -8,6 +8,7 @@
 
   /* ---------- token 与请求 ---------- */
   var TOKEN_KEY = "spritelens.localToken";
+  var QQ_GROUP_NUMBER = "1057031552";
 
   function readToken() {
     var hash = window.location.hash || "";
@@ -137,6 +138,24 @@
     node.textContent = message;
     layer.appendChild(node);
     setTimeout(function () { node.remove(); }, 3600);
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      return navigator.clipboard.writeText(text);
+    }
+    return Promise.resolve().then(function () {
+      var input = document.createElement("textarea");
+      input.value = text;
+      input.setAttribute("readonly", "");
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      document.body.appendChild(input);
+      input.select();
+      var copied = document.execCommand("copy");
+      input.remove();
+      if (!copied) { throw new Error("系统剪贴板不可用"); }
+    });
   }
 
   window.SpriteLensAccountCard.init({
@@ -518,6 +537,32 @@
     }
     if ($("btn-game-auto-unfollow")) {
       $("btn-game-auto-unfollow").addEventListener("click", function () { setGameAutoFollow(false); });
+    }
+    if ($("btn-copy-qq-group")) {
+      $("btn-copy-qq-group").addEventListener("click", function () {
+        var button = this;
+        button.disabled = true;
+        copyText(QQ_GROUP_NUMBER).then(function () {
+          toast("QQ群号已复制");
+        }).catch(function (err) {
+          toast("复制群号失败：" + err.message, true);
+        }).then(function () {
+          button.disabled = false;
+        });
+      });
+    }
+    if ($("btn-join-qq-group")) {
+      $("btn-join-qq-group").addEventListener("click", function () {
+        var button = this;
+        button.disabled = true;
+        api("/api/ui/open-qq-group", { method: "POST" }).then(function () {
+          toast("已打开QQ群加入页面");
+        }).catch(function (err) {
+          toast("打开QQ群失败：" + err.message, true);
+        }).then(function () {
+          button.disabled = false;
+        });
+      });
     }
     $("btn-key-apply").addEventListener("click", function () {
       var text = $("c-key").value.trim();

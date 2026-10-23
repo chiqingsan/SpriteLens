@@ -15,6 +15,7 @@ import urllib.parse
 import urllib.request
 from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 
 from spritelens.app_context import AppContext
 from spritelens.capture.key_store import KeyStore
@@ -189,6 +190,17 @@ class LocalServerTest(unittest.TestCase):
             f"http://127.0.0.1:{self.server.port}/api/events", token=self.server.token
         )
         self.assertEqual(status, 404)
+
+    def test_open_qq_group_uses_fixed_join_url(self):
+        with patch("spritelens.web.server.webbrowser.open", return_value=True) as opened:
+            status, payload = _http_post(
+                f"http://127.0.0.1:{self.server.port}/api/ui/open-qq-group",
+                token=self.server.token,
+                payload={},
+            )
+        self.assertEqual(status, 200)
+        self.assertEqual(payload, {"ok": True})
+        opened.assert_called_once_with("https://qun.qq.com/join/1057031552", new=2)
 
     def test_pets_query_does_not_pollute_shared_vm(self):
         """GET /api/pets 不写共享 VM：请求后 bootstrap/其他客户端不受影响（R08）。

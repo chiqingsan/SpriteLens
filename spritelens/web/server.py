@@ -53,6 +53,8 @@ from spritelens.web.breeder_library import register_breeder_routes
 from spritelens.web.breeding_planner import register_planner_routes
 
 logger = get_logger("web")
+QQ_GROUP_NUMBER = "1057031552"
+QQ_GROUP_JOIN_URL = f"https://qun.qq.com/join/{QQ_GROUP_NUMBER}"
 
 
 def _app_version() -> str:
@@ -321,6 +323,7 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         app.router.add_get("/api/ui/preferences", self._api_ui_preferences)
         app.router.add_post("/api/ui/preferences", self._api_save_ui_preferences)
         app.router.add_post("/api/ui/open-browser", self._api_open_browser)
+        app.router.add_post("/api/ui/open-qq-group", self._api_open_qq_group)
         app.router.add_get("/api/pets", self._api_pets)
         app.router.add_get(r"/api/pets/{gid:\d+}", self._api_pet_detail)
         app.router.add_get("/api/handbook", self._api_handbook)
@@ -514,6 +517,18 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         if not opened:
             return web.json_response(
                 {"error": "无法打开默认浏览器，请检查系统默认浏览器设置后重试"}, status=503
+            )
+        return web.json_response({"ok": True})
+
+    async def _api_open_qq_group(self, request: web.Request) -> web.Response:
+        try:
+            opened = await self._run_blocking(webbrowser.open, QQ_GROUP_JOIN_URL, new=2)
+        except (OSError, webbrowser.Error):
+            logger.exception("打开 QQ 群加入页面失败")
+            opened = False
+        if not opened:
+            return web.json_response(
+                {"error": "无法打开 QQ 群加入页面，请复制群号后在 QQ 中搜索"}, status=503
             )
         return web.json_response({"ok": True})
 
