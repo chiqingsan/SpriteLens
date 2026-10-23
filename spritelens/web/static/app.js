@@ -377,6 +377,13 @@
     renderInstallProgress(payload.install || {});
     $("c-record").checked = !!payload.recording_requested;
     if ($("c-autostart")) { $("c-autostart").checked = payload.autostart !== false; }
+    var automation = payload.automation || {};
+    if ($("c-game-auto")) { $("c-game-auto").checked = automation.enabled === true; }
+    if ($("c-game-process") && document.activeElement !== $("c-game-process")) {
+      $("c-game-process").value = automation.process_name || "";
+    }
+    if ($("btn-game-auto-save")) { $("btn-game-auto-save").disabled = automation.enabled === true && !automation.process_name; }
+    if ($("c-game-auto-guidance")) { $("c-game-auto-guidance").textContent = automation.audit_guidance || ""; }
     $("btn-record-toggle").textContent = payload.recording ? "停止录制" : "开始录制";
 
     var ifaceSelect = $("c-iface");
@@ -493,6 +500,18 @@
             toast(event.target.checked ? "已开启「打开即采集」" : "已关闭「打开即采集」");
           })
           .catch(function (err) { toast("设置失败：" + err.message, true); });
+      });
+    }
+    if ($("btn-game-auto-save")) {
+      $("btn-game-auto-save").addEventListener("click", function () {
+        var enabled = $("c-game-auto").checked;
+        var processName = $("c-game-process").value.trim();
+        api("/api/capture/automation", {
+          method: "POST", body: { enabled: enabled, process_name: processName }
+        }).then(function (payload) {
+          renderCapture(payload);
+          toast(enabled ? "已保存游戏自动监听" : "已关闭游戏自动监听");
+        }).catch(function (err) { toast("自动监听设置失败：" + err.message, true); });
       });
     }
     $("btn-key-apply").addEventListener("click", function () {

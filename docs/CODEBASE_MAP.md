@@ -82,7 +82,10 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `system/environment.py` | Npcap 检测与 RSC 处理、官方版本解析；PowerShell 首选下载、Python 回退、PE 校验、等待安装器退出 |
 | `system/webview_guard.py` | WebView2 运行时预检测（注册表/env）+ 缺失时原生对话框引导安装 |
 | `system/window_geometry.py` | 初始窗口尺寸：工作区 + 系统 DPI 缩放适配（fit_window 纯函数） |
-| `system/single_instance.py` | 单实例控制：命名互斥锁 + 唤醒事件 + Win32 强制置顶 |
+| `system/single_instance.py` | 单实例控制：命名互斥锁 + 唤醒事件 + Win32 强制置顶；后台采集与主界面使用不同实例标识 |
+| `system/game_process.py` | Windows 进程枚举、进程创建事件 4688 任务计划程序的安装/移除与后台启动命令 |
+| `system/runtime_session.py` | 后台采集与按需主界面之间的本机运行时地址交接文件 |
+| `system/tray.py` | 无第三方依赖的 Windows 通知区域图标与打开/退出动作 |
 | `system/net_diagnose.py` | --diagnose-net：宽抓会话统计，定位多连接的数据端口 |
 | `domain/pets.py` | 宠物语义层：形状搜索提取 PacketEvent → Pet 对象（含六维/技能/外观/佩戴奖牌；默认排除试用与好友镜像个体） |
 | `domain/identity.py` | 玩家身份语义层：登录 player_info/brief_info 与场景 self_info/avatar/base → PlayerIdentity（uid 归属） |
@@ -102,6 +105,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `repositories/settings.py` | JSON 配置仓库（读取失败阻止写回、替换成功才更新缓存、字段归一、窗口几何） |
 | `services/monitor_service.py` | 采集管线编排：字节流 → 帧 → 解密 → 解码 → PacketEvent；会话释放/空闲回收/硬上限 |
 | `services/capture_service.py` | 采集运行服务：接入层创建与生命周期、录制 tee、手动密钥、副作用命令串行化（阶段1.3 自 capture_vm 抽出） |
+| `services/game_capture_automation.py` | 游戏进程自动监听设置：保存进程名、安装/移除 4688 触发任务 |
 | `services/session_tracker.py` | 会话表（LRU，支持 drop）与全局统计 |
 | `services/account_tracker.py` | 账号切换判定；display_uid 是已加载/实时归属，写路径 uid 不变（同 uid 重复帧/离线加载登录不算切换） |
 | `services/account_selection_service.py` | 本地历史账号列表与跨宠物/蛋仓/家园的串行历史切换 |
@@ -120,7 +124,8 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `web/routes_capture.py` | 采集域路由与载荷（/api/capture*、/api/state、capture/state 载荷；阶段1.4 自 server.py 拆出） |
 | `web/routes_accounts.py` | `/api/accounts` 与 `/api/accounts/select`：历史账号列表、采集运行保护和切换结果 |
 | `web/server_helpers.py` | HTTP query 解析助手（路由模块共用） |
-| `web/run.py` | 界面入口：pywebview 窗口（系统 WebView2）+ 单实例唤醒 + 降级提示 |
+| `web/run.py` | 界面入口：pywebview 窗口（系统 WebView2）+ 单实例唤醒 + 降级提示；支持按需打开后台采集的远程界面 |
+| `web/background_run.py` | 按需后台模式：游戏进程存在期间启动采集、托盘打开主界面、游戏退出后清理 |
 | `web/close_coordinator.py` | 桌面关闭握手：等待页面保存确认、采集停止与缓存 flush；失败保留窗口或显式放弃 |
 | `web/payloads.py` | 宠物域载荷（宠物行/列表页/箱位/WS 状态统计）+ 目录域兼容重导出（无 UI 依赖） |
 | `web/payloads_catalog.py` | 目录域载荷：图鉴/色卡/家园/蛋仓/蛋图鉴（阶段1.4 自 payloads.py 拆出） |
@@ -172,6 +177,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `test_desktop_shell.py` | DPI/工作区适配、保存的宽高比例与多屏位置恢复 |
 | `test_app_icons.py` | 窗口大小图标消息、64 位句柄与图标加载失败回归 |
 | `test_single_instance.py` | 单实例互斥锁唯一性、唤醒事件投递与消费、close 幂等 |
+| `test_game_automation.py` | 游戏进程名、4688 触发任务 XML、自动监听配置与运行时交接文件 |
 | `test_persistence.py` | 身份识别（NPC 不误取）、写库/重开/加载、跨账号隔离、schema 1 基线结构与旧库拒绝、外观字段往返、彩名恢复、损坏恢复 |
 | `test_settings.py` | 配置读取失败/非法 JSON 阻止写回，原子替换失败保持磁盘与内存原值 |
 | `test_view_models.py` | 手动密钥、采集/录制命令串行化、配置/录制失败与自动采集开关 |

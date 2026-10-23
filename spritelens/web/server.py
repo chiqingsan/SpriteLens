@@ -340,6 +340,7 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         app.router.add_post("/api/capture/stop", self._api_capture_stop)
         app.router.add_post("/api/capture/recording", self._api_capture_recording)
         app.router.add_post("/api/capture/autostart", self._api_capture_autostart)
+        app.router.add_post("/api/capture/automation", self._api_capture_automation)
         app.router.add_post("/api/capture/key", self._api_capture_key)
         app.router.add_post("/api/capture/npcap/install", self._api_npcap_install)
         app.router.add_post("/api/capture/rsc", self._api_rsc)

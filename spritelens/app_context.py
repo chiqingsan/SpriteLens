@@ -36,6 +36,7 @@ from spritelens.services.egg_repository import EggBoxRepository
 from spritelens.services.account_selection_service import AccountSelectionService
 from spritelens.services.home_repository import HomeRepository
 from spritelens.services.event_logger import EventLogWriter
+from spritelens.services.game_capture_automation import GameCaptureAutomation
 from spritelens.services.monitor_service import MonitorService
 from spritelens.services.pet_repository import PetRepository
 from spritelens.view_models import CaptureViewModel, PetViewModel
@@ -66,6 +67,7 @@ class AppContext:
     egg_box: EggBoxRepository | None = None  # 蛋仓聚合（缺失时蛋仓页面空态）
     home_repo: HomeRepository | None = None  # 家园快照（缺失时家园页空态）
     account_selection: AccountSelectionService | None = None
+    game_automation: GameCaptureAutomation | None = None
     database: Database | None = None  # 组合根持有并负责关闭（R09）
     key_store: KeyStore | None = None  # 会话文件 writer 的生命周期归组合根持有
     _capture_stopped: bool = False
@@ -171,6 +173,7 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
 def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
     _created = created.append
     settings = SettingsRepository(config_path())
+    game_automation = GameCaptureAutomation(settings)
     load_library(schema_dir())
     static_data = load_static_data(static_dir())
     egg_catalog = EggCatalog(static_dir())
@@ -264,6 +267,7 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
         home_store=home_store,
         home_repo=home_repo,
         account_selection=account_selection,
+        game_automation=game_automation,
         database=database,
         key_store=key_store,
     )

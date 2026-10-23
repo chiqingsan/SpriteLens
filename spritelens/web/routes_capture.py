@@ -97,6 +97,27 @@ class CaptureRoutesMixin:
             )
         return web.json_response(self._capture_payload())
 
+    async def _api_capture_automation(self, request: web.Request) -> web.Response:
+        try:
+            body = await self._json_body(request)
+            enabled = self._require_bool(body, "enabled")
+            process_name = body.get("process_name")
+            if not isinstance(process_name, str):
+                raise ValueError("字段 process_name 必须是字符串")
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+        try:
+            await self._run_blocking(
+                self._context.game_automation.configure,
+                enabled=enabled,
+                process_name=process_name,
+            )
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+        except OSError as exc:
+            return web.json_response({"error": f"自动监听任务保存失败：{exc}"}, status=500)
+        return web.json_response(self._capture_payload())
+
     async def _api_capture_key(self, request: web.Request) -> web.Response:
         try:
             body = await self._json_body(request)
@@ -132,6 +153,10 @@ class CaptureRoutesMixin:
             "recording": snapshot.recording,
             "recording_requested": vm.recording_requested,
             "autostart": vm.autostart,
+            "automation": ctx.game_automation.snapshot() if ctx.game_automation is not None else {
+                "enabled": False, "process_name": "", "task_name": "",
+                "audit_guidance": "",
+            },
             "recorded_chunks": snapshot.recorded_chunks,
             "flow_count": snapshot.flow_count,
             "any_key": snapshot.any_key,

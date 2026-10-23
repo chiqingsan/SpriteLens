@@ -241,6 +241,13 @@
                 <label class="settings-control"><span class="sr-only">抓包网卡</span><select id="c-iface"><option value="">（默认路由网卡）</option></select></label>
               </div>
               <label class="settings-row settings-row-check"><span class="settings-row-copy"><strong>打开即采集</strong><span>应用启动时自动开始采集。</span></span><input id="c-autostart" type="checkbox"></label>
+              <div class="settings-row">
+                <div class="settings-row-copy"><strong>游戏进程名</strong><span>用于匹配 Windows 进程创建事件，例如 RocoWorld.exe。</span></div>
+                <label class="settings-control"><span class="sr-only">游戏进程名</span><input id="c-game-process" type="text" maxlength="260" placeholder="例如 RocoWorld.exe" autocomplete="off"></label>
+              </div>
+              <label class="settings-row settings-row-check"><span class="settings-row-copy"><strong>检测游戏后自动监听</strong><span>游戏进程出现后按需启动后台采集；需要 Windows 进程创建事件 4688。</span></span><input id="c-game-auto" type="checkbox"></label>
+              <div class="settings-actions"><button id="btn-game-auto-save" class="ghost-button">保存自动监听</button></div>
+              <p id="c-game-auto-guidance" class="settings-hint muted"></p>
               <label class="settings-row settings-row-check"><span class="settings-row-copy"><strong>启动时自动录制</strong><span>应用启动时同时保存原始流。</span></span><input id="c-record" type="checkbox"></label>
               <div class="settings-actions"><button id="btn-capture-start" class="primary-button">开始采集</button><button id="btn-capture-stop" class="ghost-button">停止采集</button><button id="btn-record-toggle" class="ghost-button">开始录制</button></div>
               <p id="capture-hint" class="settings-hint muted"></p>

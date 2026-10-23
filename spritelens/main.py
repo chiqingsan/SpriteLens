@@ -6,6 +6,8 @@
 - --smoke-test  组件导入与管线自检，不打开窗口（CI/构建前检查）
 - --list-ifaces 列出可用网卡
 - --replay <file.jsonl>  离线回放录制帧
+- --background          游戏启动后运行无界面的后台采集
+- --ui                  从后台采集实例打开主界面
 """
 
 from __future__ import annotations
@@ -33,6 +35,9 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--list-ifaces", action="store_true", help="列出可用抓包网卡")
     parser.add_argument("--replay", metavar="FILE", help="离线回放录制帧文件")
+    parser.add_argument("--background", action="store_true", help="运行无界面的后台采集")
+    parser.add_argument("--process-name", default="", help="后台采集匹配的游戏 exe 文件名")
+    parser.add_argument("--ui", action="store_true", help="连接后台采集实例并打开主界面")
     parser.add_argument("--diagnose-net", nargs="?", type=float, const=20.0, default=None, metavar="SECONDS",
                         help="宽抓 TCP 统计会话分布，定位游戏多连接的数据端口（默认 20 秒）")
     parser.add_argument("--debug", action="store_true", help="控制台同步输出 debug 日志")
@@ -62,11 +67,23 @@ def main(argv: list[str] | None = None) -> int:
         return run_diagnose(args.diagnose_net)
     if args.replay:
         return _run_replay(args.replay, logger)
+    if args.background:
+        from spritelens.repositories.settings import SettingsRepository
+        from spritelens.paths import config_path
+        from spritelens.services.game_capture_automation import GAME_AUTOMATION_SETTING_KEY
+
+        process_name = args.process_name
+        if not process_name:
+            raw = SettingsRepository(config_path()).get_value(GAME_AUTOMATION_SETTING_KEY, {})
+            process_name = raw.get("process_name", "") if isinstance(raw, dict) else ""
+        from spritelens.web.background_run import run_background
+
+        return run_background(process_name)
 
     # 唯一界面：Web（pywebview 窗口 + 本地服务）
     from spritelens.web.run import run_web
 
-    return run_web(open_browser=args.web_browser)
+    return run_web(open_browser=args.web_browser, ui_only=args.ui)
 
 
 def _run_smoke_test() -> int:

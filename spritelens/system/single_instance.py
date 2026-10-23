@@ -20,6 +20,8 @@ from ctypes import wintypes
 # 命名互斥锁/事件名：带应用名前缀避免与其他工具撞名
 MUTEX_NAME = "SpriteLens.SingleInstance.Mutex"
 ACTIVATION_EVENT_NAME = "SpriteLens.SingleInstance.Activate"
+UI_MUTEX_NAME = "SpriteLens.UiInstance.Mutex"
+UI_ACTIVATION_EVENT_NAME = "SpriteLens.UiInstance.Activate"
 
 ERROR_ALREADY_EXISTS = 183
 WAIT_OBJECT_0 = 0
@@ -66,7 +68,10 @@ class SingleInstanceGuard:
         guard.close()                 # 退出时释放（进程退出也会自动释放）
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, mutex_name: str = MUTEX_NAME,
+                 activation_name: str = ACTIVATION_EVENT_NAME) -> None:
+        self._mutex_name = mutex_name
+        self._activation_name = activation_name
         self._mutex_handle: int | None = None
         self._event_handle: int | None = None
 
@@ -75,7 +80,7 @@ class SingleInstanceGuard:
         """尝试成为唯一实例；返回 True 表示抢到锁。"""
         if _kernel32 is None:
             return True
-        handle = _kernel32.CreateMutexW(None, True, MUTEX_NAME)
+        handle = _kernel32.CreateMutexW(None, True, self._mutex_name)
         if not handle:
             # 创建失败（极端情况）按可启动处理，不阻断用户使用
             return True
@@ -89,7 +94,7 @@ class SingleInstanceGuard:
         """创建唤醒事件（首实例在自己启动时调用一次）。"""
         if _kernel32 is None:
             return None
-        handle = _kernel32.CreateEventW(None, True, False, ACTIVATION_EVENT_NAME)
+        handle = _kernel32.CreateEventW(None, True, False, self._activation_name)
         self._event_handle = int(handle) if handle else None
         return self._event_handle
 
@@ -107,7 +112,7 @@ class SingleInstanceGuard:
         """通知已运行实例显示窗口；返回是否投递成功。"""
         if _kernel32 is None:
             return False
-        handle = _kernel32.OpenEventW(EVENT_MODIFY_STATE, False, ACTIVATION_EVENT_NAME)
+        handle = _kernel32.OpenEventW(EVENT_MODIFY_STATE, False, self._activation_name)
         if not handle:
             return False
         try:
@@ -147,5 +152,7 @@ class SingleInstanceGuard:
 __all__ = [
     "ACTIVATION_EVENT_NAME",
     "MUTEX_NAME",
+    "UI_ACTIVATION_EVENT_NAME",
+    "UI_MUTEX_NAME",
     "SingleInstanceGuard",
 ]

@@ -12,12 +12,20 @@ from __future__ import annotations
 import os
 import threading
 import webbrowser
+from types import SimpleNamespace
 
 import spritelens
 from spritelens.app_context import build_app_context
 from spritelens.logs import get_logger, setup_logger
 from spritelens.paths import logs_dir, project_root
-from spritelens.system.single_instance import SingleInstanceGuard
+from spritelens.paths import config_path
+from spritelens.repositories.settings import SettingsRepository
+from spritelens.system.runtime_session import read_runtime
+from spritelens.system.single_instance import (
+    UI_ACTIVATION_EVENT_NAME,
+    UI_MUTEX_NAME,
+    SingleInstanceGuard,
+)
 
 logger = get_logger("web_run")
 
@@ -31,7 +39,7 @@ WEBVIEW2_HINT = (
 SPLASH_BG = "#f6f6ed"
 
 
-def run_web(*, open_browser: bool = False) -> int:
+def run_web(*, open_browser: bool = False, ui_only: bool = False) -> int:
     """启动 Web 界面；返回进程退出码。
 
     资源保护（D07）：guard 获取后所有步骤（WebView2 预检、装配、
@@ -49,8 +57,15 @@ def run_web(*, open_browser: bool = False) -> int:
     _enable_dpi_awareness()
     _set_app_user_model_id()
 
+    if ui_only:
+        return _run_remote_ui()
+
     guard = SingleInstanceGuard()
     if not guard.acquire():
+        if read_runtime() is not None:
+            notified = guard.notify_existing()
+            logger.info("检测到后台采集实例，已请求打开主界面=%s", notified)
+            return 0
         notified = guard.notify_existing()
         logger.info("检测到已有实例在运行（唤醒已有窗口=%s），本次启动退出", notified)
         return 0
@@ -106,6 +121,44 @@ def run_web(*, open_browser: bool = False) -> int:
         elif not _shutdown(server, context, guard):
             exit_code = 1
     return exit_code
+
+
+def _run_remote_ui() -> int:
+    """不抢采集互斥锁，只连接后台实例提供的本地服务。"""
+    runtime = read_runtime()
+    if runtime is None:
+        _fatal("后台监听未运行", "当前没有可连接的后台采集实例。")
+        return 1
+    try:
+        from spritelens.system.webview_guard import ensure_webview2
+
+        if not ensure_webview2(logs_dir()):
+            return 1
+        guard = SingleInstanceGuard(
+            mutex_name=UI_MUTEX_NAME,
+            activation_name=UI_ACTIVATION_EVENT_NAME,
+        )
+        if not guard.acquire():
+            guard.notify_existing()
+            return 0
+        settings = SettingsRepository(config_path())
+        context = SimpleNamespace(
+            settings=settings,
+            capture_vm=SimpleNamespace(stop=lambda: None),
+            pet_store=None,
+            egg_store=None,
+            home_store=None,
+            event_log=None,
+        )
+        server = SimpleNamespace(url=runtime.url, _context=context)
+        try:
+            return 0 if _run_window(server, guard) else 1
+        finally:
+            guard.close()
+    except Exception as exc:  # noqa: BLE001 - UI 进程失败给出可读错误
+        logger.exception("连接后台采集实例失败")
+        _fatal("主界面启动失败", f"{exc}\n\n请先确认后台监听仍在运行。")
+        return 1
 
 
 def _fatal(title: str, message: str) -> None:
