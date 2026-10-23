@@ -25,7 +25,10 @@ class GameProcessTests(unittest.TestCase):
         xml = _task_xml("RocoWorld.exe", r"C:\\SpriteLens.exe", ["--background", "--process-name", "RocoWorld.exe"])
         ET.fromstring(xml)
         self.assertIn("EventID=4688", xml)
-        self.assertIn(r"\RocoWorld.exe", xml)
+        self.assertIn("Data[@Name='NewProcessName']", xml)
+        self.assertIn("*[System[(EventID=4688)] and EventData[", xml)
+        self.assertNotIn("]] and *[EventData", xml)
+        self.assertNotIn("contains(", xml)
         self.assertIn("C:\\\\SpriteLens.exe", xml)
 
 

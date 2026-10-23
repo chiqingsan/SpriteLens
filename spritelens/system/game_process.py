@@ -110,13 +110,13 @@ def _task_xml(process_name: str, command: str, arguments: list[str]) -> str:
     domain = os.environ.get("USERDOMAIN", "").strip()
     user_id = f"{domain}\\{user}" if domain else user
     command_line = subprocess.list2cmdline(arguments)
-    escaped_name = escape(normalize_process_name(process_name))
-    # 4688 的 NewProcessName 是完整路径，用 contains 允许不同安装目录。
+    normalize_process_name(process_name)
+    # Windows 事件 XPath 不支持 contains 等字符串函数；4688 触发后由
+    # background_run 用 Win32 进程枚举按 exe 文件名做最终过滤。
     subscription = (
         "<QueryList><Query Id=\"0\" Path=\"Security\">"
         "<Select Path=\"Security\">"
-        "*[System[(EventID=4688)]] and "
-        f"*[EventData[Data[@Name='NewProcessName'] and contains(., '\\{escaped_name}')]]"
+        "*[System[(EventID=4688)] and EventData[Data[@Name='NewProcessName']]]"
         "</Select></Query></QueryList>"
     )
     return f'''<?xml version="1.0" encoding="UTF-16"?>
