@@ -25,6 +25,7 @@ GAME_PROCESS_AUDIT_GUIDANCE = (
     "需要 Windows 安全日志记录进程创建事件 4688；"
     "可用 auditpol /set /subcategory:\"Process Creation\" /success:enable 启用。"
 )
+DEFAULT_GAME_PROCESS_NAME = "NRC-Win64-Shipping.exe"
 GAME_TASK_NAME = "SpriteLens.GameCapture"
 
 _TH32CS_SNAPPROCESS = 0x00000002
@@ -55,7 +56,7 @@ def normalize_process_name(value: str) -> str:
         or not name.casefold().endswith(".exe")
         or any(char in name for char in ("/", "\\", ":", "\x00"))
     ):
-        raise ValueError("游戏进程名必须是单独的 exe 文件名，例如 RocoWorld.exe")
+        raise ValueError(f"游戏进程名必须是单独的 exe 文件名，例如 {DEFAULT_GAME_PROCESS_NAME}")
     return name
 
 
@@ -202,6 +203,7 @@ def remove_game_trigger() -> None:
 
 __all__ = [
     "GAME_PROCESS_AUDIT_GUIDANCE",
+    "DEFAULT_GAME_PROCESS_NAME",
     "GAME_TASK_NAME",
     "background_task_action",
     "current_app_command",

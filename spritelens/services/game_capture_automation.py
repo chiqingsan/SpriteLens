@@ -10,6 +10,7 @@ from spritelens.logs import get_logger
 from spritelens.system.game_process import (
     GAME_PROCESS_AUDIT_GUIDANCE,
     GAME_TASK_NAME,
+    DEFAULT_GAME_PROCESS_NAME,
     install_game_trigger,
     normalize_process_name,
     remove_game_trigger,
@@ -22,7 +23,7 @@ logger = get_logger("game_capture_automation")
 def _normalize(raw: Any) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raw = {}
-    process_name = raw.get("process_name", "")
+    process_name = raw.get("process_name", DEFAULT_GAME_PROCESS_NAME)
     if not isinstance(process_name, str):
         process_name = ""
     try:

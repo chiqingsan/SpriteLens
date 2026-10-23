@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 
 from spritelens.repositories.settings import SettingsRepository
 from spritelens.services.game_capture_automation import GameCaptureAutomation
-from spritelens.system.game_process import _task_xml, normalize_process_name
+from spritelens.system.game_process import DEFAULT_GAME_PROCESS_NAME, _task_xml, normalize_process_name
 from spritelens.system.runtime_session import RuntimeSession, clear_runtime, read_runtime, write_runtime
 
 
@@ -30,6 +30,16 @@ class GameProcessTests(unittest.TestCase):
 
 
 class AutomationServiceTests(unittest.TestCase):
+    def test_snapshot_defaults_to_game_process_from_meow(self):
+        with tempfile.TemporaryDirectory() as directory:
+            settings = SettingsRepository(Path(directory) / "config.json")
+            service = GameCaptureAutomation(settings, install=Mock(), remove=Mock())
+
+            result = service.snapshot()
+
+            self.assertFalse(result["enabled"])
+            self.assertEqual(result["process_name"], DEFAULT_GAME_PROCESS_NAME)
+
     def test_enable_installs_task_before_persisting(self):
         with tempfile.TemporaryDirectory() as directory:
             settings = SettingsRepository(Path(directory) / "config.json")
