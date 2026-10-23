@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 import spritelens.system.game_process as game_process
 from spritelens.repositories.settings import SettingsRepository
 from spritelens.services.game_capture_automation import GameCaptureAutomation
-from spritelens.system.game_process import DEFAULT_GAME_PROCESS_NAME, _task_xml, normalize_process_name
+from spritelens.system.game_process import DEFAULT_GAME_PROCESS_NAME, _powershell_literal, _task_xml, normalize_process_name
 from spritelens.system.runtime_session import RuntimeSession, clear_runtime, read_runtime, write_runtime
 
 
@@ -39,6 +39,9 @@ class GameProcessTests(unittest.TestCase):
             game_process._run_schtasks(["/Delete", "/TN", "SpriteLens.GameCapture", "/F"])
 
         elevated.assert_called_once_with(["/Delete", "/TN", "SpriteLens.GameCapture", "/F"])
+
+    def test_powershell_literal_escapes_single_quotes(self):
+        self.assertEqual(_powershell_literal(r"C:\Game's Data\task.xml"), r"'C:\Game''s Data\task.xml'")
 
     def test_remove_missing_task_is_noop_and_existing_task_uses_runner(self):
         with patch.object(game_process, "_task_exists", return_value=False), patch.object(

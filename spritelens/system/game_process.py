@@ -22,11 +22,12 @@ from spritelens.paths import project_root
 logger = get_logger("game_process")
 
 GAME_PROCESS_AUDIT_GUIDANCE = (
-    "需要 Windows 安全日志记录进程创建事件 4688；"
-    "可用 auditpol /set /subcategory:\"Process Creation\" /success:enable 启用。"
+    "保存时会自动请求管理员权限并开启 Windows 进程创建审计（事件 4688）；"
+    "如果电脑的组策略禁止修改，请在本地安全策略中手动开启。"
 )
 DEFAULT_GAME_PROCESS_NAME = "NRC-Win64-Shipping.exe"
 GAME_TASK_NAME = "SpriteLens.GameCapture"
+PROCESS_CREATION_AUDIT_SUBCATEGORY = "{0CCE922B-69AE-11D9-BED3-505054503030}"
 
 _TH32CS_SNAPPROCESS = 0x00000002
 _INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
@@ -182,6 +183,10 @@ def _run_schtasks(arguments: list[str]) -> None:
     if not _is_user_admin():
         _run_schtasks_elevated(arguments)
         return
+    _run_schtasks_direct(arguments)
+
+
+def _run_schtasks_direct(arguments: list[str]) -> None:
     result = subprocess.run(
         ["schtasks.exe", *arguments],
         capture_output=True,
@@ -205,6 +210,10 @@ def _is_user_admin() -> bool:
 
 
 def _run_schtasks_elevated(arguments: list[str]) -> None:
+    _run_elevated_executable("schtasks.exe", arguments)
+
+
+def _run_elevated_executable(executable: str, arguments: list[str]) -> None:
     shell32 = ctypes.WinDLL("shell32", use_last_error=True)
     shell32.ShellExecuteExW.argtypes = [ctypes.POINTER(_ShellExecuteInfoW)]
     shell32.ShellExecuteExW.restype = wintypes.BOOL
@@ -220,7 +229,7 @@ def _run_schtasks_elevated(arguments: list[str]) -> None:
         cbSize=ctypes.sizeof(_ShellExecuteInfoW),
         fMask=_SEE_MASK_NOCLOSEPROCESS,
         lpVerb="runas",
-        lpFile="schtasks.exe",
+        lpFile=executable,
         lpParameters=subprocess.list2cmdline(arguments),
         nShow=_SW_HIDE,
     )
@@ -239,7 +248,56 @@ def _run_schtasks_elevated(arguments: list[str]) -> None:
         kernel32.CloseHandle(info.hProcess)
 
     if exit_code.value:
-        raise OSError(f"Windows 任务计划程序操作失败：{exit_code.value}")
+        raise OSError(f"管理员命令执行失败：{executable}（{exit_code.value}）")
+
+
+def _enable_process_creation_audit() -> None:
+    result = subprocess.run(
+        [
+            "auditpol.exe",
+            "/set",
+            f"/subcategory:{PROCESS_CREATION_AUDIT_SUBCATEGORY}",
+            "/success:enable",
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    if result.returncode:
+        detail = (result.stderr or result.stdout).strip()
+        raise OSError(f"Windows 进程创建审计开启失败：{detail or result.returncode}")
+
+
+def _powershell_literal(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _run_game_trigger_setup_elevated(task_arguments: list[str]) -> None:
+    script_lines = [
+        "$ErrorActionPreference = 'Stop'",
+        f"& auditpol.exe '/set' '/subcategory:{PROCESS_CREATION_AUDIT_SUBCATEGORY}' '/success:enable'",
+        "if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
+        "$taskArguments = @(",
+        *[f"    {_powershell_literal(argument)}" for argument in task_arguments],
+        ")",
+        "& schtasks.exe @taskArguments",
+        "exit $LASTEXITCODE",
+    ]
+    with tempfile.NamedTemporaryFile(prefix="spritelens-setup-", suffix=".ps1", delete=False) as handle:
+        script = Path(handle.name)
+    try:
+        script.write_text("\n".join(script_lines) + "\n", encoding="utf-8-sig")
+        _run_elevated_executable(
+            "powershell.exe",
+            ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", str(script)],
+        )
+    finally:
+        try:
+            script.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def install_game_trigger(process_name: str) -> None:
@@ -250,7 +308,12 @@ def install_game_trigger(process_name: str) -> None:
         temporary = Path(handle.name)
     try:
         temporary.write_text(xml, encoding="utf-16")
-        _run_schtasks(["/Create", "/TN", GAME_TASK_NAME, "/XML", str(temporary), "/F"])
+        task_arguments = ["/Create", "/TN", GAME_TASK_NAME, "/XML", str(temporary), "/F"]
+        if _is_user_admin():
+            _enable_process_creation_audit()
+            _run_schtasks_direct(task_arguments)
+        else:
+            _run_game_trigger_setup_elevated(task_arguments)
     finally:
         try:
             temporary.unlink()
@@ -287,6 +350,7 @@ __all__ = [
     "GAME_PROCESS_AUDIT_GUIDANCE",
     "DEFAULT_GAME_PROCESS_NAME",
     "GAME_TASK_NAME",
+    "PROCESS_CREATION_AUDIT_SUBCATEGORY",
     "background_task_action",
     "current_app_command",
     "install_game_trigger",
