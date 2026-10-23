@@ -309,6 +309,7 @@ button:not(.nav-item):has(> .ui-icon) { display: inline-flex; align-items: cente
 .settings-group #npcap-banner { margin: var(--space-4) 0 0; }
 .settings-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); padding-top: var(--space-5); }
 .settings-hint { min-height: 18px; margin: var(--space-3) 0 0; line-height: 1.45; }
+#c-game-auto-guidance { margin-bottom: var(--space-7); }
 .advanced-settings { margin-top: var(--space-4); padding-top: var(--space-2); border-top: 1px solid var(--line-soft); }
 .advanced-settings > summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: 42px; color: var(--ink-soft); list-style: none; cursor: pointer; }
 .advanced-settings > summary::-webkit-details-marker { display: none; }
