@@ -30,6 +30,30 @@ GAME_TASK_NAME = "SpriteLens.GameCapture"
 
 _TH32CS_SNAPPROCESS = 0x00000002
 _INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+_SEE_MASK_NOCLOSEPROCESS = 0x00000040
+_SW_HIDE = 0
+_WAIT_INFINITE = 0xFFFFFFFF
+_ERROR_CANCELLED = 1223
+
+
+class _ShellExecuteInfoW(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", wintypes.DWORD),
+        ("fMask", wintypes.ULONG),
+        ("hwnd", wintypes.HWND),
+        ("lpVerb", ctypes.c_wchar_p),
+        ("lpFile", ctypes.c_wchar_p),
+        ("lpParameters", ctypes.c_wchar_p),
+        ("lpDirectory", ctypes.c_wchar_p),
+        ("nShow", ctypes.c_int),
+        ("hInstApp", wintypes.HINSTANCE),
+        ("lpIDList", ctypes.c_void_p),
+        ("lpClass", ctypes.c_wchar_p),
+        ("hkeyClass", wintypes.HKEY),
+        ("dwHotKey", wintypes.DWORD),
+        ("hIcon", wintypes.HANDLE),
+        ("hProcess", wintypes.HANDLE),
+    ]
 
 
 class _ProcessEntry32W(ctypes.Structure):
@@ -155,6 +179,9 @@ def _task_xml(process_name: str, command: str, arguments: list[str]) -> str:
 def _run_schtasks(arguments: list[str]) -> None:
     if os.name != "nt":
         raise OSError("按需游戏启动任务仅支持 Windows")
+    if not _is_user_admin():
+        _run_schtasks_elevated(arguments)
+        return
     result = subprocess.run(
         ["schtasks.exe", *arguments],
         capture_output=True,
@@ -166,6 +193,53 @@ def _run_schtasks(arguments: list[str]) -> None:
     if result.returncode:
         detail = (result.stderr or result.stdout).strip()
         raise OSError(f"Windows 任务计划程序操作失败：{detail or result.returncode}")
+
+
+def _is_user_admin() -> bool:
+    if os.name != "nt":
+        return False
+    shell32 = ctypes.WinDLL("shell32", use_last_error=True)
+    shell32.IsUserAnAdmin.argtypes = []
+    shell32.IsUserAnAdmin.restype = wintypes.BOOL
+    return bool(shell32.IsUserAnAdmin())
+
+
+def _run_schtasks_elevated(arguments: list[str]) -> None:
+    shell32 = ctypes.WinDLL("shell32", use_last_error=True)
+    shell32.ShellExecuteExW.argtypes = [ctypes.POINTER(_ShellExecuteInfoW)]
+    shell32.ShellExecuteExW.restype = wintypes.BOOL
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    kernel32.WaitForSingleObject.restype = wintypes.DWORD
+    kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+
+    info = _ShellExecuteInfoW(
+        cbSize=ctypes.sizeof(_ShellExecuteInfoW),
+        fMask=_SEE_MASK_NOCLOSEPROCESS,
+        lpVerb="runas",
+        lpFile="schtasks.exe",
+        lpParameters=subprocess.list2cmdline(arguments),
+        nShow=_SW_HIDE,
+    )
+    if not shell32.ShellExecuteExW(ctypes.byref(info)):
+        error = ctypes.get_last_error()
+        if error == _ERROR_CANCELLED:
+            raise OSError("用户取消了管理员权限确认")
+        raise ctypes.WinError(error)
+
+    try:
+        kernel32.WaitForSingleObject(info.hProcess, _WAIT_INFINITE)
+        exit_code = wintypes.DWORD()
+        if not kernel32.GetExitCodeProcess(info.hProcess, ctypes.byref(exit_code)):
+            raise ctypes.WinError(ctypes.get_last_error())
+    finally:
+        kernel32.CloseHandle(info.hProcess)
+
+    if exit_code.value:
+        raise OSError(f"Windows 任务计划程序操作失败：{exit_code.value}")
 
 
 def install_game_trigger(process_name: str) -> None:
@@ -188,17 +262,25 @@ def remove_game_trigger() -> None:
     """移除按需任务；不存在时视为已移除。"""
     if os.name != "nt":
         raise OSError("按需游戏启动任务仅支持 Windows")
+    if not _task_exists():
+        return
+    _run_schtasks(["/Delete", "/TN", GAME_TASK_NAME, "/F"])
+
+
+def _task_exists() -> bool:
     result = subprocess.run(
-        ["schtasks.exe", "/Delete", "/TN", GAME_TASK_NAME, "/F"],
+        ["schtasks.exe", "/Query", "/TN", GAME_TASK_NAME],
         capture_output=True,
         text=True,
         encoding="utf-8",
         errors="replace",
         check=False,
     )
-    if result.returncode and "does not exist" not in (result.stdout + result.stderr).casefold():
-        detail = (result.stderr or result.stdout).strip()
-        raise OSError(f"Windows 任务计划程序删除失败：{detail or result.returncode}")
+    if result.returncode == 0:
+        return True
+    detail = (result.stdout + result.stderr).casefold()
+    missing_markers = ("cannot find the file specified", "does not exist", "找不到", "不存在")
+    return not any(marker in detail for marker in missing_markers)
 
 
 __all__ = [

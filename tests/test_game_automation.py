@@ -8,6 +8,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import spritelens.system.game_process as game_process
 from spritelens.repositories.settings import SettingsRepository
 from spritelens.services.game_capture_automation import GameCaptureAutomation
 from spritelens.system.game_process import DEFAULT_GAME_PROCESS_NAME, _task_xml, normalize_process_name
@@ -30,6 +31,27 @@ class GameProcessTests(unittest.TestCase):
         self.assertNotIn("]] and *[EventData", xml)
         self.assertNotIn("contains(", xml)
         self.assertIn("C:\\\\SpriteLens.exe", xml)
+
+    def test_task_registration_elevates_only_when_needed(self):
+        with patch.object(game_process, "_is_user_admin", return_value=False), patch.object(
+            game_process, "_run_schtasks_elevated"
+        ) as elevated:
+            game_process._run_schtasks(["/Delete", "/TN", "SpriteLens.GameCapture", "/F"])
+
+        elevated.assert_called_once_with(["/Delete", "/TN", "SpriteLens.GameCapture", "/F"])
+
+    def test_remove_missing_task_is_noop_and_existing_task_uses_runner(self):
+        with patch.object(game_process, "_task_exists", return_value=False), patch.object(
+            game_process, "_run_schtasks"
+        ) as runner:
+            game_process.remove_game_trigger()
+        runner.assert_not_called()
+
+        with patch.object(game_process, "_task_exists", return_value=True), patch.object(
+            game_process, "_run_schtasks"
+        ) as runner:
+            game_process.remove_game_trigger()
+        runner.assert_called_once_with(["/Delete", "/TN", "SpriteLens.GameCapture", "/F"])
 
 
 class AutomationServiceTests(unittest.TestCase):
