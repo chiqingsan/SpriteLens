@@ -128,7 +128,7 @@ class Pet:
     is_mirror_pet: bool = False  # 好友队伍镜像，不属于自己的精灵库存
     catch_way: int = 0  # PetData 字段67，0为未提供
     add_time: int = 0  # PetData 字段32，游戏获得时间（Unix秒），不使用落库时间
-    partner_mark: int = 0  # PetData 字段78，游戏内搭档标记；0=无
+    partner_mark: int = 0  # PetData 字段78，游戏内伙伴标记；0=无。字段号经真实流量与洛克助手交叉确认，见 docs/PROTOCOL_NOTES.md
 
     def attribute(self, slot: str) -> PetAttribute:
         """按名称（hp/atk/spa/def/spd/spe）取某一维；越界返回零值。"""

@@ -47,6 +47,8 @@ def species_icon_url(base_conf_id: int) -> str:
     return pet_images(base_conf_id)["portrait_url"]
 
 
+# 游戏内伙伴标记 ID → 客户端同名素材；只读展示。真实流量出现 1/3/4/5/6/7/14/15，
+# 8 在当前账号流量里未出现但保留映射；未列出的 ID 一律不渲染，不猜测图标。
 _PARTNER_MARK_ASSETS = {
     1: "img_biaoji10_png.webp",
     3: "img_biaoji11_png.webp",
