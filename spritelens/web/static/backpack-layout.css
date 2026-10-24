@@ -48,7 +48,7 @@
 .sidebar-settings > .ui-icon { width: 16px; height: 16px; }
 /* 只命中右侧箭头（设置图标是 .ui-icon.nav-icon，不能让它吃到 auto margin 居中） */
 .sidebar-settings > .ui-icon:not(.nav-icon) { margin-left: auto; }
-.topbar { grid-template-columns: auto minmax(0, 1fr) auto; min-height: 64px; }
+.topbar { grid-template-columns: auto minmax(0, 1fr) auto; min-height: 64px; container-type: inline-size; }
 #page-title { font-size: var(--fs-xl); margin: 0; white-space: nowrap; }
 .capture-summary { align-items: center; }
 #btn-toggle { min-width: 136px; height: 40px; }
@@ -170,6 +170,13 @@
   .top-actions { grid-column: 2; grid-row: 1 / 3; }
   #btn-toggle { min-width: 108px; }
 }
+@container (max-width: 320px) {
+  #page-title { grid-column: 1 / -1; white-space: normal; overflow-wrap: anywhere; }
+  .capture-summary { grid-column: 1 / -1; grid-row: auto; min-width: 0; }
+  .capture-summary .status-pill { white-space: normal; overflow-wrap: anywhere; }
+  .top-actions { grid-column: 1 / -1; grid-row: auto; min-width: 0; justify-content: flex-end; }
+  #btn-toggle { min-width: 0; max-width: 100%; height: auto; min-height: 40px; white-space: normal; }
+}
 
 #pet-grid.box-fill-grid .point-avatar { height: min(100%, calc(var(--pet-portrait) + 8px)); min-height: 0; max-height: 100%; }
 #pet-grid.box-fill-grid .point-portrait-row { grid-template-rows: minmax(0, 1fr); min-height: 0; }
@@ -179,8 +186,8 @@
 /* 伙伴标记：顶行左簇固定为「性别 → 伙伴标记」，稀有/色卡保持绝对居中，性格胶囊贴右。
    尺寸统一由 ui.css 的 .pet-partner-mark（18px）决定，这里只负责排列顺序和间隙。
    最小支持窗口下卡片内容宽约 124px，居中标记组宽 40px（16+4+20）左边缘约 42px；
-   左簇 14px 性别 + 2px 间隙 + 18px 标记 = 34px，留约 7px 净空，不覆盖居中标记与性格胶囊。 */
-#pet-grid .point-top > .point-top-left { display: inline-flex; align-items: center; justify-content: flex-start; gap: 2px; min-width: 0; flex: none; }
+   左簇 14px 性别 + 4px 间隙 + 18px 标记 = 36px，留约 5px 净空，不覆盖居中标记与性格胶囊。 */
+#pet-grid .point-top > .point-top-left { display: inline-flex; align-items: center; justify-content: flex-start; gap: 4px; min-width: 0; flex: none; }
 #pet-grid.box-fill-grid .point-portrait-row { grid-template-columns: 28px minmax(0, 1fr) 28px; }
 #pet-grid.box-fill-grid .point-groups, #pet-grid.box-fill-grid .point-medals { width: 28px; }
 #pet-grid.box-fill-grid .point-avatar { max-width: 96px; }
