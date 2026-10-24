@@ -138,6 +138,8 @@ Store 并发批次顺序、坏库备份失败保护与坏行隔离已有修复�
   `storage.records_max_mb` 默认 300；`storage.backups_max_age_days` 默认 30 天（备份是恢复手段，
   不参与记录池总量）。主库 `spritelens.sqlite`、`spritelens.sqlite-wal/-shm`、`keys/`、`config.json` 永不清理，单文件删除失败不阻断启动。
   年龄先删、总量兜底（mtime 旧→新）；正在写的文件（当天 eventlog 当前分片、录制中的 capture）永不删但计入总量。
+  启动清理默认不保护当天分片（写入器还没打开它），超限时按总量截断——重启即收敛到上限；
+  已持有写入器或另一实例在写时通过 `eventlog_active` 传当前分片，该文件只计入总量、不会被改动。
   当天 eventlog 每写满 64MB 切一个分片（`eventlog_YYYYMMDD_pNN.jsonl`）并立刻触发一次清理——
   这是「总量超过上限立刻清最旧」在当天生效的机制，不依赖重启或跨天；上次运行留下的大分片不会被继续追加。
 - 手工回收磁盘：`python tools/cleanup_data_root.py [--root DIR] [--apply]`，默认 dry-run，`--apply` 才执行（孤儿 sidecar→备份库移入 `backups/database-recovery-YYYYMMDD/`→按上限清理）。

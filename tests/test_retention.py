@@ -400,6 +400,23 @@ class StorageLimitsTest(_RootTestCase):
         self.assertIn(old_eventlog, report.records, "0 clamp 到 1 天后可删")
         self.assertFalse(old_eventlog.exists())
 
+    def test_startup_trims_oversized_today_file(self):
+        """重启后当天分片超限也要收敛：启动清理不默认保护当天文件。"""
+        day = time.strftime("%Y%m%d")
+        today = self.root / "eventlog" / f"eventlog_{day}.jsonl"
+        line = b'{"opcode": "0x0000"}\n'
+        today.parent.mkdir(parents=True, exist_ok=True)
+        today.write_bytes(line * (17 * retention.MB // len(line) + 1))
+
+        report = apply_storage_retention(
+            self._settings({"storage.records_max_mb": 16}), self.root
+        )
+
+        self.assertEqual(report.records, (today,))
+        size = today.stat().st_size
+        self.assertLessEqual(size, 16 * retention.MB, "超限当天分片应截断到上限")
+        self.assertGreater(size, 16 * retention.MB - 2 * len(line))
+
 
 class EventLogRolloverTest(_RootTestCase):
     def setUp(self) -> None:

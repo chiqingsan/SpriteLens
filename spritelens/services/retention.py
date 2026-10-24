@@ -10,10 +10,13 @@
   的「记录数据」：先删 mtime 超过 `records_max_age_days`（默认 3 天）的文件，
   再按 mtime 从旧到新删到合计 ≤ `records_max_mb`（默认 300MB）。单个文件本身
   就超过上限时（升级前留下的大分片）从头部截断保留尾部，不整份删除。
-  这样「超过上限立刻清旧的」由当天分片滚动触发（见 event_logger 的
-  `max_part_bytes`），不必等到重启或跨天。
+  这样「超过上限立刻清旧的」在启动（重启即收敛到上限）与当天分片滚动（见
+  event_logger 的 `max_part_bytes`）时都会触发，不必等到跨天。
 - 正在写的文件（当天 eventlog 当前分片、正在录制的 capture 文件）永不删除，
   但计入总量：只有它们自身占满上限时才会超（单分片 64MB，正常不会发生）。
+  启动清理默认不把当天分片当 keep——写入器还没打开它，超限可安全截断；若
+  调用方已持有写入器（或另一实例在写），通过 `apply_storage_retention` 的
+  `eventlog_active` 传入当前分片路径，该文件就只计入总量、不会被改动。
 - `backups/*.sqlite|*.json`：只按年龄（`backups_max_age_days` 默认 30 天）删
   过期备份，`keep_dirs`（如刚生成的数据库迁移备份）整目录跳过；备份是恢复
   手段，不参与 300MB 记录池上限，宁可多留。
@@ -246,11 +249,6 @@ def _note_freed(sink: list[int] | None, freed: int) -> None:
 
 
 # -- 记录池：年龄 + 总量 ---------------------------------------------------
-def _today_eventlog_path(root: Path) -> Path:
-    """当天 eventlog 主分片路径（启动清理时即使还没开始写也按 keep 保护）。"""
-    return Path(root) / "eventlog" / f"eventlog_{time.strftime('%Y%m%d')}.jsonl"
-
-
 def prune_records(
     root: Path,
     *,
@@ -542,11 +540,16 @@ def apply_storage_retention(
 
     调用方负责兜底异常（app_context 只 warning，不阻断启动）；单文件删除
     失败已在底层消化。`recording_active`/`eventlog_active` 可以是路径或返回
-    路径的 callable，用于保护启动时仍被占用的文件（默认保护当天 eventlog）。
+    路径的 callable，用于保护启动时仍被占用的文件。
+
+    默认不保护当天 eventlog 分片：正常启动顺序下（保留策略早于任何写入）
+    写入器还没打开文件，超限时按总量截断，重启即收敛到上限；若调用方已
+    持有写入器或另一实例正在写，应传 `eventlog_active=writer.current_path`，
+    此时该文件按 keep 处理（截断/删除都会被跳过）。
     """
     limits = StorageLimits.from_settings(settings)
     root = Path(root)
-    active_eventlog = _resolve_active(eventlog_active) or _today_eventlog_path(root)
+    active_eventlog = _resolve_active(eventlog_active)
     active_recording = _resolve_active(recording_active)
     keep = [path for path in (active_eventlog, active_recording) if path is not None]
 
