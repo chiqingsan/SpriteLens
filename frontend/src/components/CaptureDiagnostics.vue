@@ -10,6 +10,8 @@ const keyText = ref(''), keyMessage = ref('')
 const error = ref(''), busy = ref(false), selected = ref(''), showDetails = ref(false)
 const ifaces = ref<{ name: string; description: string }[]>([])
 let active = true
+const sessionLabels: Record<string, string> = { waiting_key: '等待密钥', waiting_identity: '等待身份', parse_error: '解析失败', observing: '正常', stopped: '已停止' }
+function activityTime(value: number) { return value ? new Date(value * 1000).toLocaleTimeString() : '尚未收到数据' }
 const labels: Record<string, string> = { recheck: '重新检测环境', install: '安装 Npcap', rsc: '禁用 RSC' }
 const environment = computed(() => data.value?.diagnostics.find(check => check.id === 'environment'))
 const capture = computed(() => data.value?.diagnostics.find(check => check.id === 'capture'))
@@ -126,7 +128,16 @@ defineExpose({ update })
         <template v-if="data">
           <p class="capture-footnote">累计观察：原始流 {{ data.totals.raw_chunks }} 段 / {{ data.totals.raw_bytes }} 字节；解密成功 {{ data.totals.decrypt_ok }}；解密失败 {{ data.totals.decrypt_fail }}；缺密钥 {{ data.totals.key_miss }}；解析失败 {{ data.totals.parse_fail }}；会话 {{ data.sessions.length }}</p>
           <p v-if="data.event_log_name" class="capture-footnote">事件日志：{{ data.event_log_name }}</p>
-          <div class="capture-session-table"><table><caption class="sr-only">采集会话</caption><colgroup><col class="capture-session-id-col"><col><col></colgroup><thead><tr><th scope="col">会话</th><th scope="col">密钥</th><th scope="col">数据帧</th></tr></thead><tbody><tr v-for="session in data.sessions" :key="session.session_id"><td>{{ session.session_id }}</td><td>{{ session.has_key ? '已获取' : '未获取' }}</td><td>{{ session.data_frames }}</td></tr><tr v-if="!data.sessions.length"><td colspan="3">暂无会话</td></tr></tbody></table></div>
+          <div class="capture-session-table"><table>
+            <caption class="sr-only">采集会话</caption>
+            <colgroup><col class="capture-session-id-col"><col><col></colgroup>
+            <thead><tr><th scope="col">会话与账号</th><th scope="col">状态</th><th scope="col">解析</th></tr></thead>
+            <tbody><tr v-for="session in data.sessions" :key="session.session_id">
+              <td><strong>{{ session.name || '身份未确认' }}</strong><span v-if="session.uid !== '0'">UID {{ session.uid }}</span><span>{{ session.session_id }}</span></td>
+              <td>{{ sessionLabels[session.status] || session.status }}<span>{{ session.has_key ? '已有密钥' : '未获取密钥' }}</span><span>最近 {{ activityTime(session.last_activity) }}</span></td>
+              <td>成功 {{ session.decrypt_ok }} / {{ session.data_frames }}<span>失败 {{ session.failures }}</span></td>
+            </tr><tr v-if="!data.sessions.length"><td colspan="3">暂无会话</td></tr></tbody>
+          </table></div>
         </template>
       </div>
       <p class="capture-footnote">以上为累计观察，不代表当前连接健康或业务数据完整。</p>
@@ -223,7 +234,9 @@ defineExpose({ update })
 .capture-session-table { max-height: 240px; overflow-y: auto; margin-top: var(--space-4); }
 .capture-session-table table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--fs-xs); text-align: left; }
 .capture-session-table th, .capture-session-table td { padding: var(--space-3); border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
-.capture-session-id-col { width: 60%; }
+.capture-session-id-col { width: 44%; }
+.capture-session-table td span { display: block; color: var(--muted); margin-top: var(--space-1); }
+.capture-session-table td { vertical-align: top; }
 .capture-detail strong { font-size: var(--fs-xs); }
 .capture-detail-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-3); }
 .capture-footnote { font-size: var(--fs-xs); }

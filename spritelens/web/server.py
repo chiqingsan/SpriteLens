@@ -116,6 +116,7 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         self._blocking_tasks: set[asyncio.Task] = set()
         self._push_task: asyncio.Task | None = None
         self._last_state_json: str | None = None
+        self._account_epoch = 0
         self._pet_media_cache: PetMediaCache | None = None
         self._account_avatar_cache: AccountAvatarCache | None = None
         self._stopped = False
@@ -336,7 +337,9 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         app.router.add_post("/api/egg-box/annotations", self._api_save_egg_annotations)
         app.router.add_post("/api/egg-box/favorite", self._api_save_egg_favorite)
         app.router.add_get("/api/home", self._api_home)
-        register_nearby_routes(app, self._context.scene_repository)
+        register_nearby_routes(
+            app, self._context.scene_repository, self._context.static_data, self._context.settings
+        )
         register_collection_routes(app, self._context)
         register_breeder_routes(app, self._context)
         register_planner_routes(app, self._context)
@@ -780,7 +783,7 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
     async def _push_loop(self) -> None:
         while True:
             try:
-                payload = await self._run_blocking(self._state_payload)
+                payload = await self._run_blocking(self._push_payload)
                 encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
                 if encoded != self._last_state_json:
                     self._last_state_json = encoded
@@ -790,6 +793,13 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
             except Exception as exc:  # noqa: BLE001 - 推送失败不拖垮服务
                 logger.debug("状态推送异常: %s", exc)
             await asyncio.sleep(PUSH_INTERVAL)
+
+    def _push_payload(self) -> dict:
+        """推送前推进一次移动插值：推进只发生在写路径，GET 只读快照。"""
+        scene = self._context.scene_repository
+        if scene is not None:
+            scene.advance()
+        return self._state_payload()
 
     async def _broadcast(self, text: str) -> None:
         sockets = list(self._sockets)

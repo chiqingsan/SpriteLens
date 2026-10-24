@@ -61,6 +61,7 @@
   }
 
   var accountRequests = window.SpriteLensAccountRequests.create(api);
+  var nearbyPage = window.SpriteLensNearby.create(api, TOKEN);
   var petFilters = null;
   var petInventory = null;
   var eggBoxPage = null;
@@ -95,6 +96,7 @@
     openPet: function (gid) { petFilters.reset(); switchPage("pets", gid); }
   });
   window.addEventListener("pagehide", function () {
+    nearbyPage.unmount();
     captureDiagnosticsGeneration++;
     if (captureDiagnostics) { captureDiagnostics.unmount(); captureDiagnostics = null; }
     eggBoxPageGeneration++;
@@ -189,7 +191,7 @@
       if (name === "egg-dex" && revealGid) { eggDex.load(revealGid); }
       return;
     }
-    if (name === "pets" || name === "egg-box") { $("page-" + name).classList.add("page-cached"); }
+    if (name === "pets" || name === "egg-box" || name === "nearby") { $("page-" + name).classList.add("page-cached"); }
     if (state.page === "egg-box" && name !== "egg-box") { pauseEggBoxPage(); }
     else { accountRequests.cancel(state.page); }
     if (state.page === "capture") {
@@ -208,6 +210,7 @@
     if (state.page === "egg-dex") { eggDex.leave(); }
     if (state.page === "handbook") { handbookPage.leave(); }
     if (state.page === "colors") { colorsPage.leave(); }
+    if (state.page === "nearby") { nearbyPage.leave(); }
     window.SpriteLensUI.closeDetail(false, true);
     state.page = name;
     $("page-title").textContent = document.querySelector('.nav-item[data-page="' + name + '"]').textContent.trim();
@@ -229,6 +232,7 @@
     if (name === "egg-dex") { eggDex.load(revealGid); }
     if (name === "egg-box") { loadEggBoxPage(true); }
     if (name === "home") { loadHome(true); }
+    if (name === "nearby") { nearbyPage.enter(); }
     if (name === "collection-lines") { collectionLines.load(); }
     if (name === "breeder-library") { breederLibrary.load(); }
     if (name === "planner") { breedingPlanner.load(); }
@@ -290,6 +294,7 @@
     var observed = accountRequests.observe(payload);
     if (!observed.accepted) { return; }
     if (observed.changed) { resetAccountViews(); }
+    nearbyPage.update(payload.nearby);
     var capture = payload.capture || {};
     if (payload.environment) {
       state.capture = state.capture || {};
@@ -533,9 +538,16 @@
     socket.onmessage = function (event) {
       var payload;
       try { payload = JSON.parse(event.data); } catch (e) { return; }
+      // 悬浮雷达不能等待主窗口的 rAF；主窗口最小化时绘制会暂停。
+      nearbyPage.update(payload.nearby);
       scheduleRender(payload);
     };
-    socket.onclose = function () { setTimeout(connectPush, 1500); };
+    socket.onopen = function () { nearbyPage.resume(); };
+    socket.onclose = function () {
+      // 推送断开后不再广播雷达心跳，避免悬浮窗口继续显示无新数据来源的旧图。
+      nearbyPage.suspend();
+      setTimeout(connectPush, 1500);
+    };
     socket.onerror = function () { try { socket.close(); } catch (e) {} };
   }
 

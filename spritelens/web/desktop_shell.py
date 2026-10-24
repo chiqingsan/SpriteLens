@@ -200,3 +200,22 @@ class WindowControls:
         self._window.run_js(
             f"window.dispatchEvent(new CustomEvent('desktop-window-state', {{detail: {state}}}));"
         )
+
+    def restore_content(self) -> None:
+        """恢复时重新提交 WebView2 尺寸，不导航或重建页面。"""
+        from System import Action
+        from System.Drawing import Size
+
+        def resize() -> None:
+            native = self._window.native
+            if self.get_window_state()["minimized"]:
+                return
+            bounds = native.ClientRectangle
+            browser = native.webview
+            # 原生外框与 WebView2 的恢复通知可能错序；即使控件 Bounds 已相同，
+            # 也需产生一次真实 Resize，让 controller 放弃最小化时的渲染尺寸。
+            browser.Size = Size(bounds.Width - 1, bounds.Height)
+            browser.Bounds = bounds
+            browser.Refresh()
+
+        self._window.native.BeginInvoke(Action(resize))

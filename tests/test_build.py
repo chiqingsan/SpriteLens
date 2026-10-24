@@ -21,14 +21,14 @@ class BuildConfigTest(unittest.TestCase):
         self.assertEqual(build.build_timestamp(now_seconds=7), "0007")
         self.assertEqual(
             build.build_output_name(config, "0.0.0", timestamp=timestamp),
-            "SpriteLens_0.0.0_7890",
+            "小洛探探_SpriteLens_0.0.0_7890",
         )
 
     def test_existing_release_name_gets_sequence_suffix(self):
         config = build.load_config(build.DEFAULT_CONFIG)
         with TemporaryDirectory() as directory:
             output_dir = Path(directory)
-            (output_dir / "SpriteLens_0.0.0_7890.exe").touch()
+            (output_dir / "小洛探探_SpriteLens_0.0.0_7890.exe").touch()
             self.assertEqual(
                 build.available_output_name(
                     config,
@@ -37,7 +37,7 @@ class BuildConfigTest(unittest.TestCase):
                     output_dir=output_dir,
                     suffix=".exe",
                 ),
-                "SpriteLens_0.0.0_7890-2",
+                "小洛探探_SpriteLens_0.0.0_7890-2",
             )
 
 

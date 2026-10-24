@@ -37,4 +37,27 @@ def pet_marks(pet, weight_range) -> list[dict]:
             for mark in (size, voice) if mark]
 
 
-__all__ = ["pet_marks", "size_mark", "voice_mark"]
+def observation_marks(weight: int | None, voice: int | None, weight_range) -> list[dict]:
+    """Return compact marks that can be derived from a live scene observation."""
+    marks = []
+    if weight is not None:
+        size = size_mark(weight, weight_range)
+        if size:
+            marks.append({"label": size[0], "name": size[1], "source": "reference"})
+        low, high = weight_range
+        if high > low > 0 and weight == low:
+            marks.append({"label": "底重", "name": "底重", "source": "reference"})
+        elif high > low > 0 and weight == high:
+            marks.append({"label": "满重", "name": "满重", "source": "reference"})
+    if voice is not None:
+        sound = voice_mark(voice)
+        if sound:
+            marks.append({"label": sound[0], "name": sound[1], "source": "reference"})
+        if voice == -100:
+            marks.append({"label": "底分", "name": "底分", "source": "reference"})
+        elif voice == 100:
+            marks.append({"label": "满分", "name": "满分", "source": "reference"})
+    return marks
+
+
+__all__ = ["observation_marks", "pet_marks", "size_mark", "voice_mark"]

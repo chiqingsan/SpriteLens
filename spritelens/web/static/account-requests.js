@@ -8,6 +8,7 @@
       "breeder-library": "pets_version", planner: "pets_version",
       colors: "pets_version", "collection-lines": "pets_version", "egg-box": "egg_box_version", home: "home_version" };
     var generation = 0;
+    var accountEpoch = 0;
     var pending = {};
     function cancel(key) {
       var current = pending[key];
@@ -16,19 +17,23 @@
     function observe(state) {
       var nextUid = state.uid;
       if (!Number.isSafeInteger(nextUid) || nextUid < 0) { throw new Error("状态载荷缺少有效 uid"); }
+      var nextEpoch = state.account_epoch === undefined ? 0 : state.account_epoch;
+      if (!Number.isSafeInteger(nextEpoch) || nextEpoch < 0) { throw new Error("状态载荷缺少有效账号序号"); }
       var names = ["pets_version", "egg_box_version", "home_version"];
       if (names.some(function (name) { return !Number.isSafeInteger(state[name]); })) {
         throw new Error("状态载荷缺少有效版本");
       }
-      if (names.some(function (name) { return state[name] < (versions[name] || 0); })) {
+      if (nextEpoch < accountEpoch) { return { accepted: false, changed: false }; }
+      var changed = uid !== null && uid !== nextUid;
+      if (!changed && names.some(function (name) { return state[name] < (versions[name] || 0); })) {
         return { accepted: false, changed: false };
       }
-      var changed = uid !== null && uid !== nextUid;
       if (uid !== nextUid) {
         generation++;
         Object.keys(pending).forEach(cancel);
       }
       uid = nextUid;
+      accountEpoch = nextEpoch;
       names.forEach(function (name) { versions[name] = state[name]; });
       return { accepted: true, changed: changed };
     }

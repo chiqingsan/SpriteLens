@@ -5,16 +5,34 @@ import tempfile
 import unittest
 
 from spritelens.domain.color_cards import ColorCatalog
-from spritelens.domain.pet_marks import pet_marks
+from spritelens.domain.pet_marks import observation_marks, pet_marks
 from spritelens.paths import static_dir
 from spritelens.repositories.settings import SettingsRepository
 from spritelens.view_models.ui_preferences import UIPreferencesViewModel, normalize_preferences
-from spritelens.web.payloads import pet_row
+from spritelens.web.payloads import partner_mark_payload, pet_row, pet_summary_row
 from spritelens.web.payloads_catalog import colors_payload
 from tests.test_web_server import _pet
 
 
 class PetPresentationTest(unittest.TestCase):
+    def test_partner_mark_is_read_only_game_data_and_uses_game_icon(self):
+        pet = replace(_pet(1, name="样本", level=1), partner_mark=4)
+        full = pet_row(pet, None, 0, 0)
+        summary = pet_summary_row(pet, None)
+        for row in (full, summary):
+            self.assertEqual(row["partner_mark_id"], 4)
+            self.assertEqual(row["partner_mark"]["icon_url"], "/static/partner-marks/img_biaoji16_png.webp")
+            self.assertEqual(row["partner_mark"]["frame_url"], "/static/partner-marks/frame.webp")
+        self.assertIsNone(partner_mark_payload(0))
+        self.assertIsNone(partner_mark_payload(999))
+
+    def test_observation_marks_include_extremes_and_reference_marks(self):
+        marks = observation_marks(1000, -100, (1000, 2000))
+        self.assertEqual([item["name"] for item in marks], ["小不点", "底重", "粗嗓门", "底分"])
+        marks = observation_marks(2000, 100, (1000, 2000))
+        self.assertEqual([item["name"] for item in marks], ["大块头", "满重", "婉转声", "满分"])
+        self.assertEqual(observation_marks(None, None, (1000, 2000)), [])
+
     def test_size_voice_marks_are_exclusive_and_use_exact_boundaries(self):
         pet = _pet(1, name="样本", level=1, first=False)
         for weight, voice, expected in ((1020, -96, ["小", "粗"]), (1980, 96, ["大", "婉"]),

@@ -102,6 +102,7 @@
         </div>
         <div class="nav-group" data-nav-group="utilities">
           <div class="nav-group-title">便捷工具</div>
+          <button class="nav-item nav-subitem" data-page="nearby"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/static/icons/sprite.svg#eye"></use></svg>附近精灵</button>
           <button class="nav-item nav-subitem" data-page="handbook">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/static/icons/sprite.svg#book-2"></use></svg>
             精灵图鉴
@@ -186,6 +187,7 @@
       <section id="page-home" class="page">
         <div id="home-root"></div>
       </section>
+      <section id="page-nearby" class="page"><div id="nearby-root"></div></section>
       <!-- 炫彩色卡：底色 × 混色矩阵（Vue） -->
       <section id="page-colors" class="page" data-vue-page>
         <div class="empty-hint">正在加载色卡…</div>
@@ -255,6 +257,7 @@
   <script src="/static/collection-lines-page.js"></script>
   <script src="/static/breeder-library-page.js"></script>
   <script src="/static/breeding-planner-page.js"></script>
+  <script src="/static/nearby-page.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

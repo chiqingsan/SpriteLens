@@ -22,6 +22,13 @@ class SessionStats:
     key_captured_at: float | None
     last_activity: float
     data_frames: int
+    decrypt_ok: int = 0
+    parse_fail: int = 0
+    decrypt_fail: int = 0
+    key_miss: int = 0
+    uid: int = 0
+    name: str = ""
+    last_result: str = ""
 
 
 @dataclass(frozen=True)
@@ -67,6 +74,12 @@ class SessionTracker:
             session.has_key = True
             session.key_captured_at = time.time()
 
+    def mark_identity(self, session_id: str, identity: tuple[int, str, int] | None) -> None:
+        with self._lock:
+            session = self._sessions[session_id]
+            session.uid = identity[0] if identity else 0
+            session.name = identity[1] if identity else ""
+
     def drop(self, session_id: str) -> None:
         """移除会话行（连接关闭/超时淘汰时与管线会话同步）。"""
         with self._lock:
@@ -91,6 +104,9 @@ class SessionTracker:
             session.last_activity = time.time()
             if kind == "data_frame":
                 session.data_frames += 1
+            else:
+                setattr(session, kind, getattr(session, kind) + 1)
+                session.last_result = kind
 
     def snapshot(self) -> tuple[list[SessionStats], Totals]:
         with self._lock:
@@ -101,6 +117,8 @@ class SessionTracker:
                     key_captured_at=s.key_captured_at,
                     last_activity=s.last_activity,
                     data_frames=s.data_frames,
+                    decrypt_ok=s.decrypt_ok, parse_fail=s.parse_fail, decrypt_fail=s.decrypt_fail,
+                    key_miss=s.key_miss, uid=s.uid, name=s.name, last_result=s.last_result,
                 )
                 for s in self._sessions.values()
             ]
@@ -123,7 +141,8 @@ class SessionTracker:
 class _Session:
     """内部可变会话状态（非线程安全，由 Tracker 锁保护）。"""
 
-    __slots__ = ("session_id", "has_key", "key_captured_at", "last_activity", "data_frames")
+    __slots__ = ("session_id", "has_key", "key_captured_at", "last_activity", "data_frames",
+                 "decrypt_ok", "parse_fail", "decrypt_fail", "key_miss", "uid", "name", "last_result")
 
     def __init__(self, session_id: str) -> None:
         self.session_id = session_id
@@ -131,3 +150,6 @@ class _Session:
         self.key_captured_at: float | None = None
         self.last_activity = time.time()
         self.data_frames = 0
+        self.decrypt_ok = self.parse_fail = self.decrypt_fail = self.key_miss = self.uid = 0
+        self.name = ""
+        self.last_result = ""

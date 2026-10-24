@@ -93,9 +93,11 @@ PacketEvent → MonitorService.add_packet_listener
 ## 持久化（schema 1：宠物 / 蛋仓 / 账号 / 箱位 / 孵化槽 / 家园 / 手工标签）
 
 **分层**：`repositories/database.py` 管连接与当前基线结构（`PRAGMA user_version=1`）。
-新库一次性创建最终表结构；旧版本、缺表、缺列或含退役列的本地库启动时先完整备份主库及
-WAL/SHM，再重建当前基线，不把开发期迁移历史带进发布基线。仅保留备份，不尝试迁移旧结构；
-备份失败保留原文件并报告失败。基线 DDL 是唯一结构定义，重开时直接核对 SQLite 保存的表/索引 DDL，包含主键、默认值与约束，不维护第二份列清单。各域网关同构（适配器模式，调用方只见
+新库一次性创建最终表结构；唯一的原地迁移是已知的 `pets.partner_mark` 单列追加（其余基线
+对象必须都在，额外旧表保留）。其他旧版本、缺表、缺列或含退役列的本地库：库内没有任何业务
+数据时才先完整备份主库及 WAL/SHM 再重建当前基线，不把开发期迁移历史带进发布基线；库内已有
+数据时停止启动、原文件保持不变，并在错误提示里给出备份要求，避免把用户数据静默搬进
+`.incompatible-*` 后继续用空库。备份失败保留原文件并报告失败。基线 DDL 是唯一结构定义，重开时直接核对 SQLite 保存的表/索引 DDL，包含主键、默认值与约束，不维护第二份列清单。各域网关同构（适配器模式，调用方只见
 域对象）：宠物 `pet_store.py`、蛋仓 `egg_store.py`，均为 write-behind；
 事件日志由 `services/event_logger.py` 有界队列 + worker 批量落盘。
 
@@ -126,11 +128,14 @@ UI 的 `drain_events` 与后续帧处理——实测事件日志每条 `flush()`
 (0x0152) 的 `self_info.avatar.base.logic_id`（实测 = 101384922，与外部工具
 记录的账号一致，且先于宠物推送到达）。**必须严格走 self_info 路径**：
 实测 `other_actors` 下的 NPC 也带 `logic_id`（如「护主犬」），误取会串数据。
-身份未到时收到的宠物只入内存、不入库（不归错账号），界面仍可见。
+生产装配中，连接身份未确认的事件只进入协议诊断/日志，不送入任何账号业务仓库，不借用展示账号入库。
 
-**账号切换隔离**：uid 变化（真切换）清空该域内存快照（宠物/蛋仓/孵化槽/
-家园）；同 uid 重复身份帧与「离线加载账号登录」不算切换——判定统一
-走 `services/account_tracker.py`，避免历史数据误清或新账号数据串档。
+**双开与展示选择**：`services/account_sessions.py` 是连接归属与展示选择的唯一所有者。
+每个账号持有独立宠物/蛋仓/家园/场景仓库，按本连接已确认身份路由，后台同时更新并按各自 uid 保存。
+稳定的 SelectedRepository 视图使 VM/HTTP 保留原有仓库入口；取得目标后释放路由锁，仓库自身锁保护快照，历史 IO 不阻塞事件路由。
+启动时若有有效的上次手动选择则保持该展示账号；否则首次识别实时账号时默认展示它，随后其他账号进场景不抢占选择；用户可在采集中切换查看，历史读取失败保留原选择，读取期间到达的实时仓库优先。
+域内同 uid 重复身份和离线加载后的登录仍由 `account_tracker.py` 判定，不误清缓存。
+连接关闭/新握手只释放本连接归属与场景，并使其家园观察退为历史，不清另一账号。
 
 **离线可读**：组合根从 accounts 表统一选择 display uid，再分别 `load_persisted(uid)` 和 `load_account(uid)`，
 载入该账号的历史宠物与蛋仓；无该域缓存时显示空态，不借其它账号补齐。
@@ -155,9 +160,10 @@ UI 的 `drain_events` 与后续帧处理——实测事件日志每条 `flush()`
 箱位更新是增量语义：`PetBoxPetChange` 按槽位覆盖，跨箱/跨队移动先移除旧槽。
 
 **会话接续**：`capture/key_store.py` 的 `session.json`（v1）保存
-`flow_id + key + identity + server_sequence`，由 `MonitorService` 在 SYN/ACK
-时失效旧关联；仅当同一 flow、密钥一致且服务端序号连续时才以服务端帧确认
-接续（防伪造）；详见 `docs/archive/SESSION_RESUME_VERIFICATION.md`。
+最多 256 条逐连接的 `flow_id + key + identity + server_sequence + closed`（sessions 集合，原子替换与异步合并），保留最近记录字段以读取旧的单连接文件。
+启动只为匹配的 flow 恢复密钥，不再把 latest.key 自动套给所有连接；SYN/ACK、关闭、超时及淘汰使本连接旧关联失效。
+仅当同一 flow、密钥一致且服务端序号前进时才以服务端帧确认接续身份；旧版未保存的另一连接须等待握手，身份未知不进业务仓库。
+历史单连接验收见 `docs/archive/SESSION_RESUME_VERIFICATION.md`，双开修复状态见 ROADMAP 的 M01。
 
 ## 接入层可插拔（应用层/协议层解绑点）
 
@@ -384,3 +390,9 @@ StaticData 组合只读 WikiReference，从随包 data/static/wiki_reference.jso
 ## C02 场景观察边界
 
 场景实体与背包、家园分域：`domain/scene` 纯提取，`SceneRepository` 单锁维护临时 uid/session/scene/version 快照，组合根订阅既有 MonitorService。管线的关闭/SYN/回收通知只执行内存失效；采集命令服务在同一命令锁内负责新源启动前和停止确认后的观察重置，历史账号选择成功后也清空观察。接口由独立 `web/nearby` 提供，只读、无额外 WS、无持久化；现有 WS 仅推版本摘要。完整性始终标未知/部分，协议证据与现场缺口见 [场景观察规格](SCENE_OBSERVATIONS.md)。
+
+### C03 附近观察页面
+
+SceneRepository 持有实体及观察周期；StaticData 加载裁剪后的 NPC 配置映射，附近载荷只做精确物种/本地媒体联查。独立 Vue 页面持展示与请求代次，原生壳转发既有单一 WS 的 uid/version/observation_id/phase 摘要；周期改变清空旧实体，离页保留实例与局部筛选状态并暂停/取消请求；隐藏页仍处理周期失效，回页补取。场景 checkpoint 仅存 version=2 上下文，不存实体/坐标；页面无新增轮询或持久化。规格见 [附近观察](NEARBY_OBSERVATIONS.md)。桌面窗口恢复/最大化后由 WindowControls 在 GUI 队列同步 WebView2 尺寸并重绘，不重新导航业务页。
+
+悬浮雷达为同进程独立置顶WebView2窗口，由RadarWindow管理单实例、关闭及主窗退出。其页面通过同源BroadcastChannel接收主窗口现有WS与鉴权REST快照，不新增WS或轮询；主窗口推送入口在rAF绘制前转发，最小化不会阻塞悬浮状态。窗口位置不注入或绑定游戏进程，游戏独占全屏覆盖未验收。

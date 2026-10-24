@@ -69,7 +69,7 @@ if defined DRY_RUN (
 )
 
 echo Packaging finished.
-for /f "delims=" %%F in ('dir /b /a-d /o-d "%~dp0build\SpriteLens_*.exe" 2^>nul') do (
+for /f "delims=" %%F in ('dir /b /a-d /o-d "%~dp0build\*.exe" 2^>nul') do (
     echo Latest executable:
     echo   %~dp0build\%%F
     goto done

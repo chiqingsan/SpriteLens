@@ -11,6 +11,35 @@ from spritelens.web.startup_cover import StartupCover
 
 
 class DesktopStartupTest(unittest.TestCase):
+    def test_restore_resizes_browser_on_gui_thread_without_navigation(self):
+        bounds = SimpleNamespace(Width=1350, Height=900)
+        browser = Mock()
+        queued = []
+        native = SimpleNamespace(ClientRectangle=bounds, webview=browser, BeginInvoke=queued.append)
+        controls = WindowControls.__new__(WindowControls)
+        controls._window = Mock(native=native)
+        controls.get_window_state = Mock(return_value={"minimized": False, "maximized": False})
+        with patch.dict(sys.modules, {"System": SimpleNamespace(Action=lambda f: f),
+                                    "System.Drawing": SimpleNamespace(Size=lambda w, h: (w, h))}):
+            controls.restore_content()
+            browser.Refresh.assert_not_called()
+            queued.pop()()
+        self.assertEqual(browser.Size, (1349, 900))
+        self.assertIs(browser.Bounds, bounds)
+        browser.Refresh.assert_called_once()
+        controls._window.load_url.assert_not_called()
+
+    def test_restore_queued_before_another_minimize_does_not_resize_hidden_view(self):
+        browser = Mock()
+        native = SimpleNamespace(webview=browser, BeginInvoke=lambda f: f())
+        controls = WindowControls.__new__(WindowControls)
+        controls._window = SimpleNamespace(native=native)
+        controls.get_window_state = Mock(return_value={"minimized": True, "maximized": False})
+        with patch.dict(sys.modules, {"System": SimpleNamespace(Action=lambda f: f),
+                                    "System.Drawing": SimpleNamespace(Size=Mock())}):
+            controls.restore_content()
+        browser.Refresh.assert_not_called()
+
     def test_geometry_uses_normal_bounds_when_minimized_or_maximized(self):
         normal = SimpleNamespace(X=-2100, Y=150, Width=1770, Height=1095)
         native = SimpleNamespace(Bounds=normal, RestoreBounds=normal, _scale=1.5,

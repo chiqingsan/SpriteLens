@@ -150,6 +150,16 @@ class HomeRepository:
         with self._lock:
             return self._snapshot
 
+    def session_closed(self, session_id: str) -> None:
+        """断线或新握手后保留历史快照，但禁止继续接收旧家园增量。"""
+        with self._lock:
+            if self._active_session == session_id:
+                self._active_session = None
+                self._active_scene_resource = None
+                self._active_home_observed = False
+                self._delta_count = 0
+                self._version += 1
+
     def load_account(self, uid: int) -> bool:
         """恢复指定账号最近一次家园观察；恢复结果始终标为 history。"""
         if self._store is None or uid <= 0:

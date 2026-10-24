@@ -9,16 +9,17 @@ async function run() {
   const calls = [];
   const api = (path, options) => new Promise((resolve, reject) => calls.push({ path, options, resolve, reject }));
   const manager = sandbox.window.SpriteLensAccountRequests.create(api);
-  const state = (uid, version) => ({ uid, pets_version: version, egg_box_version: version,
+  const state = (uid, version, account_epoch = 0) => ({ uid, account_epoch, pets_version: version, egg_box_version: version,
     home_version: version });
   manager.observe(state(101, 10));
   const oldA = manager.request("egg-box", "/old-a");
-  assert.equal(manager.observe(state(202, 11)).changed, true);
+  assert.equal(manager.observe(state(202, 1, 1)).changed, true); // 新账号可以从较低的历史版本开始
   assert.equal(calls[0].options.signal.aborted, true);
   const b = manager.request("egg-box", "/b");
-  calls[1].resolve({ uid: 202, version: 11, total: 2 });
+  calls[1].resolve({ uid: 202, version: 1, total: 2 });
   assert.equal((await b).total, 2);
-  manager.observe(state(101, 12));
+  manager.observe(state(101, 12, 2));
+  assert.equal(manager.observe(state(202, 99, 0)).accepted, false);
   calls[0].resolve({ uid: 101, version: 99, total: 999 });
   assert.equal(await oldA, null); // A→B→A，uid 相同也必须拒绝旧代次
 
@@ -30,10 +31,10 @@ async function run() {
   assert.equal(await first, null);
 
   const outdated = manager.request("home", "/outdated");
-  manager.observe({ ...state(101, 12), home_version: 14 });
+  manager.observe({ ...state(101, 12, 2), home_version: 14 });
   calls[4].resolve({ uid: 101, version: 13 });
   assert.equal(await outdated, null);
-  assert.equal(manager.observe({ ...state(202, 12), home_version: 13 }).accepted, false);
+  assert.equal(manager.observe({ ...state(202, 12, 1), home_version: 13 }).accepted, false);
 
   const leave = manager.request("pets", "/leave");
   manager.cancel("pets");
@@ -46,7 +47,7 @@ async function run() {
   calls[7].reject(new Error("当前请求失败"));
   await assert.rejects(failure, /当前请求失败/);
 
-  manager.observe({ ...state(101, 12), pets_version: 100, home_version: 14 });
+  manager.observe({ ...state(101, 12, 2), pets_version: 100, home_version: 14 });
   const independent = manager.request("egg-box", "/independent");
   calls[8].resolve({ uid: 101, version: 12 });
   assert.equal((await independent).version, 12); // 域版本不能用宠物版本代替

@@ -49,3 +49,11 @@ class SettingsFailureTest(unittest.TestCase):
         self.assertEqual(self.settings.get_value("planner.draft"), {"revision": 7})
         self.settings.set("planner.draft", {"revision": 8})
         self.assertEqual(json.loads(self.path.read_text(encoding="utf-8"))["planner.draft"], {"revision": 8})
+
+    def test_radar_position_is_saved_and_invalid_values_are_ignored(self):
+        self.assertIsNone(self.settings.radar_position())
+        self.settings.set_radar_position(-1440, 180)
+        reopened = SettingsRepository(self.path)
+        self.assertEqual(reopened.radar_position(), (-1440, 180))
+        self.settings.set("radar.position", {"x": True, "y": 180})
+        self.assertIsNone(self.settings.radar_position())

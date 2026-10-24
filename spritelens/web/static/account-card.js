@@ -79,7 +79,7 @@
   function updateSwitchButton() {
     var blocked = !accountData || accountData.can_switch === false || switching;
     switchButton.disabled = blocked || Number(pendingUid) === Number(selectedUid);
-    switchButton.textContent = switching ? "切换中…" : "切换账号";
+    switchButton.textContent = switching ? "切换中…" : "切换查看";
     switchNote.hidden = !(accountData && accountData.reason);
     switchNote.textContent = accountData && accountData.reason || "";
   }
@@ -111,7 +111,8 @@
       var name = document.createElement("strong");
       name.textContent = profile.name || "未命名账号";
       var detail = document.createElement("small");
-      detail.textContent = "Lv" + (profile.level || "—") + " · UID " + maskedUid(profile.uid);
+      detail.textContent = "Lv" + (profile.level || "—") + " · UID " + maskedUid(profile.uid)
+        + ((accountData.live_uids || []).indexOf(profile.uid) >= 0 ? " · 连接已识别" : "");
       copy.appendChild(name);
       copy.appendChild(detail);
       var check = document.createElement("span");
@@ -141,7 +142,7 @@
 
   function loadAccounts() {
     if (!api) { return; }
-    accountList.textContent = "正在读取历史账号…";
+    accountList.textContent = "正在读取账号…";
     api("/api/accounts").then(setAccountData).catch(function (error) {
       accountList.textContent = "历史账号读取失败";
       updateSwitchButton();

@@ -107,5 +107,17 @@ class SettingsRepository:
                 pending.update({"window.x": int(x), "window.y": int(y)})
             self._save_locked(pending)
 
+    def radar_position(self) -> tuple[int, int] | None:
+        value = self.get_value("radar.position")
+        if not isinstance(value, dict):
+            return None
+        x, y = value.get("x"), value.get("y")
+        if type(x) is not int or type(y) is not int:
+            return None
+        return x, y
+
+    def set_radar_position(self, x: int, y: int) -> None:
+        self.set_checked("radar.position", {"x": int(x), "y": int(y)})
+
     def set(self, key: str, value: Any) -> None:
         self.set_checked(key, value)

@@ -241,6 +241,7 @@ def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> bool:
     from spritelens.web.desktop_shell import WindowControls
     from spritelens.web.startup_cover import StartupCover
     from spritelens.web.close_coordinator import CloseCoordinator
+    from spritelens.web.radar_window import RadarWindow
 
     settings = server._context.settings
     saved = settings.window_geometry()
@@ -266,6 +267,10 @@ def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> bool:
     )
     position = (saved["x"], saved["y"]) if saved and saved["x"] is not None else None
     controls = WindowControls(window, position)
+    radar = RadarWindow(server.url.replace('/#', '/static/radar.html#'), settings,
+                        on_closed=lambda: window.run_js("window.dispatchEvent(new Event('radar-closed'))"))
+    window.expose(radar.open_radar)
+    window.events.closed += radar.shutdown
     close_coordinator = CloseCoordinator(window, server._context, get_geometry=controls.get_window_geometry)
     window.events.closing += close_coordinator.request_close
     window.expose(controls.minimize, controls.toggle_maximize, controls.close,
@@ -281,6 +286,8 @@ def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> bool:
     window.events.loaded += controls.sync_state
     window.events.maximized += controls.sync_state
     window.events.restored += controls.sync_state
+    window.events.restored += controls.restore_content
+    window.events.maximized += controls.restore_content
 
     if activation_handle:
         stop_flag = threading.Event()
@@ -308,6 +315,7 @@ def _run_window(server: "LocalServer", guard: SingleInstanceGuard) -> bool:
             icon=str(_icon_path()),
         )  # 阻塞至窗口关闭
     finally:
+        radar.shutdown()
         if stop_flag is not None:
             stop_flag.set()
     return not close_coordinator.abandoned

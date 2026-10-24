@@ -1,4 +1,4 @@
-"""本地历史账号列表与跨业务域切换。"""
+"""本地账号列表与独立展示选择；历史数据读取完成后再发布。"""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from spritelens.services.egg_repository import EggBoxRepository
 from spritelens.services.home_repository import HomeRepository
 from spritelens.services.pet_repository import PetRepository
 from spritelens.services.scene_repository import SceneRepository
+from spritelens.services.account_sessions import AccountSessions
 
 
 class AccountSwitchBusy(Exception):
@@ -55,7 +56,10 @@ class AccountSelectionService:
         capture_running: Callable[[], bool],
         capture_command_scope: Callable[[], object] | None = None,
         scene_repository: SceneRepository | None = None,
+        account_sessions: AccountSessions | None = None,
+        remember_selected: Callable[[int], None] | None = None,
     ) -> None:
+        self._account_sessions = account_sessions
         self._scene_repository = scene_repository
         self._pet_store = pet_store
         self._egg_store = egg_store
@@ -65,14 +69,17 @@ class AccountSelectionService:
         self._home_repo = home_repo
         self._capture_running = capture_running
         self._capture_command_scope = capture_command_scope or nullcontext
+        self._remember_selected = remember_selected
         self._lock = threading.Lock()
 
     def accounts_payload(self) -> dict:
         """账号列表与当前展示/实时归属，供管理浮层使用。"""
         profiles = self._pet_repository.cached_account_profiles()
-        current_uid = self._pet_repository.consistent_snapshot().uid
-        live_identity = self._pet_repository.identity
+        snapshot = self._pet_repository.consistent_snapshot()
+        current_uid = snapshot.uid
+        live_identity = self._pet_repository.identity if self._account_sessions is None else snapshot.identity
         running = self._capture_running()
+        can_switch = self._account_sessions is not None or not running
         return {
             "accounts": [
                 {
@@ -85,8 +92,9 @@ class AccountSelectionService:
             ],
             "selected_uid": current_uid,
             "live_uid": live_identity.uid if live_identity is not None else 0,
-            "can_switch": not running,
-            "reason": "请先停止采集后再切换账号" if running else "",
+            "live_uids": list(self._account_sessions.live_uids()) if self._account_sessions else [],
+            "can_switch": can_switch,
+            "reason": "" if can_switch else "请先停止采集后再切换账号",
         }
 
     def select(self, uid: int) -> None:
@@ -97,7 +105,11 @@ class AccountSelectionService:
             # 采集服务的命令锁覆盖整个「检查、读取、应用」窗口；否则
             # start/stop 可在读取期间插入，历史快照会与实时会话混合。
             with self._capture_command_scope():
-                if self._capture_running():
+                if self._account_sessions is not None and self._account_sessions.select_cached(uid):
+                    if self._remember_selected is not None:
+                        self._remember_selected(uid)
+                    return
+                if self._account_sessions is None and self._capture_running():
                     raise AccountSwitchBusy("请先停止采集后再切换账号")
                 profile = next(
                     (item for item in self._pet_repository.cached_account_profiles() if item[0] == uid),
@@ -116,6 +128,17 @@ class AccountSelectionService:
                     home=self._home_store.load(uid),
                 )
 
+                if self._account_sessions is not None:
+                    repos = self._account_sessions.new_account()
+                    repos.pets.select_historical_account(uid, staged.profile, staged.pets, staged.backpack)
+                    repos.eggs.select_historical_account(uid, staged.eggs, staged.hatch_slots)
+                    repos.home.select_historical_account(uid, staged.home)
+                    repos.scene.reset("historical_account", uid=uid)
+                    if self._remember_selected is not None:
+                        self._remember_selected(uid)
+                    self._account_sessions.select_prepared(uid, repos)
+                    return
+
                 self._pet_repository.select_historical_account(
                     uid, staged.profile, staged.pets, staged.backpack
                 )
@@ -123,6 +146,8 @@ class AccountSelectionService:
                 self._home_repo.select_historical_account(uid, staged.home)
                 if self._scene_repository is not None:
                     self._scene_repository.reset("historical_account", uid=uid)
+                if self._remember_selected is not None:
+                    self._remember_selected(uid)
 
 
 __all__ = [

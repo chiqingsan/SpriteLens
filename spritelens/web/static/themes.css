@@ -1,5 +1,10 @@
 /* 三套初始精灵配色；组件规则共用，游戏资源色保持原值。 */
 :root {
+  --radar-overlay-bg: #17251f;
+  --radar-overlay-ink: #eef4e9;
+  --radar-overlay-muted: #b7c8b4;
+  --radar-overlay-line: #3b5042;
+  --radar-overlay-point: #d4eb96;
   --egg-card-frame: #729569;
   --egg-card-surface: #fcfefb;
   --egg-card-ink: #203b2b;
@@ -76,6 +81,11 @@
   --code-leaf: #607079;
   --code-text: #7a4fb5;
   --overlay: rgba(32, 43, 33, .45);
+  --radar-attention-0: #587d68;
+  --radar-attention-1: #6875a0;
+  --radar-attention-2: #9a7055;
+  --radar-attention-3: #80679a;
+  --radar-attention-4: #8d7a4b;
 }
 
 :root[data-theme="huohua"] {

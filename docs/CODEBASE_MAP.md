@@ -33,7 +33,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `tools/make_icon.py` | 生成 `resources/app.ico` 多尺寸图标与 favicon（PIL，产物入库） |
 | `resources/app.ico` | 应用图标（窗口/任务栏用，打包时随包分发） |
 | `resources/icon_source.png` | 已确认的好奇版头像源图，供 `tools/make_icon.py` 派生 ICO 与 favicon |
-| `spritelens/web/desktop_shell.py` | 自绘标题栏 JS 桥、WebView2原生拖动区域、保留系统动画的窗口消息回调、原生状态、最大化工作区与边缘缩放 |
+| `spritelens/web/desktop_shell.py` | 自绘标题栏 JS 桥、WebView2原生拖动区域、保留系统动画的窗口消息回调、原生状态、最大化工作区与边缘缩放、恢复后WebView2尺寸重同步 |
 | `spritelens/web/startup_cover.py` | 桌面启动唯一可见面板：静态图标与文案，首屏就绪才揭开；失败/20 秒超时原地重试，closing 释放资源 |
 | `spritelens/web/static/desktop-shell.js` / `desktop-shell.css` | 桌面顶栏、窗口操作与缩放边缘；浏览器模式隐藏 |
 | `data/schemas/` | 外挂 schema：`opcodes.json` + `messages/*.json`（字段级合并） |
@@ -47,7 +47,9 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | 文件 | 职责 |
 |---|---|
 | `docs/AI_CONTEXT.md` | 新开发者/AI快速上下文与当前风险导航 |
+| `docs/HANDOFF_DEEPSEEK_2026-10-24.md` | 2026-10-24 数据库数据恢复、伙伴标记和未完成改动交接 |
 | `docs/ROADMAP.md` | 已落实范围、待办顺序与验收；唯一持续任务状态入口 |
+| `docs/reviews/MEMORY_PERFORMANCE_HANDOFF_2026-10-24.md` | 内存/性能审查证据与 PERF01–PERF07 修复交接；任务状态只在 ROADMAP 维护 |
 | `docs/archive/ROCO_RESOURCES_ANALYSIS.md` | `roco_resources` 解包/逆向报告的功能对照、参考路径和候选实施清单；不代表当前已实现 |
 | `docs/HOME_IMPLEMENTATION_PLAN.md` | Luna6 家园编码规格、数据边界和逐切片验收；不代表修复已完成 |
 | `docs/VUE3_MIGRATION.md` | 已确认的 Vue 前端工程/接口/状态与渐进迁移决策；不代表已实现 |
@@ -79,7 +81,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `capture/reassembly.py` | TCP 流重组（乱序/重传/全零段回滚/空洞；交付历史只留最近 256KB，纯逻辑） |
 | `capture/npcap_source.py` | scapy AsyncSniffer 接入（轻量回调 + 队列 + worker 投递；FIN/RST/空闲淘汰释放流，关闭事件经队列保序） |
 | `capture/nic_rank.py` | 活跃网卡识别与排序（Get-NetAdapter Status=Up → 设备列表前置） |
-| `capture/key_store.py` | 密钥解析与持久化：latest.key + session.json v1（flow/密钥/身份/服务端序号，原子写，损坏即弃） |
+| `capture/key_store.py` | 密钥解析与持久化：latest.key + session.json v1 的逐连接集合（flow/密钥/身份/服务端序号/关闭标记，原子写） |
 | `system/environment.py` | Npcap 检测与 RSC 处理、官方版本解析；PowerShell 首选下载、Python 回退、PE 校验、等待安装器退出 |
 | `system/webview_guard.py` | WebView2 运行时预检测（注册表/env）+ 缺失时原生对话框引导安装 |
 | `system/window_geometry.py` | 初始窗口尺寸：工作区 + 系统 DPI 缩放适配（fit_window 纯函数） |
@@ -100,7 +102,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `domain/home.py` | 家园语义层：0x014A 双布局快照 + 0x0413/0x0414 已识别增量 → 居民/物种/家具/窝位/配对/场景蛋 |
 | `domain/home_breeding.py` | 家园关系过期时，按巢穴边缘距离及已知性别/蛋组生成候选 |
 | `domain/display.py` | 展示常量：系别配色、六维标签、天赋阶配色（框架无关） |
-| `repositories/database.py` | SQLite 底座：schema 1 完整基线初始化与结构校验；旧 schema/不兼容结构先按主库/WAL/SHM 成组备份再重建，不做运行时兼容迁移；备份失败保留原文件 |
+| `repositories/database.py` | SQLite 底座：schema 1 完整基线初始化与结构校验；已知 `pets.partner_mark` 单列追加走原地迁移，其余不兼容结构仅在库内无数据时按主库/WAL/SHM 成组备份后重建，库内已有数据则停止启动并保留原文件；备份失败同样保留原文件 |
 | `repositories/pet_store.py` | 宠物持久化网关：write-behind 批量落盘 + 读取（适配器模式） |
 | `repositories/egg_store.py` | 蛋仓持久化网关：write-behind 批量落盘，按 uid 读取蛋、孵化槽与性格/蛋窝/声音标签/手动声音标注 |
 | `repositories/settings.py` | JSON 配置仓库（读取失败阻止写回、替换成功才更新缓存、字段归一、窗口几何） |
@@ -109,7 +111,8 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `services/game_capture_automation.py` | 游戏进程自动监听设置：保存跟随状态、安装/移除 4688 触发任务 |
 | `services/session_tracker.py` | 会话表（LRU，支持 drop）与全局统计 |
 | `services/account_tracker.py` | 账号切换判定；display_uid 是已加载/实时归属，写路径 uid 不变（同 uid 重复帧/离线加载登录不算切换） |
-| `services/account_selection_service.py` | 本地历史账号列表与跨宠物/蛋仓/家园的串行历史切换 |
+| `services/account_selection_service.py` | 账号列表与采集中切换查看；历史数据先读完，失败保留选择 |
+| `services/account_sessions.py` | M01：连接身份路由、每账号业务仓库、稳定展示视图与选择所有权 |
 | `services/pet_repository.py` | 宠物聚合、身份/切号、彩名学习与入库；consistent_snapshot 单次取齐宠物/箱位/位置/uid/version，声音只保留抓取值 |
 | `services/egg_repository.py` | 蛋仓聚合；EggBoxSnapshot 一次取齐条目/槽/uid/version/历史来源，恢复 IO 竞争拒绝提交 |
 | `services/home_repository.py` | 家园聚合（快照覆盖 + 切号清空 + 增量帧版本提示） |
@@ -123,7 +126,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `web/server.py` | 本地服务：aiohttp，仅回环 + 随机端口 + token 鉴权 + WS 推送；数据/偏好路由与 bootstrap，采集域路由由 routes_capture mixin 提供 |
 | `web/background.py` | 受控同步后台 runner 的 AppKey 与独立路由 fallback；生产任务由 LocalServer 跟踪并在停止时等待 |
 | `web/routes_capture.py` | 采集域路由与载荷（/api/capture*、/api/state、capture/state 载荷；阶段1.4 自 server.py 拆出） |
-| `web/routes_accounts.py` | `/api/accounts` 与 `/api/accounts/select`：历史账号列表、采集运行保护和切换结果 |
+| `web/routes_accounts.py` | `/api/accounts` 与 `/api/accounts/select`：账号列表、切换查看与结果 |
 | `web/server_helpers.py` | HTTP query 解析助手（路由模块共用） |
 | `web/run.py` | 界面入口：pywebview 窗口（系统 WebView2）+ 单实例唤醒 + 降级提示；支持按需打开后台采集的远程界面 |
 | `web/background_run.py` | 按需后台模式：游戏进程存在期间启动采集、托盘打开主界面、游戏退出后清理 |
@@ -186,6 +189,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `test_pet_locations.py` | 箱位：登录映射、空箱/部分箱、槽位匹配状态、队伍归属与槽序、切号/重启、历史与实时去重 |
 | `test_asset_cache_lifecycle.py` | 精灵媒体与账号头像缓存的关闭任务回收 |
 | `test_pet_presentation.py` | 尺寸/声音标记边界、旧快捷偏好迁移与色卡解码 |
+| `test_multi_account_capture.py` | M01：双开交替更新、未知归属拒收、采集中选择、历史读取竞态、逐连接重启/重连与单边关闭 |
 | `test_session_resume.py` | 会话接续：服务端帧确认、流/密钥/序号不匹配、新握手与关闭失效、损坏缓存 |
 | `test_ui_upgrade.py` | 偏好鉴权/并发/写失败、快捷迁移/校验、范围/组合筛选与资源合并 |
 | `test_crash_log.py` | pythonw 主线程/后台线程崩溃落盘 |
@@ -315,3 +319,24 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `spritelens/web/nearby.py` | 只读附近观察载荷与鉴权路由，ID 字符串化，不导出会话地址 |
 | `tests/test_scene.py` | 场景生命周期、契约、装配/停止和加密分段流录制回放回归 |
 | `docs/SCENE_OBSERVATIONS.md` | 当前字段证据、只读接口、失败分支与待验收范围 |
+
+## 附近精灵页面（C03）
+
+| 文件 | 职责 |
+| --- | --- |
+| `frontend/src/pages/NearbyPage.vue`、`composables/useNearby.ts`、`types/nearby.ts` | 附近观察列表、搜索/排序、DTO校验、周期清空与请求失效 |
+| `frontend/src/nearbyBridge.ts`、`spritelens/web/static/nearby-page.js` | Vue装配与既有REST/单一WS摘要转发；离页暂停、周期失效、超时与悬浮请求合并 |
+| `tools/import_scene_catalog.py`、`data/static/scene_npc_pets.json` | 裁剪并记录来源哈希的NPC配置到物种映射；StaticData只读加载 |
+| `frontend/src/nearbyBridge.test.ts` | 主窗/悬浮桥接的慢请求合并、低版本切号、超时与断连失效回归 |
+| `frontend/src/composables/useNearby.test.ts` | 切号/切周期/离页的晚到响应与失败保留回归 |
+| `docs/NEARBY_OBSERVATIONS.md` | 当前操作、来源、所有权与观察版限制 |
+
+
+| 雷达新增文件 | 职责 |
+| --- | --- |
+| `frontend/src/components/SceneRadar.vue`、`SceneRadar.test.ts` | 原始二维坐标雷达、缺坐标等待、按字符串ID选择与投影回归 |
+| `frontend/src/pages/FloatingRadar.vue`、`spritelens/web/static/radar.html`、`radar.js` | 独立悬浮内容、广播订阅、版本/周期校验与释放，不建WS |
+| `spritelens/web/radar_window.py`、`tests/test_radar_window.py` | 原生单实例置顶窗口、关闭通知、重新打开与主窗口退出生命周期 |
+
+
+2026-10-24 悬浮雷达：自绘深色工具窗，标题拖动与本地关闭图标；底部固定35%–90%原生不透明度，按1%调整（默认85%）。保留置顶、不抢焦点与单一推送，正常/最小窗口/高倍缩放渲染及原生alpha验证见[附近精灵规格](NEARBY_OBSERVATIONS.md)。

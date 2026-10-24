@@ -26,6 +26,7 @@ class PacketEvent:
     payload_len: int
     decoded: list[dict]
     resumed_identity: tuple[int, str, int] | None = None
+    account_uid: int = 0
 
 
 __all__ = ["PacketEvent"]

@@ -55,6 +55,11 @@ def recordings_dir() -> Path:
     return path
 
 
+def scene_checkpoint_path() -> Path:
+    """附近精灵可丢弃场景基线；与业务 SQLite 分开保存。"""
+    return data_root() / "scene_checkpoints.json"
+
+
 def logs_dir() -> Path:
     path = data_root() / "logs"
     path.mkdir(parents=True, exist_ok=True)

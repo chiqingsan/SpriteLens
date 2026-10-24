@@ -7,6 +7,12 @@
 
 [场景实体观察快照](SCENE_OBSERVATIONS.md) — C02 当前协议证据、接口与待验收边界。
 
+[附近精灵列表](NEARBY_OBSERVATIONS.md) — C03 操作入口、解包适配来源、请求归属与观察版边界。
+
+[DeepSeek 交接文档](HANDOFF_DEEPSEEK_2026-10-24.md) — 2026-10-24 数据库数据恢复事故记录、恢复后验证结果、伙伴标记实现与遗留事项。
+
+[内存与性能修复交接](reviews/MEMORY_PERFORMANCE_HANDOFF_2026-10-24.md) — 进程内存采样、事件缓存隔离对照、PERF01–PERF07 修复方向与验收边界；持续状态见 ROADMAP，本报告不表示修复已完成。
+
 阅读顺序：
 
 1. `../README.md` — 安装与使用
@@ -33,6 +39,7 @@
 - [reviews/PET_DETAIL_VERIFICATION_2026-10-14.md](reviews/PET_DETAIL_VERIFICATION_2026-10-14.md) — F03-U3精灵详情、共享区域与立绘占比/低清限幅、登录奖牌归属核验与增量限制
 - [reviews/VUE_PET_INVENTORY_VERIFICATION_2026-10-13.md](reviews/VUE_PET_INVENTORY_VERIFICATION_2026-10-13.md) — F03 请求/三视图/分页/箱队迁移、账号失效、槽位语义与原生详情定位桥
 - [reviews/ASSET_SIZE_AUDIT_2026-10-13.md](reviews/ASSET_SIZE_AUDIT_2026-10-13.md) — 素材体积/完全重复/运行引用与压缩副本实测；正式资源尚未修改
+- [reviews/2026-10-24-nearby-review.md](reviews/2026-10-24-nearby-review.md) — 附近精灵/场景观测/雷达进度审阅：真实流量回放发现距离阈值量纲错误导致实机列表几乎恒空，附 P0/P1/P2 补全清单
 
 当前规格、历史 review 与方向（按需查阅）：
 

@@ -174,9 +174,14 @@ def build_timestamp(*, now_seconds: int | None = None) -> str:
 def build_output_name(
     config: dict[str, Any], version: str, *, timestamp: str | None = None
 ) -> str:
-    template = str(config.get("output_name_template") or "{app_name}_{version}_{timestamp}")
+    app_name = str(config.get("app_name") or "app")
+    template = str(
+        config.get("output_name_template")
+        or "{app_display_name}_{app_name}_{version}_{timestamp}"
+    )
     return template.format(
-        app_name=config.get("app_name", "app"),
+        app_display_name=str(config.get("app_display_name") or app_name),
+        app_name=app_name,
         version=version,
         timestamp=timestamp if timestamp is not None else build_timestamp(),
     )

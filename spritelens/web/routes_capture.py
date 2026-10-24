@@ -194,7 +194,9 @@ class CaptureRoutesMixin:
                 "raw_bytes": snapshot.totals.raw_bytes,
             },
             "sessions": [
-                {"session_id": s.session_id, "has_key": s.has_key, "data_frames": s.data_frames}
+                {"session_id": s.session_id, "has_key": s.has_key, "data_frames": s.data_frames,
+                 "decrypt_ok": s.decrypt_ok, "failures": s.failures, "uid": str(s.uid), "name": s.name,
+                 "last_activity": s.last_activity, "status": s.status if snapshot.running else "stopped"}
                 for s in snapshot.sessions
             ],
             "environment": self._environment_payload(),
@@ -221,7 +223,8 @@ class CaptureRoutesMixin:
             "identity": pets["identity"],
             "cached_identity": pets["cached_identity"],
             "stats": pets["stats"],
-            "nearby": {"uid": str(nearby.uid), "version": nearby.version, "phase": nearby.phase} if nearby is not None else None,
+            "account_epoch": self._account_epoch,
+            "nearby": {"uid": str(nearby.uid), "version": nearby.version, "observation_id": nearby.observation_id, "phase": nearby.phase} if nearby is not None else None,
             "capture": self._capture_payload(capture),
             # 环境探测在启动路径上异步进行（RSC 检查约 1.8s）；
             # 探测完成后 report 变化 → 此载荷变化 → WS 推送 → 横幅自动刷新

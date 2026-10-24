@@ -4,7 +4,7 @@ export interface DiagnosticCheck {
 }
 export interface CaptureDiagnostics {
   diagnostics: DiagnosticCheck[]
-  sessions: { session_id: string; has_key: boolean; data_frames: number }[]
+  sessions: { session_id: string; has_key: boolean; data_frames: number; decrypt_ok: number; failures: number; uid: string; name: string; last_activity: number; status: string }[]
   totals: { raw_chunks: number; raw_bytes: number; decrypt_ok: number; decrypt_fail: number; key_miss: number; parse_fail: number }
   event_log_name: string
   iface: string
@@ -58,8 +58,16 @@ export function parseCaptureDiagnostics(value: unknown): CaptureDiagnostics {
   const sessions = value.sessions.map((row: unknown) => {
     if (!row || typeof row !== 'object' || !('session_id' in row) || typeof row.session_id !== 'string'
         || !('has_key' in row) || typeof row.has_key !== 'boolean' || !('data_frames' in row)
-        || typeof row.data_frames !== 'number') throw new Error('采集会话响应无效')
-    return { session_id: row.session_id, has_key: row.has_key, data_frames: row.data_frames }
+        || typeof row.data_frames !== 'number'
+        || !('decrypt_ok' in row) || typeof row.decrypt_ok !== 'number'
+        || !('failures' in row) || typeof row.failures !== 'number'
+        || !('uid' in row) || typeof row.uid !== 'string'
+        || !('name' in row) || typeof row.name !== 'string'
+        || !('last_activity' in row) || typeof row.last_activity !== 'number'
+        || !('status' in row) || typeof row.status !== 'string') throw new Error('采集会话响应无效')
+    return { session_id: row.session_id, has_key: row.has_key, data_frames: row.data_frames,
+      decrypt_ok: row.decrypt_ok, failures: row.failures, uid: row.uid, name: row.name,
+      last_activity: row.last_activity, status: row.status }
   })
   const totals = value.totals
   if (!totals || typeof totals !== 'object'

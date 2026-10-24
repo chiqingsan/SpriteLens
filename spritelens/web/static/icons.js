@@ -3,7 +3,7 @@
   "use strict";
   var pages = { pets: "backpack", handbook: "book-2", "egg-dex": "egg",
     "egg-box": "box", "breeder-library": "users", planner: "sitemap",
-    "collection-lines": "checklist", home: "home", colors: "palette", capture: "settings" };
+    "collection-lines": "checklist", home: "home", nearby: "eye", colors: "palette", capture: "settings" };
   var controls = { "btn-pet-filters": "filter", "btn-reset-filters": "filter-off", "btn-empty-reset": "filter-off",
     "btn-close-pet-filters": "x",
     "btn-theme-default": "refresh", "btn-recheck": "refresh", "btn-npcap-install": "download",

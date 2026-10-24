@@ -34,6 +34,7 @@ class AccountRoutesMixin:
             return web.json_response({"error": str(exc)}, status=400)
         try:
             await self._run_blocking(service.select, uid)
+            self._account_epoch += 1
             def build_payload() -> dict:
                 accounts = service.accounts_payload()
                 return {

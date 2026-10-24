@@ -9,6 +9,7 @@ Web 界面入口（`spritelens.web.run.run_web`）调用本模块完成一次性
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 from spritelens.capture.key_store import KeyStore
 from spritelens.domain.color_cards import ColorCatalog
@@ -23,6 +24,7 @@ from spritelens.paths import (
     project_root,
     recordings_dir,
     schema_dir,
+    scene_checkpoint_path,
     static_dir,
 )
 from spritelens.protocol.opcodes import OpcodeCatalog
@@ -34,13 +36,15 @@ from spritelens.repositories.pet_store import PetStore
 from spritelens.repositories.settings import DEFAULT_CAPTURE_PORT, SettingsRepository
 from spritelens.services.egg_repository import EggBoxRepository
 from spritelens.services.account_selection_service import AccountSelectionService
+from spritelens.services.account_sessions import AccountRepositories, AccountSessions
 from spritelens.services.home_repository import HomeRepository
-from spritelens.services.scene_repository import SceneRepository
+from spritelens.services.scene_repository import DEFAULT_MAX_DISTANCE_RAW, SceneRepository
 from spritelens.services.event_logger import PART_BYTES as EVENTLOG_PART_BYTES
 from spritelens.services.event_logger import EventLogWriter
 from spritelens.services.retention import apply_storage_retention, eventlog_rollover_pruner
 from spritelens.services.game_capture_automation import GameCaptureAutomation
 from spritelens.services.monitor_service import MonitorService
+from spritelens.repositories.scene_checkpoint_store import SceneCheckpointStore
 from spritelens.services.pet_repository import PetRepository
 from spritelens.view_models import CaptureViewModel, PetViewModel
 
@@ -74,6 +78,7 @@ class AppContext:
     database: Database | None = None  # 组合根持有并负责关闭（R09）
     key_store: KeyStore | None = None  # 会话文件 writer 的生命周期归组合根持有
     scene_repository: SceneRepository | None = None
+    scene_checkpoint_store: SceneCheckpointStore | None = None
     _capture_stopped: bool = False
 
     def close(self) -> None:
@@ -107,6 +112,8 @@ class AppContext:
             self._capture_stopped = True
         if self.event_log is not None:
             _try("事件日志", self.event_log.close)
+        if self.scene_checkpoint_store is not None:
+            _try("附近场景基线", self.scene_checkpoint_store.close)
         if self.key_store is not None:
             _try("密钥存储", self.key_store.close)
         store_failures: list[tuple[str, BaseException]] = []
@@ -183,13 +190,14 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
     egg_catalog = EggCatalog(static_dir())
     color_catalog = ColorCatalog(static_dir())
 
-    # 启动即恢复上次捕获的会话密钥：连接未重连时（AES 无跨包状态）可立即续解
+    # 启动按各自 flow 恢复密钥；不能将最后一把密钥套给其他游戏连接
     key_store = KeyStore(keys_dir())
     _created(key_store.close)
+    scene_checkpoint_store = SceneCheckpointStore(scene_checkpoint_path())
+    _created(scene_checkpoint_store.close)
     monitor = MonitorService(
         catalog=load_catalog(),
         key_store=key_store,
-        preset_key=key_store.load_latest(),
     )
 
     # 应用层组装：宠物仓库订阅协议事件流（语义化 → 状态聚合 → 持久化）
@@ -198,12 +206,26 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
     pet_store = PetStore(database)
     _created(pet_store.close)
     pet_repository = PetRepository(store=pet_store)
-    monitor.add_packet_listener(pet_repository.handle_packet)
 
     # 统一离线展示 uid（R05）：accounts 表记录最近登录（登录即写，各域
     # 同源），宠物与蛋仓都按它恢复，避免两个域各自选号出现「宠物归 B、
-    # 蛋仓归 A」的串号。该账号无某域记录时明确空缓存，不拿别的账号补齐。
-    display_uid = next((uid for uid, _name in pet_store.list_accounts()), 0)
+    # 蛋仓归 A」的串号。显示账号优先恢复上次手动选择；会话检查点只供
+    # MonitorService 按 flow 接续解密，不能因为曾经捕获过某把密钥就抢走
+    # 当前显示选择。该账号无某域记录时明确空缓存，不拿别的账号补齐。
+    historical_uids = tuple(uid for uid, _name in pet_store.list_accounts())
+    resumed = tuple(
+        item for item in key_store.load_sessions()
+        if item.identity is not None and not item.closed
+    )
+    resumed_uids = tuple(dict.fromkeys(item.identity[0] for item in resumed))
+    last_selected_uid = settings.get_int("account.last_uid", 0, lo=0, hi=2**63 - 1)
+    selection_explicit = last_selected_uid in historical_uids
+    if selection_explicit:
+        display_uid = last_selected_uid
+    elif len(resumed_uids) == 1:
+        display_uid = resumed_uids[0]
+    else:
+        display_uid = next(iter(historical_uids), 0)
     restored = pet_repository.load_persisted(display_uid) if display_uid else 0
     if restored:
         logger.info("已载入历史宠物 %d 只（来自本地库）", restored)
@@ -235,7 +257,6 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
     home_store = HomeStore(database)
     _created(home_store.close)
     home_repo = HomeRepository(store=home_store)
-    monitor.add_packet_listener(home_repo.handle_packet)
     restored_home = home_repo.load_account(display_uid) if display_uid else False
     if restored_home:
         logger.info("已载入历史家园快照（账号 %s）", display_uid)
@@ -244,15 +265,33 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
     egg_store = EggStore(database)
     _created(egg_store.close)
     egg_box = EggBoxRepository(store=egg_store)
-    monitor.add_packet_listener(egg_box.handle_packet)
     if display_uid:
         restored_eggs = egg_box.load_account(display_uid)
         if restored_eggs:
             logger.info("已载入历史蛋仓 %d 枚（来自本地库）", restored_eggs)
 
-    scene_repository = SceneRepository()
-    monitor.add_packet_listener(scene_repository.handle_packet)
-    monitor.add_session_close_listener(scene_repository.session_closed)
+    # 场景观察的距离参数：都是「原始坐标单位」，米制尚未校准（见
+    # docs/NEARBY_OBSERVATIONS.md）。默认值来自真实流量回放，可用
+    # config.json 的 nearby.* 调整，改完重启生效。
+    scene_max_distance_raw = settings.get_int(
+        "nearby.max_distance_raw", DEFAULT_MAX_DISTANCE_RAW, lo=1000, hi=200000
+    )
+    scene_repository = SceneRepository(
+        checkpoint_store=scene_checkpoint_store, max_distance_raw=scene_max_distance_raw
+    )
+    account_sessions = AccountSessions(
+        AccountRepositories(pet_repository, egg_box, home_repo, scene_repository),
+        uid=display_uid, pet_store=pet_store, egg_store=egg_store, home_store=home_store,
+        scene_checkpoint_store=scene_checkpoint_store,
+        scene_max_distance_raw=scene_max_distance_raw,
+        selection_explicit=selection_explicit,
+    )
+    monitor.add_packet_listener(account_sessions.handle_packet)
+    monitor.add_session_close_listener(account_sessions.session_closed)
+    pet_repository = cast(PetRepository, account_sessions.view("pets"))
+    egg_box = cast(EggBoxRepository, account_sessions.view("eggs"))
+    home_repo = cast(HomeRepository, account_sessions.view("home"))
+    scene_repository = cast(SceneRepository, account_sessions.view("scene"))
     capture_vm = CaptureViewModel(
         monitor=monitor,
         settings=settings,
@@ -276,6 +315,8 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
         scene_repository=scene_repository,
         capture_running=lambda: capture_vm.snapshot().running,
         capture_command_scope=capture_vm.command_scope,
+        account_sessions=account_sessions,
+        remember_selected=lambda uid: settings.set("account.last_uid", uid),
     )
     pet_vm = PetViewModel(pet_repository, static_data=static_data)
     context = AppContext(

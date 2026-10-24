@@ -59,6 +59,12 @@ class SessionRow:
     session_id: str
     has_key: bool
     data_frames: int
+    decrypt_ok: int = 0
+    failures: int = 0
+    uid: int = 0
+    name: str = ""
+    last_activity: float = 0
+    status: str = "waiting_key"
 
 
 @dataclass(frozen=True)
@@ -375,7 +381,11 @@ class CaptureViewModel:
     def snapshot(self) -> CaptureSnapshot:
         sessions_raw, totals = self._monitor.snapshot()
         sessions = tuple(
-            SessionRow(session_id=s.session_id, has_key=s.has_key, data_frames=s.data_frames)
+            SessionRow(session_id=s.session_id, has_key=s.has_key, data_frames=s.data_frames,
+                       decrypt_ok=s.decrypt_ok, failures=s.parse_fail,
+                       uid=s.uid, name=s.name, last_activity=s.last_activity,
+                       status="waiting_key" if not s.has_key else "parse_error" if s.last_result in ("parse_fail", "decrypt_fail")
+                       else "waiting_identity" if not s.uid else "observing")
             for s in sessions_raw
         )
         status = self._service.status()

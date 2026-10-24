@@ -6,6 +6,8 @@
 #   .venv\Scripts\python.exe build.py --dry-run
 
 app_name = "SpriteLens"
+# 中文显示名，仅用于打包产物命名；与 spritelens.APP_DISPLAY_NAME 保持一致。
+app_display_name = "小洛探探"
 product_name = "小洛探探 SpriteLens"
 file_description = "洛克王国：世界 数据观测工具"
 company_name = "SpriteLens"
@@ -16,8 +18,9 @@ entry = "main.py"
 version = ""
 file_version = ""
 
-# 打包产物名称模板。可用变量：app_name、version、timestamp。
-output_name_template = "{app_name}_{version}_{timestamp}"
+# 打包产物名称模板。可用变量：app_display_name、app_name、version、timestamp。
+# 例：小洛探探_SpriteLens_1.0.0_1234.exe
+output_name_template = "{app_display_name}_{app_name}_{version}_{timestamp}"
 # timestamp 为当前 Unix 时间戳秒数的后四位，例如 1234。
 
 # GUI 程序：隐藏控制台窗口。

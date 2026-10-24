@@ -123,6 +123,7 @@ class StaticData:
         self.wiki_reference = WikiReference(directory)
         self._medals = _load_table(directory, "medals.json") if directory and (directory / "medals.json").is_file() else {}
         self._specialities = _load_table(directory, "specialities.json") if directory and (directory / "specialities.json").is_file() else {}
+        self._scene_species = _load_table(directory, "scene_npc_pets.json").get("npc_pets", {}) if directory else {}
         self._species: dict[str, SpeciesInfo] = {}
         self._natures: dict[int, NatureInfo] = {}
         self._types: dict[int, TypeInfo] = {}
@@ -258,6 +259,14 @@ class StaticData:
         else:
             self._species_hits += 1
         return info
+
+    def scene_species_id(self, npc_config_id: int) -> int | None:
+        """NPC 配置与背包配置不是同一种 ID，只使用显式映射。"""
+        return self._scene_species.get(str(npc_config_id))
+
+    @property
+    def scene_mapping_available(self) -> bool:
+        return bool(self._scene_species)
 
     def species_items(self) -> tuple[tuple[str, SpeciesInfo], ...]:
         """全部物种（key 为 base_conf_id 字符串），按数值 ID 升序（图鉴用）。"""

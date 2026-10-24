@@ -1,10 +1,6 @@
-"""会话密钥持久化：latest.key 供工具重启后从流中段续解。
+"""会话密钥持久化：session.json 按连接恢复密钥、身份和服务端序号。
 
-密钥文件格式（文本）：
-    key_hex=<32位hex>
-    key_ascii=<可打印时>
-    flow=<会话标识>
-    captured_at=<本地时间>
+latest.key 仅保留最近捕获的密钥供手动诊断，不再自动应用到所有连接。
 """
 
 from __future__ import annotations
@@ -29,6 +25,7 @@ class SessionCheckpoint:
     key: bytes
     identity: tuple[int, str, int] | None = None
     server_sequence: int = 0
+    closed: bool = False
 
 
 
@@ -53,13 +50,14 @@ def _ascii_or_placeholder(key: bytes) -> str:
 
 
 class KeyStore:
-    """按文件持久化最近一次密钥；checkpoint 由单写者异步合并。"""
+    """逐连接保存密钥；checkpoint 集合由单写者异步合并并原子替换。"""
 
     def __init__(self, keys_dir: Path) -> None:
         self._dir = keys_dir
         self._latest = keys_dir / "latest.key"
         self._session = keys_dir / "session.json"
         self._condition = threading.Condition()
+        self._checkpoints = {item.flow_id: item for item in self.load_sessions()}
         self._revision = 0
         self._written_revision = 0
         self._pending_session: tuple[int, SessionCheckpoint] | None = None
@@ -72,6 +70,9 @@ class KeyStore:
         with self._condition:
             if self._closing or self._closed:
                 raise RuntimeError("KeyStore 已进入关闭状态")
+            self._checkpoints[checkpoint.flow_id] = checkpoint
+            if len(self._checkpoints) > 256:
+                del self._checkpoints[next(iter(self._checkpoints))]
             self._revision += 1
             self._pending_session = (self._revision, checkpoint)
             self._ensure_writer_locked()
@@ -80,34 +81,60 @@ class KeyStore:
     def _write_session(self, revision: int, checkpoint: SessionCheckpoint) -> None:
         record = {"version": 1, "flow_id": checkpoint.flow_id, "key_hex": checkpoint.key.hex(),
                   "identity": list(checkpoint.identity) if checkpoint.identity else None,
-                  "server_sequence": checkpoint.server_sequence, "updated_at": time.time()}
+                  "server_sequence": checkpoint.server_sequence, "closed": checkpoint.closed, "updated_at": time.time()}
+        # 每次原子替换包含全部连接，异步合并不能让另一条连接的更新丢失。
+        with self._condition:
+            record["sessions"] = [
+                {"flow_id": item.flow_id, "key_hex": item.key.hex(),
+                 "identity": list(item.identity) if item.identity else None,
+                 "server_sequence": item.server_sequence, "closed": item.closed}
+                for item in self._checkpoints.values()
+            ]
         self._session.parent.mkdir(parents=True, exist_ok=True)
         temporary = self._session.with_suffix(f".{revision}.json.tmp")
         temporary.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
         temporary.replace(self._session)
 
+    @staticmethod
+    def _parse_checkpoint(record: dict) -> SessionCheckpoint:
+        key = bytes.fromhex(record["key_hex"])
+        flow = record["flow_id"]
+        sequence = record["server_sequence"]
+        identity = record.get("identity")
+        if (len(key) != KEY_LEN or not isinstance(flow, str) or not flow
+                or type(sequence) is not int or not 0 <= sequence <= 0xFFFFFFFF):
+            raise ValueError("会话记录格式错误")
+        if identity is not None:
+            if (not isinstance(identity, list) or len(identity) != 3
+                    or type(identity[0]) is not int or identity[0] <= 0
+                    or not isinstance(identity[1], str)
+                    or type(identity[2]) is not int or identity[2] < 0):
+                raise ValueError("会话身份格式错误")
+            identity = tuple(identity)
+        return SessionCheckpoint(flow, key, identity, sequence, record.get("closed") is True)
+
     def load_session(self) -> SessionCheckpoint | None:
+        """读取最近一次记录；保留现有单会话调用入口。"""
         try:
             record = json.loads(self._session.read_text(encoding="utf-8"))
             if not isinstance(record, dict) or record.get("version") != 1:
                 return None
-            key = bytes.fromhex(record["key_hex"])
-            flow = record["flow_id"]
-            sequence = record["server_sequence"]
-            identity = record.get("identity")
-            if (len(key) != KEY_LEN or not isinstance(flow, str) or not flow
-                    or type(sequence) is not int or not 0 <= sequence <= 0xFFFFFFFF):
-                return None
-            if identity is not None:
-                if (not isinstance(identity, list) or len(identity) != 3
-                        or type(identity[0]) is not int or identity[0] <= 0
-                        or not isinstance(identity[1], str)
-                        or type(identity[2]) is not int or identity[2] < 0):
-                    return None
-                identity = tuple(identity)
-            return SessionCheckpoint(flow, key, identity, sequence)
+            return self._parse_checkpoint(record)
         except (OSError, ValueError, TypeError, KeyError):
             return None
+
+    def load_sessions(self) -> tuple[SessionCheckpoint, ...]:
+        """恢复逐连接记录；旧的单连接记录只用于它原本的连接。"""
+        try:
+            record = json.loads(self._session.read_text(encoding="utf-8"))
+            if not isinstance(record, dict) or record.get("version") != 1:
+                return ()
+            records = record.get("sessions", [record])
+            if not isinstance(records, list):
+                return ()
+            return tuple(self._parse_checkpoint(item) for item in records[-256:])
+        except (OSError, ValueError, TypeError, KeyError):
+            return ()
 
     def save_latest(self, key: bytes, flow_id: str) -> None:
         text = (

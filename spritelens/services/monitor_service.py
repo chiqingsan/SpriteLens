@@ -79,9 +79,7 @@ class MonitorService:
         self._events: deque[PacketEvent] = deque(maxlen=MAX_BUFFERED_EVENTS)
         self._source: CaptureSource | None = None
         self._preset_key = preset_key
-        self._checkpoint = key_store.load_session()
-        if self._preset_key is None and self._checkpoint is not None:
-            self._preset_key = self._checkpoint.key
+        self._checkpoints = {item.flow_id: item for item in key_store.load_sessions()}
         self._packet_listeners: list[Callable[[PacketEvent], None]] = []
         self._session_close_listeners: list[Callable[[str], None]] = []
         self._last_sweep = 0.0
@@ -114,9 +112,8 @@ class MonitorService:
         with self._lock:
             confirmed = [(sid, state) for sid, state in self._sessions.items() if state.identity and state.key]
             if confirmed:
-                sid, state = max(confirmed, key=lambda item: item[1].last_activity)
-                self._checkpoint = SessionCheckpoint(sid, state.key, state.identity, state.server_sequence)
-                self._key_store.save_session(self._checkpoint)
+                for sid, state in confirmed:
+                    self._save_checkpoint(SessionCheckpoint(sid, state.key, state.identity, state.server_sequence))
         # 停止即落一条最终统计，事后诊断不再靠猜
         _sessions, totals = self._tracker.snapshot()
         logger.info(
@@ -150,9 +147,9 @@ class MonitorService:
             removed = self._sessions.pop(session_id, None)
             for callback in self._session_close_listeners:
                 callback(session_id)
-            if self._checkpoint is not None and self._checkpoint.flow_id == session_id:
-                self._checkpoint = replace(self._checkpoint, identity=None)
-                self._key_store.save_session(self._checkpoint)
+            checkpoint = self._checkpoints.get(session_id)
+            if checkpoint is not None:
+                self._save_checkpoint(replace(checkpoint, identity=None, closed=True))
         if removed is not None:
             self._tracker.drop(session_id)
 
@@ -174,9 +171,11 @@ class MonitorService:
                 self._sessions[chunk.session_id] = state
                 self._evict_lru_locked()
             state.last_activity = now
-            if state.key is None and self._preset_key is not None:
-                state.key = self._preset_key
-                self._tracker.mark_key(chunk.session_id)
+            if state.key is None:
+                checkpoint = self._checkpoints.get(chunk.session_id)
+                state.key = checkpoint.key if checkpoint is not None and not checkpoint.closed else self._preset_key
+                if state.key is not None:
+                    self._tracker.mark_key(chunk.session_id)
             stream = state.streams.get(chunk.direction)
             if stream is None:
                 stream = state.streams[chunk.direction] = FrameStream()
@@ -197,6 +196,9 @@ class MonitorService:
         ]
         for session_id in stale:
             del self._sessions[session_id]
+            checkpoint = self._checkpoints.get(session_id)
+            if checkpoint is not None:
+                self._save_checkpoint(replace(checkpoint, identity=None, closed=True))
             for callback in self._session_close_listeners:
                 callback(session_id)
             self._tracker.drop(session_id)
@@ -208,6 +210,9 @@ class MonitorService:
         while len(self._sessions) > MAX_SESSIONS:
             oldest = min(self._sessions, key=lambda sid: self._sessions[sid].last_activity)
             del self._sessions[oldest]
+            checkpoint = self._checkpoints.get(oldest)
+            if checkpoint is not None:
+                self._save_checkpoint(replace(checkpoint, identity=None, closed=True))
             for callback in self._session_close_listeners:
                 callback(oldest)
             self._tracker.drop(oldest)
@@ -217,20 +222,27 @@ class MonitorService:
         self, session_id: str, direction: str, frame: GcpFrame, state: _SessionState, key: bytes | None
     ) -> None:
         if frame.command == CMD_SYN:
+            state.key = None
+            self._tracker.drop(session_id)
             for callback in self._session_close_listeners:
                 callback(session_id)
             state.resume_checked = True
             state.identity = None
-            if self._checkpoint is not None and self._checkpoint.flow_id == session_id:
-                self._checkpoint = replace(self._checkpoint, identity=None)
-                self._key_store.save_session(self._checkpoint)
+            checkpoint = self._checkpoints.get(session_id)
+            if checkpoint is not None:
+                self._save_checkpoint(replace(checkpoint, identity=None, closed=True))
             return
         if frame.is_ack:
+            state.key = None
+            self._tracker.drop(session_id)
+            # 中途接入可能只看到 ACK；新握手同样不能沿用旧场景归属。
+            for callback in self._session_close_listeners:
+                callback(session_id)
             state.identity = None
             state.resume_checked = True
-            if self._checkpoint is not None and self._checkpoint.flow_id == session_id:
-                self._checkpoint = replace(self._checkpoint, identity=None)
-                self._key_store.save_session(self._checkpoint)
+            checkpoint = self._checkpoints.get(session_id)
+            if checkpoint is not None:
+                self._save_checkpoint(replace(checkpoint, identity=None, closed=True))
             key_candidate = extract_ack_key(frame.header_extra)
             if key_candidate is None:
                 logger.warning(
@@ -240,8 +252,7 @@ class MonitorService:
             if key_candidate is not None:
                 state.key = key_candidate
                 self._key_store.save_latest(key_candidate, session_id)
-                self._checkpoint = SessionCheckpoint(session_id, key_candidate)
-                self._key_store.save_session(self._checkpoint)
+                self._save_checkpoint(SessionCheckpoint(session_id, key_candidate))
                 self._tracker.mark_key(session_id)
                 logger.info("[ack] 会话 %s 捕获会话密钥", session_id)
             return
@@ -301,7 +312,7 @@ class MonitorService:
             if identity is not None:
                 state.identity = (identity.uid, identity.name, identity.level)
             elif not state.resume_checked:
-                checkpoint = self._checkpoint
+                checkpoint = self._checkpoints.get(session_id)
                 if (checkpoint is not None and checkpoint.identity is not None
                         and checkpoint.flow_id == session_id and checkpoint.key == state.key
                         and sequence > checkpoint.server_sequence):
@@ -311,21 +322,27 @@ class MonitorService:
                     logger.info("已确认原会话接续: %s", session_id)
                 elif checkpoint is not None and checkpoint.flow_id == session_id:
                     # 首帧不连续时使旧关联失效，不能等新连接序号涨过旧值后再误恢复。
-                    self._checkpoint = replace(checkpoint, identity=None)
-                    self._key_store.save_session(self._checkpoint)
+                    self._save_checkpoint(replace(checkpoint, identity=None))
             state.resume_checked = True
             state.server_sequence = sequence
             now = time.monotonic()
             if state.identity and state.key and (identity is not None or resumed or now - state.checkpoint_at >= 5):
-                self._checkpoint = SessionCheckpoint(session_id, state.key, state.identity, sequence)
-                self._key_store.save_session(self._checkpoint)
+                self._save_checkpoint(SessionCheckpoint(session_id, state.key, state.identity, sequence))
                 state.checkpoint_at = now
+        event = replace(event, account_uid=state.identity[0] if state.identity else 0)
+        self._tracker.mark_identity(session_id, state.identity)
         self._events.append(event)
         for listener in self._packet_listeners:
             try:
                 listener(event)
             except Exception:  # noqa: BLE001 - 业务回调缺陷不拖垮监听
                 logger.exception("packet listener 异常 opcode=0x%04X", record.opcode)
+
+    def _save_checkpoint(self, checkpoint: SessionCheckpoint) -> None:
+        self._checkpoints[checkpoint.flow_id] = checkpoint
+        if len(self._checkpoints) > MAX_SESSIONS:
+            del self._checkpoints[next(iter(self._checkpoints))]
+        self._key_store.save_session(checkpoint)
 
     # -- UI / 功能层读取 ------------------------------------------------
     def drain_events(self) -> list[PacketEvent]:
