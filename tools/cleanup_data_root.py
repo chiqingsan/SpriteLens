@@ -3,14 +3,18 @@
 用法:
     python tools/cleanup_data_root.py [--root DIR] [--apply]
 
+请在 SpriteLens 退出后运行：应用运行中被占用的文件删除/截断只会失败并告警
+（Windows 文件占用语义），不会破坏应用内存状态。
+
 步骤（顺序固定：先清垃圾，再按保留上限滚动，最后统计）:
 1. 根目录孤儿 sidecar：`spritelens.*.sqlite-shm/-wal`（对应 `.sqlite` 仍存在、
    mtime 超过 1 天）。主库 `spritelens.sqlite` 的 `-wal/-shm` 永不删。
 2. 根目录过期数据库文件：`spritelens.incompatible-*.sqlite` 与
    `spritelens.empty-before-recovery-*.sqlite`（含其 `-shm/-wal`）**移动**到
    `backups/database-recovery-YYYYMMDD/`，不删除，保留可回溯。
-3. 按默认保留上限清理 `eventlog/`、`recordings/`、`backups/`（与启动清理
-   复用 `spritelens/services/retention.py` 同一套函数与默认值）。
+3. 按默认保留上限清理记录数据池（`eventlog/` + `recordings/` 合计近 3 天、
+   最大 300MB；单个文件本身超过上限时从头部截断、保留最近尾部；`backups/` 只按
+   30 天年龄），与启动清理复用 `spritelens/services/retention.py` 同一套函数与默认值。
 4. 打印 Before/After 目录总量与每类释放量。
 
 保护名单（任何模式都不动）：`spritelens.sqlite`、`spritelens.sqlite-wal`、
@@ -36,8 +40,7 @@ from spritelens.services.retention import (
     MB,
     StorageLimits,
     prune_backups,
-    prune_event_log,
-    prune_recordings,
+    prune_records,
     prune_stale_sidecars,
 )
 
@@ -143,21 +146,25 @@ def _run_category(
     execute,
     apply: bool,
     verb: str = "清理",
+    estimate=None,
 ) -> tuple[list[Path], int]:
-    """打印一类的计划/结果，返回（实际操作对象，释放字节数）。"""
+    """打印一类的计划/结果，返回（实际操作对象，释放字节数）。
+
+    `estimate` 用于释放字节数与「整份文件大小之和」不同的情形（例如单个超大
+    分片是被截断而不是整份删除）：dry-run 由它给出预计释放量。
+    """
     print(title)
     targets = plan()
-    sizes = {path: _file_size(path) for path in targets}
-    estimated = sum(sizes.values())
     if not targets:
         print("     无")
         return [], 0
     _print_changes(targets)
     if not apply:
-        print(f"     预计{verb} {len(targets)} 个 / {estimated / MB:.2f} MB")
-        return targets, estimated
+        freed = estimate() if estimate is not None else _sum_size(targets)
+        print(f"     预计{verb} {len(targets)} 个 / {freed / MB:.2f} MB")
+        return targets, freed
     executed = execute()
-    freed = sum(sizes.get(path, 0) for path in executed if not path.exists())
+    freed = sum(_file_size(path) for path in executed if not path.exists())
     print(f"     已{verb} {len(executed)} 个 / {freed / MB:.2f} MB")
     return executed, freed
 
@@ -212,51 +219,47 @@ def main(argv: list[str] | None = None) -> int:
             print(f"     预计移动 {len(moves)} 个 / {move_bytes / MB:.2f} MB（保留在 backups/，总量不减）")
     print()
 
-    # 3) 按保留上限清理记录数据（与启动清理同一套函数）
-    eventlog_dir = root / "eventlog"
-    today_file = eventlog_dir / f"eventlog_{time.strftime('%Y%m%d')}.jsonl"
-    _, eventlog_freed = _run_category(
-        f"3a) eventlog/ 超过 {limits.eventlog_max_age_days} 天或总量 > "
-        f"{limits.eventlog_max_bytes / MB:.0f}MB 的旧分片（当天文件保留）",
-        plan=lambda: prune_event_log(
-            eventlog_dir,
-            max_age_days=limits.eventlog_max_age_days,
-            max_total_bytes=limits.eventlog_max_bytes,
-            keep=today_file,
-            keep_newest=1,
-            dry_run=True,
-        ),
-        execute=lambda: prune_event_log(
-            eventlog_dir,
-            max_age_days=limits.eventlog_max_age_days,
-            max_total_bytes=limits.eventlog_max_bytes,
-            keep=today_file,
-            keep_newest=1,
-            dry_run=False,
-        ),
-        apply=args.apply,
+    # 3) 按保留上限清理记录数据（eventlog + recordings 同一池，与启动清理同一套函数）。
+    # 本工具面向「应用已退出」的一次性回收：不保护当天文件，单个超过上限的大分片
+    # 会被从头部截断保留尾部；若应用仍在运行，占用中的文件删除/截断只会失败并告警。
+    records_before = _dir_stats(root / "eventlog")[0] + _dir_stats(root / "recordings")[0]
+    print(
+        f"3a) eventlog/ + recordings/ 近 {limits.records_max_age_days} 天、"
+        f"合计 ≤ {limits.records_max_bytes / MB:.0f}MB 的旧记录（超大分片保留最近尾部）"
     )
-    _, recordings_freed = _run_category(
-        f"3b) recordings/ 超过 {limits.recordings_max_age_days} 天或总量 > "
-        f"{limits.recordings_max_bytes / MB:.0f}MB 的旧录制",
-        plan=lambda: prune_recordings(
-            root / "recordings",
-            max_age_days=limits.recordings_max_age_days,
-            max_total_bytes=limits.recordings_max_bytes,
-            keep_newest=1,
-            dry_run=True,
-        ),
-        execute=lambda: prune_recordings(
-            root / "recordings",
-            max_age_days=limits.recordings_max_age_days,
-            max_total_bytes=limits.recordings_max_bytes,
-            keep_newest=1,
-            dry_run=False,
-        ),
-        apply=args.apply,
+    freed_sink: list[int] = []
+    records_targets = prune_records(
+        root,
+        max_age_days=limits.records_max_age_days,
+        max_total_bytes=limits.records_max_bytes,
+        dry_run=not args.apply,
+        freed_sink=freed_sink,
     )
+    if not records_targets:
+        print("     无")
+        records_freed = 0
+    else:
+        _print_changes(records_targets)
+        records_freed = sum(freed_sink)
+        print(
+            f"     {'已清理' if args.apply else '预计清理'} "
+            f"{len(records_targets)} 个 / {records_freed / MB:.2f} MB"
+        )
+    remaining = _dir_stats(root / "eventlog")[0] + _dir_stats(root / "recordings")[0]
+    if args.apply:
+        if records_targets and remaining > limits.records_max_bytes:
+            print(
+                f"     注意：清理后记录数据仍有 {remaining / MB:.2f} MB，超过上限 "
+                f"{limits.records_max_bytes / MB:.0f}MB 的部分是占用中/无法修改的文件；"
+                "关闭应用后重跑本工具或等下次启动继续收敛。"
+            )
+    else:
+        print(
+            f"     预计清理后记录数据约 "
+            f"{max(0, records_before - records_freed) / MB:.2f} MB"
+        )
     _, backups_freed = _run_category(
-        f"3c) backups/ 超过 {limits.backups_max_age_days} 天的旧备份",
+        f"3b) backups/ 超过 {limits.backups_max_age_days} 天的旧备份",
         plan=lambda: prune_backups(
             root / "backups", max_age_days=limits.backups_max_age_days, dry_run=True
         ),
@@ -269,7 +272,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # 4) 汇总
     after_bytes, after_files = _dir_stats(root)
-    freed_total = sidecar_freed + eventlog_freed + recordings_freed + backups_freed
+    freed_total = sidecar_freed + records_freed + backups_freed
     print("汇总")
     print(f"  Before：{before_bytes / MB:.2f} MB / {before_files} 个文件")
     if args.apply:
@@ -278,8 +281,10 @@ def main(argv: list[str] | None = None) -> int:
         estimated_after = max(0, before_bytes - freed_total)
         print(f"  After ：约 {estimated_after / MB:.2f} MB（dry-run 预计值，未改文件）")
     print(f"  孤儿 sidecar：{sidecar_freed / MB:.2f} MB")
-    print(f"  eventlog    ：{eventlog_freed / MB:.2f} MB")
-    print(f"  recordings  ：{recordings_freed / MB:.2f} MB")
+    print(
+        f"  记录数据    ：{records_freed / MB:.2f} MB"
+        f"（上限 近 {limits.records_max_age_days} 天 / {limits.records_max_bytes / MB:.0f}MB）"
+    )
     print(f"  backups     ：{backups_freed / MB:.2f} MB")
     print(f"  释放合计    ：{freed_total / MB:.2f} MB")
     if moves:

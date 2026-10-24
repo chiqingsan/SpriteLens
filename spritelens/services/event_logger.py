@@ -1,6 +1,8 @@
 """事件日志落盘：PacketEvent 逐条写 JSONL（复盘与离线再分析用）。
 
-文件按天分片（eventlog_YYYYMMDD.jsonl），含完整 decoded 字段树。
+文件按天分片（eventlog_YYYYMMDD.jsonl），含完整 decoded 字段树。单个分片
+写满 `max_part_bytes`（默认 64MB）时继续切分片（eventlog_YYYYMMDD_pNN.jsonl），
+让「记录数据总量超过保留上限就立刻清最旧」可以在当天就生效，而不是等重启。
 
 写入策略（实测教训）：抓包回调运行在 MonitorService 锁内，同步 flush()
 在登录突发下让事件消费者的 drain_events 最长等 57ms，chunk 队列随之面临过载。
@@ -27,6 +29,9 @@ logger = get_logger("event_log")
 
 # 待写队列上限：抓包突发（每秒数百事件）下给 worker 数秒腾挪空间
 QUEUE_MAX = 8192
+# 单个 eventlog 分片的目标大小：写满即切下一个分片并触发保留策略。
+# 取 64MB 是为了让「300MB 上限」有可清理的粒度：一次切换最多超出上限一个分片。
+PART_BYTES = 64 * 1024 * 1024
 _QUEUE_SENTINEL = object()
 
 
@@ -42,9 +47,10 @@ class _Barrier:
 class EventLogWriter:
     """事件日志监听器；组合根挂到 monitor.add_packet_listener。
 
-    on_day_rollover：可选跨天回调（worker 线程、无锁调用），参数是切换后
-    新一天的文件路径，供保留策略把旧分片当 keep 之外的文件清理。回调异常
-    只 warning，不影响日志写入；默认 None 保持既有行为。
+    on_rollover：可选分片切换回调（worker 线程、旧文件已关闭、无锁调用），
+    参数是切换后的新文件路径；跨天切换与当天写满 `max_part_bytes` 切分片
+    都会触发，供保留策略清理旧分片。回调异常只 warning，不影响日志写入；
+    默认 None 保持既有行为。
     """
 
     def __init__(
@@ -53,12 +59,15 @@ class EventLogWriter:
         *,
         queue_max: int = QUEUE_MAX,
         close_join_timeout: float = 5.0,
-        on_day_rollover: Callable[[Path], None] | None = None,
+        on_rollover: Callable[[Path], None] | None = None,
+        max_part_bytes: int = PART_BYTES,
     ) -> None:
         self._dir = log_dir
-        self._on_day_rollover = on_day_rollover
+        self._on_rollover = on_rollover
+        self._max_part_bytes = max(0, int(max_part_bytes))
         self._lock = threading.Lock()  # 只保护计数与句柄视图，不覆盖 IO
         self._file = None
+        self._path: Path | None = None
         self._day = ""
         self._count = 0
         self._dropped = 0
@@ -89,7 +98,7 @@ class EventLogWriter:
     @property
     def current_path(self) -> Path | None:
         with self._lock:
-            return self._file.name if self._file is not None else None
+            return self._path
 
     @property
     def error(self) -> str:
@@ -174,7 +183,7 @@ class EventLogWriter:
                 line = _serialize(event)
                 if line is None:
                     continue
-                file.write(line + "\n")
+                file.write((line + "\n").encode("utf-8"))
                 written += 1
             file.flush()  # 复盘场景要求及时可见（崩溃/强退后不丢）
         except OSError as exc:
@@ -187,40 +196,98 @@ class EventLogWriter:
             return
         with self._lock:
             self._count += written
+        self._rotate_if_needed()
 
     def _open_day_file(self):
-        """按天开文件（worker 独占写者）；跨天切文件。"""
+        """按天开文件（worker 独占写者）；跨天切文件。
+
+        当天已有分片且已超过 `max_part_bytes`（例如上次运行留下的大分片）时，
+        不再往它后面追加，而是另起一个分片——旧分片随即关闭，交给保留策略。
+        """
         day = time.strftime("%Y%m%d")
         with self._lock:
             if self._file is not None and day == self._day:
                 return self._file
         self._dir.mkdir(parents=True, exist_ok=True)
-        path = self._dir / f"eventlog_{day}.jsonl"
-        file = path.open("a", encoding="utf-8")
+        path = self._start_part_path(day)
+        file = path.open("ab")
         with self._lock:
             old = self._file
             self._file = file
+            self._path = path
             self._day = day
         if old is not None:
             old.close()
             # 旧分片已关闭且不持锁：此时回调清理旧文件不会与写入/加锁重入冲突
-            self._notify_day_rollover(path)
+            self._notify_rollover(path)
         return file
 
-    def _notify_day_rollover(self, path: Path) -> None:
-        """跨天回调：仅为保留策略服务，失败只 warning 不影响日志写入。"""
-        callback = self._on_day_rollover
+    def _start_part_path(self, day: str) -> Path:
+        """当天第一个写入分片：文件不存在或还很小就沿用，否则顺延新分片。"""
+        base = self._dir / f"eventlog_{day}.jsonl"
+        try:
+            size = base.stat().st_size
+        except OSError:
+            size = 0
+        if size <= 0 or self._max_part_bytes <= 0 or size < self._max_part_bytes:
+            return base
+        return self._next_part_path(day)
+
+    def _next_part_path(self, day: str) -> Path:
+        """当天下一个分片路径（eventlog_YYYYMMDD_pNN.jsonl，从 p02 开始）。"""
+        highest = 1
+        for candidate in self._dir.glob(f"eventlog_{day}_p*.jsonl"):
+            try:
+                highest = max(highest, int(candidate.stem.rsplit("_p", 1)[1]))
+            except (IndexError, ValueError):
+                continue
+        return self._dir / f"eventlog_{day}_p{highest + 1:02d}.jsonl"
+
+    def _rotate_if_needed(self) -> None:
+        """当前分片写满目标大小就切下一个（worker 线程内调用）。"""
+        if self._max_part_bytes <= 0:
+            return
+        with self._lock:
+            file = self._file
+        if file is None:
+            return
+        try:
+            size = int(file.tell())
+        except (OSError, ValueError):
+            return
+        if size < self._max_part_bytes:
+            return
+        day = time.strftime("%Y%m%d")
+        self._dir.mkdir(parents=True, exist_ok=True)
+        path = self._next_part_path(day)
+        file = path.open("ab")
+        with self._lock:
+            old = self._file
+            self._file = file
+            self._path = path
+            self._day = day
+        if old is not None:
+            try:
+                old.close()
+            except OSError as exc:
+                logger.warning("事件日志旧分片关闭失败: %s", exc)
+        self._notify_rollover(path)
+
+    def _notify_rollover(self, path: Path) -> None:
+        """分片切换回调：仅为保留策略服务，失败只 warning 不影响日志写入。"""
+        callback = self._on_rollover
         if callback is None:
             return
         try:
             callback(path)
         except Exception as exc:  # noqa: BLE001 - 清理失败不得影响日志写入
-            logger.warning("事件日志跨天清理回调失败: %s", exc)
+            logger.warning("事件日志分片切换清理回调失败: %s", exc)
 
     def _close_owned_file(self) -> None:
         """关闭日志文件（仅限 worker 线程调用——文件句柄由 worker 独占）。"""
         with self._lock:
             file, self._file = self._file, None
+            self._path = None
         if file is not None:
             try:
                 file.close()
@@ -287,4 +354,4 @@ def _serialize(event: PacketEvent) -> str | None:
         return None
 
 
-__all__ = ["QUEUE_MAX", "EventLogWriter"]
+__all__ = ["PART_BYTES", "QUEUE_MAX", "EventLogWriter"]

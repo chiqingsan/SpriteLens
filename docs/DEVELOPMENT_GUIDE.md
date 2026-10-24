@@ -134,10 +134,12 @@ Store 并发批次顺序、坏库备份失败保护与坏行隔离已有修复�
 离线恢复统一选择展示uid，所有业务域按该uid加载；载荷应来自同一版本快照。
 没有完整分页/删除事件证据时，只能声明观察集合或历史缓存，不能推断当前仓库已完整。
 - 运行数据保留上限见 `services/retention.py`（config.json 键，缺键/越界用默认值+clamp）：
-  `storage.eventlog_max_age_days` 默认 7 天 / `storage.eventlog_max_mb` 默认 1024；
-  `storage.recordings_max_age_days` 默认 14 天 / `storage.recordings_max_mb` 默认 1024；
-  `storage.backups_max_age_days` 默认 30 天。主库 `spritelens.sqlite`、`spritelens.sqlite-wal/-shm`、`keys/`、`config.json` 永不清理，单文件删除失败不阻断启动。
-  年龄先删、总量兜底（mtime 旧→新）；最新一个已关闭分片受保护（单日分片超过上限时总量宁可略超，也不整份删除最近一天），当天/正在写的文件永不删。
+  `eventlog/` 与 `recordings/` 视为同一个记录池，`storage.records_max_age_days` 默认 3 天、
+  `storage.records_max_mb` 默认 300；`storage.backups_max_age_days` 默认 30 天（备份是恢复手段，
+  不参与记录池总量）。主库 `spritelens.sqlite`、`spritelens.sqlite-wal/-shm`、`keys/`、`config.json` 永不清理，单文件删除失败不阻断启动。
+  年龄先删、总量兜底（mtime 旧→新）；正在写的文件（当天 eventlog 当前分片、录制中的 capture）永不删但计入总量。
+  当天 eventlog 每写满 64MB 切一个分片（`eventlog_YYYYMMDD_pNN.jsonl`）并立刻触发一次清理——
+  这是「总量超过上限立刻清最旧」在当天生效的机制，不依赖重启或跨天；上次运行留下的大分片不会被继续追加。
 - 手工回收磁盘：`python tools/cleanup_data_root.py [--root DIR] [--apply]`，默认 dry-run，`--apply` 才执行（孤儿 sidecar→备份库移入 `backups/database-recovery-YYYYMMDD/`→按上限清理）。
 
 ## 资源与打包兼容

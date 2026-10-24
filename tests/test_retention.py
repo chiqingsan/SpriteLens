@@ -1,4 +1,4 @@
-"""记录数据保留策略测试：上限清理、keep 保护、失败隔离、目录穿越、跨天回调与清理工具。
+"""记录数据保留策略测试：3 天/300MB 记录池、分片滚动、上限清理、失败隔离、清理工具。
 
 不联网、不依赖真实用户目录：全部目录由 tempfile 创建，mtime 用 os.utime 造旧。
 """
@@ -22,8 +22,7 @@ from spritelens.services.retention import (
     StorageLimits,
     apply_storage_retention,
     prune_backups,
-    prune_event_log,
-    prune_recordings,
+    prune_records,
     prune_stale_sidecars,
 )
 from spritelens.events import PacketEvent
@@ -59,93 +58,90 @@ class _RootTestCase(unittest.TestCase):
         self.root = Path(temporary.name)
 
 
-class EventLogRetentionTest(_RootTestCase):
+class RecordsRetentionTest(_RootTestCase):
+    """eventlog 与 recordings 共享同一套年龄 + 总量上限。"""
+
     def setUp(self) -> None:
         super().setUp()
-        self.dir = self.root / "eventlog"
-        self.dir.mkdir()
+        self.eventlog = self.root / "eventlog"
+        self.recordings = self.root / "recordings"
+        self.eventlog.mkdir()
+        self.recordings.mkdir()
 
-    def test_prune_by_age_removes_only_expired_shards(self):
-        old = _write(self.dir / "eventlog_20200101.jsonl", age_days=10)
-        fresh = _write(self.dir / "eventlog_20200102.jsonl", age_days=1)
-        deleted = prune_event_log(self.dir, max_age_days=7, max_total_bytes=0)
+    def test_prune_by_age_removes_only_expired(self):
+        old = _write(self.eventlog / "eventlog_20200101.jsonl", age_days=10)
+        fresh = _write(self.eventlog / "eventlog_20200102.jsonl", age_days=1)
+        deleted = prune_records(self.root, max_age_days=3, max_total_bytes=0)
         self.assertEqual(deleted, [old])
         self.assertFalse(old.exists())
         self.assertTrue(fresh.exists())
 
-    def test_prune_by_total_size_keeps_newest_shards(self):
-        oldest = _write(self.dir / "eventlog_20200101.jsonl", size=100, age_days=3)
-        middle = _write(self.dir / "eventlog_20200102.jsonl", size=100, age_days=2)
-        newest = _write(self.dir / "eventlog_20200103.jsonl", size=100, age_days=1)
-        deleted = prune_event_log(self.dir, max_age_days=0, max_total_bytes=150)
-        self.assertEqual(deleted, [oldest, middle])
-        self.assertFalse(oldest.exists())
-        self.assertFalse(middle.exists())
-        self.assertTrue(newest.exists())
+    def test_old_recording_is_pruned_by_age_too(self):
+        old = _write(self.recordings / "capture_20200101_000000.jsonl", age_days=10)
+        fresh = _write(self.recordings / "capture_20200102_000000.jsonl", age_days=1)
+        deleted = prune_records(self.root, max_age_days=3, max_total_bytes=0)
+        self.assertEqual(deleted, [old])
+        self.assertTrue(fresh.exists())
 
-    def test_keep_newest_shard_survives_size_cap(self):
-        """单日分片本身超过上限时，最新分片整体保留（不整份删除最近一天）。"""
-        only = _write(self.dir / "eventlog_20200101.jsonl", size=300, age_days=1)
-        deleted = prune_event_log(
-            self.dir, max_age_days=0, max_total_bytes=100, keep_newest=1
+    def test_total_cap_deletes_oldest_across_both_directories(self):
+        oldest_log = _write(self.eventlog / "eventlog_20200101.jsonl", size=100, age_days=2)
+        middle_recording = _write(
+            self.recordings / "capture_20200102_000000.jsonl", size=100, age_days=1
         )
-        self.assertEqual(deleted, [])
-        self.assertTrue(only.exists(), "最新分片即使超过总量上限也不整份删除")
+        newest_log = _write(self.eventlog / "eventlog_20200103.jsonl", size=100, age_days=0)
+        deleted = prune_records(self.root, max_age_days=0, max_total_bytes=150)
+        self.assertEqual(deleted, [oldest_log, middle_recording])
+        self.assertFalse(oldest_log.exists())
+        self.assertFalse(middle_recording.exists())
+        self.assertTrue(newest_log.exists())
 
-    def test_keep_newest_leaves_older_shards_prunable(self):
-        old = _write(self.dir / "eventlog_20200101.jsonl", size=100, age_days=3)
-        middle = _write(self.dir / "eventlog_20200102.jsonl", size=100, age_days=2)
-        newest = _write(self.dir / "eventlog_20200103.jsonl", size=100, age_days=1)
-        deleted = prune_event_log(
-            self.dir, max_age_days=0, max_total_bytes=150, keep_newest=1
+    def test_keep_file_counts_toward_total_but_is_never_removed(self):
+        keep = _write(self.eventlog / "eventlog_20200101.jsonl", size=100, age_days=30)
+        other = _write(self.eventlog / "eventlog_20200102.jsonl", size=100, age_days=1)
+        deleted = prune_records(
+            self.root, max_age_days=3, max_total_bytes=150, keep=(keep,)
         )
-        self.assertEqual(deleted, [old, middle])
-        self.assertTrue(newest.exists())
-        sizes = sum(p.stat().st_size for p in self.dir.glob("*.jsonl"))
-        self.assertLessEqual(sizes, 150, "保护一个最新分片后，其余仍需收敛到上限内")
-
-    def test_keep_file_is_never_removed_by_age_or_size(self):
-        keep = _write(self.dir / "eventlog_20200101.jsonl", size=100, age_days=30)
-        middle = _write(self.dir / "eventlog_20200102.jsonl", size=100, age_days=10)
-        newest = _write(self.dir / "eventlog_20200103.jsonl", size=100, age_days=1)
-        deleted = prune_event_log(
-            self.dir, max_age_days=7, max_total_bytes=150, keep=keep
-        )
-        self.assertEqual(deleted, [middle])
+        self.assertEqual(deleted, [other])
         self.assertTrue(keep.exists(), "keep（正在写的文件）永不被删")
-        self.assertFalse(middle.exists())
-        self.assertTrue(newest.exists())
+        self.assertFalse(other.exists(), "keep 计入总量后仍需把其它文件清到上限内")
+        self.assertLessEqual(keep.stat().st_size, 150)
+
+    def test_keep_only_file_over_cap_is_reported_but_kept(self):
+        keep = _write(self.eventlog / "eventlog_20200101.jsonl", size=400)
+        deleted = prune_records(self.root, max_age_days=0, max_total_bytes=300, keep=(keep,))
+        self.assertEqual(deleted, [])
+        self.assertTrue(keep.exists(), "只剩正在写的文件时不能为了上限删它")
 
     def test_zero_limits_disable_both_dimensions(self):
-        old = _write(self.dir / "eventlog_20200101.jsonl", age_days=100)
-        self.assertEqual(prune_event_log(self.dir, max_age_days=0, max_total_bytes=0), [])
+        old = _write(self.eventlog / "eventlog_20200101.jsonl", age_days=100)
+        self.assertEqual(prune_records(self.root, max_age_days=0, max_total_bytes=0), [])
         self.assertTrue(old.exists())
 
-    def test_missing_directory_is_noop(self):
+    def test_missing_directories_are_noop(self):
         self.assertEqual(
-            prune_event_log(self.root / "nope", max_age_days=7, max_total_bytes=0), []
+            prune_records(self.root / "nope", max_age_days=3, max_total_bytes=0), []
         )
 
     def test_only_matching_files_are_touched(self):
-        match = _write(self.dir / "eventlog_20200101.jsonl", age_days=10)
-        other_jsonl = _write(self.dir / "capture_20200101.jsonl", age_days=10)
-        other_txt = _write(self.dir / "eventlog_20200101.txt", age_days=10)
-        deleted = prune_event_log(self.dir, max_age_days=7, max_total_bytes=0)
+        match = _write(self.eventlog / "eventlog_20200101.jsonl", age_days=10)
+        other_jsonl = _write(self.eventlog / "capture_20200101.jsonl", age_days=10)
+        other_txt = _write(self.eventlog / "eventlog_20200101.txt", age_days=10)
+        deleted = prune_records(self.root, max_age_days=3, max_total_bytes=0)
         self.assertEqual(deleted, [match])
         self.assertTrue(other_jsonl.exists())
         self.assertTrue(other_txt.exists())
 
     def test_directory_named_like_shard_is_skipped(self):
-        fake = self.dir / "eventlog_20200102.jsonl"
+        fake = self.eventlog / "eventlog_20200102.jsonl"
         fake.mkdir()
-        old = _write(self.dir / "eventlog_20200101.jsonl", age_days=10)
-        deleted = prune_event_log(self.dir, max_age_days=7, max_total_bytes=0)
+        old = _write(self.eventlog / "eventlog_20200101.jsonl", age_days=10)
+        deleted = prune_records(self.root, max_age_days=3, max_total_bytes=0)
         self.assertEqual(deleted, [old])
         self.assertTrue(fake.is_dir())
 
     def test_delete_failure_is_isolated_and_does_not_raise(self):
-        locked = _write(self.dir / "eventlog_20200101.jsonl", age_days=10)
-        other = _write(self.dir / "eventlog_20200102.jsonl", age_days=10)
+        locked = _write(self.eventlog / "eventlog_20200101.jsonl", age_days=10)
+        other = _write(self.eventlog / "eventlog_20200102.jsonl", age_days=10)
         real_unlink = Path.unlink
 
         def flaky(path, *args, **kwargs):
@@ -155,52 +151,74 @@ class EventLogRetentionTest(_RootTestCase):
 
         with patch.object(Path, "unlink", flaky):
             with self.assertLogs("spritelens.retention", level="WARNING"):
-                deleted = prune_event_log(self.dir, max_age_days=7, max_total_bytes=0)
+                deleted = prune_records(self.root, max_age_days=3, max_total_bytes=0)
         self.assertEqual(deleted, [other])
         self.assertTrue(locked.exists(), "删除失败的文件不能被报告为已删除")
         self.assertFalse(other.exists(), "单文件失败不能挡住其它文件")
 
     def test_dry_run_reports_targets_without_deleting(self):
-        old = _write(self.dir / "eventlog_20200101.jsonl", age_days=10)
-        deleted = prune_event_log(self.dir, max_age_days=7, max_total_bytes=0, dry_run=True)
+        old = _write(self.eventlog / "eventlog_20200101.jsonl", age_days=10)
+        deleted = prune_records(
+            self.root, max_age_days=3, max_total_bytes=0, dry_run=True
+        )
         self.assertEqual(deleted, [old])
         self.assertTrue(old.exists(), "dry-run 不得改文件")
 
+    def _lines(self, path: Path, count: int = 100) -> Path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"".join(f"line{i:04d}\n".encode() for i in range(count)))
+        return path
 
-class RecordingRetentionTest(_RootTestCase):
-    def setUp(self) -> None:
-        super().setUp()
-        self.dir = self.root / "recordings"
-        self.dir.mkdir()
-
-    def test_prune_recordings_by_age_and_size(self):
-        oldest = _write(self.dir / "capture_20200101_000000.jsonl", size=100, age_days=30)
-        middle = _write(self.dir / "capture_20200102_000000.jsonl", size=100, age_days=20)
-        newest = _write(self.dir / "capture_20200103_000000.jsonl", size=100, age_days=1)
-        deleted = prune_recordings(self.dir, max_age_days=14, max_total_bytes=150)
-        self.assertEqual(deleted, [oldest, middle])
-        self.assertTrue(newest.exists())
-
-    def test_active_recording_is_kept(self):
-        active = _write(self.dir / "capture_20200101_000000.jsonl", size=100, age_days=40)
-        other_old = _write(self.dir / "capture_20200102_000000.jsonl", size=100, age_days=40)
-        deleted = prune_recordings(
-            self.dir, max_age_days=14, max_total_bytes=0, keep=active
+    def test_single_oversized_file_is_trimmed_to_keep_recent_tail(self):
+        """升级前留下的大分片超过上限时，整份删除会丢最近记录，应截断保留尾部。"""
+        shard = self._lines(self.eventlog / "eventlog_20200101.jsonl")  # 900 字节
+        deleted = prune_records(self.root, max_age_days=0, max_total_bytes=450)
+        self.assertEqual(deleted, [shard])
+        self.assertTrue(shard.exists())
+        self.assertEqual(shard.stat().st_size, 450)
+        self.assertEqual(
+            shard.read_bytes().splitlines()[0], b"line0050", "保留的是最近的完整行"
         )
-        self.assertEqual(deleted, [other_old])
-        self.assertTrue(active.exists(), "正在录制的文件永不删")
-        self.assertFalse(other_old.exists())
 
-    def test_keep_newest_recording_survives_oversized_cap(self):
-        """最近一次会话录制即使单独超过上限也保留，避免整份删掉最新证据。"""
-        newest = _write(self.dir / "capture_20200103_000000.jsonl", size=300, age_days=1)
-        older = _write(self.dir / "capture_20200102_000000.jsonl", size=300, age_days=2)
-        deleted = prune_recordings(
-            self.dir, max_age_days=0, max_total_bytes=100, keep_newest=1
+    def test_freed_sink_counts_trimmed_bytes_not_full_size(self):
+        """截断释放量是「原大小 - 保留大小」，不能按整份文件大小重复计入。"""
+        shard = self._lines(self.eventlog / "eventlog_20200101.jsonl")  # 900 字节
+        sink: list[int] = []
+        deleted = prune_records(
+            self.root,
+            max_age_days=0,
+            max_total_bytes=450,
+            dry_run=True,
+            freed_sink=sink,
         )
-        self.assertEqual(deleted, [older])
-        self.assertTrue(newest.exists())
-        self.assertFalse(older.exists())
+        self.assertEqual(deleted, [shard])
+        self.assertEqual(sink, [450])
+
+    def test_trim_dry_run_keeps_file_untouched(self):
+        shard = self._lines(self.eventlog / "eventlog_20200101.jsonl")
+        deleted = prune_records(
+            self.root, max_age_days=0, max_total_bytes=450, dry_run=True
+        )
+        self.assertEqual(deleted, [shard])
+        self.assertEqual(shard.stat().st_size, 900, "dry-run 不得截断文件")
+
+    def test_trim_failure_keeps_original_file(self):
+        shard = self._lines(self.eventlog / "eventlog_20200101.jsonl")
+        with patch.object(retention.os, "replace", side_effect=OSError("locked")):
+            with self.assertLogs("spritelens.retention", level="WARNING"):
+                deleted = prune_records(self.root, max_age_days=0, max_total_bytes=450)
+        self.assertEqual(deleted, [])
+        self.assertEqual(shard.stat().st_size, 900, "截断失败不得损坏原文件")
+        self.assertFalse(shard.with_name(shard.name + ".trim-tmp").exists())
+
+    def test_old_files_are_deleted_before_trimming_the_big_one(self):
+        old = _write(self.eventlog / "eventlog_20200101.jsonl", size=200, age_days=2)
+        shard = self._lines(self.eventlog / "eventlog_20200102.jsonl", 100)  # 900 字节
+        deleted = prune_records(self.root, max_age_days=0, max_total_bytes=603)
+        self.assertEqual(deleted, [old, shard])
+        self.assertFalse(old.exists())
+        self.assertEqual(shard.stat().st_size, 603, "预算按「上限 - 其它文件」计算")
+        self.assertTrue(shard.read_bytes().startswith(b"line0033"))
 
 
 class BackupsRetentionTest(_RootTestCase):
@@ -214,9 +232,7 @@ class BackupsRetentionTest(_RootTestCase):
         kept = _write(keep_dir / "db.sqlite", age_days=400)
         nested_old = _write(backups / "nested" / "old.sqlite", age_days=40)
 
-        deleted = prune_backups(
-            backups, max_age_days=30, keep_dirs=(keep_dir,)
-        )
+        deleted = prune_backups(backups, max_age_days=30, keep_dirs=(keep_dir,))
         self.assertEqual(set(deleted), {old_sqlite, old_json, nested_old})
         self.assertFalse(old_sqlite.exists())
         self.assertFalse(old_json.exists())
@@ -226,9 +242,7 @@ class BackupsRetentionTest(_RootTestCase):
         self.assertTrue(kept.exists(), "keep_dirs 内文件必须跳过")
 
     def test_missing_backups_directory_is_noop(self):
-        self.assertEqual(
-            prune_backups(self.root / "nope", max_age_days=30), []
-        )
+        self.assertEqual(prune_backups(self.root / "nope", max_age_days=30), [])
 
 
 class SidecarRetentionTest(_RootTestCase):
@@ -296,7 +310,7 @@ class TraversalGuardTest(_RootTestCase):
         # 直接构造符号链接需要 Windows 开发者模式/管理员权限；用 patch 断言
         # “枚举到符号链接即跳过、不跟随删除”这条防线本身。
         with patch.object(Path, "is_symlink", fake_is_symlink):
-            deleted = prune_event_log(inside, max_age_days=7, max_total_bytes=0)
+            deleted = prune_records(self.root, max_age_days=3, max_total_bytes=0)
         self.assertEqual(deleted, [])
         self.assertTrue(target.exists(), "符号链接不得被跟随删除")
 
@@ -307,39 +321,41 @@ class StorageLimitsTest(_RootTestCase):
         path.write_text(json.dumps(payload or {}), encoding="utf-8")
         return SettingsRepository(path)
 
-    def test_defaults_and_clamp(self):
+    def test_defaults_are_three_days_and_300mb(self):
         limits = StorageLimits.from_settings(self._settings())
-        self.assertEqual(limits.eventlog_max_age_days, 7)
-        self.assertEqual(limits.eventlog_max_bytes, 1024 * retention.MB)
-        self.assertEqual(limits.recordings_max_age_days, 14)
-        self.assertEqual(limits.recordings_max_bytes, 1024 * retention.MB)
+        self.assertEqual(limits.records_max_age_days, 3)
+        self.assertEqual(limits.records_max_bytes, 300 * retention.MB)
         self.assertEqual(limits.backups_max_age_days, 30)
 
+    def test_clamp(self):
         clamped = StorageLimits.from_settings(
             self._settings(
                 {
-                    "storage.eventlog_max_age_days": 0,
-                    "storage.eventlog_max_mb": 1,
-                    "storage.recordings_max_age_days": 9999,
+                    "storage.records_max_age_days": 0,
+                    "storage.records_max_mb": 1,
+                    "storage.backups_max_age_days": 99999,
                 }
             )
         )
-        self.assertEqual(clamped.eventlog_max_age_days, 1, "低于下限要 clamp 到 1")
-        self.assertEqual(clamped.eventlog_max_bytes, 64 * retention.MB)
-        self.assertEqual(clamped.recordings_max_age_days, 365, "高于上限 clamp 到 365")
+        self.assertEqual(clamped.records_max_age_days, 1, "低于下限要 clamp 到 1")
+        self.assertEqual(clamped.records_max_bytes, 16 * retention.MB)
+        self.assertEqual(clamped.backups_max_age_days, 3650, "高于上限 clamp 到 3650")
 
     def test_apply_storage_retention_uses_defaults(self):
         settings = self._settings()
-        eventlog_dir = self.root / "eventlog"
-        recordings = self.root / "recordings"
-        backups = self.root / "backups"
-        old_eventlog = _write(eventlog_dir / "eventlog_20200101.jsonl", age_days=10)
-        today_file = eventlog_dir / f"eventlog_{time.strftime('%Y%m%d')}.jsonl"
+        old_eventlog = _write(
+            self.root / "eventlog" / "eventlog_20200101.jsonl", age_days=10
+        )
+        today_file = self.root / "eventlog" / f"eventlog_{time.strftime('%Y%m%d')}.jsonl"
         _write(today_file, age_days=0)
-        old_recording = _write(recordings / "capture_20200101_000000.jsonl", age_days=20)
-        fresh_recording = _write(recordings / "capture_20200102_000000.jsonl", age_days=2)
-        old_backup = _write(backups / "old.sqlite", age_days=40)
-        fresh_backup = _write(backups / "fresh.sqlite", age_days=5)
+        old_recording = _write(
+            self.root / "recordings" / "capture_20200101_000000.jsonl", age_days=10
+        )
+        fresh_recording = _write(
+            self.root / "recordings" / "capture_20200102_000000.jsonl", age_days=2
+        )
+        old_backup = _write(self.root / "backups" / "old.sqlite", age_days=40)
+        fresh_backup = _write(self.root / "backups" / "fresh.sqlite", age_days=5)
         incompatible = _write(
             self.root / "spritelens.incompatible-1782.sqlite", age_days=2
         )
@@ -351,8 +367,7 @@ class StorageLimitsTest(_RootTestCase):
 
         report = apply_storage_retention(settings, self.root)
 
-        self.assertEqual(report.eventlog, (old_eventlog,))
-        self.assertEqual(report.recordings, (old_recording,))
+        self.assertEqual(report.records, (old_eventlog, old_recording))
         self.assertEqual(report.backups, (old_backup,))
         self.assertEqual(report.sidecars, (stale_sidecar,))
         self.assertEqual(report.total_files, 4)
@@ -367,31 +382,33 @@ class StorageLimitsTest(_RootTestCase):
         self.assertTrue(main_db.exists())
         self.assertTrue(main_wal.exists())
 
-    def test_settings_override_and_recording_keep(self):
+    def test_settings_override_and_active_recording_keep(self):
         old_eventlog = _write(
             self.root / "eventlog" / "eventlog_20200101.jsonl", age_days=10
         )
         active = _write(
             self.root / "recordings" / "capture_20200101_000000.jsonl", age_days=40
         )
-        settings = self._settings({"storage.eventlog_max_age_days": 30})
-        report = apply_storage_retention(
-            settings, self.root, recording_active=active
-        )
-        self.assertEqual(report.eventlog, (), "配置放宽到 30 天后 10 天分片保留")
+        settings = self._settings({"storage.records_max_age_days": 30})
+        report = apply_storage_retention(settings, self.root, recording_active=active)
+        self.assertEqual(report.records, (), "配置放宽到 30 天后 10 天分片保留")
         self.assertTrue(old_eventlog.exists())
-        self.assertEqual(report.recordings, (), "正在录制文件不删")
-        self.assertTrue(active.exists())
+        self.assertTrue(active.exists(), "正在录制文件不删")
 
-        clamped = self._settings({"storage.eventlog_max_age_days": 0})
+        clamped = self._settings({"storage.records_max_age_days": 0})
         report = apply_storage_retention(clamped, self.root)
-        self.assertEqual(report.eventlog, (old_eventlog,), "0 clamp 到 1 天后可删")
+        self.assertIn(old_eventlog, report.records, "0 clamp 到 1 天后可删")
+        self.assertFalse(old_eventlog.exists())
 
 
 class EventLogRolloverTest(_RootTestCase):
-    def test_rollover_callback_receives_new_day_file(self):
+    def setUp(self) -> None:
+        super().setUp()
+        self.dir = self.root / "eventlog"
+
+    def test_day_rollover_callback_receives_new_day_file(self):
         calls: list[Path] = []
-        writer = EventLogWriter(self.root / "eventlog", on_day_rollover=calls.append)
+        writer = EventLogWriter(self.dir, on_rollover=calls.append, max_part_bytes=0)
         self.addCleanup(writer.close)
         writer.handle_packet(_event())
         writer.flush()
@@ -404,15 +421,45 @@ class EventLogRolloverTest(_RootTestCase):
         self.assertEqual(calls[0].name, f"eventlog_{time.strftime('%Y%m%d')}.jsonl")
         self.assertEqual(writer.count, 2)
 
+    def test_part_rotation_switches_file_and_notifies(self):
+        calls: list[Path] = []
+        writer = EventLogWriter(self.dir, on_rollover=calls.append, max_part_bytes=1)
+        self.addCleanup(writer.close)
+        writer.handle_packet(_event())
+        writer.flush()
+
+        day = time.strftime("%Y%m%d")
+        self.assertEqual(len(calls), 1, "写满分片后必须触发一次保留回调")
+        self.assertEqual(calls[0].name, f"eventlog_{day}_p02.jsonl")
+        self.assertEqual(writer.current_path, calls[0])
+        self.assertTrue((self.dir / f"eventlog_{day}.jsonl").exists(), "第一个分片保留")
+
+        writer.handle_packet(_event())
+        writer.flush()
+        self.assertEqual(len(calls), 2, "第二个分片写满后继续切换")
+        self.assertEqual(calls[1].name, f"eventlog_{day}_p03.jsonl")
+
+    def test_oversized_existing_part_is_not_appended(self):
+        day = time.strftime("%Y%m%d")
+        legacy = _write(self.dir / f"eventlog_{day}.jsonl", size=4096)
+        writer = EventLogWriter(self.dir, max_part_bytes=1024)
+        self.addCleanup(writer.close)
+        writer.handle_packet(_event())
+        writer.flush()
+        self.assertEqual(
+            writer.current_path, self.dir / f"eventlog_{day}_p02.jsonl",
+            "上次运行留下的大分片不应继续追加",
+        )
+        self.assertEqual(legacy.stat().st_size, 4096, "旧分片内容不被改写")
+
     def test_rollover_callback_failure_does_not_break_writing(self):
         def boom(_path: Path) -> None:
             raise RuntimeError("prune failed")
 
-        writer = EventLogWriter(self.root / "eventlog", on_day_rollover=boom)
+        writer = EventLogWriter(self.dir, on_rollover=boom, max_part_bytes=1)
         self.addCleanup(writer.close)
         writer.handle_packet(_event())
         writer.flush()
-        writer._day = "19990101"
         with self.assertLogs("spritelens.event_log", level="WARNING"):
             writer.handle_packet(_event())
             writer.flush()
@@ -455,6 +502,11 @@ class CleanupToolTest(_RootTestCase):
                 size=128,
                 age_days=20,
             ),
+            "fresh_recording": _write(
+                self.root / "recordings" / "capture_20200102_000000.jsonl",
+                size=128,
+                age_days=1,
+            ),
             "old_backup": _write(self.root / "backups" / "old.sqlite", size=64, age_days=40),
             "fresh_backup": _write(
                 self.root / "backups" / "fresh.sqlite", size=64, age_days=2
@@ -486,7 +538,7 @@ class CleanupToolTest(_RootTestCase):
             self.assertTrue(path.exists(), f"dry-run 不得改动 {name}")
         self.assertFalse((self.root / "backups" / "database-recovery").exists())
 
-    def test_apply_moves_recovery_dbs_and_prunes_recordings(self):
+    def test_apply_moves_recovery_dbs_and_prunes_records(self):
         files = self._build_root()
         output = self._run_tool("--root", str(self.root), "--apply")
         self.assertIn("APPLY", output)
@@ -502,10 +554,11 @@ class CleanupToolTest(_RootTestCase):
         self.assertFalse(files["incompatible_shm"].exists())
         self.assertFalse((recovery_dir / "spritelens.incompatible-1782.sqlite-shm").exists())
 
-        # 记录数据按默认上限清理
+        # 记录数据按 3 天/300MB 默认上限清理
         self.assertFalse(files["old_eventlog"].exists())
         self.assertTrue(files["today_eventlog"].exists())
         self.assertFalse(files["old_recording"].exists())
+        self.assertTrue(files["fresh_recording"].exists())
         self.assertFalse(files["old_backup"].exists())
         self.assertTrue(files["fresh_backup"].exists())
 

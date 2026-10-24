@@ -36,6 +36,7 @@ from spritelens.services.egg_repository import EggBoxRepository
 from spritelens.services.account_selection_service import AccountSelectionService
 from spritelens.services.home_repository import HomeRepository
 from spritelens.services.scene_repository import SceneRepository
+from spritelens.services.event_logger import PART_BYTES as EVENTLOG_PART_BYTES
 from spritelens.services.event_logger import EventLogWriter
 from spritelens.services.retention import apply_storage_retention, eventlog_rollover_pruner
 from spritelens.services.game_capture_automation import GameCaptureAutomation
@@ -207,20 +208,26 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
     if restored:
         logger.info("已载入历史宠物 %d 只（来自本地库）", restored)
 
-    # 事件日志落盘（复盘用）：data/eventlog/eventlog_YYYYMMDD.jsonl
+    # 事件日志落盘（复盘用）：data/eventlog/eventlog_YYYYMMDD.jsonl。
+    # 当天分片写满 64MB 继续切分片（_pNN），每次切换都触发保留策略，让
+    # 「记录数据总量超过上限立刻清最旧」在当天生效，而不是等重启。
     eventlog_dir = data_root() / "eventlog"
     event_log = EventLogWriter(
         eventlog_dir,
-        on_day_rollover=eventlog_rollover_pruner(settings, eventlog_dir),
+        max_part_bytes=EVENTLOG_PART_BYTES,
+        on_rollover=eventlog_rollover_pruner(settings, data_root()),
     )
     _created(event_log.close)  # 构造即启动 worker：失败必须回收线程
     monitor.add_packet_listener(event_log.handle_packet)
 
-    # 记录数据上限：启动清理过期 eventlog/recordings/backups 与旧备份库
-    # 孤儿 sidecar。纯文件元数据操作（约 1 秒内）；清理是尽力而为，失败只
-    # warning——磁盘问题不能让程序起不来。跨天滚动由上面回调负责。
+    # 记录数据上限：只保留近 3 天、总量不超过 300MB 的 eventlog/recordings
+    #（默认值即用户口径，可用 config.json 的 storage.* 覆盖）；另外按年龄清
+    # 过期备份与旧备份库孤儿 sidecar。正在写的文件永不删；清理是尽力而为，
+    # 失败只 warning——磁盘问题不能让程序起不来。分片/跨天切换由上面回调负责。
     try:
-        apply_storage_retention(settings, data_root())
+        apply_storage_retention(
+            settings, data_root(), eventlog_active=lambda: event_log.current_path
+        )
     except Exception as exc:  # noqa: BLE001 - 启动清理不得中断装配
         logger.warning("存储清理失败，不影响启动: %s", exc)
 

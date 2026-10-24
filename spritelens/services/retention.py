@@ -1,23 +1,25 @@
-"""记录数据保留策略：eventlog / recordings / backups 的年龄与总量上限。
+"""记录数据保留策略：只保留最近 3 天、总量不超过 300MB 的 eventlog/recordings。
 
 背景：`%LOCALAPPDATA%\\SpriteLens` 下的记录数据原先只增不减（实测 eventlog
-2.0GB/10 天、recordings 290MB）。本模块负责在启动时与跨天时做保守清理，
-只依赖标准库与 `spritelens.logs`，全部函数可注入目录，便于单测。
+单日 1.1GB、累计 2.0GB）。本模块负责在启动时、跨天时、以及当天分片滚动时
+清理旧记录；只依赖标准库与 `spritelens.logs`，全部函数可注入目录，便于单测。
 
-策略（保守、可解释、失败不致命）：
-- `eventlog_YYYYMMDD.jsonl`：先删 mtime 超过 `eventlog_max_age_days` 的整天
-  分片，再对剩余非 keep 分片按 mtime 从旧到新删到总量 ≤ `eventlog_max_mb`；
-  keep（当天正在写的文件，跨天回调传入新文件）永不删。最新一个已关闭分片
-  也受保护（`keep_newest`）：单日分片本身超过总量上限时，宁可略超上限，
-  也不把最近一天整份删掉——上限约束的是长期增长，不是最新数据。
-- `capture_YYYYMMDD_HHMMSS.jsonl`：同样的年龄 + 总量策略；正在录制的文件
-  （keep）永不删。录制文件是整段会话，不做行级截断，只按文件粒度清理。
-- `backups/*.sqlite|*.json`：只按年龄（`backups_max_age_days`）删过期备份，
-  keep_dirs（如刚生成的数据库迁移备份）整目录跳过；备份是恢复手段，不做
-  总量上限，宁可多留。
+策略（用户口径：近 3 天、最大 300MB）：
+- `eventlog/*.jsonl`（`eventlog_YYYYMMDD.jsonl` 与滚动分片
+  `eventlog_YYYYMMDD_pNN.jsonl`）与 `recordings/capture_*.jsonl` 视为同一池
+  的「记录数据」：先删 mtime 超过 `records_max_age_days`（默认 3 天）的文件，
+  再按 mtime 从旧到新删到合计 ≤ `records_max_mb`（默认 300MB）。单个文件本身
+  就超过上限时（升级前留下的大分片）从头部截断保留尾部，不整份删除。
+  这样「超过上限立刻清旧的」由当天分片滚动触发（见 event_logger 的
+  `max_part_bytes`），不必等到重启或跨天。
+- 正在写的文件（当天 eventlog 当前分片、正在录制的 capture 文件）永不删除，
+  但计入总量：只有它们自身占满上限时才会超（单分片 64MB，正常不会发生）。
+- `backups/*.sqlite|*.json`：只按年龄（`backups_max_age_days` 默认 30 天）删
+  过期备份，`keep_dirs`（如刚生成的数据库迁移备份）整目录跳过；备份是恢复
+  手段，不参与 300MB 记录池上限，宁可多留。
 - 根目录孤儿 sidecar（`spritelens.*.sqlite-shm/-wal`，对应 `.sqlite` 仍在）：
-  只清理主库之外的旧备份库 sidecar（读取备份时 SQLite 产生的垃圾）；主库
-  `spritelens.sqlite` 的 `-wal/-shm` 永不删，没有对应库的孤 sidecar 也不动。
+  只清理主库之外的旧备份库 sidecar；主库 `spritelens.sqlite` 的 `-wal/-shm`
+  永不删，没有对应库的孤 sidecar 也不动。
 - 单文件删除失败（PermissionError/OSError，例如文件仍被运行中的进程占用）
   只记 warning 并继续处理其它文件，绝不向上抛出；启动清理的整体异常由
   `app_context` 兜底（只 warning，不阻断启动）。
@@ -25,13 +27,12 @@
   `is_relative_to` 校验，符号链接一律跳过，防目录穿越。
 - `max_age_days <= 0` 或 `max_total_bytes <= 0` 关闭对应维度（只按另一维度）。
 
-配置键（config.json，经 `SettingsRepository.get_int` 读取并 clamp）：
-- `storage.eventlog_max_age_days`  默认 7，[1, 365]
-- `storage.eventlog_max_mb`        默认 1024（1 GB），[64, 102400]
-- `storage.recordings_max_age_days` 默认 14，[1, 365]
-- `storage.recordings_max_mb`      默认 1024（1 GB），[64, 102400]
-- `storage.backups_max_age_days`   默认 30，[3, 3650]
-MB 换算按 1024*1024，保留 MB 单位便于用户手改 config.json。
+配置键（config.json，经 `SettingsRepository.get_int` 读取并 clamp；默认值
+即用户口径，不需要手工配置）：
+- `storage.records_max_age_days` 默认 3，[1, 365]
+- `storage.records_max_mb`      默认 300，[16, 102400]
+- `storage.backups_max_age_days` 默认 30，[3, 3650]
+MB 换算按 1024*1024。
 
 手工清理（一次性排查/回收）：`python tools/cleanup_data_root.py [--root DIR] [--apply]`，
 默认 dry-run，`--apply` 才真正移动/删除。
@@ -39,6 +40,7 @@ MB 换算按 1024*1024，保留 MB 单位便于用户手改 config.json。
 
 from __future__ import annotations
 
+import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,16 +51,17 @@ from spritelens.logs import get_logger
 logger = get_logger("retention")
 
 MB = 1024 * 1024
-EVENTLOG_PATTERN = "eventlog_*.jsonl"
-RECORDING_PATTERN = "capture_*.jsonl"
+# 记录池：目录名 → 文件名模式；两者共享同一套年龄与总量上限
+RECORD_DIRS: tuple[tuple[str, str], ...] = (
+    ("eventlog", "eventlog_*.jsonl"),
+    ("recordings", "capture_*.jsonl"),
+)
 SIDECAR_SUFFIXES = ("-shm", "-wal")
 MAIN_DATABASE_NAME = "spritelens.sqlite"
 
 # 默认上限（也是 config.json 缺键时的回退值，见模块 docstring 的键表）
-EVENTLOG_MAX_AGE_DAYS = 7
-EVENTLOG_MAX_MB = 1024
-RECORDINGS_MAX_AGE_DAYS = 14
-RECORDINGS_MAX_MB = 1024
+RECORDS_MAX_AGE_DAYS = 3
+RECORDS_MAX_MB = 300
 BACKUPS_MAX_AGE_DAYS = 30
 
 _SECONDS_PER_DAY = 86400.0
@@ -69,28 +72,21 @@ _SECONDS_PER_DAY = 86400.0
 class StorageLimits:
     """一次启动读取到的保留上限；字节数由配置的 MB 换算而来。"""
 
-    eventlog_max_age_days: int = EVENTLOG_MAX_AGE_DAYS
-    eventlog_max_bytes: int = EVENTLOG_MAX_MB * MB
-    recordings_max_age_days: int = RECORDINGS_MAX_AGE_DAYS
-    recordings_max_bytes: int = RECORDINGS_MAX_MB * MB
+    records_max_age_days: int = RECORDS_MAX_AGE_DAYS
+    records_max_bytes: int = RECORDS_MAX_MB * MB
     backups_max_age_days: int = BACKUPS_MAX_AGE_DAYS
 
     @classmethod
     def from_settings(cls, settings) -> "StorageLimits":
         """从 SettingsRepository 读取（缺键/非法值走默认值 + clamp，不抛）。"""
         return cls(
-            eventlog_max_age_days=settings.get_int(
-                "storage.eventlog_max_age_days", EVENTLOG_MAX_AGE_DAYS, lo=1, hi=365
+            records_max_age_days=settings.get_int(
+                "storage.records_max_age_days", RECORDS_MAX_AGE_DAYS, lo=1, hi=365
             ),
-            eventlog_max_bytes=settings.get_int(
-                "storage.eventlog_max_mb", EVENTLOG_MAX_MB, lo=64, hi=102400
-            ) * MB,
-            recordings_max_age_days=settings.get_int(
-                "storage.recordings_max_age_days", RECORDINGS_MAX_AGE_DAYS, lo=1, hi=365
-            ),
-            recordings_max_bytes=settings.get_int(
-                "storage.recordings_max_mb", RECORDINGS_MAX_MB, lo=64, hi=102400
-            ) * MB,
+            records_max_bytes=settings.get_int(
+                "storage.records_max_mb", RECORDS_MAX_MB, lo=16, hi=102400
+            )
+            * MB,
             backups_max_age_days=settings.get_int(
                 "storage.backups_max_age_days", BACKUPS_MAX_AGE_DAYS, lo=3, hi=3650
             ),
@@ -102,13 +98,12 @@ class RetentionReport:
     """一次保留策略执行的删除明细（供启动日志/测试断言使用）。"""
 
     sidecars: tuple[Path, ...] = ()
-    eventlog: tuple[Path, ...] = ()
-    recordings: tuple[Path, ...] = ()
+    records: tuple[Path, ...] = ()
     backups: tuple[Path, ...] = ()
 
     @property
     def total_files(self) -> int:
-        return len(self.sidecars) + len(self.eventlog) + len(self.recordings) + len(self.backups)
+        return len(self.sidecars) + len(self.records) + len(self.backups)
 
 
 # -- 底层安全删除 ---------------------------------------------------------
@@ -183,91 +178,193 @@ def _try_delete_file(
     return size
 
 
-def _same_keep(entry: Path, keep: Path | None, keep_resolved: Path | None) -> bool:
-    """keep（正在写的文件）判定：解析路径相同，或文件名相同（保守多留）。"""
-    if keep is None:
+def _is_keep(entry: Path, keep_resolved: Sequence[Path]) -> bool:
+    """entry 是否是正在写的文件（解析后路径相同）。"""
+    if not keep_resolved:
         return False
-    if keep_resolved is not None and _safe_resolve(entry) == keep_resolved:
-        return True
-    return entry.name.casefold() == keep.name.casefold()
+    resolved = _safe_resolve(entry)
+    return resolved is not None and resolved in keep_resolved
 
 
-# -- 通用策略：年龄 + 总量 --------------------------------------------------
-def _prune_by_age_and_size(
-    directory: Path,
-    pattern: str,
+def _trim_front(path: Path, keep_bytes: int, directory: Path) -> int | None:
+    """把记录文件从头部截断到只剩最后 keep_bytes 字节（按行边界）。
+
+    只在「单个文件本身就超过上限」时使用：整份删除会丢掉最近的数据，截断
+    则保留文件尾部最近的记录。JSONL 每行独立，从头截断不会破坏剩余行。
+    调用方必须保证该文件不是正在写的文件（写入方已切换走、句柄已关闭）。
+    返回释放字节数；失败只 warning 并返回 None（原文件保持不变）。
+    """
+    try:
+        size = path.stat().st_size
+    except OSError as exc:
+        logger.warning("记录数据：读取文件状态失败 %s（%s），跳过", path.name, exc)
+        return None
+    if keep_bytes >= size:
+        return 0
+    if keep_bytes <= 0:
+        return _try_delete_file(path, directory, dry_run=False, label="记录数据")
+    start = size - keep_bytes
+    staging = path.with_name(path.name + ".trim-tmp")
+    try:
+        with path.open("rb") as source, staging.open("wb") as target:
+            # 起点落在行中间时丢弃半行，保证剩余内容仍是完整 JSONL
+            if start > 0:
+                source.seek(start - 1)
+                previous = source.read(1)
+                source.seek(start)
+                if previous != b"\n":
+                    source.readline()
+            while True:
+                chunk = source.read(1024 * 1024)
+                if not chunk:
+                    break
+                target.write(chunk)
+        os.replace(staging, path)
+    except OSError as exc:
+        try:
+            staging.unlink()
+        except OSError:
+            pass
+        logger.warning("记录数据：截断失败 %s（%s），跳过", path.name, exc)
+        return None
+    try:
+        remaining = path.stat().st_size
+    except OSError:
+        return None
+    logger.info(
+        "记录数据：%s 单文件超过上限，已从头部截断并保留最近 %.2f MB",
+        path.name,
+        remaining / MB,
+    )
+    return max(0, size - remaining)
+
+
+def _note_freed(sink: list[int] | None, freed: int) -> None:
+    """把单个文件的实际/预计释放字节记入 sink（供调用方汇总 dry-run 预计值）。"""
+    if sink is not None:
+        sink.append(freed)
+
+
+# -- 记录池：年龄 + 总量 ---------------------------------------------------
+def _today_eventlog_path(root: Path) -> Path:
+    """当天 eventlog 主分片路径（启动清理时即使还没开始写也按 keep 保护）。"""
+    return Path(root) / "eventlog" / f"eventlog_{time.strftime('%Y%m%d')}.jsonl"
+
+
+def prune_records(
+    root: Path,
     *,
     max_age_days: float,
     max_total_bytes: int,
-    keep: Path | None,
-    label: str,
-    dry_run: bool,
-    keep_newest: int = 0,
+    keep: Sequence[Path] = (),
+    dry_run: bool = False,
+    freed_sink: list[int] | None = None,
 ) -> list[Path]:
-    directory = Path(directory)
-    if not directory.is_dir():
-        logger.info("%s：目录不存在，跳过清理（%s）", label, directory)
-        return []
+    """清理 eventlog 与 recordings 组成的记录池（先年龄、再合计总量）。
 
-    keep_resolved = _safe_resolve(keep) if keep is not None else None
-    candidates: list[tuple[Path, float, int]] = []
-    for entry in _iter_regular_files(directory, pattern):
-        if _same_keep(entry, keep, keep_resolved):
+    keep 里的文件（正在写的分片/录制）永不删除，但计入总量，保证上限口径
+    是「磁盘上的记录数据总量」；总量超限时按 mtime 从旧到新删。单个文件
+    本身就超过上限时（例如升级前留下的大分片），从头部截断保留尾部，避免
+    整份删除丢掉最近记录。
+
+    返回被删除或截断的文件（keep 中从未被改动）；传入 `freed_sink` 时逐个
+    追加释放字节数（截断时是「原大小 - 保留大小」，dry-run 为估计值），供
+    调用方汇总，避免把被截断的文件按整份大小重复计入释放量。
+    """
+    root = Path(root)
+    keep_resolved = [
+        resolved for resolved in (_safe_resolve(item) for item in keep if item) if resolved
+    ]
+    candidates: list[tuple[Path, Path, float, int]] = []
+    for sub, pattern in RECORD_DIRS:
+        directory = root / sub
+        if not directory.is_dir():
+            logger.info("记录数据：目录不存在，跳过清理（%s）", directory)
             continue
-        try:
-            stat = entry.stat()
-        except OSError as exc:
-            logger.warning("%s：读取文件状态失败 %s（%s），跳过", label, entry.name, exc)
-            continue
-        candidates.append((entry, stat.st_mtime, stat.st_size))
+        for entry in _iter_regular_files(directory, pattern):
+            try:
+                stat = entry.stat()
+            except OSError as exc:
+                logger.warning("记录数据：读取文件状态失败 %s（%s），跳过", entry.name, exc)
+                continue
+            candidates.append((entry, directory, stat.st_mtime, stat.st_size))
 
     deleted: list[Path] = []
     freed = 0
     now = time.time()
-
-    # 第一遍：按 mtime 删过旧分片；删除失败的仍计入占用，但不再重复尝试。
-    remaining: list[tuple[Path, float, int]] = []
     failed: set[Path] = set()
+    remaining: list[tuple[Path, Path, float, int]] = []
+
+    # 第一遍：按 mtime 删过期分片；删除失败的仍计入占用，但不再重复尝试。
     if max_age_days > 0:
         cutoff = now - float(max_age_days) * _SECONDS_PER_DAY
-        for entry, mtime, size in candidates:
+        for entry, directory, mtime, size in candidates:
+            if _is_keep(entry, keep_resolved):
+                remaining.append((entry, directory, mtime, size))
+                continue
             if mtime < cutoff:
-                freed_size = _try_delete_file(entry, directory, dry_run=dry_run, label=label)
+                freed_size = _try_delete_file(
+                    entry, directory, dry_run=dry_run, label="记录数据"
+                )
                 if freed_size is not None:
                     deleted.append(entry)
                     freed += freed_size
+                    _note_freed(freed_sink, freed_size)
                     continue
                 failed.add(entry)
-            remaining.append((entry, mtime, size))
+            remaining.append((entry, directory, mtime, size))
     else:
         remaining = list(candidates)
 
-    # 第二遍：剩余非 keep 按 mtime 从旧到新删，直到总量 ≤ 上限。
-    # keep_newest：最新的若干分片不计入可删集合。单日分片可能单独超过总量
-    # 上限（例如大版本更新后的长会话），此时宁可总量略超，也不整份删除最近
-    # 一天的数据。
-    protected: set[Path] = set()
-    if keep_newest > 0 and remaining:
-        newest = sorted(remaining, key=lambda item: item[1], reverse=True)[:keep_newest]
-        protected = {entry for entry, _mtime, _size in newest}
+    # 第二遍：先按 mtime 从旧到新整份删除，但留下最大的那个文件——它多半是
+    # 升级前的大分片，整份删会丢最近记录，改为从头部截断保留尾部。
     if max_total_bytes > 0 and remaining:
-        total = sum(size for _entry, _mtime, size in remaining)
-        for entry, _mtime, _size in sorted(remaining, key=lambda item: item[1]):
+        total = sum(size for _entry, _directory, _mtime, size in remaining)
+        prunable = [
+            item
+            for item in sorted(remaining, key=lambda item: item[2])
+            if item[0] not in failed and not _is_keep(item[0], keep_resolved)
+        ]
+        kept_for_trim: tuple[Path, Path, float, int] | None = None
+        if prunable:
+            largest = max(prunable, key=lambda item: item[3])
+            # 只有「单个文件本身就超过上限」时才截断：能整份纳入上限的文件
+            # 直接按 mtime 删除即可，不必改写文件内容。
+            if largest[3] > max_total_bytes:
+                kept_for_trim = largest
+                prunable = [item for item in prunable if item is not kept_for_trim]
+        for entry, directory, _mtime, _size in prunable:
             if total <= max_total_bytes:
                 break
-            if entry in failed or entry in protected:
-                continue
-            freed_size = _try_delete_file(entry, directory, dry_run=dry_run, label=label)
+            freed_size = _try_delete_file(entry, directory, dry_run=dry_run, label="记录数据")
             if freed_size is None:
                 failed.add(entry)
                 continue
             deleted.append(entry)
             freed += freed_size
+            _note_freed(freed_sink, freed_size)
             total -= freed_size
+        if total > max_total_bytes and kept_for_trim is not None:
+            entry, directory, _mtime, size = kept_for_trim
+            allowance = max(0, max_total_bytes - (total - size))
+            freed_size = (
+                size - allowance if dry_run else _trim_front(entry, allowance, directory)
+            )
+            if freed_size is not None:
+                deleted.append(entry)
+                freed += freed_size
+                _note_freed(freed_sink, freed_size)
+                total -= freed_size
+        if total > max_total_bytes:
+            logger.info(
+                "记录数据：清理后仍有 %.2f MB（上限 %.2f MB），超出部分来自正在写的"
+                "文件或无法修改的文件，等分片滚动/应用退出后继续收敛",
+                total / MB,
+                max_total_bytes / MB,
+            )
 
     logger.info(
-        "%s：%s %d 个文件，%s %.2f MB（上限：%s）",
-        label,
+        "记录数据：%s %d 个文件，%s %.2f MB（上限：%s）",
         "预计清理" if dry_run else "清理",
         len(deleted),
         "预计释放" if dry_run else "释放",
@@ -286,57 +383,7 @@ def _policy_text(max_age_days: float, max_total_bytes: int) -> str:
     return " / ".join(parts) if parts else "两维上限均关闭"
 
 
-# -- 公共 API ------------------------------------------------------------
-def prune_event_log(
-    log_dir: Path,
-    *,
-    max_age_days: float,
-    max_total_bytes: int,
-    keep: Path | None = None,
-    dry_run: bool = False,
-    keep_newest: int = 0,
-) -> list[Path]:
-    """清理 `eventlog_*.jsonl`（按年龄再按总量）；`keep`（当天文件）永不删。
-
-    `keep_newest` 保护最新的若干已关闭分片，见 `_prune_by_age_and_size`。
-    """
-    return _prune_by_age_and_size(
-        log_dir,
-        EVENTLOG_PATTERN,
-        max_age_days=max_age_days,
-        max_total_bytes=max_total_bytes,
-        keep=keep,
-        label="事件日志",
-        dry_run=dry_run,
-        keep_newest=keep_newest,
-    )
-
-
-def prune_recordings(
-    rec_dir: Path,
-    *,
-    max_age_days: float,
-    max_total_bytes: int,
-    keep: Path | None = None,
-    dry_run: bool = False,
-    keep_newest: int = 0,
-) -> list[Path]:
-    """清理 `capture_*.jsonl`（按年龄再按总量）；`keep`（录制中文件）永不删。
-
-    `keep_newest` 保护最新的若干已关闭录制，避免最近一次会话被整份删掉。
-    """
-    return _prune_by_age_and_size(
-        rec_dir,
-        RECORDING_PATTERN,
-        max_age_days=max_age_days,
-        max_total_bytes=max_total_bytes,
-        keep=keep,
-        label="录制文件",
-        dry_run=dry_run,
-        keep_newest=keep_newest,
-    )
-
-
+# -- 备份：只按年龄 -------------------------------------------------------
 def prune_backups(
     backups_dir: Path,
     *,
@@ -457,24 +504,31 @@ def prune_stale_sidecars(
     return deleted
 
 
-def eventlog_rollover_pruner(settings, log_dir: Path) -> Callable[[Path], None]:
-    """构造跨天回调：在 worker 线程按当前配置清理旧分片，keep=新文件。
+# -- 组合入口 ------------------------------------------------------------
+def eventlog_rollover_pruner(settings, root: Path) -> Callable[[Path], None]:
+    """构造分片切换回调：在 worker 线程按当前配置清理旧记录，keep=新分片。
 
-    回调异常由 EventLogWriter 兜底（warning），清理失败不影响日志写入；
-    上限在跨天时重新读配置，用户改 config.json 后无需重启即可生效。
+    当天 eventlog 每写满一个分片、以及跨天切文件时都会调用；回调异常由
+    EventLogWriter 兜底（warning），清理失败不影响日志写入。上限在每次
+    切换时重读配置，用户改 config.json 后无需重启即可生效。
     """
 
     def _on_rollover(new_path: Path) -> None:
         limits = StorageLimits.from_settings(settings)
-        prune_event_log(
-            log_dir,
-            max_age_days=limits.eventlog_max_age_days,
-            max_total_bytes=limits.eventlog_max_bytes,
-            keep=new_path,
-            keep_newest=1,
+        prune_records(
+            root,
+            max_age_days=limits.records_max_age_days,
+            max_total_bytes=limits.records_max_bytes,
+            keep=(new_path,),
         )
 
     return _on_rollover
+
+
+def _resolve_active(value) -> Path | None:
+    """eventlog_active/recording_active 允许传路径或返回路径的 callable。"""
+    resolved = value() if callable(value) else value
+    return Path(resolved) if resolved is not None else None
 
 
 def apply_storage_retention(
@@ -482,39 +536,31 @@ def apply_storage_retention(
     root: Path,
     *,
     recording_active: Path | Callable[[], Path | None] | None = None,
+    eventlog_active: Path | Callable[[], Path | None] | None = None,
 ) -> RetentionReport:
     """启动门面：按配置清理一轮，返回删除明细。
 
     调用方负责兜底异常（app_context 只 warning，不阻断启动）；单文件删除
-    失败已在底层消化。`recording_active` 可以是路径或返回路径的 callable，
-    用于保护启动时仍被占用的录制文件。
+    失败已在底层消化。`recording_active`/`eventlog_active` 可以是路径或返回
+    路径的 callable，用于保护启动时仍被占用的文件（默认保护当天 eventlog）。
     """
     limits = StorageLimits.from_settings(settings)
     root = Path(root)
-    active = recording_active() if callable(recording_active) else recording_active
+    active_eventlog = _resolve_active(eventlog_active) or _today_eventlog_path(root)
+    active_recording = _resolve_active(recording_active)
+    keep = [path for path in (active_eventlog, active_recording) if path is not None]
 
     sidecars = prune_stale_sidecars(root)
-    eventlog_dir = root / "eventlog"
-    today = eventlog_dir / f"eventlog_{time.strftime('%Y%m%d')}.jsonl"
-    eventlog = prune_event_log(
-        eventlog_dir,
-        max_age_days=limits.eventlog_max_age_days,
-        max_total_bytes=limits.eventlog_max_bytes,
-        keep=today,
-        keep_newest=1,
-    )
-    recordings = prune_recordings(
-        root / "recordings",
-        max_age_days=limits.recordings_max_age_days,
-        max_total_bytes=limits.recordings_max_bytes,
-        keep=active,
-        keep_newest=1,
+    records = prune_records(
+        root,
+        max_age_days=limits.records_max_age_days,
+        max_total_bytes=limits.records_max_bytes,
+        keep=keep,
     )
     backups = prune_backups(root / "backups", max_age_days=limits.backups_max_age_days)
     report = RetentionReport(
         sidecars=tuple(sidecars),
-        eventlog=tuple(eventlog),
-        recordings=tuple(recordings),
+        records=tuple(records),
         backups=tuple(backups),
     )
     logger.info("存储保留策略执行完成：共清理 %d 个文件", report.total_files)
@@ -523,19 +569,15 @@ def apply_storage_retention(
 
 __all__ = [
     "BACKUPS_MAX_AGE_DAYS",
-    "EVENTLOG_MAX_AGE_DAYS",
-    "EVENTLOG_MAX_MB",
-    "EVENTLOG_PATTERN",
     "MB",
-    "RECORDINGS_MAX_AGE_DAYS",
-    "RECORDINGS_MAX_MB",
-    "RECORDING_PATTERN",
+    "RECORDS_MAX_AGE_DAYS",
+    "RECORDS_MAX_MB",
+    "RECORD_DIRS",
     "RetentionReport",
     "StorageLimits",
     "apply_storage_retention",
     "eventlog_rollover_pruner",
     "prune_backups",
-    "prune_event_log",
-    "prune_recordings",
+    "prune_records",
     "prune_stale_sidecars",
 ]
