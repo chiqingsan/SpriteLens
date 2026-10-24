@@ -2,6 +2,7 @@
 
 import json
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -156,6 +157,60 @@ class EventLogWriterTest(unittest.TestCase):
         self.assertEqual(len(files), 1)
         self.assertEqual(len(files[0].read_text(encoding="utf-8").strip().splitlines()), 1)
         writer.close()
+
+
+    def test_part_rotation_switches_file_and_notifies(self):
+        """当天分片写满目标大小就切下一个分片，旧分片不再追加。"""
+        calls: list[Path] = []
+        writer = self._writer(max_part_bytes=1, on_rollover=calls.append)
+        writer.handle_packet(_event())
+        writer.flush()
+        parts = sorted(self.dir.glob("eventlog_*.jsonl"))
+        self.assertEqual(len(parts), 2, "写满后应切出第二个分片")
+        base = next(p for p in parts if "_p0" not in p.name)
+        first_part = next(p for p in parts if "_p0" in p.name)
+        self.assertTrue(first_part.name.endswith("_p02.jsonl"))
+        self.assertEqual(calls, [first_part], "切换分片时应回调新分片路径")
+        self.assertEqual(len(base.read_text(encoding="utf-8").strip().splitlines()), 1)
+        self.assertEqual(first_part.read_text(encoding="utf-8"), "")
+
+        writer.handle_packet(_event(0x0101))
+        writer.flush()
+        second_part = writer.current_path
+        self.assertNotEqual(second_part, first_part)
+        self.assertTrue(second_part.name.endswith("_p03.jsonl"))
+        self.assertEqual(calls, [first_part, second_part])
+        self.assertEqual(len(first_part.read_text(encoding="utf-8").strip().splitlines()), 1)
+        self.assertEqual(second_part.read_text(encoding="utf-8"), "", "新分片在下一次写入前为空")
+        self.assertEqual(len(base.read_text(encoding="utf-8").strip().splitlines()), 1, "旧分片不再追加")
+
+    def test_existing_oversized_same_day_part_is_not_appended(self):
+        """上次运行留下的大分片（当天）不再追加，另起 p02 分片。"""
+        day = time.strftime("%Y%m%d")
+        base = self.dir / f"eventlog_{day}.jsonl"
+        original = b'{"opcode": "0x0000"}\n' * 20  # 500 字节，超过下面的上限
+        base.write_bytes(original)
+        calls: list[Path] = []
+        writer = self._writer(max_part_bytes=400, on_rollover=calls.append)
+        writer.handle_packet(_event())
+        writer.flush()
+        self.assertEqual(base.read_bytes(), original, "旧分片不得被追加")
+        part = writer.current_path
+        self.assertTrue(part.name.endswith("_p02.jsonl"))
+        self.assertEqual(len(part.read_text(encoding="utf-8").strip().splitlines()), 1)
+        self.assertEqual(calls, [], "首次打开新分片不触发清理回调（启动清理另行执行）")
+
+    def test_rollover_callback_failure_does_not_break_writer(self):
+        """清理回调异常只 warning，不影响日志写入。"""
+        def boom(_path: Path) -> None:
+            raise RuntimeError("cleanup failed")
+
+        writer = self._writer(max_part_bytes=1, on_rollover=boom)
+        with self.assertLogs("spritelens.event_log", level="WARNING"):
+            writer.handle_packet(_event())
+            writer.flush()
+        self.assertEqual(writer.count, 1)
+        self.assertEqual(writer.error, "")
 
 
 if __name__ == "__main__":
