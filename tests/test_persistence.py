@@ -175,7 +175,7 @@ class PetStoreTest(unittest.TestCase):
     def _pets(self) -> list[Pet]:
         return [
             Pet(gid=1, conf_id=20508, name="魔力猫", level=41, exp=1, nature=11,
-                gender=1, blood_id=4, talent_rank=4, is_first_catch=True),
+                gender=1, blood_id=4, talent_rank=4, is_first_catch=True, partner_mark=4),
             Pet(gid=2, conf_id=20510, name="岚鸟", level=39, exp=2, nature=3,
                 gender=2, blood_id=0, talent_rank=2, is_first_catch=False),
         ]
@@ -196,6 +196,7 @@ class PetStoreTest(unittest.TestCase):
         self.assertEqual(loaded[0].name, "魔力猫")
         self.assertEqual(loaded[0].level, 41)
         self.assertTrue(loaded[0].is_first_catch)
+        self.assertEqual(loaded[0].partner_mark, 4)
         self.assertEqual(loaded[1].gid, 2)
         # 账号表也持久化
         accounts = store2.list_accounts()
@@ -512,6 +513,62 @@ class DatabaseBaselineTest(unittest.TestCase):
         finally:
             db.close()
 
+    def test_partner_mark_addition_migrates_without_losing_pets(self):
+        import sqlite3
+
+        from spritelens.repositories.database import _BASELINE_SCHEMA
+
+        db = Database(self.db_path)
+        store = PetStore(db, flush_interval=60.0)
+        store.put(
+            UID,
+            [Pet(
+                gid=7, conf_id=3001, name="保留", level=42, exp=0, nature=0,
+                gender=0, blood_id=0, talent_rank=0, is_first_catch=False,
+            )],
+        )
+        self.assertEqual(store.flush(), 1)
+        store.close()
+        db.close()
+
+        connection = sqlite3.connect(self.db_path)
+        connection.execute("DROP INDEX idx_pets_conf")
+        connection.execute("DROP INDEX idx_pets_level")
+        connection.execute("ALTER TABLE pets RENAME TO pets_with_partner_mark")
+        legacy_pets = next(
+            statement for statement in _BASELINE_SCHEMA
+            if statement.lstrip().startswith("CREATE TABLE pets")
+        ).replace(",\n        partner_mark   INTEGER NOT NULL DEFAULT 0", "", 1)
+        connection.execute(legacy_pets)
+        old_columns = [
+            row[1] for row in connection.execute("PRAGMA table_info(pets_with_partner_mark)")
+            if row[1] != "partner_mark"
+        ]
+        quoted = ", ".join(f'"{column}"' for column in old_columns)
+        connection.execute(
+            f"INSERT INTO pets ({quoted}) SELECT {quoted} FROM pets_with_partner_mark"
+        )
+        connection.execute("DROP TABLE pets_with_partner_mark")
+        connection.execute("CREATE INDEX idx_pets_conf ON pets(uid, conf_id)")
+        connection.execute("CREATE INDEX idx_pets_level ON pets(uid, level)")
+        connection.execute(
+            "CREATE TABLE pet_annotations (uid INTEGER NOT NULL, gid INTEGER NOT NULL, "
+            "partner_mark TEXT NOT NULL DEFAULT '', PRIMARY KEY (uid, gid))"
+        )
+        connection.commit()
+        connection.close()
+
+        migrated = Database(self.db_path)
+        migrated_store = PetStore(migrated, flush_interval=60.0)
+        try:
+            loaded = migrated_store.load(UID)
+            self.assertEqual([(pet.gid, pet.name, pet.partner_mark) for pet in loaded], [(7, "保留", 0)])
+            self.assertEqual(migrated.query("SELECT COUNT(*) FROM pet_annotations")[0][0], 0)
+            self.assertEqual(list(self.tmp_path.glob("mig.incompatible-*.sqlite")), [])
+        finally:
+            migrated_store.close()
+            migrated.close()
+
     def test_old_schema_is_backed_up_and_rebuilt(self):
         import sqlite3
 
@@ -595,6 +652,40 @@ class DatabaseBaselineTest(unittest.TestCase):
         finally:
             rebuilt.close()
         self.assertEqual(len(list(self.tmp_path.glob("mig.incompatible-*.sqlite"))), 1)
+
+    def test_incompatible_schema_with_data_refuses_to_rebuild(self):
+        """库内已有数据时不得静默重建：保留原文件并阻止启动。"""
+        import sqlite3
+
+        from spritelens.repositories.database import DatabaseSchemaError
+
+        db = Database(self.db_path)
+        try:
+            db.execute(
+                "INSERT INTO accounts (uid, name, first_seen, last_seen) VALUES (?, ?, ?, ?)",
+                (UID, "保留", 1.0, 1.0),
+            )
+        finally:
+            db.close()
+
+        connection = sqlite3.connect(self.db_path)
+        connection.execute("DROP TABLE egg_annotations")
+        connection.execute(
+            "CREATE TABLE egg_annotations (uid INTEGER, instance_id INTEGER, nature_id INTEGER, "
+            "nest_override TEXT, note TEXT, voice_tag TEXT, voice_db INTEGER, is_favorite INTEGER)"
+        )
+        connection.commit()
+        connection.close()
+
+        with self.assertRaises(DatabaseSchemaError) as raised:
+            Database(self.db_path)
+        self.assertFalse(raised.exception.rebuild_allowed, "有数据时不允许备份后重建")
+
+        self.assertEqual(list(self.tmp_path.glob("mig.incompatible-*.sqlite*")), [])
+        with sqlite3.connect(self.db_path) as reopened:
+            self.assertEqual(
+                reopened.execute("SELECT name FROM accounts").fetchall(), [("保留",)]
+            )
 
     def test_extended_fields_round_trip(self):
         """六维/外观/技能写入后能完整读回（含负值声音）。"""

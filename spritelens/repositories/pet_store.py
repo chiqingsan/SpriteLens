@@ -49,8 +49,13 @@ INSERT INTO pets (
     attr_hp, attr_atk, attr_spa, attr_def, attr_spd, attr_spe,
     height, weight, voice, mutation_type, classis, breakthrough_lv,
     speciality_id, ball_id, attributes_json, skills_json, base_conf_id,
-    colorful_conf_id, glass_type, glass_value, worn_medal_id, is_trial_pet, is_mirror_pet, catch_way, add_time, awarded_medals_json
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    colorful_conf_id, glass_type, glass_value, worn_medal_id, is_trial_pet, is_mirror_pet, catch_way, add_time, awarded_medals_json, partner_mark
+) VALUES (
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+)
 ON CONFLICT(uid, gid) DO UPDATE SET
     conf_id        = excluded.conf_id,
     name           = excluded.name,
@@ -87,6 +92,7 @@ ON CONFLICT(uid, gid) DO UPDATE SET
     catch_way      = excluded.catch_way,
     add_time       = excluded.add_time,
     awarded_medals_json = excluded.awarded_medals_json,
+    partner_mark   = excluded.partner_mark,
     updated_at     = excluded.updated_at
 """
 
@@ -95,7 +101,7 @@ SELECT gid, conf_id, name, level, exp, nature, gender, blood_id, talent_rank, is
        attr_hp, attr_atk, attr_spa, attr_def, attr_spd, attr_spe,
        height, weight, voice, mutation_type, classis, breakthrough_lv,
        speciality_id, ball_id, attributes_json, skills_json, base_conf_id,
-       colorful_conf_id, glass_type, glass_value, worn_medal_id, is_trial_pet, is_mirror_pet, catch_way, add_time, awarded_medals_json
+       colorful_conf_id, glass_type, glass_value, worn_medal_id, is_trial_pet, is_mirror_pet, catch_way, add_time, awarded_medals_json, partner_mark
 FROM pets WHERE uid = ? ORDER BY gid
 """
 
@@ -311,6 +317,7 @@ class PetStore:
                         int(pet.is_trial_pet),
                         int(pet.is_mirror_pet), pet.catch_way, pet.add_time,
                         json.dumps(pet.awarded_medal_ids) if pet.awarded_medal_ids is not None else None,
+                        pet.partner_mark,
                     )
                     for (uid, _gid), pet in pets.items()
                 ],
@@ -393,6 +400,7 @@ class PetStore:
             is_trial_pet=bool(row["is_trial_pet"]),
             is_mirror_pet=bool(row["is_mirror_pet"]),
             skills=_skills_from_json(str(row["skills_json"] or "")),
+            partner_mark=int(row["partner_mark"]),
         )
 
     def list_accounts(self) -> tuple[tuple[int, str], ...]:

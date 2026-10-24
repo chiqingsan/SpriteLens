@@ -175,7 +175,7 @@ class ExtendedPetFieldsTest(unittest.TestCase):
             ],
         }
         extra = [
-            _v(26, 98), _v(27, 33242), _v(28, 6), _v(30, 30),
+            _v(26, 98), _v(27, 33242), _v(28, 6), _v(30, 30), _v(78, 4),
             _v(45, 0), _v(82, 103), _v(93, -100),
             skills,
         ]
@@ -186,6 +186,7 @@ class ExtendedPetFieldsTest(unittest.TestCase):
         self.assertEqual(pet.breakthrough_lv, 30)
         self.assertEqual(pet.speciality_id, 103)
         self.assertEqual(pet.voice, -100)
+        self.assertEqual(pet.partner_mark, 4)
         self.assertEqual(len(pet.skills), 2)
         self.assertEqual(pet.skills[0].skill_id, 7050210)
         self.assertTrue(pet.skills[0].is_learned)

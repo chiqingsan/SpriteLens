@@ -48,6 +48,7 @@ _NO_BLOOD = 47
 _NO_TALENT_RANK = 55
 _NO_SPECIALITY = 82
 _NO_VOICE = 93
+_NO_PARTNER_MARK = 78
 
 # PetAttributeInfo 六维顺序（字段号 → 名称）
 _ATTR_SLOTS: tuple[tuple[int, str], ...] = (
@@ -127,6 +128,7 @@ class Pet:
     is_mirror_pet: bool = False  # 好友队伍镜像，不属于自己的精灵库存
     catch_way: int = 0  # PetData 字段67，0为未提供
     add_time: int = 0  # PetData 字段32，游戏获得时间（Unix秒），不使用落库时间
+    partner_mark: int = 0  # PetData 字段78，游戏内搭档标记；0=无
 
     def attribute(self, slot: str) -> PetAttribute:
         """按名称（hp/atk/spa/def/spd/spe）取某一维；越界返回零值。"""
@@ -274,6 +276,7 @@ def _extend_pet(base: Pet, node: list[dict]) -> Pet:
         add_time=_coerce_int(_raw_by_no(node, 32)),
         skills=_skills_from_children(_children_by_no(node, _NO_SKILL)),
         is_trial_pet=bool(_coerce_int(_raw_by_no(node, 81))),
+        partner_mark=max(0, _coerce_int(_raw_by_no(node, _NO_PARTNER_MARK))),
     )
 
 

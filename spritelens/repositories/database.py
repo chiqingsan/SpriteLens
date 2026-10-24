@@ -4,8 +4,8 @@
 - 单连接 + 互斥锁：sqlite3 连接对象非线程安全。写入发生在 PetStore 的
   worker 线程、读取发生在 UI 线程，统一由锁串行化；WAL 模式让读写在
   文件层面并发，锁只保护连接对象本身。
-- 当前处于破坏性开发阶段，schema 1 直接描述完整当前结构；旧结构不会被
-  隐式迁移，避免把开发期历史负债带进发布基线。
+- 当前 schema 1 直接描述完整当前结构；对已知的向后兼容字段变更做原地迁移，
+  未知结构仍先备份再重建，避免启动时无提示覆盖用户数据。
 - 不依赖 UI 与网络：路径可指向临时目录或 :memory:，测试直接构造即可。
 """
 
@@ -24,8 +24,28 @@ logger = get_logger("db")
 _SCHEMA_VERSION = 1
 
 
+def _normalize_schema_sql(statement: str) -> str:
+    """比较 SQLite DDL 时忽略空白和重命名产生的标识符引号。
+
+    去掉引号这一步是承重条件：``_migrate_partner_mark_column_locked`` 用
+    ``ALTER TABLE ... RENAME TO pets`` 重建表，SQLite 会把 DDL 改写成
+    ``CREATE TABLE "pets" (...)``；不再迁移的库下次启动就靠这里把引号抹平
+    才能与基线原文相等。改动本函数的归一化规则会直接让已迁移的本地库
+    命不中基线（且库内已有数据，启动会被阻止）。
+    """
+    return " ".join(statement.split()).replace('"', "")
+
+
 class DatabaseSchemaError(sqlite3.DatabaseError):
-    """本地数据库不是当前破坏性开发基线，需要备份后重建。"""
+    """本地数据库不是当前破坏性开发基线。
+
+    ``rebuild_allowed`` 为真时调用方可以备份原库后重建空基线（库内没有
+    业务数据，重建不会丢东西）；为假时必须保留原文件并停止启动。
+    """
+
+    def __init__(self, message: str, *, rebuild_allowed: bool = True) -> None:
+        super().__init__(message)
+        self.rebuild_allowed = rebuild_allowed
 
 
 _BASELINE_SCHEMA: tuple[str, ...] = (
@@ -80,6 +100,7 @@ _BASELINE_SCHEMA: tuple[str, ...] = (
         catch_way      INTEGER NOT NULL DEFAULT 0,
         add_time       INTEGER NOT NULL DEFAULT 0,
         awarded_medals_json TEXT DEFAULT NULL,
+        partner_mark   INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (uid, gid)
     )
     """,
@@ -146,6 +167,11 @@ class Database:
             self._configure_connection()
         except DatabaseSchemaError as exc:
             self._conn.close()
+            if not exc.rebuild_allowed:
+                logger.error(
+                    "数据库结构不兼容且库内已有数据，已停止启动并保留原库: %s", exc
+                )
+                raise
             self._rebuild_unsupported_schema(exc)
             try:
                 self._configure_connection()
@@ -313,6 +339,41 @@ class Database:
         return "file is not a database" in message or "malformed" in message
 
     # -- 基线结构 ------------------------------------------------------
+    def _has_user_data_locked(self) -> bool:
+        """库内是否已有业务数据。
+
+        结构不可信时不能假设表名/列名，只做 `SELECT 1 ... LIMIT 1`；
+        任何读取失败都按「有数据」处理，宁可阻止重建也不覆盖本地数据。
+        """
+        names = [
+            row[0]
+            for row in self._conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+            )
+        ]
+        for name in names:
+            quoted = str(name).replace('"', '""')
+            try:
+                if self._conn.execute(f'SELECT 1 FROM "{quoted}" LIMIT 1').fetchone() is not None:
+                    return True
+            except sqlite3.Error:
+                return True
+        return False
+
+    def _schema_error(self, reason: str) -> DatabaseSchemaError:
+        """构造结构不兼容错误；库内已有数据时禁止备份重建。"""
+        if self._has_user_data_locked():
+            return DatabaseSchemaError(
+                f"数据库 {self.path} {reason}；"
+                "库内已有数据，为避免覆盖本地数据已停止启动，原文件保持不变。"
+                "请先备份该文件（同目录 -wal/-shm 一并保留），再确认迁移方式后重试",
+                rebuild_allowed=False,
+            )
+        return DatabaseSchemaError(
+            f"数据库 {self.path} {reason}；库内没有数据，将备份原文件后重建",
+            rebuild_allowed=True,
+        )
+
     def _initialize_schema_locked(self) -> None:
         current = int(self._conn.execute("PRAGMA user_version").fetchone()[0])
         if current == 0:
@@ -323,10 +384,7 @@ class Database:
                 )
             }
             if tables:
-                raise DatabaseSchemaError(
-                    f"数据库 {self.path} 没有当前基线版本，但已经包含旧表；"
-                    "请先备份并删除本地数据库后重启"
-                )
+                raise self._schema_error("没有当前基线版本，但已经包含旧表")
             try:
                 self._conn.execute("BEGIN")
                 for statement in _BASELINE_SCHEMA:
@@ -339,22 +397,73 @@ class Database:
             logger.info("数据库初始化为 schema %d: %s", _SCHEMA_VERSION, self.path)
             return
         if current != _SCHEMA_VERSION:
-            raise DatabaseSchemaError(
-                f"数据库 {self.path} 使用不支持的 schema {current}；"
-                "当前开发不兼容旧数据库，请先备份并重建"
-            )
+            raise self._schema_error(f"使用不支持的 schema {current}")
         # SQLite 保存建表时的 DDL，直接与唯一基线比较，包含主键、默认值和索引。
-        expected = {" ".join(statement.split()) for statement in _BASELINE_SCHEMA}
+        expected = {_normalize_schema_sql(statement) for statement in _BASELINE_SCHEMA}
         actual = {
-            " ".join(row[0].split())
+            _normalize_schema_sql(row[0])
             for row in self._conn.execute(
                 "SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'"
             )
         }
-        if actual != expected:
-            raise DatabaseSchemaError(
-                f"数据库 {self.path} 的结构与当前基线不一致；请先备份并重建"
+        if self._migrate_partner_mark_column_locked(actual, expected):
+            actual = {
+                _normalize_schema_sql(row[0])
+                for row in self._conn.execute(
+                    "SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'"
+                )
+            }
+        if not expected.issubset(actual):
+            raise self._schema_error("的结构与当前基线不一致")
+
+    def _migrate_partner_mark_column_locked(
+        self, actual: set[str], expected: set[str]
+    ) -> bool:
+        """将搭档标记字段加入上一版 schema 1，保留已有宠物数据。
+
+        这里只接受已知的单字段追加：其余基线对象必须已经存在，额外旧表保留，
+        不把未知结构误判为可迁移结构。
+        """
+        pets_statement = next(
+            statement for statement in _BASELINE_SCHEMA
+            if statement.lstrip().startswith("CREATE TABLE pets")
+        )
+        legacy_statement = pets_statement.replace(
+            ",\n        partner_mark   INTEGER NOT NULL DEFAULT 0", "", 1
+        )
+        normalized_legacy = _normalize_schema_sql(legacy_statement)
+        normalized_current = _normalize_schema_sql(pets_statement)
+        if normalized_legacy not in actual or normalized_current in actual:
+            return False
+        if not (expected - {normalized_current}).issubset(actual):
+            return False
+
+        old_columns = [row[1] for row in self._conn.execute("PRAGMA table_info(pets)")]
+        if "partner_mark" in old_columns:
+            return False
+        migration_table = "pets_partner_mark_migration"
+        quoted_columns = ", ".join(f'"{column}"' for column in old_columns)
+        new_statement = pets_statement.replace(
+            "CREATE TABLE pets", f"CREATE TABLE {migration_table}", 1
+        )
+        try:
+            self._conn.execute("BEGIN")
+            self._conn.execute(new_statement)
+            self._conn.execute(
+                f"INSERT INTO {migration_table} ({quoted_columns}, partner_mark) "
+                f"SELECT {quoted_columns}, 0 FROM pets"
             )
+            self._conn.execute("DROP TABLE pets")
+            self._conn.execute(f"ALTER TABLE {migration_table} RENAME TO pets")
+            for statement in _BASELINE_SCHEMA:
+                if statement.lstrip().startswith("CREATE INDEX") and "pets" in statement:
+                    self._conn.execute(statement)
+            self._conn.commit()
+        except sqlite3.Error:
+            self._conn.rollback()
+            raise
+        logger.info("数据库已原地迁移 pets.partner_mark，保留已有数据: %s", self.path)
+        return True
 
     @property
     def schema_version(self) -> int:
