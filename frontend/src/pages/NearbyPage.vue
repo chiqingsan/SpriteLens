@@ -101,17 +101,45 @@ watch(rows, (next, previous) => {
 watch([search, sort, () => summary.value?.uid, () => summary.value?.observation_id], () => {
   if (listViewport.value) listViewport.value.scrollTop = 0
 }, { flush: 'post' })
-const messages: Record<string, [string, string]> = {
-  awaiting_identity: ['等待识别当前角色', '开始采集后重新进入游戏，确认本次角色与场景。'],
-  awaiting_scene: ['等待场景精灵', '在游戏中移动或进入场景后，服务器会陆续下发附近实体。'],
-  resumed_stale: ['等待当前场景数据', '收到游戏新下发的实体后显示，不展示上次缓存。'],
-  battle_unverified: ['战斗中，已清空附近观察', '战斗结束后等待新的场景数据，不恢复战斗前的缓存。'],
-  disconnected: ['游戏连接已断开', '重新连接游戏后会重新识别角色与场景。'],
-  stopped: ['采集已停止', '开始采集并进入游戏后，这里会展示附近精灵。'],
-  historical_account: ['当前为历史账号', '附近精灵只展示本次连接的观察，不读取历史附近缓存。'],
-  observing: ['正在观察当前场景', '只展示服务器已下发的精灵，未观察到不代表附近没有。'],
+// 状态文案只保留用户能直接理解的短句；完整解释放在 title 里，避免首屏堆字。
+const labels: Record<string, string> = {
+  awaiting_identity: '未连接游戏',
+  awaiting_scene: '等待场景数据',
+  resumed_stale: '恢复场景中',
+  battle_unverified: '战斗中暂停',
+  disconnected: '连接已断开',
+  stopped: '采集已停止',
+  historical_account: '历史账号',
+  observing: '实时观察中',
 }
-const status = computed(() => messages[summary.value?.phase || 'awaiting_identity']!)
+const hints: Record<string, string> = {
+  awaiting_identity: '开始采集后重新进入游戏，确认本次角色与场景。',
+  awaiting_scene: '在游戏中移动或进入场景后，服务器会陆续下发附近实体。',
+  resumed_stale: '收到游戏新下发的实体后显示，不展示上次缓存。',
+  battle_unverified: '战斗判定期间清空附近观察，结束后等待新的场景数据。',
+  disconnected: '重新连接游戏后会重新识别角色与场景。',
+  stopped: '开始采集并进入游戏后，这里会展示附近精灵。',
+  historical_account: '附近精灵只展示本次连接的观察，不读取历史附近缓存。',
+  observing: '只展示服务器已下发的精灵，未观察到不代表附近没有。',
+}
+const phase = computed(() => summary.value?.phase || 'awaiting_identity')
+const status = computed(() => labels[phase.value] ?? labels.awaiting_identity!)
+const statusHint = computed(() => hints[phase.value] ?? hints.awaiting_identity!)
+// 未解析更新只影响完整性，放成计数行旁的一句浅色提示，避免整条黄色横幅常驻。
+const incomplete = computed(() => {
+  const snapshot = data.value
+  return snapshot !== null && (snapshot.unresolved_updates > 0 || snapshot.rejected_actors > 0)
+})
+const countNote = computed(() => {
+  if (stale.value) return '刷新失败，显示的是稍早的结果'
+  return incomplete.value ? '部分精灵可能未显示' : ''
+})
+const countNoteTitle = computed(() => {
+  if (stale.value) return `刷新失败，显示的是稍早的结果${error.value ? '：' + error.value : ''}`
+  const snapshot = data.value
+  if (!incomplete.value || snapshot === null) return '雷达外环为原始坐标单位，尚未校准米制'
+  return `有 ${snapshot.unresolved_updates} 条更新未能解析，${snapshot.rejected_actors} 个实体未能接纳；列表可能有缺失。`
+})
 function time(value: number | null) { return value === null ? '尚无更新' : new Date(value * 1000).toLocaleTimeString('zh-CN', { hour12: false }) }
 function relativeTime(value: number | null) {
   if (value === null) return '尚无更新'
@@ -136,21 +164,19 @@ defineExpose({ update, load, pause, resume })
     <header class="nearby-heading">
       <div class="nearby-heading-main">
         <h2 class="sr-only">附近精灵</h2>
-        <span class="nearby-phase" :class="`is-${summary?.phase || 'awaiting_identity'}`" :title="status[1]">
-          <span class="nearby-phase-dot" aria-hidden="true"></span>{{ status[0] }}
+        <span class="nearby-phase" :class="`is-${phase}`" :title="statusHint">
+          <span class="nearby-phase-dot" aria-hidden="true"></span>{{ status }}
         </span>
-        <span class="nearby-scene">场景 {{ data?.scene_id ?? '未知' }} · 更新 {{ time(data?.updated_at ?? null) }}</span>
+        <span class="nearby-scene" title="游戏内场景编号与最后更新时间">场景 {{ data?.scene_id ?? '未知' }} · 更新 {{ time(data?.updated_at ?? null) }}</span>
       </div>
       <div class="nearby-heading-actions">
-        <span class="nearby-partial" title="本次观察可能缺少部分实体，列表只展示已下发数据">不完整观察</span>
         <button class="ghost-button small nearby-floating" @click="openFloating"><UiIcon name="eye" />悬浮雷达</button>
       </div>
     </header>
-    <div v-if="floatingError || (error && !stale) || (data && !data.mapping_available) || (data && (data.unresolved_updates || data.rejected_actors))" class="nearby-notices">
+    <div v-if="floatingError || (error && !stale) || (data && !data.mapping_available)" class="nearby-notices">
       <p v-if="floatingError" class="nearby-error" role="alert">{{ floatingError }}</p>
       <p v-if="error && !stale" class="nearby-error" role="alert">{{ error }}。当前无可用数据，请刷新重试。</p>
-      <p v-if="data && !data.mapping_available" class="nearby-warning" role="status">精灵映射表不可用，名称、头像及体型参考标识可能缺失；原始观察数据仍会保留。</p>
-      <p v-if="data && (data.unresolved_updates || data.rejected_actors)" class="nearby-warning" role="status">有 {{ data.unresolved_updates }} 项更新尚未解析，{{ data.rejected_actors }} 项实体未能接纳；列表可能有缺失。</p>
+      <p v-if="data && !data.mapping_available" class="nearby-warning" role="status" title="精灵映射表未加载，名称、头像及体型参考标识可能缺失；原始观察数据仍会保留。">部分精灵资料缺失</p>
     </div>
     <div class="nearby-toolbar">
       <label class="nearby-search"><UiIcon name="search" /><input v-model="search" type="search" aria-label="搜索附近精灵" placeholder="搜索名称、配置或实体编号"></label>
@@ -159,7 +185,7 @@ defineExpose({ update, load, pause, resume })
     </div>
     <div class="nearby-count">
       <strong>{{ rows.length }} 只<span v-if="search.trim()"> / 已观察 {{ data?.actors.length ?? 0 }} 只</span></strong>
-      <span class="nearby-count-note" :class="{ 'is-stale': stale }" :title="stale ? `刷新失败，显示的是稍早的结果${error ? '：' + error : ''}` : '雷达外环为原始坐标单位，尚未校准米制'" role="status">{{ stale ? '刷新失败，显示的是稍早的结果' : '距离与方向待校准' }}</span>
+      <span class="nearby-count-note" :class="{ 'is-stale': stale }" :title="countNoteTitle" role="status">{{ countNote }}</span>
     </div>
     <div class="nearby-workspace">
       <div ref="listViewport" class="nearby-list-pane">
@@ -180,11 +206,11 @@ defineExpose({ update, load, pause, resume })
             </article>
           </div>
         </section>
-        <section v-else class="nearby-empty" aria-live="polite"><UiIcon :name="initialLoading ? 'refresh' : 'eye'" /><h3>{{ initialLoading ? '正在读取附近观察' : search.trim() ? '没有匹配的精灵' : '尚未观察到附近精灵' }}</h3><p>{{ search.trim() ? '试试其他名称或编号。' : status[1] }}</p></section>
+        <section v-else class="nearby-empty" aria-live="polite"><UiIcon :name="initialLoading ? 'refresh' : 'eye'" /><h3>{{ initialLoading ? '正在读取附近观察' : search.trim() ? '没有匹配的精灵' : '尚未观察到附近精灵' }}</h3><p>{{ search.trim() ? '试试其他名称或编号。' : '进入场景并开始采集后会自动显示。' }}</p></section>
       </div>
       <div class="nearby-radar-pane"><SceneRadar :data="data" :selected="selected" :radius="data?.radar_radius_raw" @select="selectActor" /></div>
     </div>
-    <p class="nearby-footnote">仅代表本次连接已观察到的范围，不保证覆盖整个场景。实体与位置会随切号、切场景及停止采集清空。</p>
+    <p class="nearby-footnote">只显示本次连接观察到的精灵，切号或切场景后清空。</p>
   </div>
 </template>
 
@@ -200,7 +226,6 @@ defineExpose({ update, load, pause, resume })
 .nearby-phase.is-battle_unverified .nearby-phase-dot, .nearby-phase.is-disconnected .nearby-phase-dot, .nearby-phase.is-stopped .nearby-phase-dot, .nearby-phase.is-awaiting_identity .nearby-phase-dot { background: var(--amber); }
 .nearby-scene { font-size: var(--fs-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
 .nearby-heading-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
-.nearby-partial { background: var(--amber-soft); color: var(--amber-ink); border: 1px solid var(--amber-line); padding: 2px var(--space-3); border-radius: var(--radius-sm); font-size: var(--fs-xs); }
 .nearby-notices { display: flex; flex-direction: column; gap: var(--space-2); }
 .nearby-toolbar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; min-width: 0; }
 .nearby-search { display: flex; align-items: center; gap: var(--space-3); flex: 1 1 240px; min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); padding-inline: var(--space-4); }

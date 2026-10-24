@@ -199,9 +199,9 @@ const projection = computed(() => {
       </svg>
     </div>
     <template v-if="!compact">
-      <p v-if="projection">外环 {{ projection.range.toLocaleString('zh-CN') }} 原始坐标单位 · 已定位 {{ projection.rows.length }} / {{ data?.actors.length ?? 0 }}</p>
+      <p v-if="projection">外环 {{ projection.range.toLocaleString('zh-CN') }} 单位 · 已定位 {{ projection.rows.length }} / {{ data?.actors.length ?? 0 }}</p>
       <p v-else>进入场景并移动后更新；缺少位置的精灵仍保留在列表。</p>
-      <footer>坐标与方位以原始坐标单位显示，仅作参考，尚未校准为米制；只显示本次已观察范围。</footer>
+      <footer>原始坐标单位，尚未校准为米制。</footer>
     </template>
   </section>
 </template>

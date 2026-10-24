@@ -117,7 +117,7 @@ describe('附近精灵更新布局稳定性', () => {
     expect(wrapper.get('.nearby-error').text()).toContain('网络断开')
     expect(wrapper.find('.nearby-empty').exists()).toBe(true)
     expect(wrapper.findAll('.nearby-card')).toHaveLength(0)
-    expect(wrapper.get('.nearby-count-note').text()).toBe('距离与方向待校准')
+    expect(wrapper.get('.nearby-count-note').text()).toBe('')
     wrapper.unmount()
   })
 })
