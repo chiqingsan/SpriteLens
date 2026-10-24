@@ -133,6 +133,12 @@ Store 并发批次顺序、坏库备份失败保护与坏行隔离已有修复�
 新增持久化能力应验证批次顺序、失败回填、坏行隔离、账号一致性、停止超时和未写数据提示。
 离线恢复统一选择展示uid，所有业务域按该uid加载；载荷应来自同一版本快照。
 没有完整分页/删除事件证据时，只能声明观察集合或历史缓存，不能推断当前仓库已完整。
+- 运行数据保留上限见 `services/retention.py`（config.json 键，缺键/越界用默认值+clamp）：
+  `storage.eventlog_max_age_days` 默认 7 天 / `storage.eventlog_max_mb` 默认 1024；
+  `storage.recordings_max_age_days` 默认 14 天 / `storage.recordings_max_mb` 默认 1024；
+  `storage.backups_max_age_days` 默认 30 天。主库 `spritelens.sqlite`、`spritelens.sqlite-wal/-shm`、`keys/`、`config.json` 永不清理，单文件删除失败不阻断启动。
+  年龄先删、总量兜底（mtime 旧→新）；最新一个已关闭分片受保护（单日分片超过上限时总量宁可略超，也不整份删除最近一天），当天/正在写的文件永不删。
+- 手工回收磁盘：`python tools/cleanup_data_root.py [--root DIR] [--apply]`，默认 dry-run，`--apply` 才执行（孤儿 sidecar→备份库移入 `backups/database-recovery-YYYYMMDD/`→按上限清理）。
 
 ## 资源与打包兼容
 

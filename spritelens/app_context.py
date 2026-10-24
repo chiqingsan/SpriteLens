@@ -37,6 +37,7 @@ from spritelens.services.account_selection_service import AccountSelectionServic
 from spritelens.services.home_repository import HomeRepository
 from spritelens.services.scene_repository import SceneRepository
 from spritelens.services.event_logger import EventLogWriter
+from spritelens.services.retention import apply_storage_retention, eventlog_rollover_pruner
 from spritelens.services.game_capture_automation import GameCaptureAutomation
 from spritelens.services.monitor_service import MonitorService
 from spritelens.services.pet_repository import PetRepository
@@ -207,9 +208,21 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
         logger.info("已载入历史宠物 %d 只（来自本地库）", restored)
 
     # 事件日志落盘（复盘用）：data/eventlog/eventlog_YYYYMMDD.jsonl
-    event_log = EventLogWriter(data_root() / "eventlog")
+    eventlog_dir = data_root() / "eventlog"
+    event_log = EventLogWriter(
+        eventlog_dir,
+        on_day_rollover=eventlog_rollover_pruner(settings, eventlog_dir),
+    )
     _created(event_log.close)  # 构造即启动 worker：失败必须回收线程
     monitor.add_packet_listener(event_log.handle_packet)
+
+    # 记录数据上限：启动清理过期 eventlog/recordings/backups 与旧备份库
+    # 孤儿 sidecar。纯文件元数据操作（约 1 秒内）；清理是尽力而为，失败只
+    # warning——磁盘问题不能让程序起不来。跨天滚动由上面回调负责。
+    try:
+        apply_storage_retention(settings, data_root())
+    except Exception as exc:  # noqa: BLE001 - 启动清理不得中断装配
+        logger.warning("存储清理失败，不影响启动: %s", exc)
 
     # 家园快照聚合（0x014A 全量 + 增量合并 + 本地历史快照）
     home_store = HomeStore(database)

@@ -18,6 +18,7 @@ import queue
 import threading
 import time
 from pathlib import Path
+from typing import Callable
 
 from spritelens.logs import get_logger
 from spritelens.events import PacketEvent
@@ -39,12 +40,23 @@ class _Barrier:
 
 
 class EventLogWriter:
-    """事件日志监听器；组合根挂到 monitor.add_packet_listener。"""
+    """事件日志监听器；组合根挂到 monitor.add_packet_listener。
+
+    on_day_rollover：可选跨天回调（worker 线程、无锁调用），参数是切换后
+    新一天的文件路径，供保留策略把旧分片当 keep 之外的文件清理。回调异常
+    只 warning，不影响日志写入；默认 None 保持既有行为。
+    """
 
     def __init__(
-        self, log_dir: Path, *, queue_max: int = QUEUE_MAX, close_join_timeout: float = 5.0
+        self,
+        log_dir: Path,
+        *,
+        queue_max: int = QUEUE_MAX,
+        close_join_timeout: float = 5.0,
+        on_day_rollover: Callable[[Path], None] | None = None,
     ) -> None:
         self._dir = log_dir
+        self._on_day_rollover = on_day_rollover
         self._lock = threading.Lock()  # 只保护计数与句柄视图，不覆盖 IO
         self._file = None
         self._day = ""
@@ -183,14 +195,27 @@ class EventLogWriter:
             if self._file is not None and day == self._day:
                 return self._file
         self._dir.mkdir(parents=True, exist_ok=True)
-        file = (self._dir / f"eventlog_{day}.jsonl").open("a", encoding="utf-8")
+        path = self._dir / f"eventlog_{day}.jsonl"
+        file = path.open("a", encoding="utf-8")
         with self._lock:
             old = self._file
             self._file = file
             self._day = day
         if old is not None:
             old.close()
+            # 旧分片已关闭且不持锁：此时回调清理旧文件不会与写入/加锁重入冲突
+            self._notify_day_rollover(path)
         return file
+
+    def _notify_day_rollover(self, path: Path) -> None:
+        """跨天回调：仅为保留策略服务，失败只 warning 不影响日志写入。"""
+        callback = self._on_day_rollover
+        if callback is None:
+            return
+        try:
+            callback(path)
+        except Exception as exc:  # noqa: BLE001 - 清理失败不得影响日志写入
+            logger.warning("事件日志跨天清理回调失败: %s", exc)
 
     def _close_owned_file(self) -> None:
         """关闭日志文件（仅限 worker 线程调用——文件句柄由 worker 独占）。"""
