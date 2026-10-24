@@ -133,7 +133,9 @@ C04 目标条件 → C05 应用内告警 → C06 雷达校准（米制/方位）
 2. **失败语义**：用户决定「保留同周期」→ 请求失败保留同周期已有结果并标注「可能已过期」，切号/切场景/观察周期变化清空；文档与测试同步改。
 3. **战斗恢复**：已用回放证据说明（11 个战斗窗口，结束后 120 秒内服务器重新下发 0–142 个实体），采用「清空 + 等待重发」，删除「恢复战前快照」的叙述；不实现内部快照。用户 2026-10-24 明确确认采用此选项 A，死状态 `_battle_backup` / `_battle_restored_from_cache` 已删除。
 
-## 六、实施状态（2026-10-24，P0 全部落地，未提交）
+## 六、实施状态（2026-10-24 P0 落地、2026-10-25 布局重构）
+
+- **已提交**：附近精灵整条功能线（观察、列表、雷达、悬浮窗、多账号会话、采集诊断等）已随 `9970853` 入库；本节其余改动在 2026-10-25 布局提交中入库。
 
 - **P0-1 已实现**：删除阈值/雷达半径改为可配置原始单位。`spritelens/services/scene_repository.py` 新增 `DEFAULT_MAX_DISTANCE_RAW=15000` 与 `max_distance_raw` 构造参数；`spritelens/web/nearby.py` 载荷新增 `radar_radius_raw`（默认 10000，`nearby.radar_radius_raw` 可调）；`spritelens/app_context.py` 装配 `nearby.max_distance_raw`；`SceneRadar.vue` 用 `radius` prop，`NearbyPage.vue`/`FloatingRadar.vue` 从 payload 取值。
 - **P0-2 已实现**：`snapshot()` 只读，推进改由写路径（`SceneRepository.advance()`，WS 推送循环 `_push_payload()` 调用）；`GET /api/nearby` 不再自激；连续两次 `snapshot()` 的版本与实体一致（单测锁定）。
@@ -142,6 +144,7 @@ C04 目标条件 → C05 应用内告警 → C06 雷达校准（米制/方位）
 - **失败语义已统一**：页面与悬浮雷达都「保留同周期已有数据 + 标注可能过期」，仅切号/周期变化/清空指令/无数据失败才清空；文档 `docs/NEARBY_OBSERVATIONS.md` 与 `docs/UI_GUIDE.md` 口径一致。
 - **P0-5 文档口径已改**：删除「战斗后恢复战前快照」；0x014A「全量实体列表」假设改为实测描述（当日仅 2 条、实体主要来自 0x0414 `SpaceAct_ActorEnter`）。
 - **战斗语义已定稿（选项 A）**：`spritelens/services/scene_repository.py` 删除从未写入的 `_battle_backup` / `_battle_restored_from_cache`，4908/4909 分支加注释「不恢复战前快照，保持空态等新观察周期重发」；0x014A 分支只判断 checkpoint 恢复。`docs/SCENE_OBSERVATIONS.md:23-24,46` 与 `docs/NEARBY_OBSERVATIONS.md:9,15` 统一为「清空 + 等待重发」，并注明 2026-10-24 用户决策。现有回归 `tests/test_scene.py:217,239` 已锁定该行为（战后实体/位置为空、phase=awaiting_scene，收到新 0x0414 后 phase=observing）。
+- **附近页布局已重构（2026-10-25）**：`NearbyPage.vue` 改为视口工作台（`#nearby-root` 100% 高、列表与雷达各自内部滚动、整页不纵向滚动），顶部五段（大标题/状态条/工具条/计数/警告）压成三行——1440×900 的 workspace 起点从 387px 降到 219px；卡片 188px→78px（头像 48、标题行内联等级/属性/标记、内联指标、`#…末 9 位` 编号 + 相对时间）；分栏 1.15 : 0.85，≤900 单列且列表在前、≤640 换行；页面标题改为读屏专用，避免与顶栏重复。`SceneRadar.vue` 改为填充面板、三环刻度（10k/5k/2k 原始单位）、中心「你」、选中+最近 6 个标签（同名聚合 ×N、越界翻转、半透明底），compact 模式行为不变。
 
 ### 验收证据（2026-10-24）
 
@@ -149,6 +152,7 @@ C04 目标条件 → C05 应用内告警 → C06 雷达校准（米制/方位）
 - 真实数据 + 动态推送（每 300ms 重放真实事件包）经 Edge headless CDP 验收：1440×900 与 864×672 均渲染 36 只、雷达 79 个点、无横向溢出；连续 8 次采样期间计数、文案、卡片数与 `scrollTop=120` 全部不变（无闪动、无回顶）。
 - 悬浮雷达 360×460 与最小 280×380：36 只、79 个点、重点胶囊 3 个、无错误提示；关闭主页面 4.5 秒后自动清空并显示失效文案（心跳兜底成立）。
 - 自动化：`tests.test_scene/test_scene_checkpoint/test_radar_window/test_multi_account_capture/test_web_server` → 65 项 OK；`npx vitest run` → 152 passed / 1 skipped；`tools/frontend.py build`（vue-tsc + vite）通过。
+- 布局验收（2026-10-25，同一回放 53 只实体、5 档尺寸）：1440×900 与 864×672 均无页面纵向滚动、雷达圆盘完整可见，首屏分别 7 张和 5 张完整卡片；1920×1080 首屏 10 张；1280×800 6 张；640×720 单列且列表在前、无横向滚动。`npx vitest run` → 167 passed / 1 skipped（28 文件）、`vue-tsc --noEmit` 通过、`tools/frontend.py build` 通过。
 
 ### 仍未验证
 
@@ -158,6 +162,6 @@ C04 目标条件 → C05 应用内告警 → C06 雷达校准（米制/方位）
 
 ## 七、建议执行顺序（后续）
 
-1. P1：`position_source` 文案、`attention` 前后端单源、请求超时、长名称 `title` 与标记行换行（`_battle_backup` 死状态已于 2026-10-24 清理）。
-2. C04 目标条件 → C05 应用内告警 → C06 雷达校准（米制/方位）→ C07 悬浮命中监控 → C08 安全导出；C04/C05 需要先补协议字段证据，不猜。
-3. 提交：当前附近线仍全部未提交，建议按「后端阈值/只读快照」「壳层与前端状态」「文档」拆分提交，避免混入雷达/采集诊断工作线。
+1. 已交付：P0-1/2/3/4/5、失败语义统一、战斗语义（选项 A）、附近页布局与雷达视觉重构（见 §六）。
+2. P1 待办：`position_source` 文案、`attention` 前后端单源、窄窗（雷达面板 ≤300px）标签字号可读性、失败提示与警告行在极窄视口的换行目检。
+3. C04 目标条件 → C05 应用内告警 → C06 雷达校准（米制/方位）→ C07 悬浮命中监控 → C08 安全导出；C04/C05 需要先补协议字段证据，不猜。

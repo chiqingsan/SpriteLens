@@ -66,11 +66,11 @@ const listViewport = ref<HTMLElement | null>(null)
 const rowVirtualizerOptions = computed(() => ({
   count: rows.value.length,
   getScrollElement: () => listViewport.value,
-  estimateSize: () => 220,
+  estimateSize: () => 108,
   getItemKey: (index: number) => rows.value[index]?.actor_id ?? index,
-  gap: 16,
-  initialRect: { width: 640, height: 680 },
-  overscan: 3,
+  gap: 12,
+  initialRect: { width: 640, height: 600 },
+  overscan: 4,
 }))
 const rowVirtualizer = useVirtualizer(rowVirtualizerOptions)
 const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems())
@@ -113,6 +113,15 @@ const messages: Record<string, [string, string]> = {
 }
 const status = computed(() => messages[summary.value?.phase || 'awaiting_identity']!)
 function time(value: number | null) { return value === null ? '尚无更新' : new Date(value * 1000).toLocaleTimeString('zh-CN', { hour12: false }) }
+function relativeTime(value: number | null) {
+  if (value === null) return '尚无更新'
+  const seconds = Math.max(0, Math.floor(Date.now() / 1000 - value))
+  if (seconds < 60) return '刚刚'
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟前`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} 小时前`
+  return time(value)
+}
+function shortId(value: string) { return value.length > 10 ? `…${value.slice(-9)}` : value }
 function metric(value: number | null, divisor: number, unit: string) { return value === null ? '未知' : `${(value / divisor).toLocaleString('zh-CN', { maximumFractionDigits: 3 })} ${unit}` }
 function imageFailed(id: string) { failedImages.value = new Set(failedImages.value).add(id) }
 function measureRow(element: Element | ComponentPublicInstance | null) {
@@ -124,98 +133,137 @@ defineExpose({ update, load, pause, resume })
 
 <template>
   <div class="nearby-page">
-    <header class="nearby-heading"><div><span class="nearby-eyebrow">{{ summary?.phase === 'resumed_stale' ? '已恢复基线 · 待确认' : '当前场景 · 实时观察' }}</span><h2>附近精灵</h2><p>从游戏连接中观察附近的精灵与个体数据。</p></div><div class="nearby-heading-actions"><span class="nearby-partial">不完整观察</span><button class="ghost-button small nearby-refresh" @click="openFloating"><UiIcon name="eye" />悬浮雷达</button></div></header>
-    <section class="nearby-status" aria-label="场景观察状态"><UiIcon name="eye" /><div><strong>{{ status[0] }}</strong><p>{{ status[1] }}</p></div><div class="nearby-scene"><span>场景 {{ data?.scene_id ?? '未知' }}</span><span>更新 {{ time(data?.updated_at ?? null) }}</span></div></section>
-    <div class="nearby-toolbar"><label class="nearby-search"><UiIcon name="search" /><input v-model="search" type="search" aria-label="搜索附近精灵" placeholder="搜索名称、配置或实体编号"></label><label class="nearby-sort">排序<select v-model="sort" aria-label="附近精灵排序"><option value="recent">最近观察</option><option value="name">精灵名称</option></select></label><button class="ghost-button small nearby-refresh" :aria-busy="refreshing" :aria-disabled="refreshing" @click="refresh"><UiIcon name="refresh" />刷新</button></div>
-    <p v-if="floatingError" class="nearby-error" role="alert">{{ floatingError }}</p>
-    <p v-if="error && !stale" class="nearby-error" role="alert">{{ error }}。当前无可用数据，请刷新重试。</p>
-    <p v-if="data && !data.mapping_available" class="nearby-warning" role="status">精灵映射表不可用，名称、头像及体型参考标识可能缺失；原始观察数据仍会保留。</p>
-    <p v-if="data && (data.unresolved_updates || data.rejected_actors)" class="nearby-warning" role="status">有 {{ data.unresolved_updates }} 项更新尚未解析，{{ data.rejected_actors }} 项实体未能接纳；列表可能有缺失。</p>
-    <div class="nearby-count"><strong>{{ rows.length }} 只<span v-if="search.trim()"> / 已观察 {{ data?.actors.length ?? 0 }} 只</span></strong><span class="nearby-count-note" :class="{ 'is-stale': stale }" :title="stale ? `刷新失败，显示的是稍早的结果${error ? '：' + error : ''}` : undefined" role="status">{{ stale ? '刷新失败，显示的是稍早的结果' : '距离与方向待校准' }}</span></div>
-    <div class="nearby-workspace"><div ref="listViewport" class="nearby-list-pane">
-    <section v-if="rows.length" class="nearby-grid" aria-label="附近精灵列表" :aria-busy="loading">
-      <div class="nearby-virtual-space" :style="{ height: `${virtualHeight}px` }">
-        <article v-for="entry in virtualCards" :key="`${data?.observation_id}:${entry.actor.actor_id}`" :ref="measureRow" class="nearby-card nearby-virtual-row" :class="{ 'is-selected': selected === entry.actor.actor_id }" :data-index="entry.item.index" :id="`nearby-actor-${entry.actor.actor_id}`" tabindex="0" role="button" :aria-pressed="selected === entry.actor.actor_id" :style="{ transform: `translateY(${entry.item.start}px)` }" @click="selected = entry.actor.actor_id" @keydown.enter="selected = entry.actor.actor_id" @keydown.space.prevent="selected = entry.actor.actor_id">
-          <div class="nearby-portrait"><img v-if="entry.actor.icon_url && !failedImages.has(entry.actor.icon_url)" :src="entry.actor.icon_url" alt="" loading="lazy" @error="imageFailed(entry.actor.icon_url)"><UiIcon v-else name="eye" /></div>
-          <div class="nearby-card-copy"><div class="nearby-card-title"><h3 :title="entry.actor.name">{{ entry.actor.name }}</h3><span>Lv.{{ entry.actor.level ?? '未知' }}</span></div><div class="nearby-types"><span v-for="type in entry.actor.type_names" :key="type">{{ type }}</span><span v-if="!entry.actor.type_names.length">属性未知</span></div>
-            <div class="nearby-card-marks" :class="{ 'is-empty': !entry.actor.marks.length && entry.actor.attention !== 'double' }" aria-label="重点标识"><template v-for="mark in entry.actor.marks" :key="mark.name"><MedalIcon v-if="isMedalMark(mark)" :name="mark.name" :source="mark.source" /><span v-else class="nearby-reference-mark" :title="`${mark.name} · 数值参考`">{{ mark.name }}</span></template><span v-if="entry.actor.attention === 'double'" class="nearby-double-mark" title="体型与声音均命中当前参考线，尚未确认游戏奖牌">双牌</span></div>
-            <dl class="nearby-metrics"><div><dt>身高</dt><dd>{{ metric(entry.actor.height, 100, 'm') }}</dd></div><div><dt>体重</dt><dd>{{ metric(entry.actor.weight, 1000, 'kg') }}</dd></div><div><dt>音量原值</dt><dd>{{ entry.actor.voice ?? '未知' }}</dd></div></dl>
-            <footer><span>实体 {{ entry.actor.actor_id }}</span><time>{{ time(entry.actor.updated_at) }}</time></footer>
-          </div>
-        </article>
+    <header class="nearby-heading">
+      <div class="nearby-heading-main">
+        <h2 class="sr-only">附近精灵</h2>
+        <span class="nearby-phase" :class="`is-${summary?.phase || 'awaiting_identity'}`" :title="status[1]">
+          <span class="nearby-phase-dot" aria-hidden="true"></span>{{ status[0] }}
+        </span>
+        <span class="nearby-scene">场景 {{ data?.scene_id ?? '未知' }} · 更新 {{ time(data?.updated_at ?? null) }}</span>
       </div>
-    </section>
-    <section v-else class="nearby-empty" aria-live="polite"><UiIcon :name="initialLoading ? 'refresh' : 'eye'" /><h3>{{ initialLoading ? '正在读取附近观察' : search.trim() ? '没有匹配的精灵' : '尚未观察到附近精灵' }}</h3><p>{{ search.trim() ? '试试其他名称或编号。' : status[1] }}</p></section>
-    </div><div class="nearby-radar-pane"><SceneRadar :data="data" :selected="selected" :radius="data?.radar_radius_raw" @select="selectActor" /></div></div>
+      <div class="nearby-heading-actions">
+        <span class="nearby-partial" title="本次观察可能缺少部分实体，列表只展示已下发数据">不完整观察</span>
+        <button class="ghost-button small nearby-floating" @click="openFloating"><UiIcon name="eye" />悬浮雷达</button>
+      </div>
+    </header>
+    <div v-if="floatingError || (error && !stale) || (data && !data.mapping_available) || (data && (data.unresolved_updates || data.rejected_actors))" class="nearby-notices">
+      <p v-if="floatingError" class="nearby-error" role="alert">{{ floatingError }}</p>
+      <p v-if="error && !stale" class="nearby-error" role="alert">{{ error }}。当前无可用数据，请刷新重试。</p>
+      <p v-if="data && !data.mapping_available" class="nearby-warning" role="status">精灵映射表不可用，名称、头像及体型参考标识可能缺失；原始观察数据仍会保留。</p>
+      <p v-if="data && (data.unresolved_updates || data.rejected_actors)" class="nearby-warning" role="status">有 {{ data.unresolved_updates }} 项更新尚未解析，{{ data.rejected_actors }} 项实体未能接纳；列表可能有缺失。</p>
+    </div>
+    <div class="nearby-toolbar">
+      <label class="nearby-search"><UiIcon name="search" /><input v-model="search" type="search" aria-label="搜索附近精灵" placeholder="搜索名称、配置或实体编号"></label>
+      <label class="nearby-sort">排序<select v-model="sort" aria-label="附近精灵排序"><option value="recent">最近观察</option><option value="name">精灵名称</option></select></label>
+      <button class="ghost-button small nearby-refresh" :aria-busy="refreshing" :aria-disabled="refreshing" @click="refresh"><UiIcon name="refresh" />刷新</button>
+    </div>
+    <div class="nearby-count">
+      <strong>{{ rows.length }} 只<span v-if="search.trim()"> / 已观察 {{ data?.actors.length ?? 0 }} 只</span></strong>
+      <span class="nearby-count-note" :class="{ 'is-stale': stale }" :title="stale ? `刷新失败，显示的是稍早的结果${error ? '：' + error : ''}` : '雷达外环为原始坐标单位，尚未校准米制'" role="status">{{ stale ? '刷新失败，显示的是稍早的结果' : '距离与方向待校准' }}</span>
+    </div>
+    <div class="nearby-workspace">
+      <div ref="listViewport" class="nearby-list-pane">
+        <section v-if="rows.length" class="nearby-grid" aria-label="附近精灵列表" :aria-busy="loading">
+          <div class="nearby-virtual-space" :style="{ height: `${virtualHeight}px` }">
+            <article v-for="entry in virtualCards" :key="`${data?.observation_id}:${entry.actor.actor_id}`" :ref="measureRow" class="nearby-card nearby-virtual-row" :class="{ 'is-selected': selected === entry.actor.actor_id }" :data-index="entry.item.index" :id="`nearby-actor-${entry.actor.actor_id}`" tabindex="0" role="button" :aria-pressed="selected === entry.actor.actor_id" :style="{ transform: `translateY(${entry.item.start}px)` }" @click="selected = entry.actor.actor_id" @keydown.enter="selected = entry.actor.actor_id" @keydown.space.prevent="selected = entry.actor.actor_id">
+              <div class="nearby-portrait"><img v-if="entry.actor.icon_url && !failedImages.has(entry.actor.icon_url)" :src="entry.actor.icon_url" alt="" loading="lazy" @error="imageFailed(entry.actor.icon_url)"><UiIcon v-else name="eye" /></div>
+              <div class="nearby-card-copy">
+                <div class="nearby-card-title">
+                  <h3 :title="entry.actor.name">{{ entry.actor.name }}</h3>
+                  <span class="nearby-level">Lv.{{ entry.actor.level ?? '?' }}</span>
+                  <div class="nearby-types"><span v-for="type in entry.actor.type_names" :key="type">{{ type }}</span><span v-if="!entry.actor.type_names.length">属性未知</span></div>
+                  <div class="nearby-card-marks" :class="{ 'is-empty': !entry.actor.marks.length && entry.actor.attention !== 'double' }" aria-label="重点标识"><template v-for="mark in entry.actor.marks" :key="mark.name"><MedalIcon v-if="isMedalMark(mark)" :name="mark.name" :source="mark.source" /><span v-else class="nearby-reference-mark" :title="`${mark.name} · 数值参考`">{{ mark.name }}</span></template><span v-if="entry.actor.attention === 'double'" class="nearby-double-mark" title="体型与声音均命中当前参考线，尚未确认游戏奖牌">双牌</span></div>
+                </div>
+                <p class="nearby-card-meta"><span>身高 <b>{{ metric(entry.actor.height, 100, 'm') }}</b></span><span aria-hidden="true">·</span><span>体重 <b>{{ metric(entry.actor.weight, 1000, 'kg') }}</b></span><span aria-hidden="true">·</span><span>音量 <b>{{ entry.actor.voice ?? '未知' }}</b></span></p>
+                <footer><span class="nearby-entity" :title="`实体 ${entry.actor.actor_id}`">#{{ shortId(entry.actor.actor_id) }}</span><time :title="time(entry.actor.updated_at)">{{ relativeTime(entry.actor.updated_at) }}</time></footer>
+              </div>
+            </article>
+          </div>
+        </section>
+        <section v-else class="nearby-empty" aria-live="polite"><UiIcon :name="initialLoading ? 'refresh' : 'eye'" /><h3>{{ initialLoading ? '正在读取附近观察' : search.trim() ? '没有匹配的精灵' : '尚未观察到附近精灵' }}</h3><p>{{ search.trim() ? '试试其他名称或编号。' : status[1] }}</p></section>
+      </div>
+      <div class="nearby-radar-pane"><SceneRadar :data="data" :selected="selected" :radius="data?.radar_radius_raw" @select="selectActor" /></div>
+    </div>
     <p class="nearby-footnote">仅代表本次连接已观察到的范围，不保证覆盖整个场景。实体与位置会随切号、切场景及停止采集清空。</p>
   </div>
 </template>
 
 <style scoped>
-.nearby-heading-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
-.nearby-workspace { display: grid; grid-template-columns: minmax(260px, .85fr) minmax(0, 1.15fr); gap: var(--space-5); align-items: start; }
-.nearby-list-pane { min-width: 0; height: clamp(240px, calc(100vh - 280px), 680px); overflow-y: auto; padding: 2px; }
-.nearby-radar-pane { min-width: 0; position: sticky; top: var(--space-4); }
-.nearby-card { cursor: pointer; }
-.nearby-card.is-selected, .nearby-card:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-@media(max-width:900px) { .nearby-workspace { grid-template-columns: minmax(0,1fr); } .nearby-radar-pane { grid-row: 1; position: static; } }
-.nearby-page { min-width: 0; color: var(--ink); }
-.nearby-heading, .nearby-status, .nearby-toolbar, .nearby-card-title, .nearby-count, .nearby-card footer { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
-.nearby-heading { margin-bottom: var(--space-6); align-items: flex-start; }
-.nearby-heading h2 { margin: var(--space-2) 0; font-size: var(--fs-xl); }
-.nearby-heading p, .nearby-status p { margin: var(--space-2) 0 0; line-height: 1.6; color: var(--muted); }
-.nearby-eyebrow, .nearby-partial, .nearby-count, .nearby-footnote { font-size: var(--fs-xs); }
-.nearby-eyebrow { color: var(--teal-dark); }
-.nearby-partial { background: var(--amber-soft); color: var(--amber-ink); border: 1px solid var(--amber-line); padding: var(--space-2) var(--space-4); border-radius: var(--radius-sm); }
-.nearby-status { padding: var(--space-5); background: var(--teal-soft); border: 1px solid var(--line); border-radius: var(--radius-sm); margin-bottom: var(--space-5); }
-.nearby-status > .ui-icon { flex: none; color: var(--teal-dark); }
-.nearby-status > div:first-of-type { flex: 1 1 240px; min-width: 0; }
-.nearby-scene { display: grid; gap: var(--space-2); min-width: 0; color: var(--muted); font-size: var(--fs-xs); }
-.nearby-scene span { min-width: 0; overflow-wrap: anywhere; }
-.nearby-toolbar { min-width: 0; margin-bottom: var(--space-5); justify-content: flex-start; }
+/* 页面占满 app shell 的 `.page` 内容区：固定高度、内部滚动，避免整页纵向滚动把雷达裁掉。 */
+:global(#nearby-root) { display: flex; height: 100%; min-height: 0; }
+.nearby-page { display: flex; flex-direction: column; flex: 1; gap: var(--space-3); min-height: 0; min-width: 0; color: var(--ink); }
+.nearby-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+.nearby-heading-main { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; min-width: 0; }
+/* 顶栏已经显示页面名，重复的大标题只留给读屏，避免同一屏出现两次「附近精灵」。 */
+.nearby-phase { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--muted); min-width: 0; }
+.nearby-phase-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--teal); flex: none; }
+.nearby-phase.is-battle_unverified .nearby-phase-dot, .nearby-phase.is-disconnected .nearby-phase-dot, .nearby-phase.is-stopped .nearby-phase-dot, .nearby-phase.is-awaiting_identity .nearby-phase-dot { background: var(--amber); }
+.nearby-scene { font-size: var(--fs-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
+.nearby-heading-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.nearby-partial { background: var(--amber-soft); color: var(--amber-ink); border: 1px solid var(--amber-line); padding: 2px var(--space-3); border-radius: var(--radius-sm); font-size: var(--fs-xs); }
+.nearby-notices { display: flex; flex-direction: column; gap: var(--space-2); }
+.nearby-toolbar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; min-width: 0; }
 .nearby-search { display: flex; align-items: center; gap: var(--space-3); flex: 1 1 240px; min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); padding-inline: var(--space-4); }
-.nearby-search input { width: 100%; min-width: 0; border: 0; background: none; height: 36px; color: var(--ink); }
+.nearby-search input { width: 100%; min-width: 0; border: 0; background: none; height: 34px; color: var(--ink); }
 .nearby-search:focus-within { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-.nearby-sort { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); font-size: var(--fs-xs); min-width: 0; max-width: 100%; }
-.nearby-sort select { min-width: 0; max-width: 100%; min-height: 36px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); padding-inline: var(--space-3); }
-.nearby-refresh { background: var(--panel); border: 1px solid var(--teal); color: var(--teal-dark); min-height: 36px; min-width: 0; max-width: 100%; flex-wrap: wrap; white-space: normal; }
-.nearby-count { margin-bottom: var(--space-4); color: var(--muted); }
-.nearby-count strong { color: var(--ink); }
+.nearby-sort { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-xs); min-width: 0; max-width: 100%; }
+.nearby-sort select { min-width: 0; max-width: 100%; min-height: 34px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); padding-inline: var(--space-3); }
+.nearby-refresh, .nearby-floating { background: var(--panel); border: 1px solid var(--teal); color: var(--teal-dark); min-height: 34px; min-width: 0; max-width: 100%; white-space: normal; }
+.nearby-count { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); min-width: 0; font-size: var(--fs-xs); color: var(--muted); }
+.nearby-count strong { color: var(--ink); font-variant-numeric: tabular-nums; }
 .nearby-count strong span { font-weight: normal; color: var(--muted); }
-.nearby-count-note { flex: 1 1 0; min-width: 0; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nearby-count-note { flex: 0 1 auto; min-width: 0; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 状态文案固定单行：失败提示出现/消失不改变计数行高度，避免内容区跳动；超窄视口截断，完整文案见 title。 */
-.nearby-count-note.is-stale { max-width: 100%; padding: 0 var(--space-2); border-radius: var(--radius-sm); background: var(--amber-soft); color: var(--amber-ink); }
+.nearby-count-note.is-stale { padding: 0 var(--space-2); border-radius: var(--radius-sm); background: var(--amber-soft); color: var(--amber-ink); }
+.nearby-workspace { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr); gap: var(--space-4); flex: 1; min-height: 0; }
+.nearby-list-pane { min-width: 0; min-height: 0; overflow-y: auto; padding: 2px; }
+.nearby-radar-pane { display: flex; min-width: 0; min-height: 0; }
+.nearby-radar-pane > * { flex: 1; min-width: 0; min-height: 0; }
 .nearby-grid { min-width: 0; container-type: inline-size; }
 .nearby-virtual-space { position: relative; min-width: 0; }
 .nearby-virtual-row { position: absolute; inset: 0 0 auto; }
-.nearby-card { display: flex; gap: var(--space-4); min-width: 0; padding: var(--space-5); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-sm); }
-.nearby-portrait { display: grid; place-items: center; flex: none; width: 64px; height: 64px; background: var(--surface-2); border-radius: var(--radius-sm); color: var(--muted); }
+.nearby-card { display: flex; align-items: flex-start; gap: var(--space-3); min-width: 0; padding: calc(var(--space-3) + 2px) var(--space-4); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; }
+.nearby-card:hover { background: var(--surface-2); }
+.nearby-card.is-selected, .nearby-card:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.nearby-portrait { display: grid; place-items: center; flex: none; width: 48px; height: 48px; background: var(--surface-2); border-radius: var(--radius-sm); color: var(--muted); }
 .nearby-portrait img { width: 100%; height: 100%; object-fit: contain; }
-.nearby-card-copy { flex: 1; min-width: 0; }
-.nearby-card-title { align-items: flex-start; flex-wrap: nowrap; gap: var(--space-2); }
-.nearby-card h3 { min-width: 0; margin: 0; overflow: hidden; font-size: var(--fs-md); flex: 1 1 100px; text-overflow: ellipsis; white-space: nowrap; }
-.nearby-card-title > span { color: var(--muted); font-size: var(--fs-xs); }
-.nearby-types { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
-.nearby-types span { background: var(--surface-2); color: var(--muted); border-radius: var(--radius-sm); padding: 2px var(--space-2); font-size: var(--fs-xs); }
-.nearby-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 74px), 1fr)); gap: var(--space-3); margin: var(--space-4) 0; }
-.nearby-metrics dt { font-size: var(--fs-xs); color: var(--muted); }
-.nearby-metrics dd { margin: var(--space-1) 0 0; font-size: var(--fs-sm); }
-.nearby-card footer { border-top: 1px solid var(--line-soft); padding-top: var(--space-3); font-size: var(--fs-xs); color: var(--muted); }
-.nearby-card-marks { display: flex; align-items: center; flex-wrap: nowrap; gap: var(--space-2); width: 100%; min-width: 0; height: 40px; overflow-x: auto; }
+.nearby-card-copy { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.nearby-card-title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
+.nearby-card h3 { min-width: 0; max-width: 100%; margin: 0; overflow: hidden; font-size: var(--fs-sm); font-weight: 700; line-height: 1.35; flex: 0 1 auto; text-overflow: ellipsis; white-space: nowrap; }
+.nearby-level { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.nearby-types { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.nearby-types span { background: var(--surface-2); color: var(--muted); border-radius: var(--radius-sm); padding: 0 var(--space-2); font-size: var(--fs-2xs); line-height: 1.7; }
+.nearby-card-marks { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; height: 24px; min-width: 0; }
 .nearby-card-marks > * { flex-shrink: 0; }
-.nearby-card-marks.is-empty { visibility: hidden; }
-.nearby-card-marks .medal-icon { width: 24px; height: 24px; }
-.nearby-reference-mark, .nearby-double-mark { display: inline-flex; align-items: center; min-height: 24px; padding: 0 var(--space-2); border: 1px solid var(--amber-line); border-radius: var(--radius-sm); background: var(--amber-soft); color: var(--amber-ink); font-size: var(--fs-2xs); font-weight: 700; white-space: nowrap; }
+.nearby-card-marks.is-empty { display: none; }
+.nearby-card-marks .medal-icon { width: 22px; height: 22px; }
+.nearby-reference-mark, .nearby-double-mark { display: inline-flex; align-items: center; min-height: 20px; padding: 0 var(--space-2); border: 1px solid var(--amber-line); border-radius: var(--radius-sm); background: var(--amber-soft); color: var(--amber-ink); font-size: var(--fs-2xs); font-weight: 700; white-space: nowrap; }
 .nearby-double-mark { border-color: var(--teal); background: var(--accent); color: var(--teal-deep); }
-.nearby-card time { min-width: 0; overflow-wrap: anywhere; }
+.nearby-card-meta { display: flex; align-items: baseline; gap: var(--space-1); margin: 0; min-width: 0; overflow: hidden; color: var(--muted); font-size: var(--fs-xs); white-space: nowrap; text-overflow: ellipsis; }
+.nearby-card-meta b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.nearby-card footer { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); min-width: 0; padding: 0; border: 0; color: var(--muted); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; }
+.nearby-entity { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nearby-card time { flex: none; }
 .nearby-empty { padding: var(--space-7) var(--space-5); min-height: 200px; display: grid; place-content: center; justify-items: center; text-align: center; border: 1px dashed var(--line); border-radius: var(--radius-sm); background: var(--panel); }
 .nearby-empty h3 { font-size: var(--fs-md); margin-bottom: 0; }
-.nearby-empty p, .nearby-footnote { color: var(--muted); line-height: 1.6; }
-.nearby-error, .nearby-warning { padding: var(--space-4); border-radius: var(--radius-sm); line-height: 1.6; }
+.nearby-empty p, .nearby-footnote { margin: 0; color: var(--muted); line-height: 1.6; }
+.nearby-footnote { font-size: var(--fs-2xs); }
+.nearby-error, .nearby-warning { margin: 0; padding: var(--space-1) var(--space-3); border-radius: var(--radius-sm); font-size: var(--fs-xs); line-height: 1.5; }
 .nearby-error { background: var(--danger-soft); color: var(--danger-ink); }
 .nearby-warning { background: var(--amber-soft); color: var(--amber-ink); }
 .nearby-page :is(p, h3, span, dd, strong) { overflow-wrap: anywhere; }
-@media(max-width:480px) { .nearby-card { flex-direction: column; } .nearby-portrait { width: 48px; height: 48px; } }
-@container(max-width:300px) { .nearby-card { flex-direction: column; } }
-@media(max-width:900px) { .nearby-status { align-items: flex-start; } .nearby-scene { flex: 1 1 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); } .nearby-search { flex-basis: 100%; } }
+@media(max-width:1024px) { .nearby-workspace { grid-template-columns: minmax(0, 1fr) 280px; } }
+/* 窄窗改为单列且列表在前：雷达不再挤占首屏主位。 */
+@media(max-width:820px) {
+  :global(#nearby-root) { height: auto; }
+  .nearby-page { height: auto; }
+  .nearby-workspace { grid-template-columns: minmax(0, 1fr); }
+  .nearby-list-pane { height: min(62vh, 520px); }
+  .nearby-radar-pane { height: 340px; }
+}
+@media(max-width:480px) {
+  .nearby-toolbar .nearby-search { flex-basis: 100%; }
+  .nearby-card { padding: var(--space-2) var(--space-3); }
+  .nearby-portrait { width: 40px; height: 40px; }
+}
 </style>
