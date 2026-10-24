@@ -5,7 +5,9 @@
 数据为合成，不依赖游戏在线。
 
 用法：
-    python tools/run_web_demo.py [--pets 12]
+    python tools/run_web_demo.py [--pets 12] [--scenario normal|extreme]
+    --scenario extreme 使用极限布局数据集（最长名称、全部已映射伙伴标记、
+    稀有+色卡+最多奖牌+体型/声音组合、四种箱位空态），仅用于视觉验收。
 按 Ctrl+C 退出。
 """
 
@@ -51,6 +53,110 @@ _SAMPLE = (
     ("护主犬", 3070, 1),
 )
 
+# 极限布局数据集（--scenario extreme）：用真实静态数据中的最长名称、全部已映射伙伴标记、
+# 稀有+色卡+最多奖牌+体型/声音组合，以及四种箱位空态，验证真实 6 列点阵而不是单张合成卡片。
+_PARTNER_MARK_IDS = (1, 3, 4, 5, 6, 7, 8, 14, 15)
+_UNKNOWN_PARTNER_MARK_ID = 2  # 素材映射表没有 2：未知 ID 必须完全不渲染
+_LONGEST_SPECIES = (16000002, "厉毒修萝-B1小游戏变形用")  # 静态数据内最长名称（含测试用条目）
+_LONGEST_NORMAL = (5062, "暮风隐者（枯叶的样子）")  # 有真实体型区间的长名称
+_ALL_MEDALS = (1001, 1002, 1004, 1005, 1006, 1010, 1025, 1026, 1028, 1030)
+_UNKNOWN_SLOT_GIDS = tuple(5555 + index for index in range(10))  # 箱内存在但未采集的精灵 → 待补
+
+
+def _extreme_pet(static, gid: int, name: str, base_conf: int, *, gender: int, mark: int = 0,
+                 nature: int = 1, level: int = 60, mutation: int = 0, glass: tuple[int, int] = (0, 0),
+                 worn_medal_id: int = 0, awarded: tuple[int, ...] | None = None,
+                 height: int | None = None, weight: int | None = None, voice: int = 0) -> Pet:
+    from spritelens.domain.pets import _ATTR_SLOTS  # noqa: PLC0415 - demo 专用
+
+    species = static.species(base_conf)
+    height_range = species.height_range if species is not None else (0, 0)
+    weight_range = species.weight_range if species is not None else (0, 0)
+    if height is None:
+        height = (height_range[0] + height_range[1]) // 2 if height_range[1] > height_range[0] > 0 else 100
+    if weight is None:
+        weight = (weight_range[0] + weight_range[1]) // 2 if weight_range[1] > weight_range[0] > 0 else 10000
+    rng = random.Random(gid)
+    return Pet(
+        gid=gid, conf_id=900000 + gid, name=name, level=level, exp=0,
+        nature=nature, gender=gender, blood_id=gid % 5 + 1, talent_rank=rng.randint(1, 5),
+        is_first_catch=False, base_conf_id=base_conf,
+        attributes=tuple(PetAttribute(total_race=rng.randint(70, 130), talent=rng.choice([0, 24, 48]),
+                                      base_value=rng.randint(120, 220), effort_add=rng.randint(0, 30))
+                         for _ in _ATTR_SLOTS),
+        height=height, weight=weight, voice=voice, mutation_type=mutation,
+        glass_type=glass[0], glass_value=glass[1], worn_medal_id=worn_medal_id,
+        awarded_medal_ids=awarded, classis=gid % 18, breakthrough_lv=level // 10,
+        speciality_id=401 + gid % 3, ball_id=1,
+        skills=tuple(PetSkill(skill_id=7050210 + k, conf_idx=10 + k, is_learned=True, is_equipped=k < 2, pos=k)
+                     for k in range(4)),
+        partner_mark=mark, catch_way=gid % 6 + 1, add_time=int(time.time()) - gid * 3600,
+    )
+
+
+def _apply_extreme_dataset(static, repository: PetRepository) -> None:
+    """把合成仓库替换成极限布局数据集；只影响当前进程，不落库。"""
+    rows = [
+        # 1) 最长名称 + 异色/炫彩 + 色卡 + 10 枚奖牌 + 佩戴"大" + 粗嗓门（同卡最多标记）
+        dict(gid=5001, name=_LONGEST_SPECIES[1], base_conf=_LONGEST_SPECIES[0], gender=1, mark=1, nature=12,
+             mutation=9, glass=(2, 1), worn_medal_id=1001, awarded=_ALL_MEDALS, voice=-100),
+        dict(gid=5002, name="迪莫", base_conf=3004, gender=2, mark=0, nature=1),  # 无标记
+        dict(gid=5003, name="火神", base_conf=3006, gender=2, mark=_UNKNOWN_PARTNER_MARK_ID, nature=2),  # 未知标记
+        dict(gid=5004, name="水灵", base_conf=3005, gender=0, mark=4, nature=14),  # 性别未知 + 标记
+        dict(gid=5005, name="彩蝶鲨", base_conf=3117, gender=1, mark=3, nature=4),
+        dict(gid=5006, name="燃薪虫", base_conf=3437, gender=2, mark=5, nature=10),
+        dict(gid=5007, name="小独角兽", base_conf=3062, gender=1, mark=6, nature=7),
+        dict(gid=5008, name="菊花梨", base_conf=3227, gender=2, mark=7, nature=13),
+        dict(gid=5009, name="恶魔叮", base_conf=3010, gender=1, mark=8, nature=12),
+        dict(gid=5010, name="皇家狮鹫", base_conf=3469, gender=2, mark=14, nature=4),
+        dict(gid=5011, name="治愈兔", base_conf=3081, gender=1, mark=15, nature=1),
+        # 12) 体型下限 + 满声音 → 参考规则得到"小 + 婉"；名称是真实最长可用名
+        dict(gid=5012, name=_LONGEST_NORMAL[1], base_conf=_LONGEST_NORMAL[0], gender=2, mark=0, nature=13,
+             weight=5000, voice=100),
+        dict(gid=5013, name="机械方方", base_conf=3200, gender=1, mark=6, nature=10),
+        # 14) 未知性格 ID：性格胶囊显示原始编号（3 字符），验证胶囊不被撑破
+        dict(gid=5014, name="护主犬", base_conf=3070, gender=2, mark=0, nature=999, level=1),
+        dict(gid=5015, name="乖乖鹄", base_conf=3344, gender=1, mark=3, nature=7),
+        # 16) 体型上限 → "大"；长名称 + 两个参考标记
+        dict(gid=5016, name=_LONGEST_NORMAL[1], base_conf=_LONGEST_NORMAL[0], gender=2, mark=0, nature=2,
+             weight=9000),
+        dict(gid=5017, name="迪莫", base_conf=3004, gender=1, mark=1, nature=14, worn_medal_id=1002),
+        dict(gid=5018, name="火神", base_conf=3006, gender=2, mark=4, nature=1, worn_medal_id=1025),
+        dict(gid=5019, name="水灵", base_conf=3005, gender=1, mark=8, nature=12, worn_medal_id=1026),
+        dict(gid=5020, name="燃薪虫", base_conf=3437, gender=2, mark=0, nature=4),
+        dict(gid=5021, name="小独角兽", base_conf=3062, gender=1, mark=15, nature=10),
+        dict(gid=5022, name="菊花梨", base_conf=3227, gender=2, mark=5, nature=13),
+        dict(gid=5023, name="恶魔叮", base_conf=3010, gender=1, mark=0, nature=7),
+        dict(gid=5024, name="皇家狮鹫", base_conf=3469, gender=2, mark=14, nature=12),
+    ]
+    box_pets = [_extreme_pet(static, **row) for row in rows]
+    team_pets = []
+    for index in range(12):
+        name, base_conf, _level = _SAMPLE[index % len(_SAMPLE)]
+        team_pets.append(_extreme_pet(
+            static, 5101 + index, name, base_conf, gender=1 + index % 2,
+            mark=(_PARTNER_MARK_IDS + (0, _UNKNOWN_PARTNER_MARK_ID, 1))[index], nature=1 + index % 15,
+        ))
+    repository._pets = {pet.gid: pet for pet in box_pets + team_pets}
+    repository._backpack = Backpack(
+        {
+            # 6 列 5 排：前 24 格是极限卡片，后 6 格留空格
+            1: PetBox(1, tuple(row["gid"] for row in rows) + (0,) * 6, "极限数据箱"),
+            # 四种空态：未采集（None）/ 空格（0）/ 待补（箱内 gid 未采集到）
+            2: PetBox(2, (None,) * 10 + (0,) * 10 + _UNKNOWN_SLOT_GIDS, "四种空态"),
+            3: PetBox(3, (0,) * 30, ""),
+        },
+        (
+            PetBox(1, tuple(pet.gid for pet in team_pets[:6]), "极限队伍一"),
+            PetBox(2, tuple(pet.gid for pet in team_pets[6:]), "极限队伍二"),
+            PetBox(3, (0,) * 6, ""),
+        ),
+        1,
+    )
+    repository._locations = repository._backpack.locations()
+    repository._version += 1
+
+
 
 def _demo_home() -> HomeRepository:
     repo = HomeRepository()
@@ -74,7 +180,7 @@ def _demo_home() -> HomeRepository:
     return repo
 
 
-def build_demo_context(tmp: Path, count: int) -> AppContext:
+def build_demo_context(tmp: Path, count: int, scenario: str = "normal") -> AppContext:
     """合成 AppContext：内存快照 + 临时配置，不落库、不抓包。"""
     load_library(schema_dir())
     static = load_static_data(static_dir())
@@ -132,6 +238,8 @@ def build_demo_context(tmp: Path, count: int) -> AppContext:
     repository._backpack = Backpack(boxes, teams, 1 if teams else None)
     repository._locations = repository._backpack.locations()
     repository._version += 1
+    if scenario == "extreme":
+        _apply_extreme_dataset(static, repository)
     repository._account.observe(PlayerIdentity(uid=101384922, name="话绵雨", level=60))
 
     # 合成蛋仓（联查蛋目录：confId 取 eggs.json 的真实条目）
@@ -182,17 +290,21 @@ def build_demo_context(tmp: Path, count: int) -> AppContext:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--pets", type=int, default=12)
+    parser.add_argument("--pets", type=int, default=None, help="普通数据集精灵数量（默认 12）")
+    parser.add_argument("--scenario", choices=("normal", "extreme"), default="normal",
+                        help="normal=日常演示数据；extreme=极限布局验收数据集")
     parser.add_argument("--no-open", action="store_true", help="不开浏览器，只打印 URL")
     args = parser.parse_args(argv)
 
     setup_logger(logs_dir())
     tmp = Path(tempfile.mkdtemp())
-    context = build_demo_context(tmp, args.pets)
+    count = args.pets if args.pets is not None else 12
+    context = build_demo_context(tmp, count, scenario=args.scenario)
     server = LocalServer(context, port=0)
     server.start()
 
-    info = {"url": server.url, "port": server.port, "pets": args.pets}
+    info = {"url": server.url, "port": server.port, "scenario": args.scenario,
+            "pets": len(context.pet_repository.snapshot())}
     print("[web-demo] " + json.dumps(info, ensure_ascii=False), flush=True)
 
     if not args.no_open:

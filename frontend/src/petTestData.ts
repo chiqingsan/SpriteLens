@@ -8,7 +8,7 @@ export function testPet(gid = 1): Pet {
     range_positions: { height: { ratio: .5, status: 'within' }, weight: { ratio: null, status: 'missing' } },
     skills: [], portrait_url: '/static/pet-media/3001-normal-portrait.webp', artwork_url: '', icon_url: '', is_shiny: false,
     is_colorful: false, color_card: null, medal_marks: [], base_conf_id: 3004, stat_sum: 0, species_stat_sum: 0,
-    worn_medal_id: 0, catch_way: 0, add_time: 0, worn_medal_name: '', location: null, reference_ranges: { height: '暂无数据', weight: '暂无数据' }, egg_ranges: { height: '暂无数据', weight: '暂无数据' },
+    worn_medal_id: 0, catch_way: 0, add_time: 0, worn_medal_name: '', partner_mark_id: 0, partner_mark: null, location: null, reference_ranges: { height: '暂无数据', weight: '暂无数据' }, egg_ranges: { height: '暂无数据', weight: '暂无数据' },
     detail: { speciality_name: '特性未知', acquisition_name: '未采集', types: [],
       measurements: { height: { value: 1, limits: [.5, 1.5], ratio: .5, status: 'within' },
         weight: { value: 2, limits: null, ratio: null, status: 'unknown' }, voice: { value: 10, limits: [-100, 100], ratio: .55, status: 'within' } },

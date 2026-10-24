@@ -16,12 +16,14 @@ export interface PetDetailData {
 export interface RangePosition { ratio: number | null; status: string }
 export interface ColorCard { card_id: string; name: string; particle_name: string; particle_id: number; base_color: string; mix_color: string }
 export interface MedalMark { label: string; name: string; source: string }
+export interface PartnerMark { id: number; name: string; icon_url: string; frame_url: string }
 export type PetLocation = { team_id: number; slot: number; historical: boolean } | { box_id: number; slot: number; row: number; column: number }
 export interface PetSummary {
   [key: string]: unknown
   gid: number; name: string; gender: number; nature_name: string; species_name: string; egg_groups: string[]
   portrait_url: string; artwork_url: string; icon_url: string; is_shiny: boolean; is_colorful: boolean
   color_card: ColorCard | null; medal_marks: MedalMark[]
+  partner_mark_id: number; partner_mark: PartnerMark | null
   height_text: string; weight_text: string; voice_text: string
   range_positions: { height: RangePosition; weight: RangePosition }
   location: PetLocation | null
@@ -67,6 +69,10 @@ function position(value: unknown): value is RangePosition {
 function colorCard(value: unknown): value is ColorCard {
   return record(value) && ['card_id', 'name', 'particle_name', 'base_color', 'mix_color'].every(key => typeof value[key] === 'string') && integer(value.particle_id)
 }
+function partnerMark(value: unknown): value is PartnerMark {
+  return value === null || record(value) && integer(value.id) && value.id > 0
+    && typeof value.name === 'string' && typeof value.icon_url === 'string' && typeof value.frame_url === 'string'
+}
 function location(value: unknown): value is PetLocation | null {
   if (value === null) return true
   if (!record(value) || !integer(value.slot) || value.slot < 1) return false
@@ -108,6 +114,7 @@ function pet(value: unknown): value is Pet {
     && typeof value.is_shiny === 'boolean' && typeof value.is_colorful === 'boolean'
     && (value.color_card === null || colorCard(value.color_card))
     && Array.isArray(value.medal_marks) && value.medal_marks.every(item => record(item) && ['label', 'name', 'source'].every(key => typeof item[key] === 'string'))
+    && integer(value.partner_mark_id) && partnerMark(value.partner_mark)
     && ['base_conf_id', 'stat_sum', 'species_stat_sum', 'worn_medal_id', 'catch_way', 'add_time'].every(key => integer(value[key])) && typeof value.worn_medal_name === 'string'
     && detail(value.detail) && location(value.location) && ranges(value.reference_ranges) && ranges(value.egg_ranges)
 }
@@ -120,6 +127,7 @@ function petSummary(value: unknown): value is PetSummary {
     && (value.color_card === null || colorCard(value.color_card))
     && Array.isArray(value.medal_marks) && value.medal_marks.every(item => record(item)
       && ['label', 'name', 'source'].every(key => typeof item[key] === 'string'))
+    && integer(value.partner_mark_id) && partnerMark(value.partner_mark)
     && record(value.range_positions) && position(value.range_positions.height) && position(value.range_positions.weight)
     && location(value.location)
 }

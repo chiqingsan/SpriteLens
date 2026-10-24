@@ -47,6 +47,32 @@ def species_icon_url(base_conf_id: int) -> str:
     return pet_images(base_conf_id)["portrait_url"]
 
 
+_PARTNER_MARK_ASSETS = {
+    1: "img_biaoji10_png.webp",
+    3: "img_biaoji11_png.webp",
+    4: "img_biaoji16_png.webp",
+    5: "img_biaoji13_png.webp",
+    6: "img_biaoji6_png.webp",
+    7: "img_biaoji15_png.webp",
+    8: "img_biaoji1_png.webp",
+    14: "img_biaoji12_png.webp",
+    15: "img_biaoji14_png.webp",
+}
+
+
+def partner_mark_payload(mark_id: int) -> dict | None:
+    """游戏 PetData.partner_mark 的只读展示数据；0 或未知标记不伪造图标。"""
+    asset = _PARTNER_MARK_ASSETS.get(mark_id)
+    if asset is None:
+        return None
+    return {
+        "id": mark_id,
+        "name": "伙伴标记",
+        "icon_url": f"/static/partner-marks/{asset}",
+        "frame_url": "/static/partner-marks/frame.webp",
+    }
+
+
 def pet_row(
     pet: Pet,
     static: StaticData | None,
@@ -104,6 +130,8 @@ def pet_row(
         **pet_images(pet.base_conf_id, bool(pet.mutation_type & 1)),
         "color_card": color_catalog.effect_for(pet.glass_type, pet.glass_value) if color_catalog and pet.mutation_type & 8 else None,
         "worn_medal_id": pet.worn_medal_id,
+        "partner_mark_id": pet.partner_mark,
+        "partner_mark": partner_mark_payload(pet.partner_mark),
         "detail": detail_payload(pet, static, egg_catalog),
         "catch_way": pet.catch_way, "add_time": pet.add_time,
         "medal_marks": pet_marks(pet, weight_range),
@@ -154,6 +182,8 @@ def pet_summary_row(pet: Pet, static: StaticData | None, color_catalog=None) -> 
         "color_card": color_catalog.effect_for(pet.glass_type, pet.glass_value)
         if color_catalog and pet.mutation_type & 8 else None,
         "medal_marks": pet_marks(pet, weight_range),
+        "partner_mark_id": pet.partner_mark,
+        "partner_mark": partner_mark_payload(pet.partner_mark),
         "height_text": f"{pet.height / 100:.2f} m" if pet.height else "暂无数据",
         "weight_text": f"{pet.weight / 1000:.2f} kg" if pet.weight else "暂无数据",
         "voice_text": f"{pet.voice:+d}" if pet.voice else "暂无数据",
