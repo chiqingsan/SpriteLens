@@ -177,10 +177,10 @@
 #pet-grid.box-fill-grid .point-top { display: flex; justify-content: space-between; width: 100%; }
 #pet-grid.box-fill-grid .point-markers { position: absolute; left: 50%; transform: translateX(-50%); display: grid; grid-template-columns: 16px 20px; gap: var(--space-1); }
 /* 伙伴标记：顶行左簇固定为「性别 → 伙伴标记」，稀有/色卡保持绝对居中，性格胶囊贴右。
+   尺寸统一由 ui.css 的 .pet-partner-mark（18px）决定，这里只负责排列顺序和间隙。
    最小支持窗口下卡片内容宽约 124px，居中标记组宽 40px（16+4+20）左边缘约 42px；
-   左簇 14px 性别 + 2px 间隙 + 24px 标记 = 40px，仍留约 2px 净空，不覆盖居中标记与性格胶囊。 */
+   左簇 14px 性别 + 2px 间隙 + 18px 标记 = 34px，留约 7px 净空，不覆盖居中标记与性格胶囊。 */
 #pet-grid .point-top > .point-top-left { display: inline-flex; align-items: center; justify-content: flex-start; gap: 2px; min-width: 0; flex: none; }
-#pet-grid .point-top > .point-top-left > .pet-partner-mark { width: 24px; height: 24px; }
 #pet-grid.box-fill-grid .point-portrait-row { grid-template-columns: 28px minmax(0, 1fr) 28px; }
 #pet-grid.box-fill-grid .point-groups, #pet-grid.box-fill-grid .point-medals { width: 28px; }
 #pet-grid.box-fill-grid .point-avatar { max-width: 96px; }
