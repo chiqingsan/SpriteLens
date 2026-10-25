@@ -235,7 +235,8 @@ defineExpose({ update, load, pause, resume })
 .nearby-count-inline span { color: var(--muted); font-weight: normal; }
 .nearby-notices { display: flex; flex-direction: column; gap: var(--space-2); }
 .nearby-toolbar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; min-width: 0; }
-.nearby-search { display: flex; align-items: center; gap: var(--space-3); flex: 1 1 240px; min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); padding-inline: var(--space-4); }
+.nearby-search { display: flex; align-items: center; gap: var(--space-3); flex: 1 1 240px; min-width: 0; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); padding-inline: var(--space-4); }
+/* 搜索框用胶囊圆角：与同排的胶囊状态一致，只是外壳圆角，不改输入框本身。 */
 .nearby-search input { width: 100%; min-width: 0; border: 0; background: none; height: 34px; color: var(--ink); }
 .nearby-search:focus-within { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .nearby-sort { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-xs); min-width: 0; max-width: 100%; }
