@@ -411,12 +411,19 @@ body, .app-shell, .sidebar, .main-shell, .topbar, .content-panel, .filter-rail,
 /* 采集切换按钮：采集中是常态，运行态保持中性，不长期占用警示色；
    只在处理中（toggle-busy）短暂用琥珀提示状态切换。 */
 .top-actions .primary-button.stop-button {
-  background: var(--surface-2);
-  color: var(--ink-soft);
-  font-weight: 500;
+  background: color-mix(in srgb, var(--ink) 72%, var(--panel));
+  color: var(--white);
+  font-weight: 600;
+  border-color: transparent;
 }
-.top-actions .primary-button.stop-button:hover:not(:disabled) { background: var(--surface-3); color: var(--ink); }
-.top-actions .primary-button.stop-button:active:not(:disabled) { background: var(--surface-3); color: var(--ink); }
+.top-actions .primary-button.stop-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 82%, var(--panel));
+  color: var(--white);
+}
+.top-actions .primary-button.stop-button:active:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 88%, var(--panel));
+  color: var(--white);
+}
 .top-actions .primary-button.toggle-busy {
   background: var(--amber);
   color: var(--on-amber);
@@ -428,22 +435,26 @@ body, .app-shell, .sidebar, .main-shell, .topbar, .content-panel, .filter-rail,
 .ghost-button, .ui-btn--ghost {
   height: 34px; padding: 0 var(--space-6);
   border-radius: var(--radius-md);
-  background: var(--surface-2); color: var(--ink-soft);
+  background: var(--panel); color: var(--ink);
   font-size: var(--fs-sm);
   font-weight: 600;
-  border: 1px solid transparent;
+  border: 1px solid var(--hairline-strong);
 }
-.ghost-button:hover:not(:disabled), .ui-btn--ghost:hover:not(:disabled) { background: var(--surface-3); border-color: var(--line); color: var(--ink); }
+.ghost-button:hover:not(:disabled), .ui-btn--ghost:hover:not(:disabled) {
+  background: var(--surface-1);
+  border-color: color-mix(in srgb, var(--ink) 22%, transparent);
+  color: var(--ink);
+}
 .ghost-button:disabled, .ui-btn--ghost:disabled { opacity: .45; cursor: not-allowed; }
 .ghost-button.small { height: 30px; padding: 0 var(--space-4); font-size: var(--fs-xs); }
 
 .icon-button, .ui-icon-btn {
   width: 28px; height: 28px; padding: var(--space-1);
   border-radius: var(--radius-sm);
-  background: transparent; color: var(--muted);
+  background: transparent; color: var(--ink-soft);
   display: inline-grid; place-items: center;
 }
-.icon-button:hover, .ui-icon-btn:hover { background: var(--surface-2); color: var(--ink); }
+.icon-button:hover, .ui-icon-btn:hover { background: var(--surface-2); border-color: transparent; color: var(--ink); }
 .text-button {
   background: transparent;
   color: var(--teal-dark);
@@ -636,7 +647,7 @@ input[type="password"]:focus, select:focus, textarea:focus {
   height: 28px; padding: 0 var(--space-5);
   border: 0; border-radius: calc(var(--radius-md) - 2px);
   background: transparent;
-  font-size: var(--fs-xs); font-weight: 500; color: var(--muted);
+  font-size: var(--fs-xs); font-weight: 500; color: var(--ink-soft);
   line-height: 1;
 }
 .segmented button:hover, .ui-segmented > button:hover { color: var(--ink); background: color-mix(in srgb, var(--panel) 55%, transparent); }
