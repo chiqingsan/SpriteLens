@@ -165,6 +165,12 @@ class PetRepository:
             return self._version
 
     @property
+    def display_uid(self) -> int:
+        """当前数据归属账号（离线载入也算）；推送摘要按版本复用时用作依赖项。"""
+        with self._lock:
+            return self._account.display_uid
+
+    @property
     def identity(self) -> PlayerIdentity | None:
         with self._lock:
             return self._account.identity

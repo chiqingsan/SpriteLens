@@ -116,6 +116,8 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         self._blocking_tasks: set[asyncio.Task] = set()
         self._push_task: asyncio.Task | None = None
         self._last_state_json: str | None = None
+        # 宠物摘要按（uid/版本/身份/账号代次）复用，见 CaptureRoutesMixin._pet_summary
+        self._pet_summary_cache: tuple[object, dict] | None = None
         self._account_epoch = 0
         self._pet_media_cache: PetMediaCache | None = None
         self._account_avatar_cache: AccountAvatarCache | None = None
@@ -783,22 +785,32 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
     async def _push_loop(self) -> None:
         while True:
             try:
-                payload = await self._run_blocking(self._push_payload)
-                encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-                if encoded != self._last_state_json:
-                    self._last_state_json = encoded
-                    await self._broadcast(encoded)
+                await self._push_once()
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001 - 推送失败不拖垮服务
                 logger.debug("状态推送异常: %s", exc)
             await asyncio.sleep(PUSH_INTERVAL)
 
-    def _push_payload(self) -> dict:
-        """推送前推进一次移动插值：推进只发生在写路径，GET 只读快照。"""
+    async def _push_once(self) -> None:
+        """一拍推送：无人订阅时只推进场景插值，跳过整份状态构造与编码（PERF07）。"""
+        if not self._sockets:
+            await self._run_blocking(self._advance_scene)
+            return
+        payload = await self._run_blocking(self._push_payload)
+        encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        if encoded != self._last_state_json:
+            self._last_state_json = encoded
+            await self._broadcast(encoded)
+
+    def _advance_scene(self) -> None:
+        """推进一次移动插值（只发生在写路径，GET 只读快照）。"""
         scene = self._context.scene_repository
         if scene is not None:
             scene.advance()
+
+    def _push_payload(self) -> dict:
+        self._advance_scene()
         return self._state_payload()
 
     async def _broadcast(self, text: str) -> None:

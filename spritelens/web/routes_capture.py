@@ -210,8 +210,10 @@ class CaptureRoutesMixin:
     def _state_payload(self, view: PetView | None = None) -> dict:
         ctx = self._context
         if view is None:
-            view = ctx.pet_vm.view_with(PetFilters())
-        pets = pet_summary_payload(view, ctx.static_data)
+            pets = self._pet_summary()
+        else:
+            # bootstrap 与 /api/pets 共用同一快照：必须用传入的 view，不复用缓存
+            pets = pet_summary_payload(view, ctx.static_data)
         capture = ctx.capture_vm.snapshot()
         install = ctx.capture_vm.install_state()
         nearby = ctx.scene_repository.snapshot() if ctx.scene_repository is not None else None
@@ -237,6 +239,29 @@ class CaptureRoutesMixin:
                 "progress": install.progress,
             },
         }
+
+    def _pet_summary(self) -> dict:
+        """宠物摘要按（归属 uid、仓库版本、身份、账号代次）复用（PERF07）。
+
+        状态推送每 0.5s 取一次；静止采集时宠物仓库的输入不变，而重新排序
+        快照并聚合统计是每拍的主要构造成本，因此按依赖项缓存摘要。
+        采集计数、安装进度、环境与附近数据仍在每次调用时重新读取。
+        """
+        ctx = self._context
+        repo = ctx.pet_repository
+        key = (
+            repo.display_uid,
+            repo.version,
+            repo.identity,
+            repo.cached_identity,
+            self._account_epoch,
+        )
+        cache = self._pet_summary_cache
+        if cache is not None and cache[0] == key:
+            return cache[1]
+        summary = pet_summary_payload(ctx.pet_vm.view_with(PetFilters()), ctx.static_data)
+        self._pet_summary_cache = (key, summary)
+        return summary
 
     def _environment_payload(self) -> dict:
         """环境报告 → JSON（/api/capture 与 WS state 推送共用一份契约）。"""

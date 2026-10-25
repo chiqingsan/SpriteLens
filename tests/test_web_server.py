@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import tempfile
 import threading
@@ -15,7 +16,7 @@ import urllib.parse
 import urllib.request
 from dataclasses import replace
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from spritelens.app_context import AppContext
 from spritelens.capture.key_store import KeyStore
@@ -25,6 +26,7 @@ from spritelens.repositories.settings import SettingsRepository
 from spritelens.services.monitor_service import MonitorService
 from spritelens.services.pet_repository import PetRepository
 from spritelens.view_models import CaptureViewModel, PetViewModel
+from spritelens.view_models.pet_vm import PetFilters
 from spritelens.web.payloads_catalog import handbook_payload
 from spritelens.web.server import LocalServer
 
@@ -495,6 +497,96 @@ class LocalServerTest(unittest.TestCase):
         first = asyncio.run(good_scenario())
         self.assertIn("pets_total", first)
         self.assertIn("capture", first)
+
+
+class StatePushTest(unittest.TestCase):
+    """状态推送：无人订阅时省掉构造，宠物摘要按（版本、身份、代次）复用（PERF07）。"""
+
+    def _server(self, pets: tuple[Pet, ...] = ()) -> LocalServer:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        context = _make_context(Path(tmp.name), pets=pets)
+        self.addCleanup(context.close)
+        return LocalServer(context, token="push-token", port=0)
+
+    def test_push_once_without_subscribers_only_advances_scene(self):
+        """没有 WS 订阅者时只推进场景插值，不构造整份状态载荷。"""
+        server = self._server()
+
+        class _Scene:
+            def __init__(self) -> None:
+                self.advances = 0
+
+            def advance(self) -> None:
+                self.advances += 1
+
+        scene = _Scene()
+        server._context.scene_repository = scene
+        with patch.object(
+            LocalServer, "_state_payload", side_effect=AssertionError("无人订阅却构造了状态")
+        ):
+            asyncio.run(server._push_once())
+        self.assertEqual(scene.advances, 1)
+
+    def test_push_once_with_subscribers_broadcasts_only_on_change(self):
+        """有订阅者时构造并广播；内容未变化时不重复广播。"""
+        server = self._server(pets=(_pet(1, name="迪莫", level=60, first=True),))
+        server._sockets.add(object())  # 只用于判定「有订阅者」，广播被替换掉
+        server._state_payload = Mock(return_value={"pets_total": 1})
+        server._broadcast = AsyncMock()
+        asyncio.run(server._push_once())
+        self.assertEqual(server._broadcast.await_count, 1)
+        asyncio.run(server._push_once())  # 同一内容 → 去重
+        self.assertEqual(server._broadcast.await_count, 1)
+        server._state_payload.return_value = {"pets_total": 2}
+        asyncio.run(server._push_once())
+        self.assertEqual(server._broadcast.await_count, 2)
+
+    def test_state_payload_reuses_pet_summary_until_dependencies_change(self):
+        """静止采集复用宠物摘要；版本、账号代次变化才重建。"""
+        server = self._server(
+            pets=(
+                _pet(1, name="迪莫", level=60, first=True),
+                _pet(2, name="火神", level=30),
+            )
+        )
+        context = server._context
+        repository = context.pet_repository
+        direct = PetRepository.consistent_snapshot
+        calls: list[int] = []
+
+        def counting(repo):
+            calls.append(1)
+            return direct(repo)
+
+        with patch.object(PetRepository, "consistent_snapshot", counting):
+            first = server._state_payload()
+            second = server._state_payload()
+            self.assertEqual(len(calls), 1)  # 第二次命中缓存
+            self.assertEqual(second, first)
+            self.assertEqual(first["pets_total"], 2)
+            from_view = server._state_payload(context.pet_vm.view_with(PetFilters()))
+            self.assertEqual(from_view, first)  # 复用值与重建值一致
+            repository.clear()  # 版本推进 → 缓存失效
+            after_clear = server._state_payload()
+            self.assertEqual(len(calls), 3)  # 摘要重建 1 次 + 直连 view 1 次 + 失效后 1 次
+        self.assertEqual(after_clear["pets_total"], 0)
+        self.assertEqual(after_clear["pets_version"], first["pets_version"] + 1)
+
+        server._account_epoch += 1  # 账号代次变化 → 同样重建
+        with patch.object(PetRepository, "consistent_snapshot", counting):
+            bumped = server._state_payload()
+        self.assertEqual(len(calls), 4)
+        self.assertEqual(bumped["account_epoch"], 1)
+
+    def test_state_payload_uses_given_view_without_cache(self):
+        """bootstrap/宠物列表传入快照时不得改写复用缓存。"""
+        server = self._server(pets=(_pet(1, name="迪莫", level=60, first=True),))
+        context = server._context
+        view = context.pet_vm.view_with(PetFilters())
+        self.assertEqual(server._state_payload(view)["pets_total"], 1)
+        self.assertEqual(server._state_payload(view)["pets_total"], 1)
+        self.assertIsNone(server._pet_summary_cache)
 
 
 class HandbookPayloadTest(unittest.TestCase):
