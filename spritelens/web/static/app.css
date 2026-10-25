@@ -287,10 +287,12 @@ body, .app-shell, .sidebar, .main-shell, .topbar, .content-panel, .filter-rail,
   color: var(--sidebar-muted);
   user-select: none;
   font-size: var(--fs-3xs);
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
 }
 .sidebar-settings {
-  width: 100%;
+  flex: 1; min-width: 0;
   justify-content: flex-start;
   gap: var(--space-4);
   height: 38px;
@@ -302,12 +304,35 @@ body, .app-shell, .sidebar, .main-shell, .topbar, .content-panel, .filter-rail,
 .sidebar-settings.active { background: transparent; color: var(--ink); }
 .sidebar-settings.active:hover { background: transparent; }
 .sidebar-settings > .ui-icon:not(.nav-icon) { margin-left: auto; opacity: .55; }
+.sidebar-rail-toggle { flex: none; width: 32px; height: 32px; }
+.sidebar-rail-toggle:hover { background: var(--sidebar-hover); }
 .privacy-dot {
   width: 8px; height: 8px; border-radius: 50%;
   background: var(--ok); margin-top: var(--space-1); flex: none;
 }
 .sidebar-foot strong { display: block; font-size: var(--fs-xs); color: var(--sidebar-text); font-weight: 600; }
 .sidebar-foot span { font-size: var(--fs-3xs); }
+
+/* 侧栏折叠为图标条：只保留图标 + tooltip（Ctrl+B 或底栏按钮切换，状态持久化） */
+#app.sidebar-rail { --sidebar: 64px; }
+#app.sidebar-rail .sidebar { padding: 12px 6px 10px; }
+#app.sidebar-rail .account-card { margin-bottom: var(--space-3); padding: 0; border: 0; background: transparent; box-shadow: none; }
+#app.sidebar-rail .account-information > summary { justify-content: center; padding: var(--space-1); height: 44px; }
+#app.sidebar-rail .account-information > summary > .account-expand,
+#app.sidebar-rail .account-copy,
+#app.sidebar-rail .account-uid-row,
+#app.sidebar-rail .nav-group-title { display: none; }
+#app.sidebar-rail .account-avatar { width: 40px; height: 40px; border-radius: var(--radius-lg); }
+#app.sidebar-rail .nav-group + .nav-group { margin-top: var(--space-1); padding-top: var(--space-2); border-top: 1px solid var(--sidebar-line); }
+#app.sidebar-rail .nav-item { justify-content: center; padding: 0; gap: 0; font-size: 0; }
+#app.sidebar-rail .nav-item .nav-icon { width: 19px; height: 19px; }
+#app.sidebar-rail .sidebar-foot { flex-direction: column; align-items: center; gap: var(--space-1); padding-top: var(--space-3); }
+#app.sidebar-rail .sidebar-settings { flex: none; width: 40px; justify-content: center; padding: 0; gap: 0; font-size: 0; background: transparent; border: 0; box-shadow: none; }
+#app.sidebar-rail .sidebar-settings:hover { background: var(--sidebar-hover); }
+#app.sidebar-rail .sidebar-settings.active { background: var(--panel); box-shadow: var(--shadow-1); }
+#app.sidebar-rail .sidebar-settings > .ui-icon:not(.nav-icon) { display: none; }
+#app.sidebar-rail .sidebar-rail-toggle { width: 34px; height: 34px; }
+
 
 /* ══════════════ 主区：浮动工作画布 ══════════════ */
 .main-shell {
@@ -381,8 +406,21 @@ body, .app-shell, .sidebar, .main-shell, .topbar, .content-panel, .filter-rail,
 .status-copy { font-size: var(--fs-xs); color: var(--muted); }
 .capture-summary .status-copy { flex-basis: 100%; }
 
-.top-actions { display: flex; gap: var(--space-3); align-items: center; }
+.top-actions { display: flex; gap: var(--space-2); align-items: center; }
 .top-actions button { white-space: nowrap; }
+.top-search-button {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  height: 32px; padding: 0 var(--space-2) 0 var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--hairline-strong);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
+.top-search-button:hover { border-color: color-mix(in srgb, var(--ink) 22%, transparent); color: var(--ink); }
+.top-search-button .ui-kbd { margin-left: var(--space-1); }
+.top-search-label { display: inline-block; }
 
 /* ── 按钮 ──
    平面风格：纯色填充、无渐变、无投影、无悬停抬升；
@@ -408,20 +446,20 @@ body, .app-shell, .sidebar, .main-shell, .topbar, .content-panel, .filter-rail,
 }
 .primary-button:disabled, .ui-btn--primary:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
 .primary-button.small { height: 30px; padding: 0 var(--space-4); font-size: var(--fs-xs); }
-/* 采集切换按钮：采集中是常态，运行态保持中性，不长期占用警示色；
+/* 采集切换按钮：运行态沿用主按钮的墨绿底（用户确认：停止采集 = 开始采集的配色），
    只在处理中（toggle-busy）短暂用琥珀提示状态切换。 */
 .top-actions .primary-button.stop-button {
-  background: color-mix(in srgb, var(--ink) 72%, var(--panel));
+  background: var(--teal);
   color: var(--white);
   font-weight: 600;
   border-color: transparent;
 }
 .top-actions .primary-button.stop-button:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--ink) 82%, var(--panel));
+  background: var(--teal-dark);
   color: var(--white);
 }
 .top-actions .primary-button.stop-button:active:not(:disabled) {
-  background: color-mix(in srgb, var(--ink) 88%, var(--panel));
+  background: var(--teal-deep);
   color: var(--white);
 }
 .top-actions .primary-button.toggle-busy {
@@ -986,6 +1024,8 @@ details[open] > :not(summary) { animation: reveal-in var(--motion-base) var(--mo
 @media (max-width: 960px) {
   :root { --sidebar: 184px; --canvas-margin: 8px; }
   .topbar { padding: 0 var(--space-4); gap: var(--space-4); }
+  .top-search-label, .top-search-button .ui-kbd { display: none; }
+  .top-search-button { padding: 0 var(--space-2); }
 }
 @media (max-width: 760px) {
   :root { --sidebar: 168px; --canvas-margin: 6px; }

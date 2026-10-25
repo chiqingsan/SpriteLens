@@ -264,6 +264,24 @@
   #pet-grid.game-box-grid .point-egg-group { font-size: 11px; line-height: 16px; }
 }
 
+/* 窄窗列数：≤760 时 6 列卡宽不足 100px，数值/名字会被裁切。
+   让箱位网格退化为自适应卡片网格（保持箱位顺序、可纵向滚动），
+   640 时 3 列，保证卡片内容完整。 */
+@media (max-width: 760px) {
+  #pet-grid.box-fill-grid {
+    height: auto;
+    min-height: 0;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-rows: none;
+    grid-auto-rows: 152px;
+    align-content: start;
+  }
+  #pet-grid.box-fill-grid > .point-pet { height: 100%; }
+}
+@media (max-width: 640px) {
+  #pet-grid.box-fill-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
 /* 640 窗口：内容宽约 576，6 列卡宽仅 ~89px。优先保住立绘、名称和三列数值，
    两侧蛋组/奖牌与顶部居中标记让位，避免元素互相遮挡。 */
 @media (max-width: 640px) {

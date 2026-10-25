@@ -34,6 +34,10 @@ ICONS = {
     "arrows-shuffle": ["generate", "plan", "regenerate"],
     "alert-circle": ["error", "failure"],
     "info-circle": ["notice", "info"],
+    "layout-sidebar-left-collapse": ["sidebar", "collapse", "rail"],
+    "layout-sidebar-left-expand": ["sidebar", "expand", "rail"],
+    "corner-down-left": ["enter", "open", "run"],
+    "command": ["palette", "shortcut", "search"],
 }
 STROKE_WIDTH_OVERRIDES = {"arrow-up": "2.5", "arrow-down": "2.5"}
 

@@ -511,6 +511,58 @@
       "sha256": "48b7dddf34a6b87e93843a42b14781ce01794cf69274c458249ed8bfc01b6e4d"
     },
     {
+      "name": "layout-sidebar-left-collapse",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/layout-sidebar-left-collapse",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/layout-sidebar-left-collapse.svg",
+      "license": "MIT",
+      "search_tags": [
+        "sidebar",
+        "collapse",
+        "rail"
+      ],
+      "sha256": "f8058a4540ca374e0c0ae15ab4a4ffc1b0e5e0369ae4eea3363bb8e53aec75da"
+    },
+    {
+      "name": "layout-sidebar-left-expand",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/layout-sidebar-left-expand",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/layout-sidebar-left-expand.svg",
+      "license": "MIT",
+      "search_tags": [
+        "sidebar",
+        "expand",
+        "rail"
+      ],
+      "sha256": "49deaa23030d08ed8ef60c53bef50b64f77a64a64bd07398c2845b25594c66ee"
+    },
+    {
+      "name": "corner-down-left",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/corner-down-left",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/corner-down-left.svg",
+      "license": "MIT",
+      "search_tags": [
+        "enter",
+        "open",
+        "run"
+      ],
+      "sha256": "43ddec644c3ca5330aa385cafc804dac73addc337007fdd314658216348d3192"
+    },
+    {
+      "name": "command",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/command",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/command.svg",
+      "license": "MIT",
+      "search_tags": [
+        "palette",
+        "shortcut",
+        "search"
+      ],
+      "sha256": "e2c48826702bf66925f59380f78e10404f23562b90563a95112cb004acb80e45"
+    },
+    {
       "name": "star",
       "source": "项目保留图形（原资源）",
       "url": "",

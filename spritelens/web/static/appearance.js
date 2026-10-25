@@ -64,6 +64,11 @@
   window.SpriteLensAppearance = {
     initialize: function (value, persist, toast, open) { save = persist; notify = toast; openBrowser = open; apply(value); },
     view: function (view) { update({ pet_view: view }); },
-    shortcuts: function (items) { return update({ shortcuts: items }); }
+    shortcuts: function (items) { return update({ shortcuts: items }); },
+    theme: function (name) {
+      if (["miaomiao", "huohua", "shuilanlan"].indexOf(name) < 0) { return; }
+      update({ theme: name });
+    },
+    currentTheme: function () { return preferences.theme; }
   };
 })();
