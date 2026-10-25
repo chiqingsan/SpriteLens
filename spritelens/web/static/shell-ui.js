@@ -275,5 +275,6 @@
       if (railButton) { event.preventDefault(); applyRail(!appShell.classList.contains("sidebar-rail"), true); }
     }
     if (layer && !layer.hidden && event.key === "Escape") { closePalette(); }
+    if (layer && !layer.hidden && event.key === "Tab") { event.preventDefault(); input.focus(); }
   });
 })();
