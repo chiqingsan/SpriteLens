@@ -165,15 +165,15 @@ def _demo_home() -> HomeRepository:
         room_level=10,
         residents=(
             HomeResident(actor_id=0x84182c0b68a0000a, name="护主犬", gender=1, level=41,
-                         position=(-882, 1284, 61)),
+                         position=(-882, 1284, 61), instance_id=1000),
             HomeResident(actor_id=0x84182c0b68a0000b, name="喵喵", gender=2, level=35,
-                         position=(100, 200, 1)),
+                         position=(100, 200, 1), instance_id=1001),
         ),
         nests=(
             HomeFurniture(config_id=710069, guid="70182c0b68100000", kind="ordinary",
                           name="普通小窝", position=(100, 200, 1)),
-            HomeFurniture(config_id=150011, guid="65d37b61f2690", kind="furniture",
-                          name="家具 #150011", position=(300, 400, 1)),
+            HomeFurniture(config_id=1001072, guid="65d37b61f2690", kind="academy",
+                          name="学院小窝", position=(300, 400, 1)),
         ),
     )
     repo._version += 1
