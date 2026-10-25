@@ -200,7 +200,6 @@ const projection = computed(() => {
     </div>
     <template v-if="!compact">
       <p v-if="projection">外环 {{ projection.range.toLocaleString('zh-CN') }} 单位 · 已定位 {{ projection.rows.length }} / {{ data?.actors.length ?? 0 }} · 原始坐标，未校准米制</p>
-      <p v-else>进入场景并移动后更新；缺少位置的精灵仍保留在列表。</p>
       </template>
   </section>
 </template>

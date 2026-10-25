@@ -174,7 +174,9 @@ defineExpose({ update, load, pause, resume })
         <span class="nearby-phase" :class="`is-${phase}`" :title="statusHint">
           <span class="nearby-phase-dot" aria-hidden="true"></span>{{ status }}
         </span>
+        <span v-if="rows.length" class="nearby-count-inline">{{ rows.length }} 只<span v-if="search.trim()"> / 已观察 {{ data?.actors.length ?? 0 }} 只</span></span>
       </div>
+      <span class="nearby-count-note" :class="{ 'is-stale': stale }" :title="countNoteTitle" role="status">{{ countNote }}</span>
     </header>
     <div v-if="floatingError || (error && !stale) || (data && !data.mapping_available)" class="nearby-notices">
       <p v-if="floatingError" class="nearby-error" role="alert">{{ floatingError }}</p>
@@ -186,10 +188,6 @@ defineExpose({ update, load, pause, resume })
       <label class="nearby-sort">排序<select v-model="sort" aria-label="附近精灵排序"><option value="recent">最近观察</option><option value="marks">有牌优先</option></select></label>
       <button class="ghost-button small nearby-refresh" :aria-busy="refreshing" :aria-disabled="refreshing" @click="refresh"><UiIcon name="refresh" />刷新</button>
       <button class="ghost-button small nearby-floating" @click="openFloating"><UiIcon name="eye" />悬浮雷达</button>
-    </div>
-    <div class="nearby-count">
-      <strong>{{ rows.length }} 只<span v-if="search.trim()"> / 已观察 {{ data?.actors.length ?? 0 }} 只</span></strong>
-      <span class="nearby-count-note" :class="{ 'is-stale': stale }" :title="countNoteTitle" role="status">{{ countNote }}</span>
     </div>
     <div class="nearby-workspace">
       <div ref="listViewport" class="nearby-list-pane">
@@ -218,7 +216,7 @@ defineExpose({ update, load, pause, resume })
       </div>
       <div class="nearby-radar-pane"><SceneRadar :data="data" :selected="selected" :radius="data?.radar_radius_raw" @select="selectActor" /></div>
     </div>
-    <p class="nearby-footnote">只显示本次连接观察到的精灵，切号或切场景后清空。</p>
+    <p class="nearby-footnote">只显示本次连接观察到的精灵，切号或切场景后清空；缺少位置的精灵仍保留在列表。</p>
   </div>
 </template>
 
@@ -232,8 +230,9 @@ defineExpose({ update, load, pause, resume })
 .nearby-phase { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--muted); min-width: 0; }
 .nearby-phase-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--teal); flex: none; }
 .nearby-phase.is-battle_unverified .nearby-phase-dot, .nearby-phase.is-disconnected .nearby-phase-dot, .nearby-phase.is-stopped .nearby-phase-dot, .nearby-phase.is-awaiting_identity .nearby-phase-dot { background: var(--amber); }
-.nearby-scene { font-size: var(--fs-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
-.nearby-heading-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+/* 计数并进状态行：空列表时不显示「0 只」，少一行零散文字。 */
+.nearby-count-inline { color: var(--ink); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.nearby-count-inline span { color: var(--muted); font-weight: normal; }
 .nearby-notices { display: flex; flex-direction: column; gap: var(--space-2); }
 .nearby-toolbar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; min-width: 0; }
 .nearby-search { display: flex; align-items: center; gap: var(--space-3); flex: 1 1 240px; min-width: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); padding-inline: var(--space-4); }
@@ -242,11 +241,8 @@ defineExpose({ update, load, pause, resume })
 .nearby-sort { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-xs); min-width: 0; max-width: 100%; }
 .nearby-sort select { min-width: 0; max-width: 100%; min-height: 34px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); padding-inline: var(--space-3); }
 .nearby-refresh, .nearby-floating { background: var(--panel); border: 1px solid var(--teal); color: var(--teal-dark); min-height: 34px; min-width: 0; max-width: 100%; white-space: normal; }
-.nearby-count { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); min-width: 0; font-size: var(--fs-xs); color: var(--muted); }
-.nearby-count strong { color: var(--ink); font-variant-numeric: tabular-nums; }
-.nearby-count strong span { font-weight: normal; color: var(--muted); }
-.nearby-count-note { flex: 0 1 auto; min-width: 0; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* 状态文案固定单行：失败提示出现/消失不改变计数行高度，避免内容区跳动；超窄视口截断，完整文案见 title。 */
+.nearby-count-note { flex: 0 1 auto; min-width: 0; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-xs); color: var(--muted); }
+/* 状态文案固定单行且常驻在标题右侧：失败提示出现/消失不改变布局，避免内容区跳动；超窄视口截断，完整文案见 title。 */
 .nearby-count-note.is-stale { padding: 0 var(--space-2); border-radius: var(--radius-sm); background: var(--amber-soft); color: var(--amber-ink); }
 .nearby-workspace { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr); gap: var(--space-4); flex: 1; min-height: 0; }
 .nearby-list-pane { min-width: 0; min-height: 0; overflow-y: auto; padding: 2px; }

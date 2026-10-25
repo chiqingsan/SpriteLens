@@ -157,12 +157,13 @@ C04 目标条件 → C05 应用内告警 → C06 雷达校准（米制/方位）
 - 信息密度调整验收（2026-10-25，真实静态资源 + 30 只构造实体，Edge headless）：1440×900 与 864×672 均 `sceneLine=false`、工具栏 `[刷新, 悬浮雷达]`、排序选项 `[最近观察, 有牌优先]`、图例「普通单牌双牌」、属性图标 18px（13 个图标、alt 为属性名）、页面滚动 0、雷达 491×570 / 262×323；截图在 `output/nearby-searchshot/`。`npx vitest run`（NearbyPage/SceneRadar/FloatingRadar）→ 33 passed；Python `test_scene` 等 5 模块 → 67 项 OK。
 - 布局验收（2026-10-25，同一回放 53 只实体、5 档尺寸）：1440×900 与 864×672 均无页面纵向滚动、雷达圆盘完整可见，首屏分别 7 张和 5 张完整卡片；1920×1080 首屏 10 张；1280×800 6 张；640×720 单列且列表在前、无横向滚动。`npx vitest run` → 167 passed / 1 skipped（28 文件）、`vue-tsc --noEmit` 通过、`tools/frontend.py build` 通过。
 
+- **文字整合（2026-10-25）**：计数并入状态行、提示移到标题右侧、页脚合并雷达说明、删除雷达空态重复行；`NearbyPage.vue` -12/+7 行、`SceneRadar.vue` 删 1 行；`vitest` 20 项通过、构建通过、数据态 1440×900 与 864×672 截图 `output/nearby-copy/` 与 `output/nearby-copy-actors/`（`countInline=5 只`、`cards=5`、`radarCaption` 单行、`pageScroll=0`）。
+
 ### 仍未验证
 
 - 真实桌面 WebView2 进程内的失效/恢复时序、WS 断开 1.5 秒重连窗口不闪动的端到端表现（仅单测与 headless 验证）。
 - stale 提示在 640×360 最小窗口与 150% 缩放下的换行/高度目检。
 - 真实游戏实时增量（非回放）下的长时观察与内存占用。
-
 ## 七、建议执行顺序（后续）
 
 1. 已交付：P0-1/2/3/4/5、失败语义统一、战斗语义（选项 A）、附近页布局与雷达视觉重构（见 §六）。
