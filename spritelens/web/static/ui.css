@@ -202,7 +202,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { appearance:
 .point-pet, .point-grid .point-pet.selected { background: var(--surface-1); }
 .point-pet.male, .point-grid .point-pet.male.selected { background: color-mix(in srgb, var(--male) 62%, var(--panel)); }
 .point-pet.female, .point-grid .point-pet.female.selected { background: color-mix(in srgb, var(--female) 62%, var(--panel)); }
-.point-grid { --pet-portrait: 64px; --pet-height: 164px; --pet-medal: 28px; --pet-name: 14px; --pet-number: 11px; }
+.point-grid { --pet-portrait: 64px; --pet-height: 164px; --pet-medal: 28px; --pet-name: 14px; --pet-number: 12px; }
 .point-pet { position: relative; border: 1px solid var(--line-soft); border-radius: var(--radius-md); justify-items: center; }
 .point-pet:hover { border-color: color-mix(in srgb, var(--teal) 45%, var(--line)); box-shadow: var(--shadow-2); z-index: 2; }
 .point-grid .point-pet:hover { transform: none; }
@@ -219,8 +219,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { appearance:
 .pet-partner-mark-frame { inset: 0; width: 100%; height: 100%; }
 .pet-partner-mark-icon { top: 50%; left: 50%; width: 62%; height: 62%; transform: translate(-50%, -50%); }
 .point-nature {
-  position: relative; flex: none; min-width: 0; max-width: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: var(--fs-2xs); font-weight: 500; text-align: center; line-height: 18px; height: 26px; padding: 3px 7px; border-radius: 999px;
+  position: relative; flex: none; min-width: 0; max-width: 44px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-3xs); font-weight: 500; text-align: center; line-height: 18px; height: 26px; padding: 3px 6px; border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
   background: color-mix(in srgb, var(--panel) 45%, transparent);
 }
@@ -260,8 +260,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { appearance:
 .point-pet .point-metrics > span { display: flex; align-items: baseline; justify-content: center; gap: 0; min-width: 0; white-space: nowrap; }
 .point-pet .point-metrics > span + span { border-left: 1px solid color-mix(in srgb, var(--line) 55%, transparent); }
 .point-pet .point-metrics b { font-size: var(--pet-number); font-weight: 600; line-height: 17px; white-space: nowrap; }
-.point-pet .point-metrics small { font-size: 10px; line-height: 13px; color: var(--muted); white-space: nowrap; }
-.point-metrics [data-pet-display="positions"] { font-size: 9px; color: var(--ink-soft); }
+.point-pet .point-metrics small { font-size: 11px; line-height: 14px; color: var(--muted); white-space: nowrap; }
+.point-metrics [data-pet-display="positions"] { font-size: 10px; color: var(--ink-soft); }
 .hide-pet-positions [data-pet-display="positions"] { display: none; }
 .pet-business-mark { padding: 2px var(--space-3); border-radius: var(--radius-sm); color: var(--teal-dark); background: var(--teal-soft); font-size: var(--fs-xs); }
 .hide-pet-groups .point-pet [data-pet-display="groups"] { display: grid; visibility: hidden; }
@@ -277,7 +277,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { appearance:
 #pet-grid.game-box-grid { grid-template-columns: repeat(6, minmax(136px, 164px)); min-width: 864px; max-width: 1032px; grid-auto-rows: var(--pet-height); gap: var(--space-2); padding: var(--space-3); }
 #pet-grid.game-box-grid:has(.pet-team-heading) .point-pet, #pet-grid.game-box-grid:has(.pet-team-heading) .pet-box-slot { min-height: var(--pet-height); }
 @container backpack (min-width: 948px) {
-  .point-grid { --pet-portrait: 80px; --pet-height: 180px; --pet-medal: 30px; --pet-name: 15px; --pet-number: 12px; }
+  .point-grid { --pet-portrait: 80px; --pet-height: 180px; --pet-medal: 30px; --pet-name: 15px; --pet-number: 13px; }
 }
 
 /* ══════════ 设置页：单页纵向分组，设置项保持同一条视觉轴 ══════════ */

@@ -608,7 +608,7 @@
 
 .eggbox-card-tag-row--dense .eggbox-card-tag {
   padding: 0 var(--space-0);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .eggbox-card-tag--nature {
@@ -1221,7 +1221,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--amber), var(--amber-bright));
+  background: var(--amber);
 }
 
 .eggbox-detail-meta {

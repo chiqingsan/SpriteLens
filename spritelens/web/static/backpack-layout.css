@@ -18,6 +18,7 @@
 .account-copy small { display: block; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-3xs); color: var(--muted); margin-top: var(--space-1); white-space: nowrap; }
 .account-popover { position: fixed; z-index: 125; display: flex; flex-direction: column; gap: var(--space-3); width: min(340px, calc(100vw - var(--sidebar) - var(--space-6))); max-height: min(520px, calc(100vh - var(--space-8))); padding: var(--space-4); border: 1px solid var(--line-soft); border-radius: var(--radius-lg); background: var(--panel); box-shadow: var(--shadow-pop); }
 .account-popover[hidden] { display: none; }
+.account-popover:not([hidden]) { animation: popover-in var(--motion-fast) var(--motion-ease) both; }
 .account-manager-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
 .account-manager-head strong { color: var(--sidebar-text); font-size: var(--fs-sm); }
 .account-manager-head span { color: var(--sidebar-muted); font-size: var(--fs-3xs); }
@@ -194,7 +195,20 @@
 #pet-grid.box-fill-grid .point-groups, #pet-grid.box-fill-grid .point-medals { width: 28px; }
 #pet-grid.box-fill-grid .point-avatar { max-width: 96px; }
 #pet-grid.box-fill-grid .point-name { font-size: var(--fs-xs); line-height: 16px; }
-#pet-grid.game-box-grid .point-egg-group { font-size: 11px; line-height: 20px; }
+#pet-grid.game-box-grid .point-egg-group { font-size: 12px; line-height: 20px; }
+/* 箱位填充模式：卡片高度随窗口收缩时，肖像行可能只有约 44px 高，
+   左右两列（蛋组/奖牌）改为跟随行高等比收缩，避免固定 28px 奖牌压到名字行。 */
+#pet-grid.box-fill-grid .point-groups,
+#pet-grid.box-fill-grid .point-medals {
+  height: 100%; align-content: stretch; grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+#pet-grid.box-fill-grid .point-groups { gap: 2px; padding: 2px 2px 0; }
+#pet-grid.box-fill-grid .point-medals { gap: 3px; padding-top: 2px; }
+#pet-grid.box-fill-grid .point-group-slot,
+#pet-grid.box-fill-grid .point-medal-slot { align-items: center; }
+#pet-grid.box-fill-grid .point-pet .pet-medal.has-icon {
+  width: auto; height: 100%; max-height: var(--pet-medal); aspect-ratio: 1; min-height: 0;
+}
 @media (max-width: 760px) {
   .account-card { border: 0; margin: 0 0 var(--space-5); padding-bottom: 0; background: transparent; box-shadow: none; }
   .account-information > summary { justify-content: center; padding: var(--space-1); height: 44px; }
@@ -226,15 +240,15 @@
 @media (max-width: 1360px) {
   #pet-grid.box-fill-grid > .point-pet { grid-template-rows: 22px minmax(0, 1fr) 14px 20px; }
   #pet-grid.game-box-grid .point-top { height: 22px; }
-  #pet-grid.game-box-grid .point-nature { max-width: 40px; height: 20px; padding: 0 4px; font-size: 10px; line-height: 20px; }
+  #pet-grid.game-box-grid .point-nature { max-width: 42px; height: 20px; padding: 0 4px; font-size: 11px; line-height: 20px; }
   #pet-grid.game-box-grid .point-metrics { padding-top: 3px; display: flex; align-items: baseline; justify-content: space-evenly; gap: 2px; }
   #pet-grid.game-box-grid .point-metrics > span { flex: 0 1 auto; }
   #pet-grid.game-box-grid .point-metrics > span + span { border-left: 0; }
-  #pet-grid.game-box-grid .point-metrics b { font-size: 10px; line-height: 14px; }
-  #pet-grid.game-box-grid .point-metrics small { font-size: 9px; line-height: 12px; }
+  #pet-grid.game-box-grid .point-metrics b { font-size: 11px; line-height: 15px; }
+  #pet-grid.game-box-grid .point-metrics small { font-size: 10px; line-height: 13px; }
   #pet-grid.game-box-grid .point-metrics > span + span { border-left-color: color-mix(in srgb, var(--line) 85%, transparent); }
-  #pet-grid.game-box-grid .point-name { font-size: 12px; line-height: 15px; }
-  #pet-grid.game-box-grid .point-egg-group { font-size: 10px; line-height: 16px; }
+  #pet-grid.game-box-grid .point-name { font-size: 13px; line-height: 16px; }
+  #pet-grid.game-box-grid .point-egg-group { font-size: 11px; line-height: 16px; }
 }
 
 /* 640 窗口：内容宽约 576，6 列卡宽仅 ~89px。优先保住立绘、名称和三列数值，
@@ -244,8 +258,8 @@
   #pet-grid.box-fill-grid .point-medals { display: none; }
   #pet-grid.box-fill-grid .point-portrait-row { grid-template-columns: minmax(0, 1fr); }
   #pet-grid.game-box-grid .point-markers { display: none; }
-  #pet-grid.game-box-grid .point-name { font-size: 11px; line-height: 14px; }
-  #pet-grid.game-box-grid .point-nature { max-width: 30px; padding: 0 3px; }
-  #pet-grid.game-box-grid .point-metrics b { font-size: 9px; line-height: 13px; }
-  #pet-grid.game-box-grid .point-metrics small { font-size: 8px; line-height: 11px; }
+  #pet-grid.game-box-grid .point-name { font-size: 12px; line-height: 15px; }
+  #pet-grid.game-box-grid .point-nature { max-width: 32px; padding: 0 3px; }
+  #pet-grid.game-box-grid .point-metrics b { font-size: 10px; line-height: 14px; }
+  #pet-grid.game-box-grid .point-metrics small { font-size: 9px; line-height: 12px; }
 }
