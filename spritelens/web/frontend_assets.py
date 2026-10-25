@@ -5,6 +5,12 @@ import hashlib
 import json
 from pathlib import Path
 
+# 稳定加载器：构建工具为每个入口生成一个，缺一个都必须阻断发布（PERF04 拆出雷达入口）。
+ENTRY_LOADERS = {
+    "src/main.ts": "entry.js",
+    "src/radar.ts": "radar-entry.js",
+}
+
 
 def check_frontend_assets(directory: Path) -> list[str]:
     """检查入口、Vite chunk/媒体引用及发布哈希，缺失或损坏必须阻断发布。"""
@@ -12,10 +18,13 @@ def check_frontend_assets(directory: Path) -> list[str]:
         receipt = json.loads((directory / "build.json").read_text(encoding="utf-8"))
         manifest = json.loads((directory / ".vite/manifest.json").read_text(encoding="utf-8"))
         outputs = receipt["outputs"]
-        entry = manifest["src/main.ts"]
-        if not entry["isEntry"] or "entry.js" not in outputs:
-            return ["Vue 入口清单无效"]
         failures: list[str] = []
+        for source, loader in ENTRY_LOADERS.items():
+            entry = manifest.get(source)
+            if not isinstance(entry, dict) or not entry.get("isEntry"):
+                failures.append(f"Vue 入口清单无效: {source}")
+            elif loader not in outputs:
+                failures.append(f"Vue 入口未发布: {loader}")
         for name, digest in outputs.items():
             path = (directory / name).resolve()
             if not path.is_relative_to(directory.resolve()):

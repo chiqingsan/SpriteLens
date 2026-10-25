@@ -335,7 +335,8 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | 雷达新增文件 | 职责 |
 | --- | --- |
 | `frontend/src/components/SceneRadar.vue`、`SceneRadar.test.ts` | 原始二维坐标雷达、缺坐标等待、按字符串ID选择与投影回归 |
-| `frontend/src/pages/FloatingRadar.vue`、`spritelens/web/static/radar.html`、`radar.js` | 独立悬浮内容、广播订阅、版本/周期校验与释放，不建WS |
+| `frontend/src/pages/FloatingRadar.vue`、`spritelens/web/static/radar.html`、`radar.js` | 独立悬浮内容、广播订阅、版本/周期校验与释放，不建WS；`radar.js` 只 import `vue/radar-entry.js` |
+| `frontend/src/radar.ts`、`floatingRadarBridge.ts` | 雷达独立入口与其 Vue 桥；主窗壳经 `nearbyBridge.ts` 保留同名导出，共享同一实现 |
 | `spritelens/web/radar_window.py`、`tests/test_radar_window.py` | 原生单实例置顶窗口、关闭通知、重新打开与主窗口退出生命周期 |
 
 

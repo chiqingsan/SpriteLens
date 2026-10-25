@@ -48,6 +48,11 @@ npm test -- src/composables/usePets.test.ts
 `frontend.py check` 与 `build.py` 拒绝源不匹配、引用缺失、产物损坏；smoke 与 HTTP 首页也检查运行产物。
 冻结包无需 Node，仅检查产物。源码/demo 缺构建时首页返回可读 500，不显示半成品。
 
+构建输出两个稳定加载器，壳与雷达窗各取所需（PERF04）：`vue/entry.js` 对应 `src/main.ts`，
+`vue/radar-entry.js` 对应 `src/radar.ts`。每个加载器只注入自己入口可达的 CSS，加载器被 import 后才注入；`frontend/src/nearbyBridge.ts` 仍导出 `mountFloatingRadar` 供主窗壳旧引用使用，
+实现统一在 `floatingRadarBridge.ts`。新增入口必须同时登记 `tools/frontend.py` 与
+`spritelens/web/frontend_assets.py` 的 `ENTRY_LOADERS`，否则构建或产物校验失败。
+
 ## 页面与迁移桥
 
 蛋图鉴与精灵蛋仓由旧 `app.js` 在导航时动态 import `vue/entry.js` 并挂载；

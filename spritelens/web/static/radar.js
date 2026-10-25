@@ -33,8 +33,8 @@ function waitForStyles() {
 async function start() {
   try {
     await waitForStyles();
-    const { mountFloatingRadar } = await import('/static/vue/entry.js');
-    /* entry.js 导入后才注入 Vue 样式链接，等它们就绪再挂载，避免未样式化的布局闪烁。 */
+    const { mountFloatingRadar } = await import('/static/vue/radar-entry.js');
+    /* 入口加载后才注入 Vue 样式链接，等它们就绪再挂载，避免未样式化的布局闪烁。 */
     await waitForStyles();
     if (started) { return; }
     started = true;

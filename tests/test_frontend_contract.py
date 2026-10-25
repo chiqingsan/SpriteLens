@@ -42,8 +42,11 @@ class FrontendBuildTest(unittest.TestCase):
             directory = static / "vue"
             (directory / ".vite").mkdir(parents=True)
             (directory / "entry.js").write_text("export {};", encoding="utf-8")
-            (directory / ".vite/manifest.json").write_text(json.dumps({"src/main.ts":
-                {"file": "entry.js", "isEntry": True}}), encoding="utf-8")
+            (directory / "radar-entry.js").write_text("export {};", encoding="utf-8")
+            (directory / "radar-asset.js").write_text("export {};", encoding="utf-8")
+            (directory / ".vite/manifest.json").write_text(json.dumps({
+                "src/main.ts": {"file": "entry.js", "isEntry": True},
+                "src/radar.ts": {"file": "radar-asset.js", "isEntry": True}}), encoding="utf-8")
             outputs = {p.relative_to(directory).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                        for p in directory.rglob("*") if p.is_file()}
             (directory / "build.json").write_text(json.dumps({"outputs": outputs, "source_hash": "old"}), encoding="utf-8")
@@ -51,12 +54,26 @@ class FrontendBuildTest(unittest.TestCase):
             with patch.object(frontend, "STATIC", static):
                 self.assertIn("过期", frontend.check()[0])
             manifest_path = directory / ".vite/manifest.json"
-            manifest_path.write_text(json.dumps({"src/main.ts": {"file": "entry.js", "isEntry": True,
-                "css": ["missing.css"], "dynamicImports": ["missing-chunk"]}}), encoding="utf-8")
+            manifest_path.write_text(json.dumps({
+                "src/main.ts": {"file": "entry.js", "isEntry": True,
+                                "css": ["missing.css"], "dynamicImports": ["missing-chunk"]},
+                "src/radar.ts": {"file": "radar-asset.js", "isEntry": True}}), encoding="utf-8")
             failures = check_frontend_assets(directory)
             self.assertTrue(any("引用未登记" in failure for failure in failures))
             self.assertTrue(any("chunk 引用缺失" in failure for failure in failures))
             (directory / "entry.js").write_text("changed", encoding="utf-8")
             self.assertIn("改变", check_frontend_assets(directory)[0])
             (directory / "entry.js").unlink()
-            self.assertIn("缺失", check_frontend_assets(directory)[0])
+            self.assertTrue(any("Vue 产物缺失或已改变: entry.js" in failure
+                                for failure in check_frontend_assets(directory)))
+            (directory / "radar-entry.js").unlink()
+            outputs = {p.relative_to(directory).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+                       for p in directory.rglob("*") if p.is_file() and p.name != "build.json"}
+            (directory / "build.json").write_text(json.dumps({"outputs": outputs, "source_hash": "old"}),
+                                                  encoding="utf-8")
+            failures = check_frontend_assets(directory)
+            self.assertIn("Vue 入口未发布: entry.js", failures)
+            self.assertIn("Vue 入口未发布: radar-entry.js", failures)
+            manifest_path.write_text(json.dumps({"src/main.ts": {"file": "entry.js", "isEntry": True}}),
+                                     encoding="utf-8")
+            self.assertIn("Vue 入口清单无效: src/radar.ts", check_frontend_assets(directory))
