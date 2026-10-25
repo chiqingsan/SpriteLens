@@ -10,6 +10,10 @@ import type { NearbyActor, NearbyMark } from '../types/nearby'
 const props = defineProps<{ host: NearbyHost }>()
 const { data, summary, loading, error, stale, load, update, pause, resume } = useNearby(props.host)
 const initialLoading = computed(() => loading.value && !data.value && !error.value)
+// 提醒音开关由壳层持有并负责试听，Vue 只镜像 toggle 返回的状态；旧壳层没有 alert 时整枚按钮不渲染。
+const alertHost = props.host.alert
+const alertOn = ref(alertHost ? alertHost.enabled() : false)
+function toggleAlert() { if (!alertHost) return; alertOn.value = alertHost.toggle(!alertOn.value) }
 const selected = ref(''), floatingError = ref('')
 const refreshing = ref(false)
 async function refresh() {
@@ -191,6 +195,7 @@ defineExpose({ update, load, pause, resume })
       <label class="nearby-sort">排序<select v-model="sort" aria-label="附近精灵排序"><option value="recent">最近观察</option><option value="marks">有牌优先</option></select></label>
       <button class="ghost-button small nearby-refresh" :aria-busy="refreshing" :aria-disabled="refreshing" @click="refresh"><UiIcon name="refresh" />刷新</button>
       <button class="ghost-button small nearby-floating" @click="openFloating"><UiIcon name="eye" />悬浮雷达</button>
+      <button v-if="alertHost" class="ghost-button small nearby-alert" type="button" :aria-pressed="alertOn" :title="alertOn ? '发现双牌重点精灵时播放提示音；点击关闭' : '声音提醒已关闭；点击开启并试听'" @click="toggleAlert"><UiIcon :name="alertOn ? 'bell' : 'bell-off'" />提醒音{{ alertOn ? '开' : '关' }}</button>
     </div>
     <div class="nearby-workspace">
       <div ref="listViewport" class="nearby-list-pane">
@@ -244,6 +249,12 @@ defineExpose({ update, load, pause, resume })
 .nearby-sort { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-xs); min-width: 0; max-width: 100%; }
 .nearby-sort select { min-width: 0; max-width: 100%; min-height: 34px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); padding-inline: var(--space-3); }
 .nearby-refresh, .nearby-floating { background: var(--panel); border: 1px solid var(--teal); color: var(--teal-dark); min-height: 34px; min-width: 0; max-width: 100%; white-space: normal; }
+/* 提醒音是偏好项，固定在工具条末尾。开/关都显示四个汉字、图标盒同为 18px，切换只换底色/描边，不改变按钮尺寸。 */
+.nearby-alert { background: var(--panel); border: 1px solid var(--line); color: var(--ink); min-height: 34px; min-width: 0; max-width: 100%; white-space: nowrap; }
+.nearby-alert:hover { background: var(--surface-2); border-color: var(--muted); }
+/* 开启态沿用重点标识配色（accent 底 + 深字 + teal 描边），与「双牌」标记同一语义。 */
+.nearby-alert[aria-pressed='true'] { background: var(--accent); border-color: var(--teal); color: var(--teal-deep); }
+.nearby-alert[aria-pressed='true']:hover { border-color: var(--teal-dark); }
 .nearby-count-note { flex: 0 1 auto; min-width: 0; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-xs); color: var(--muted); }
 /* 状态文案固定单行且常驻在标题右侧：失败提示出现/消失不改变布局，避免内容区跳动；超窄视口截断，完整文案见 title。 */
 .nearby-count-note.is-stale { padding: 0 var(--space-2); border-radius: var(--radius-sm); background: var(--amber-soft); color: var(--amber-ink); }

@@ -2,6 +2,8 @@
 (function () {
   "use strict";
   window.SpriteLensNearby = { create: function (request, token) {
+    /* 旧构建/测试没有提醒模块时优雅降级：附近页与雷达照常工作，只是没有声音。 */
+    var alertApi = window.SpriteLensNearbyAlert ? window.SpriteLensNearbyAlert.create() : null;
     var mounted = null, summary = null, generation = 0, active = false;
     var floating = false, feedController = null, feedQueued = false, hadSnapshot = false, heartbeat = null, disconnectTimer = null;
     var channel = new BroadcastChannel("spritelens-nearby-" + token);
@@ -21,12 +23,18 @@
       return !summary || payload.uid === summary.uid && payload.observation_id >= summary.observation_id;
     }
     function publish(payload) {
+      /* 声音提醒复用同一份快照；它自己判重与降级，失败不影响列表与雷达。 */
+      if (alertApi) {
+        try { alertApi.evaluate(payload); } catch (error) { /* 提醒失败只丢提示音 */ }
+      }
       if (floating && currentCycle(payload)) {
         channel.postMessage({ kind: "snapshot", payload: payload });
         hadSnapshot = true;
       }
       return payload;
     }
+    /* 页面可见时 Vue 会自己按摘要取快照；隐藏或未挂载时才由壳层替雷达和声音提醒供数。 */
+    function feedNeeded() { return floating || Boolean(alertApi && alertApi.enabled()); }
     function reportFailure(error, signal) {
       if (!floating || (signal && signal.aborted)) { return; }
       var message = error && error.message ? error.message : String(error);
@@ -53,6 +61,9 @@
       }, function (error) {
         reportFailure(error, signal);
         throw error;
+      }).finally(function () {
+        /* 页面加载完时可能已切到后台：声音提醒还需要快照，补一次供数当基线。 */
+        if (feedNeeded() && (!mounted || !active)) { loadFloating(); }
       });
     }
     function loadFloating() {
@@ -65,7 +76,7 @@
       }).finally(function () {
         if (feedController !== current) { return; }
         feedController = null;
-        if (feedQueued && floating) { feedQueued = false; loadFloating(); }
+        if (feedQueued && feedNeeded()) { feedQueued = false; loadFloating(); }
       });
     }
     channel.onmessage = function (event) {
@@ -100,13 +111,21 @@
       root.textContent = "正在加载附近精灵…";
       return import("/static/vue/entry.js").then(function (vue) {
         if (!active || current !== generation) { return; }
-        mounted = vue.mountNearby(root, {
+        var host = {
           load: loadPage,
           openFloating: function () {
             if (!window.pywebview || !window.pywebview.api.open_radar) { return Promise.reject(new Error("置顶悬浮雷达请在桌面版中打开")); }
             return window.pywebview.api.open_radar();
           }
-        });
+        };
+        /* 提醒能力由壳层注入，Vue 只负责按钮状态与试听，不自己发声。 */
+        if (alertApi) {
+          host.alert = {
+            enabled: function () { return alertApi.enabled(); },
+            toggle: function (next) { return alertApi.toggle(next); }
+          };
+        }
+        mounted = vue.mountNearby(root, host);
         if (summary) { mounted.update(summary); }
         else { return mounted.load(); }
       }).catch(function (error) {
@@ -123,7 +142,7 @@
         if (floating) { channel.postMessage(next ? { kind: "summary", summary: next } : { kind: "error", message: "当前没有可用的附近观察数据" }); }
         // 隐藏页面仍接收归属失效，但暂停请求，避免回页闪现旧周期实体。
         if (mounted) { mounted.update(next); }
-        if (floating && changed && (!mounted || !active)) { loadFloating(); }
+        if (changed && (!mounted || !active) && feedNeeded()) { loadFloating(); }
     }
     return { enter: enter, leave: leave,
       /* 推送连接断开/恢复由壳通知；断线期间不假装数据仍然新鲜。 */
@@ -142,6 +161,7 @@
         if (disconnectTimer) { window.clearTimeout(disconnectTimer); disconnectTimer = null; }
         window.removeEventListener("radar-closed", stopFloating);
         if (mounted) { mounted.unmount(); mounted = null; }
+        if (alertApi) { alertApi.dispose(); alertApi = null; }
         channel.close();
       },
       update: update };

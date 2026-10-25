@@ -131,7 +131,7 @@ def _smoke_check_assets() -> int:
     failures.extend(check_frontend_assets(STATIC_DIR / "vue"))
     if not (STATIC_DIR / "account-requests.js").is_file():
         failures.append("前端文件缺失: account-requests.js")
-    for name in ("index.html", "boot.js", "desktop-shell.js", "desktop-shell.css", "ui.js", "app.js", "app.css", "ui.css", "themes.css", "appearance.js", "icons.js", "icons/sprite.svg", "radar.html", "radar.js",
+    for name in ("index.html", "boot.js", "desktop-shell.js", "desktop-shell.css", "ui.js", "app.js", "app.css", "ui.css", "themes.css", "appearance.js", "icons.js", "nearby-alert.js", "icons/sprite.svg", "radar.html", "radar.js",
                  "vue/entry.js", "vue/radar-entry.js"):
         if not (STATIC_DIR / name).is_file():
             failures.append(f"前端文件缺失: {STATIC_DIR / name}")

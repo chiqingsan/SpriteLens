@@ -30,8 +30,13 @@ ICONS = {
     "gender-male": ["male", "gender"], "gender-female": ["female", "gender"],
     "arrow-up": ["nature-positive", "increase", "up"],
     "arrow-down": ["nature-negative", "decrease", "down"],
+    "bell": ["reminder", "sound"], "bell-off": ["reminder", "mute"],
 }
 STROKE_WIDTH_OVERRIDES = {"arrow-up": "2.5", "arrow-down": "2.5"}
+
+# 注意：sprite.svg 里另有 4 个手工追加的本地 symbol（star / star-filled / graduation-cap / sprout），
+# 它们不在 ICONS 里，直接重跑本脚本会把 sprite.svg 覆盖成纯 Tabler 版本而丢掉这 4 个图标。
+# 加图标时需要先合并手工 symbol（做法见 docs/CODEBASE_MAP.md 的图标小节）。
 
 
 def fetch(url: str) -> bytes:
@@ -53,13 +58,13 @@ def main() -> None:
         assert svg.get("viewBox") == "0 0 24 24" and svg.get("stroke-width") == "2"
         stroke_width = STROKE_WIDTH_OVERRIDES.get(name, "2")
         text = data.decode("utf-8").replace('stroke-width="2"', f'stroke-width="{stroke_width}"', 1)
-        (dest / f"{name}.svg").write_text(text, encoding="utf-8")
+        (dest / f"{name}.svg").write_text(text, encoding="utf-8", newline="\n")
         body = text[text.index(">", text.index("<svg")) + 1:text.rindex("</svg>")]
         symbols.append(f'<symbol id="{name}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{stroke_width}" stroke-linecap="round" stroke-linejoin="round">{body}</symbol>')
         metadata.append({"name": name, "source": "Tabler Icons", "url": f"https://tabler.io/icons/icon/{name}",
                          "svg_url": url, "license": "MIT", "search_tags": tags, "sha256": hashlib.sha256(data).hexdigest()})
-    (dest / "sprite.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg">' + "\n".join(symbols) + '</svg>\n', encoding="utf-8")
-    (dest / "sources.json").write_text(json.dumps({"commit": commit, "icons": metadata}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (dest / "sprite.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg">' + "\n".join(symbols) + '</svg>\n', encoding="utf-8", newline="\n")
+    (dest / "sources.json").write_text(json.dumps({"commit": commit, "icons": metadata}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     (dest / "LICENSE.txt").write_bytes(fetch(f"{base}/LICENSE"))
     print(f"Imported {len(metadata)} Tabler icons at {commit}")
 

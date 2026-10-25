@@ -1,7 +1,10 @@
 import { ref, shallowRef } from 'vue'
 import { parseNearby, parseNearbySummary, type NearbySummary, type NearbySnapshot } from '../types/nearby'
 
-export interface NearbyHost { load: (signal: AbortSignal) => Promise<unknown>; openFloating?: () => Promise<unknown> }
+// 壳层提供的声音提醒能力：enabled 读取当前开关，toggle 切换并返回切换后的状态（可传目标值）。
+export interface NearbyAlertHost { enabled(): boolean; toggle(next?: boolean): boolean }
+// alert 由壳层注入；缺失时（例如未接提醒音的旧壳层）工具条不出现提醒音开关。
+export interface NearbyHost { load: (signal: AbortSignal) => Promise<unknown>; openFloating?: () => Promise<unknown>; alert?: NearbyAlertHost }
 export function useNearby(host: NearbyHost) {
   const data = shallowRef<NearbySnapshot | null>(null), summary = shallowRef<NearbySummary | null>(null)
   const loading = ref(false), error = ref(''), stale = ref(false)

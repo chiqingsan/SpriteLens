@@ -172,3 +172,37 @@ describe('附近精灵更新布局稳定性', () => {
   })
 
 })
+
+describe('附近精灵提醒音开关', () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('nearby-list-pane') ? 680 : 220
+    })
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(640)
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  it('壳层提供 alert 时开关同步 aria-pressed、文案与 toggle 目标值', async () => {
+    const toggle = vi.fn((next?: boolean) => next ?? true)
+    const host = { load: vi.fn().mockResolvedValue(snapshot(1, [])), alert: { enabled: () => true, toggle } }
+    const wrapper = mount(NearbyPage, { props: { host } })
+    const button = wrapper.get('.nearby-toolbar .nearby-alert')
+    expect(button.attributes('aria-pressed')).toBe('true')
+    expect(button.text()).toBe('提醒音开')
+    expect(button.attributes('title')).toContain('点击关闭')
+    await button.trigger('click')
+    expect(toggle).toHaveBeenCalledWith(false)
+    expect(button.attributes('aria-pressed')).toBe('false')
+    expect(button.text()).toBe('提醒音关')
+    expect(button.attributes('title')).toContain('点击开启')
+    wrapper.unmount()
+  })
+
+  it('壳层未提供 alert 时不渲染开关，既有工具条按钮次序不变', () => {
+    const host = { load: vi.fn().mockResolvedValue(snapshot(1, [])) }
+    const wrapper = mount(NearbyPage, { props: { host } })
+    expect(wrapper.find('.nearby-alert').exists()).toBe(false)
+    expect(wrapper.findAll('.nearby-toolbar button').map(item => item.text())).toEqual(['刷新', '悬浮雷达'])
+    wrapper.unmount()
+  })
+})

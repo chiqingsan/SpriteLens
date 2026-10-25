@@ -460,6 +460,30 @@
         "mass"
       ],
       "sha256": "f6d08a8374007c97464ca1b7756dd326cf05fa919b85267543f901595e9c4d03"
+    },
+    {
+      "name": "bell",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/bell",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/bell.svg",
+      "license": "MIT",
+      "search_tags": [
+        "reminder",
+        "sound"
+      ],
+      "sha256": "7ef4f0c56a58fc7ea27ded1c2ee5bc753d63f8851ce85b33da48ddeefe53faf8"
+    },
+    {
+      "name": "bell-off",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/bell-off",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/bell-off.svg",
+      "license": "MIT",
+      "search_tags": [
+        "reminder",
+        "mute"
+      ],
+      "sha256": "15ac20136bcc58b3a7f792cd1b648f4cb1c05c555d92b23f00efdc8819a41c99"
     }
   ]
 }
