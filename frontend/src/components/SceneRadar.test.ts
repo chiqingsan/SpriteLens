@@ -35,6 +35,8 @@ describe('参考坐标雷达', () => {
     expect(wrapper.text()).toContain('等待玩家位置')
     expect(wrapper.findAll('.radar-target')).toHaveLength(0)
     expect(wrapper.find('.radar-center-label').exists()).toBe(false)
+    expect(wrapper.find('.radar-legend').exists()).toBe(false)
+    expect(wrapper.get('header').text()).toBe('场景雷达')
   })
   it('按传入半径固定雷达外环，并隐藏显示距离之外的目标', () => {
     const far = actor('4', '远处精灵', [2500, 0, 0])

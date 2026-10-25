@@ -210,7 +210,11 @@ defineExpose({ update, load, pause, resume })
             </article>
           </div>
         </section>
-        <section v-else class="nearby-empty" aria-live="polite"><UiIcon :name="initialLoading ? 'refresh' : 'eye'" /><h3>{{ initialLoading ? '正在读取附近观察' : search.trim() ? '没有匹配的精灵' : '尚未观察到附近精灵' }}</h3><p>{{ search.trim() ? '试试其他名称或编号。' : '进入场景并开始采集后会自动显示。' }}</p></section>
+        <section v-else class="nearby-empty" aria-live="polite">
+          <span class="nearby-empty-icon"><UiIcon :name="initialLoading ? 'refresh' : 'eye'" /></span>
+          <h3>{{ initialLoading ? '正在读取附近观察' : search.trim() ? '没有匹配的精灵' : '尚未观察到附近精灵' }}</h3>
+          <p>{{ search.trim() ? '试试其他名称或编号。' : '进入场景并开始采集后会自动显示。' }}</p>
+        </section>
       </div>
       <div class="nearby-radar-pane"><SceneRadar :data="data" :selected="selected" :radius="data?.radar_radius_raw" @select="selectActor" /></div>
     </div>
@@ -274,8 +278,11 @@ defineExpose({ update, load, pause, resume })
 .nearby-card footer { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); min-width: 0; padding: 0; border: 0; color: var(--muted); font-size: var(--fs-2xs); font-variant-numeric: tabular-nums; }
 .nearby-entity { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nearby-card time { flex: none; }
-.nearby-empty { padding: var(--space-7) var(--space-5); min-height: 200px; display: grid; place-content: center; justify-items: center; text-align: center; border: 1px dashed var(--line); border-radius: var(--radius-sm); background: var(--panel); }
-.nearby-empty h3 { font-size: var(--fs-md); margin-bottom: 0; }
+.nearby-empty { height: 100%; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2); padding: var(--space-6); text-align: center; border: 0; border-radius: var(--radius-sm); background: var(--panel); }
+.nearby-empty-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--surface-2); color: var(--muted); }
+.nearby-empty-icon .ui-icon { width: 20px; height: 20px; }
+.nearby-empty h3 { font-size: var(--fs-md); margin: 0; }
+.nearby-empty p { max-width: 36ch; }
 .nearby-empty p, .nearby-footnote { margin: 0; color: var(--muted); line-height: 1.6; }
 .nearby-footnote { font-size: var(--fs-2xs); }
 .nearby-error, .nearby-warning { margin: 0; padding: var(--space-1) var(--space-3); border-radius: var(--radius-sm); font-size: var(--fs-xs); line-height: 1.5; }
