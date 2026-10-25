@@ -45,7 +45,7 @@ describe('参考坐标雷达', () => {
     expect(wrapper.text()).toContain('2,000 单位')
   })
   it('缺失半径时默认使用 10,000 单位', () => {
-    const edge = actor('5', '外环精灵', [0, 10000, 0])
+    const edge = actor('5', '外环精灵', [0, 10000, 0], { attention: 'marked' })
     const wrapper = mount(SceneRadar, { props: { data: snapshot([edge]) } })
     expect(wrapper.text()).toContain('10,000 单位')
     expect(wrapper.get('.radar-target').attributes('transform')).toBe('translate(200,380)')
@@ -78,7 +78,7 @@ describe('参考坐标雷达', () => {
     const silent = mount(SceneRadar, { props: { data: snapshot(), compact: true } })
     expect(silent.findAll('.radar-target-label')).toHaveLength(0)
   })
-  it('绘制玩家中心点、短十字与「你」标签', () => {
+  it('绘制玩家中心点与短十字，不再绘制中心文字', () => {
     const wrapper = mount(SceneRadar, { props: { data: snapshot() } })
     const player = wrapper.get('.radar-player')
     expect(player.classes()).not.toContain('radar-point')
@@ -86,12 +86,7 @@ describe('参考坐标雷达', () => {
     expect(player.attributes('cy')).toBe('200')
     expect(player.attributes('r')).toBe('5')
     expect(wrapper.find('.radar-player-cross').exists()).toBe(true)
-    const centerLabel = wrapper.get('.radar-center-label')
-    expect(centerLabel.text()).toBe('你')
-    expect(centerLabel.attributes('x')).toBe('200')
-    expect(centerLabel.attributes('y')).toBe('200')
-    expect(centerLabel.attributes('dy')).toBe('14')
-    expect(centerLabel.attributes('text-anchor')).toBe('middle')
+    expect(wrapper.find('.radar-center-label').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('位置参考')
   })
   it('三环刻度按半径显示为 2k / 5k / 10k 并随半径缩放', () => {
@@ -104,14 +99,14 @@ describe('参考坐标雷达', () => {
   })
   it('默认只标注最近 6 个目标，选中目标即使更远也始终显示标签', () => {
     const spread = [
-      actor('101', '甲精灵', [4000, 0, 0]),
-      actor('102', '乙精灵', [3800, 3800, 0]),
-      actor('103', '丙精灵', [0, 5500, 0]),
-      actor('104', '丁精灵', [-4200, 4200, 0]),
-      actor('105', '戊精灵', [-6500, 0, 0]),
-      actor('106', '己精灵', [-4600, -4600, 0]),
-      actor('107', '庚精灵', [0, -7000, 0]),
-      actor('108', '辛精灵', [5000, -5000, 0]),
+      actor('101', '甲精灵', [4000, 0, 0], { attention: 'marked' }),
+      actor('102', '乙精灵', [3800, 3800, 0], { attention: 'marked' }),
+      actor('103', '丙精灵', [0, 5500, 0], { attention: 'marked' }),
+      actor('104', '丁精灵', [-4200, 4200, 0], { attention: 'marked' }),
+      actor('105', '戊精灵', [-6500, 0, 0], { attention: 'marked' }),
+      actor('106', '己精灵', [-4600, -4600, 0], { attention: 'marked' }),
+      actor('107', '庚精灵', [0, -7000, 0], { attention: 'marked' }),
+      actor('108', '辛精灵', [5000, -5000, 0], { attention: 'marked' }),
     ]
     const wrapper = mount(SceneRadar, { props: { data: snapshot(spread) } })
     expect(wrapper.findAll('.radar-target')).toHaveLength(8)
@@ -121,10 +116,21 @@ describe('参考坐标雷达', () => {
     expect(labelTexts(selected)).toEqual(['辛精灵', '甲精灵', '乙精灵', '丙精灵', '丁精灵', '戊精灵', '己精灵'])
     expect(selected.get('.radar-label.selected .radar-target-label').text()).toBe('辛精灵')
   })
+  it('普通目标不标注名称，单牌/双牌才显示名称；选中普通目标仍显示名称', () => {
+    const mixed = [
+      actor('401', '普通靠前', [1000, 0, 0]),
+      actor('402', '单牌靠后', [6000, 0, 0], { attention: 'marked' }),
+    ]
+    const wrapper = mount(SceneRadar, { props: { data: snapshot(mixed) } })
+    expect(wrapper.findAll('.radar-target')).toHaveLength(2)
+    expect(labelTexts(wrapper)).toEqual(['单牌靠后'])
+    const selected = mount(SceneRadar, { props: { data: snapshot(mixed), selected: '401' } })
+    expect(labelTexts(selected)).toEqual(['普通靠前', '单牌靠后'])
+  })
   it('边缘长名称标签翻转方向后仍留在 viewBox 内', () => {
     const edges = [
-      actor('201', '极左边缘长名精灵', [-10000, 0, 0]),
-      actor('202', '极右边缘长名精灵', [7000, -7000, 0]),
+      actor('201', '极左边缘长名精灵', [-10000, 0, 0], { attention: 'marked' }),
+      actor('202', '极右边缘长名精灵', [7000, -7000, 0], { attention: 'marked' }),
     ]
     const wrapper = mount(SceneRadar, { props: { data: snapshot(edges) } })
     expect(labelTexts(wrapper)).toHaveLength(2)
@@ -147,9 +153,9 @@ describe('参考坐标雷达', () => {
   })
   it('同名目标聚合为「名称 ×N」标签，选中项单独显示', () => {
     const flock = [
-      actor('301', '吸泥鸥', [1000, 0, 0]),
-      actor('302', '吸泥鸥', [-1000, 0, 0]),
-      actor('303', '吸泥鸥', [0, 1000, 0]),
+      actor('301', '吸泥鸥', [1000, 0, 0], { attention: 'marked' }),
+      actor('302', '吸泥鸥', [-1000, 0, 0], { attention: 'marked' }),
+      actor('303', '吸泥鸥', [0, 1000, 0], { attention: 'marked' }),
     ]
     const wrapper = mount(SceneRadar, { props: { data: snapshot(flock) } })
     expect(wrapper.findAll('.radar-target')).toHaveLength(3)

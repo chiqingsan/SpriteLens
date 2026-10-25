@@ -16,8 +16,6 @@ const LABEL_MARGIN = 4
 const LABEL_LIMIT = 6
 const LABEL_FONT_SIZE = 9
 const SELECTED_FONT_SIZE = 10
-const CENTER_FONT_SIZE = 11
-const CENTER_LABEL = '你'
 
 interface RadarRow {
   actor: NearbyActor
@@ -148,20 +146,9 @@ const projection = computed(() => {
   }
   // 选中的目标永远优先占位，即使它不在最近 6 个里。
   if (selectedRow) addLabel(selectedRow, selectedRow.label, SELECTED_FONT_SIZE, true)
-  // 中心标签「你」固定在圆心下方 14px，先于普通标签占位，避免被点位标签压住。
-  const centerWidth = estimateTextWidth(CENTER_LABEL, CENTER_FONT_SIZE) + 6
-  const centerChipTop = CENTER + 14 + -Math.round(CENTER_FONT_SIZE * 1.1)
-  const centerBox: Box = {
-    left: CENTER - centerWidth / 2,
-    right: CENTER + centerWidth / 2,
-    top: centerChipTop - 1,
-    bottom: centerChipTop + CENTER_FONT_SIZE + 5,
-  }
-  const showCenterLabel = !occupied.some(other => centerBox.left < other.right && centerBox.right > other.left && centerBox.top < other.bottom && centerBox.bottom > other.top)
-  if (showCenterLabel) occupied.push(centerBox)
-  // compact 模式只保留选中目标的名称；完整模式标注最近 6 个，同名合并成「名称 ×N」。
+  // compact 模式只保留选中目标的名称；完整模式只给单牌/双牌标注名称（普通点不加文字），同名合并成「名称 ×N」。
   if (!props.compact) {
-    const nearest = byDistance.filter(row => row.actor.actor_id !== selectedRow?.actor.actor_id).slice(0, LABEL_LIMIT)
+    const nearest = byDistance.filter(row => row.actor.actor_id !== selectedRow?.actor.actor_id && row.kind !== 'normal').slice(0, LABEL_LIMIT)
     const groups = new Map<string, RadarRow[]>()
     for (const row of nearest) {
       const key = row.actor.name.trim() || row.actor.actor_id
@@ -174,7 +161,7 @@ const projection = computed(() => {
       addLabel(anchorRow, group.length > 1 ? `${anchorRow.label} ×${group.length}` : anchorRow.label, LABEL_FONT_SIZE)
     }
   }
-  return { range: range.value, rows: visibleRows, labels, showCenterLabel }
+  return { range: range.value, rows: visibleRows, labels }
 })
 </script>
 <template>
@@ -187,7 +174,7 @@ const projection = computed(() => {
         <path d="M20 200H380M200 20V380" class="radar-axis" />
         <g v-if="!compact" class="radar-scale" aria-hidden="true"><text v-for="tick in scale" :key="tick.key" class="radar-scale-label" :x="tick.x" :y="tick.y" text-anchor="middle">{{ tick.text }}</text></g>
         <g v-if="projection">
-          <g class="radar-center"><path class="radar-player-cross" d="M194 200H206M200 194V206" /><circle cx="200" cy="200" r="5" class="radar-player" /><text v-if="projection.showCenterLabel" class="radar-center-label" x="200" y="200" dy="14" text-anchor="middle">{{ CENTER_LABEL }}</text></g>
+          <g class="radar-center"><path class="radar-player-cross" d="M194 200H206M200 194V206" /><circle cx="200" cy="200" r="5" class="radar-player" /></g>
           <g v-for="row in projection.rows" :key="row.actor.actor_id" class="radar-target" :class="[`is-${row.kind}`, `attention-tone-${row.attentionTone}`, { selected: selected === row.actor.actor_id }]" :transform="`translate(${row.x},${row.y})`" tabindex="0" role="button" :aria-label="`${row.actor.name}${row.kind === 'double' ? '，双牌' : row.kind === 'marked' ? '，单牌' : ''}`" @click="emit('select', row.actor.actor_id)" @keydown.enter="emit('select', row.actor.actor_id)" @keydown.space.prevent="emit('select', row.actor.actor_id)">
             <title>{{ row.actor.name }} · {{ row.kind === 'double' ? '双牌' : row.kind === 'marked' ? '单牌' : '普通' }} · Lv.{{ row.actor.level ?? '未知' }}</title><circle r="12" class="radar-hit"/><circle v-if="row.kind !== 'normal'" r="10" class="radar-attention-ring" /><circle :r="row.kind === 'double' ? 7 : row.kind === 'marked' ? 6 : 5" class="radar-point" />
           </g>
@@ -217,8 +204,7 @@ const projection = computed(() => {
 .radar-axis { stroke-dasharray: 4 5; }
 .scene-radar text { fill: var(--muted); font-size: 11px; }
 .radar-scale-label { font-size: 10px; font-weight: 600; }
-.radar-center-label { font-size: 11px; font-weight: 700; fill: var(--ink); }
-.radar-player-cross { fill: none; stroke: var(--radar-player, var(--teal-dark)); stroke-width: 1.5; stroke-linecap: round; }
+.radar-player-cross { fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-linecap: round; }
 .scene-radar .radar-target-label { font-size: 9px; font-weight: 700; fill: var(--ink); pointer-events: none; }
 /* 标签底色沿用面板/悬浮层底色：避免标签与点位、网格线粘连。 */
 .scene-radar { --radar-label-bg: var(--panel); }
@@ -229,7 +215,7 @@ const projection = computed(() => {
 .radar-legend-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--teal); }
 .radar-legend-dot.is-marked { background: var(--amber); }
 .radar-legend-dot.is-double { width: 11px; height: 11px; background: var(--danger); border: 1px solid var(--danger-ink); }
-.radar-player { fill: var(--radar-player, var(--teal-dark)); stroke: var(--panel); stroke-width: 2; }
+.radar-player { fill: var(--ink); stroke: var(--panel); stroke-width: 2; }
 .radar-target { cursor: pointer; outline: none; }
 .radar-label { pointer-events: none; }
 .radar-hit { fill: transparent; }
@@ -252,12 +238,12 @@ const projection = computed(() => {
 .is-overlay .scene-radar-scope { aspect-ratio: auto; background: transparent; }
 .is-overlay .radar-point { fill: var(--radar-overlay-point); stroke: var(--radar-overlay-bg); }
 .is-overlay .radar-target-label { fill: var(--radar-overlay-ink); }
-.is-overlay .radar-center-label { fill: var(--radar-overlay-ink); }
 .is-overlay .radar-label.selected .radar-target-label { fill: var(--radar-overlay-ink); }
 .scene-radar.is-overlay .radar-target.is-marked .radar-point { fill: var(--amber-bright); }
 .scene-radar.is-overlay .radar-target.is-double .radar-point { fill: var(--danger); stroke: var(--radar-overlay-bg); }
 .scene-radar.is-overlay .radar-legend-dot { background: var(--radar-overlay-point); }
 .scene-radar.is-overlay .radar-legend-dot.is-marked { background: var(--amber-bright); }
 .scene-radar.is-overlay .radar-legend-dot.is-double { background: var(--danger); border-color: var(--danger); }
-.is-overlay .radar-player { fill: var(--radar-player, var(--radar-overlay-point)); }
+.is-overlay .radar-player { fill: var(--radar-overlay-ink); stroke: var(--radar-overlay-bg); }
+.is-overlay .radar-player-cross { stroke: var(--radar-overlay-ink); }
 </style>
