@@ -115,6 +115,46 @@ class EventLogWriterTest(unittest.TestCase):
         self.assertEqual(writer.count, 0)
         release.set()
 
+    def test_batches_are_bounded_under_sustained_input(self):
+        """持续输入时按批上限落盘，不把整个积压抓成一个无界批次（PERF05）。
+
+        旧实现 worker 一直取到队列暂时为空才写，慢盘下批次可超过队列容量；
+        这里先把队列压满，再确认每批都不超过 `batch_max_events`。
+        """
+        import threading
+
+        writer = self._writer(batch_max_events=8)
+        sizes: list[int] = []
+        real_write = writer._write_batch
+        release = threading.Event()
+
+        def recording_write(events):
+            sizes.append(len(events))
+            release.wait(timeout=5)  # 第一拍卡住，让事件先在队列里积压
+            real_write(events)
+
+        writer._write_batch = recording_write
+        writer.handle_packet(_event())  # worker 取走一条并卡在首拍
+        deadline = 0
+        while writer._queue.qsize() == 0 and deadline < 100:
+            deadline += 1
+            time.sleep(0.005)
+        for _ in range(49):
+            writer.handle_packet(_event())
+        release.set()
+        writer.flush()
+        self.assertEqual(writer.dropped_count, 0)
+        self.assertEqual(writer.count, 50)
+        self.assertTrue(sizes, "应至少写入一批")
+        self.assertLessEqual(max(sizes), 8, f"单批不得超过上限，实际 {sizes}")
+        self.assertEqual(sum(sizes), 50)
+        files = list(self.dir.glob("eventlog_*.jsonl"))
+        self.assertEqual(
+            sum(len(p.read_text(encoding="utf-8").strip().splitlines()) for p in files),
+            50,
+            "按上限分批后仍要完整落盘",
+        )
+
     def test_close_timeout_does_not_close_file_under_worker(self):
         """回归（P2）：worker 写盘卡死时，close 超时路径不得跨线程关文件。
 

@@ -7,7 +7,9 @@
 写入策略（实测教训）：抓包回调运行在 MonitorService 锁内，同步 flush()
 在登录突发下让事件消费者的 drain_events 最长等 57ms，chunk 队列随之面临过载。
 因此 handle_packet 只把事件放进有界队列（无 IO），由后台 worker 线程
-批量落盘；队列满时丢新事件并计数（丢日志不阻塞采集主链路）。
+批量落盘；队列满时丢新事件并计数（丢日志不阻塞采集主链路）。单批另有独立上限
+`batch_max_events`（默认 256，不等于队列容量）：持续输入时 worker 也按批落盘，
+写完立刻释放事件引用，不会把在线积压抓成一个无界批次。
 
 锁设计：文件 IO 全程不持锁——worker 是文件句柄的唯一写者，锁只保护
 计数与句柄的读取视图，保证 handle_packet 在磁盘卡死时也不阻塞。
@@ -29,6 +31,10 @@ logger = get_logger("event_log")
 
 # 待写队列上限：抓包突发（每秒数百事件）下给 worker 数秒腾挪空间
 QUEUE_MAX = 8192
+# 单批上限：持续输入时保证 worker 落盘并释放引用，不把整个积压抓成一批。
+# 取值依据（2026-10-25 实测，24MB 录制 10,836 事件）：平均 5.6KB/行，
+# 256 条一批约 1.4MB，慢盘下单批占用可控，且不会被队列容量放大。
+BATCH_MAX_EVENTS = 256
 # 单个 eventlog 分片的目标大小：写满即切下一个分片并触发保留策略。
 # 取 64MB 是为了让「300MB 上限」有可清理的粒度：一次切换最多超出上限一个分片。
 PART_BYTES = 64 * 1024 * 1024
@@ -58,6 +64,7 @@ class EventLogWriter:
         log_dir: Path,
         *,
         queue_max: int = QUEUE_MAX,
+        batch_max_events: int = BATCH_MAX_EVENTS,
         close_join_timeout: float = 5.0,
         on_rollover: Callable[[Path], None] | None = None,
         max_part_bytes: int = PART_BYTES,
@@ -65,6 +72,7 @@ class EventLogWriter:
         self._dir = log_dir
         self._on_rollover = on_rollover
         self._max_part_bytes = max(0, int(max_part_bytes))
+        self._batch_max_events = max(1, int(batch_max_events))
         self._lock = threading.Lock()  # 只保护计数与句柄视图，不覆盖 IO
         self._file = None
         self._path: Path | None = None
@@ -143,28 +151,27 @@ class EventLogWriter:
                 self._close_owned_file()
                 return
             batch: list[PacketEvent] = []
-            barriers: list[_Barrier] = []
-            if isinstance(item, _Barrier):
-                barriers.append(item)
-            else:
-                batch.append(item)
             stop_after = False
-            # 一次取出当前全部积压：批量写 + 单次 flush，降磁盘次数
+            # 逐项取用、按上限成批写：持续输入时每批写完即释放引用
             while True:
-                try:
-                    nxt = self._queue.get_nowait()
-                except queue.Empty:
-                    break
-                if nxt is _QUEUE_SENTINEL:
+                if item is _QUEUE_SENTINEL:
                     stop_after = True
                     break
-                if isinstance(nxt, _Barrier):
-                    barriers.append(nxt)
-                    continue
-                batch.append(nxt)
+                if isinstance(item, _Barrier):
+                    # barrier 之前的事件先落盘，再置位（保持既有完成语义）
+                    self._write_batch(batch)
+                    batch = []
+                    item.done.set()
+                else:
+                    batch.append(item)
+                    if len(batch) >= self._batch_max_events:
+                        self._write_batch(batch)
+                        batch = []
+                try:
+                    item = self._queue.get_nowait()
+                except queue.Empty:
+                    break
             self._write_batch(batch)
-            for barrier in barriers:
-                barrier.done.set()
             if stop_after:
                 self._close_owned_file()
                 return
@@ -354,4 +361,4 @@ def _serialize(event: PacketEvent) -> str | None:
         return None
 
 
-__all__ = ["PART_BYTES", "QUEUE_MAX", "EventLogWriter"]
+__all__ = ["BATCH_MAX_EVENTS", "PART_BYTES", "QUEUE_MAX", "EventLogWriter"]
