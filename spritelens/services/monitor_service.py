@@ -3,7 +3,9 @@
 线程模型：on_chunk 与连接关闭（close_session）均由接入层**投递线程**
 按序调用（嗅探线程只做分类/重组/入队，见 npcap_source 模块注释——
 关闭事件排在残余数据之后，不会被抢跑）。内部用锁保护会话状态；
-事件消费者通过 drain_events() / snapshot 拉取，不做跨线程回调；运行中的 UI 不再提供协议流页面。
+业务消费者通过 add_packet_listener 注册的回调取事件（回调在管线线程内
+同步执行，单个回调异常不影响管线）；诊断/回放用 drain_events() 拉取历史，
+历史需在构造时显式开启 keep_event_history（默认关闭，避免常驻内存）。
 """
 
 from __future__ import annotations
@@ -27,6 +29,8 @@ from spritelens.services.session_tracker import SessionTracker, Totals
 
 logger = get_logger("monitor")
 
+# 事件历史容量上限：只在 keep_event_history=True（诊断/CLI 回放）时分配。
+# 桌面链路由业务监听器直接消费同一事件，保留历史只会常驻内存。
 MAX_BUFFERED_EVENTS = 2000
 # 会话状态上限与空闲回收：抓包中途接入/异常断连会留下永不关闭的会话，
 # 帧流缓冲与密钥状态必须随连接关闭或长时间无活动释放（复现过 _sessions
@@ -69,6 +73,7 @@ class MonitorService:
         schema_library: SchemaLibrary | None = None,
         tracker: SessionTracker | None = None,
         preset_key: bytes | None = None,
+        keep_event_history: bool = False,
     ) -> None:
         self._catalog = catalog
         self._key_store = key_store
@@ -76,7 +81,12 @@ class MonitorService:
         self._tracker = tracker if tracker is not None else SessionTracker()
         self._lock = threading.Lock()
         self._sessions: dict[str, _SessionState] = {}
-        self._events: deque[PacketEvent] = deque(maxlen=MAX_BUFFERED_EVENTS)
+        # 事件历史默认不保留：桌面链路由监听器消费，drain_events() 只服务诊断/回放。
+        self._events: deque[PacketEvent] | None = (
+            deque(maxlen=MAX_BUFFERED_EVENTS) if keep_event_history else None
+        )
+        self._emitted_total = 0
+        self._history_warned = False
         self._source: CaptureSource | None = None
         self._preset_key = preset_key
         self._checkpoints = {item.flow_id: item for item in key_store.load_sessions()}
@@ -114,13 +124,14 @@ class MonitorService:
             if confirmed:
                 for sid, state in confirmed:
                     self._save_checkpoint(SessionCheckpoint(sid, state.key, state.identity, state.server_sequence))
+            emitted_total = self._emitted_total
         # 停止即落一条最终统计，事后诊断不再靠猜
         _sessions, totals = self._tracker.snapshot()
         logger.info(
             "[stats] 停止采集：原始流 %d 段 / %d 字节，解密成功 %d，解密失败 %d，"
             "缺密钥 %d，拆分失败 %d，事件 %d 条",
             totals.raw_chunks, totals.raw_bytes, totals.decrypt_ok, totals.decrypt_fail,
-            totals.key_miss, totals.parse_fail, len(self._events),
+            totals.key_miss, totals.parse_fail, emitted_total,
         )
 
     @property
@@ -331,7 +342,9 @@ class MonitorService:
                 state.checkpoint_at = now
         event = replace(event, account_uid=state.identity[0] if state.identity else 0)
         self._tracker.mark_identity(session_id, state.identity)
-        self._events.append(event)
+        self._emitted_total += 1
+        if self._events is not None:
+            self._events.append(event)
         for listener in self._packet_listeners:
             try:
                 listener(event)
@@ -346,7 +359,13 @@ class MonitorService:
 
     # -- UI / 功能层读取 ------------------------------------------------
     def drain_events(self) -> list[PacketEvent]:
+        """取走并清空事件历史；构造时 keep_event_history=True 才有内容。"""
         with self._lock:
+            if self._events is None:
+                if not self._history_warned:
+                    self._history_warned = True
+                    logger.warning("事件历史未开启（keep_event_history=False），drain_events() 恒为空")
+                return []
             events = list(self._events)
             self._events.clear()
         return events

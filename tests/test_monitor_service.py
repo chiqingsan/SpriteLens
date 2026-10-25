@@ -30,10 +30,12 @@ class MonitorServiceTest(unittest.TestCase):
         self.tracker = SessionTracker()
         self.key_store = KeyStore(self.tmp_path / "keys")
         self.addCleanup(self.key_store.close)
+        # 本文件断言 drain_events() 的历史内容，显式开启历史（桌面装配默认关闭）。
         self.monitor = MonitorService(
             catalog=OpcodeCatalog({}),
             key_store=self.key_store,
             tracker=self.tracker,
+            keep_event_history=True,
         )
 
     def _feed_raw(self, raw: bytes, direction: Direction = Direction.S2C, seq: int = 1):
@@ -60,6 +62,7 @@ class MonitorServiceTest(unittest.TestCase):
             key_store=key_store,
             tracker=self.tracker,
             schema_library=library,
+            keep_event_history=True,
         )
         saved = schema_mod._library
         schema_mod._library = None  # 全局库为空：解码若回读全局将退化为 field_1
@@ -97,6 +100,29 @@ class MonitorServiceTest(unittest.TestCase):
         _sessions, totals = self.monitor.snapshot()
         self.assertEqual(totals.decrypt_ok, 1)
         self.assertEqual(totals.key_miss, 0)
+
+    def test_default_keeps_no_event_history_but_listeners_still_fire(self):
+        """桌面等价路径：默认不驻留事件历史，业务监听器照常收到事件。"""
+        key_store = KeyStore(self.tmp_path / "keys-no-history")
+        self.addCleanup(key_store.close)
+        monitor = MonitorService(
+            catalog=OpcodeCatalog({}),
+            key_store=key_store,
+            tracker=SessionTracker(),
+        )
+        received: list = []
+        monitor.add_packet_listener(received.append)
+        monitor.on_chunk(StreamChunk(
+            session_id=SESSION, direction=Direction.S2C,
+            data=make_ack_frame(SYNTH_KEY), first_seq=1,
+        ))
+        monitor.on_chunk(StreamChunk(
+            session_id=SESSION, direction=Direction.S2C,
+            data=make_data_frame(SYNTH_KEY, 0x1888, make_protobuf_payload(), sequence=2),
+            first_seq=2,
+        ))
+        self.assertEqual([event.opcode for event in received], [0x1888])
+        self.assertEqual(monitor.drain_events(), [])
 
     def test_key_persisted_to_store(self):
         self._feed_raw(make_ack_frame(SYNTH_KEY))
@@ -156,6 +182,7 @@ class MonitorServiceTest(unittest.TestCase):
             key_store=key_store,
             tracker=SessionTracker(),
             preset_key=SYNTH_KEY,
+            keep_event_history=True,
         )
         monitor.on_chunk(
             StreamChunk(

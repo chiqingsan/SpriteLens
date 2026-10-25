@@ -166,7 +166,8 @@ class MultiAccountCaptureTest(unittest.TestCase):
         self.ctx.key_store.flush()
         keys = KeyStore(Path(self.tmp.name) / "keys")
         self.addCleanup(keys.close)
-        restarted = MonitorService(catalog=load_catalog(), key_store=keys)
+        # 下方断言 drain_events() 的历史，需显式开启事件历史。
+        restarted = MonitorService(catalog=load_catalog(), key_store=keys, keep_event_history=True)
         self.pet(FLOW_A, SYNTH_KEY, 113, sequence=12, monitor=restarted)
         self.pet(FLOW_B, KEY_B, 223, sequence=12, monitor=restarted)
         events = restarted.drain_events()

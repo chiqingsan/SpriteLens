@@ -82,6 +82,7 @@ class ReplayPipelineTest(unittest.TestCase):
                     catalog=OpcodeCatalog({}),
                     key_store=key_store,
                     tracker=SessionTracker(),
+                    keep_event_history=True,
                 )
                 source = ReplaySource(chunks, on_chunk=monitor.on_chunk)
                 monitor.bind(source)

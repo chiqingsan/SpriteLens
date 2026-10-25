@@ -102,8 +102,8 @@ PacketEvent → MonitorService.add_packet_listener
 事件日志由 `services/event_logger.py` 有界队列 + worker 批量落盘。
 
 **为什么异步写**：抓包回调运行在 `MonitorService` 锁内，同步 IO 会阻塞
-UI 的 `drain_events` 与后续帧处理——实测事件日志每条 `flush()` 在登录突发
-下净增约 14ms、UI 轮询最长等待 57ms。因此写路径统一「只入内存」：宠物/
+事件处理与后续帧处理——实测事件日志每条 `flush()` 在登录突发
+下净增约 14ms、当时 UI 轮询最长等待 57ms。因此写路径统一「只入内存」：宠物/
 蛋仓的 `put()` 只并入内存待写表，落盘由各自 worker 按间隔批量执行（同一
 `(uid,gid)` 自动合并，百只级突发最终只产生一次 upsert）；事件日志走有界
 队列 + worker 批量落盘（队列满丢新条并计数）。`close()` 做最终 flush，

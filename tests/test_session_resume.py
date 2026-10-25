@@ -31,7 +31,12 @@ class SessionResumeTest(unittest.TestCase):
         return self.store.load_session()
 
     def monitor(self):
-        monitor = MonitorService(catalog=OpcodeCatalog.load(ROOT / "data/schemas/opcodes.json"), key_store=self.store)
+        monitor = MonitorService(
+            catalog=OpcodeCatalog.load(ROOT / "data/schemas/opcodes.json"),
+            key_store=self.store,
+            # 用例通过 drain_events() 校验事件历史，需显式开启。
+            keep_event_history=True,
+        )
         repo = PetRepository()
         monitor.add_packet_listener(repo.handle_packet)
         return monitor, repo

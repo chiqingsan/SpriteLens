@@ -195,9 +195,11 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
     _created(key_store.close)
     scene_checkpoint_store = SceneCheckpointStore(scene_checkpoint_path())
     _created(scene_checkpoint_store.close)
+    # 桌面链路由下面的业务监听器消费事件，不保留事件历史（2000 条常驻无消费方）。
     monitor = MonitorService(
         catalog=load_catalog(),
         key_store=key_store,
+        keep_event_history=False,
     )
 
     # 应用层组装：宠物仓库订阅协议事件流（语义化 → 状态聚合 → 持久化）

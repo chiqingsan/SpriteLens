@@ -60,7 +60,8 @@ def run_replay(path: str, *, logger: logging.Logger) -> int:
     load_library(SCHEMAS_DIR)
     key_store = KeyStore(keys_dir())
     try:
-        monitor = MonitorService(catalog=catalog, key_store=key_store)
+        # 回放 CLI 靠 drain_events() 打印事件，需显式开启历史（桌面装配不需要）。
+        monitor = MonitorService(catalog=catalog, key_store=key_store, keep_event_history=True)
         source = ReplaySource(chunks, on_chunk=monitor.on_chunk)
         monitor.bind(source)
         started = time.perf_counter()
