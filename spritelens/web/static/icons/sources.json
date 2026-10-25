@@ -338,6 +338,32 @@
       "sha256": "971b0b2d3b5b17ae240cd3aac1a09710ab680d8c41900f1a37a0e430994d7fda"
     },
     {
+      "name": "ruler-2",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/ruler-2",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/ruler-2.svg",
+      "license": "MIT",
+      "search_tags": [
+        "egg",
+        "height",
+        "size"
+      ],
+      "sha256": "d7024458069cdabbdd59a8c21e279bdd42c7e8e2400f95196259c32800a223b2"
+    },
+    {
+      "name": "weight",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/weight",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/weight.svg",
+      "license": "MIT",
+      "search_tags": [
+        "egg",
+        "weight",
+        "mass"
+      ],
+      "sha256": "f6d08a8374007c97464ca1b7756dd326cf05fa919b85267543f901595e9c4d03"
+    },
+    {
       "name": "eye",
       "source": "Tabler Icons",
       "url": "https://tabler.io/icons/icon/eye",
@@ -436,30 +462,97 @@
       "sha256": "34efc2d5737ffa3f29f8056e6d861ea8218d8f40858539a959a9482811f6bd05"
     },
     {
-      "name": "ruler-2",
+      "name": "flag",
       "source": "Tabler Icons",
-      "url": "https://tabler.io/icons/icon/ruler-2",
-      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/ruler-2.svg",
+      "url": "https://tabler.io/icons/icon/flag",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/flag.svg",
       "license": "MIT",
       "search_tags": [
-        "egg",
-        "height",
-        "size"
+        "planner-target",
+        "goal"
       ],
-      "sha256": "d7024458069cdabbdd59a8c21e279bdd42c7e8e2400f95196259c32800a223b2"
+      "sha256": "91c224b828fd0716ef8617633a714ef6764a16618fe222becbcf0a4b83b35b9e"
     },
     {
-      "name": "weight",
+      "name": "arrows-shuffle",
       "source": "Tabler Icons",
-      "url": "https://tabler.io/icons/icon/weight",
-      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/weight.svg",
+      "url": "https://tabler.io/icons/icon/arrows-shuffle",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/arrows-shuffle.svg",
       "license": "MIT",
       "search_tags": [
-        "egg",
-        "weight",
-        "mass"
+        "generate",
+        "plan",
+        "regenerate"
       ],
-      "sha256": "f6d08a8374007c97464ca1b7756dd326cf05fa919b85267543f901595e9c4d03"
+      "sha256": "d17d782777733bb584c28d5b29c91c643f6749c5c7261be450e45a5e8c2d72af"
+    },
+    {
+      "name": "alert-circle",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/alert-circle",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/alert-circle.svg",
+      "license": "MIT",
+      "search_tags": [
+        "error",
+        "failure"
+      ],
+      "sha256": "7aff9be6b14daf212f982513de43ad7784752c021995719d00006cad8a75bef0"
+    },
+    {
+      "name": "info-circle",
+      "source": "Tabler Icons",
+      "url": "https://tabler.io/icons/icon/info-circle",
+      "svg_url": "https://raw.githubusercontent.com/tabler/tabler-icons/a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d/icons/outline/info-circle.svg",
+      "license": "MIT",
+      "search_tags": [
+        "notice",
+        "info"
+      ],
+      "sha256": "48b7dddf34a6b87e93843a42b14781ce01794cf69274c458249ed8bfc01b6e4d"
+    },
+    {
+      "name": "star",
+      "source": "项目保留图形（原资源）",
+      "url": "",
+      "svg_url": "",
+      "license": "ISC",
+      "search_tags": [
+        "legacy"
+      ],
+      "sha256": ""
+    },
+    {
+      "name": "star-filled",
+      "source": "项目保留图形（原资源）",
+      "url": "",
+      "svg_url": "",
+      "license": "ISC",
+      "search_tags": [
+        "legacy"
+      ],
+      "sha256": ""
+    },
+    {
+      "name": "graduation-cap",
+      "source": "项目保留图形（原资源）",
+      "url": "",
+      "svg_url": "",
+      "license": "ISC",
+      "search_tags": [
+        "legacy"
+      ],
+      "sha256": ""
+    },
+    {
+      "name": "sprout",
+      "source": "项目保留图形（原资源）",
+      "url": "",
+      "svg_url": "",
+      "license": "ISC",
+      "search_tags": [
+        "legacy"
+      ],
+      "sha256": ""
     }
   ]
 }

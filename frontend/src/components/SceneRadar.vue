@@ -193,34 +193,29 @@ const projection = computed(() => {
   </section>
 </template>
 <style scoped>
-/* 块级容器：填满父面板，父面板固定高度时由内部 flex 分配空间，避免圆盘被裁掉。 */
-.scene-radar { display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; max-width: 100%; padding: var(--space-3); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-sm); }
-.scene-radar > header, .scene-radar > .radar-legend, .scene-radar > p { flex: none; }
-.scene-radar .radar-note { margin-bottom: var(--space-1); }
-.scene-radar header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-3); min-width: 0; }
-.scene-radar header span, .scene-radar p { min-width: 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.6; overflow-wrap: anywhere; }
-/* svg 外层吃掉剩余高度并居中；svg 自身撑满容器，viewBox 等比缩放保证圆盘完整可见。 */
-.radar-body { flex: 1 1 0; min-height: 0; min-width: 0; display: grid; place-items: center; margin: var(--space-2) 0; }
-.scene-radar-scope { display: block; width: 100%; height: 100%; max-width: 100%; max-height: 100%; aspect-ratio: 1; background: var(--surface-1); border-radius: var(--radius-sm); }
+/* 场景雷达：面板模式是白底浮卡，compact 模式嵌进悬浮雷达的深色浮层。 */
+.scene-radar { display: flex; flex-direction: column; height: 100%; min-width: 0; min-height: 0; max-width: 100%; padding: var(--space-4); border: 1px solid var(--line-soft); border-radius: var(--radius-lg); background: var(--panel); color: var(--ink); }
+.scene-radar header { display: flex; flex: none; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1) var(--space-3); min-width: 0; }
+.scene-radar header strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
+.scene-radar header span { min-width: 0; color: var(--muted); font-size: var(--fs-3xs); overflow-wrap: anywhere; }
+.radar-legend { display: flex; flex: none; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-2); color: var(--muted); font-size: var(--fs-3xs); }
+.radar-legend > span { display: inline-flex; align-items: center; gap: var(--space-1); }
+.radar-legend-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--teal); }
+.radar-legend-dot.is-marked { background: var(--amber); }
+.radar-legend-dot.is-double { width: 10px; height: 10px; border: 1px solid var(--danger-ink); background: var(--danger); }
+.radar-body { display: grid; flex: 1 1 0; place-items: center; min-width: 0; min-height: 0; margin: var(--space-2) 0; }
+.scene-radar-scope { display: block; width: 100%; height: 100%; max-width: 100%; max-height: 100%; border-radius: var(--radius-md); background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--line-soft); }
 .radar-ring, .radar-axis { fill: none; stroke: var(--line); stroke-width: 1; }
 .radar-ring { stroke-dasharray: 2 4; }
 .radar-axis { stroke-dasharray: 4 5; }
-.scene-radar text { fill: var(--muted); font-size: 11px; }
-.radar-scale-label { font-size: 10px; font-weight: 600; }
+/* 字号不要写在 .scene-radar text 上：它比 .radar-target-label 的类选择器优先级高，
+   会把标签算好的 9px 底片撑破。空态提示单独给字号。 */
+.scene-radar text { fill: var(--muted); }
+.scene-radar-scope > text { font-size: 11px; }
+.radar-scale-label { fill: var(--muted-2); font-size: 10px; font-weight: 500; }
 .radar-player-cross { fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-linecap: round; }
-.scene-radar .radar-target-label { font-size: 9px; font-weight: 700; fill: var(--ink); pointer-events: none; }
-/* 标签底色沿用面板/悬浮层底色：避免标签与点位、网格线粘连。 */
-.scene-radar { --radar-label-bg: var(--panel); }
-.radar-label-bg { fill: var(--radar-label-bg); fill-opacity: .86; }
-.radar-label.selected .radar-label-bg { fill-opacity: .96; }
-.radar-legend { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-3); color: var(--muted); font-size: var(--fs-2xs); }
-.radar-legend span { display: inline-flex; align-items: center; gap: var(--space-1); }
-.radar-legend-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--teal); }
-.radar-legend-dot.is-marked { background: var(--amber); }
-.radar-legend-dot.is-double { width: 11px; height: 11px; background: var(--danger); border: 1px solid var(--danger-ink); }
 .radar-player { fill: var(--ink); stroke: var(--panel); stroke-width: 2; }
 .radar-target { cursor: pointer; outline: none; }
-.radar-label { pointer-events: none; }
 .radar-hit { fill: transparent; }
 .radar-attention-ring { fill: none; stroke-width: 2.5; }
 .radar-target.attention-tone-0 .radar-attention-ring { stroke: var(--radar-attention-0); }
@@ -230,23 +225,43 @@ const projection = computed(() => {
 .radar-target.attention-tone-4 .radar-attention-ring { stroke: var(--radar-attention-4); }
 .radar-point { fill: var(--teal); stroke: var(--panel); stroke-width: 2; }
 .radar-target.is-marked .radar-point { fill: var(--amber); }
-.radar-target.is-double .radar-point { fill: var(--danger); stroke: var(--panel); stroke-width: 2.5; }
-.radar-target.selected .radar-hit, .radar-target:focus-visible .radar-hit { fill: var(--accent); stroke: var(--teal-dark); stroke-width: 2; }
-.radar-label.selected .radar-target-label { font-size: 10px; fill: var(--teal-deep); }
-.scene-radar > p { padding-top: var(--space-3); border-top: 1px solid var(--line-soft); }
-.scene-radar.is-overlay { flex: 1; min-height: 0; padding: 0; border: 0; background: transparent; --radar-label-bg: var(--radar-overlay-bg); }
+.radar-target.is-double .radar-point { fill: var(--danger); stroke-width: 2.5; }
+.radar-target:hover .radar-hit { fill: color-mix(in srgb, var(--teal) 10%, transparent); }
+.radar-target:focus-visible .radar-hit,
+.radar-target.selected .radar-hit { fill: color-mix(in srgb, var(--teal) 16%, transparent); stroke: var(--teal); stroke-width: 1.5; }
+.radar-label { pointer-events: none; }
+.radar-label-bg { fill: var(--panel); fill-opacity: .86; }
+.radar-label.selected .radar-label-bg { fill-opacity: .98; }
+.radar-target-label { fill: var(--ink); font-size: 9px; font-weight: 600; }
+.radar-label.selected .radar-target-label { fill: var(--teal-deep); font-size: 10px; }
+.scene-radar > p { flex: none; margin: 0; color: var(--muted); font-size: var(--fs-3xs); line-height: 1.5; overflow-wrap: anywhere; }
+.scene-radar > .radar-note { margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--line-soft); }
+
+.scene-radar.is-overlay { flex: 1; min-height: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
 .is-overlay header { display: none; }
-.is-overlay .radar-legend { flex: none; margin: 0 0 var(--space-2); justify-content: center; }
 .is-overlay .radar-body { margin: 0; }
-.is-overlay .scene-radar-scope { aspect-ratio: auto; background: transparent; }
-.is-overlay .radar-point { fill: var(--radar-overlay-point); stroke: var(--radar-overlay-bg); }
-.is-overlay .radar-target-label { fill: var(--radar-overlay-ink); }
-.is-overlay .radar-label.selected .radar-target-label { fill: var(--radar-overlay-ink); }
-.scene-radar.is-overlay .radar-target.is-marked .radar-point { fill: var(--amber-bright); }
-.scene-radar.is-overlay .radar-target.is-double .radar-point { fill: var(--danger); stroke: var(--radar-overlay-bg); }
-.scene-radar.is-overlay .radar-legend-dot { background: var(--radar-overlay-point); }
-.scene-radar.is-overlay .radar-legend-dot.is-marked { background: var(--amber-bright); }
-.scene-radar.is-overlay .radar-legend-dot.is-double { background: var(--danger); border-color: var(--danger); }
+.is-overlay .scene-radar-scope { border-radius: 0; background: transparent; box-shadow: none; }
+.is-overlay .radar-ring, .is-overlay .radar-axis { stroke: var(--radar-overlay-line); }
+.is-overlay .scene-radar text { fill: var(--radar-overlay-muted); }
 .is-overlay .radar-player { fill: var(--radar-overlay-ink); stroke: var(--radar-overlay-bg); }
 .is-overlay .radar-player-cross { stroke: var(--radar-overlay-ink); }
+.is-overlay .radar-point { fill: var(--radar-overlay-point); stroke: var(--radar-overlay-bg); }
+.is-overlay .radar-target.is-marked .radar-point { fill: var(--amber-bright); }
+.is-overlay .radar-target.is-double .radar-point { fill: var(--danger); stroke: var(--radar-overlay-bg); }
+.is-overlay .radar-target-label { fill: var(--radar-overlay-ink); }
+.is-overlay .radar-label.selected .radar-target-label { fill: var(--radar-overlay-ink); }
+.is-overlay .radar-label-bg { fill: var(--radar-overlay-bg); fill-opacity: .85; }
+.is-overlay .radar-target:hover .radar-hit { fill: color-mix(in srgb, var(--radar-overlay-point) 16%, transparent); }
+.is-overlay .radar-target.selected .radar-hit,
+.is-overlay .radar-target:focus-visible .radar-hit { fill: color-mix(in srgb, var(--radar-overlay-point) 22%, transparent); stroke: var(--radar-overlay-point); }
+
+/* SVG 字号是用户单位，会随画布等比缩放。.radar-target-label 的底片几何由脚本按
+   9px/10px 用户单位算好，CSS 改字号会让文字溢出底片并被 viewBox 裁掉，所以只补偿
+   不受几何约束的文字（空态提示、刻度值）。 */
+.is-overlay .scene-radar-scope > text { font-size: 16px; }
+
+@media (max-width: 1200px) {
+  .scene-radar:not(.is-overlay) .radar-scale-label { font-size: 13px; }
+  .scene-radar:not(.is-overlay) .scene-radar-scope > text { font-size: 15px; }
+}
 </style>

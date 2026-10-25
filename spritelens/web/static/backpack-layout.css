@@ -1,12 +1,12 @@
 /* 定稿布局：应用壳与背包样式，复用主题 token；不改变业务卡片配色。 */
-:root { --backpack-control: 36px; --pet-search-width: clamp(220px, 18vw, 280px); }
-#page-pets { --pet-side-width: 360px; }
-.account-card { position: relative; margin-bottom: var(--space-5); padding-bottom: var(--space-4); border: 1px solid var(--sidebar-line); border-radius: var(--radius-lg); background: var(--sidebar-bg); box-shadow: none; }
+:root { --backpack-control: 34px; --pet-search-width: clamp(220px, 18vw, 280px); }
+#page-pets { --pet-side-width: 340px; }
+.account-card { position: relative; margin-bottom: var(--space-4); padding: 2px; border: 1px solid var(--line-soft); border-radius: var(--radius-lg); background: var(--panel); box-shadow: var(--shadow-1); }
 .account-information { position: relative; }
-.account-information > summary { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-5); cursor: pointer; list-style: none; }
+.account-information > summary { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-3) var(--space-2); cursor: pointer; list-style: none; border-radius: var(--radius-md); }
 .account-information > summary::-webkit-details-marker { display: none; }
-.account-information > summary:hover { background: var(--sidebar-hover); }
-.account-avatar { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-lg); background: var(--teal-soft); overflow: hidden; flex: none; }
+.account-information > summary:hover { background: var(--surface-1); }
+.account-avatar { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: var(--teal-soft); overflow: hidden; flex: none; }
 .account-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .account-avatar > span { color: var(--teal); }
 .account-avatar .ui-icon { display: block; width: 24px; height: 24px; }
@@ -14,9 +14,9 @@
 .account-information[open] .account-expand { transform: rotate(180deg); }
 .account-empty .account-avatar { opacity: .45; }
 .account-copy { flex: 1; min-width: 0; }
-.account-copy strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); }
+.account-copy strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); font-weight: 600; }
 .account-copy small { display: block; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-3xs); color: var(--muted); margin-top: var(--space-1); white-space: nowrap; }
-.account-popover { position: fixed; z-index: 125; display: flex; flex-direction: column; gap: var(--space-3); width: min(340px, calc(100vw - var(--sidebar) - var(--space-6))); max-height: min(520px, calc(100vh - var(--space-8))); padding: var(--space-4); border: 1px solid var(--sidebar-line); border-radius: var(--radius-lg); background: var(--surface-1); box-shadow: var(--shadow-pop); }
+.account-popover { position: fixed; z-index: 125; display: flex; flex-direction: column; gap: var(--space-3); width: min(340px, calc(100vw - var(--sidebar) - var(--space-6))); max-height: min(520px, calc(100vh - var(--space-8))); padding: var(--space-4); border: 1px solid var(--line-soft); border-radius: var(--radius-lg); background: var(--panel); box-shadow: var(--shadow-pop); }
 .account-popover[hidden] { display: none; }
 .account-manager-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
 .account-manager-head strong { color: var(--sidebar-text); font-size: var(--fs-sm); }
@@ -38,21 +38,21 @@
 .account-switch-button { width: 100%; min-height: 36px; border: 1px solid var(--teal); border-radius: var(--radius-md); background: var(--teal); color: var(--surface-1); font-size: var(--fs-xs); font-weight: 600; }
 .account-switch-button:hover:not(:disabled) { background: var(--teal-dark); }
 .account-switch-button:disabled { cursor: not-allowed; border-color: var(--sidebar-line); background: var(--surface-2); color: var(--sidebar-muted); }
-.account-uid-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); height: 32px; padding: 0 var(--space-3); margin: 0 var(--space-5); border-radius: var(--radius-md); background: var(--surface-2); font-size: var(--fs-xs); color: var(--ink-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.account-uid-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); height: 28px; padding: 0 var(--space-3); margin: 0 var(--space-3) var(--space-2); border-radius: var(--radius-sm); background: var(--surface-2); font-size: var(--fs-3xs); color: var(--ink-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .account-uid-row .icon-button { flex: none; width: 24px; height: 24px; padding: var(--space-1); border-radius: var(--radius-sm); background: var(--teal-soft); }
 .account-uid-row .icon-button:hover { background: var(--sidebar-hover); transform: none; }
 .icon-button { width: 28px; height: 28px; padding: var(--space-1); background: transparent; border-radius: var(--radius-sm); }
 .sidebar-foot { padding: var(--space-5) 0 0; flex: none; }
-.sidebar-settings { display: flex; align-items: center; justify-content: flex-start; gap: var(--space-5); width: 100%; height: 48px; padding: 0 var(--space-6); text-align: left; border: 1px solid var(--sidebar-line); border-radius: var(--radius-lg); background: var(--sidebar-bg); box-shadow: none; font-size: var(--fs-md); }
+.sidebar-settings { display: flex; align-items: center; justify-content: flex-start; gap: var(--space-5); width: 100%; height: 40px; padding: 0 var(--space-3); text-align: left; border: 1px solid var(--line-soft); border-radius: var(--radius-md); background: var(--panel); box-shadow: var(--shadow-1); font-size: var(--fs-sm); font-weight: 500; }
 .sidebar-settings .nav-icon { width: 20px; height: 20px; }
 .sidebar-settings > .ui-icon { width: 16px; height: 16px; }
 /* 只命中右侧箭头（设置图标是 .ui-icon.nav-icon，不能让它吃到 auto margin 居中） */
 .sidebar-settings > .ui-icon:not(.nav-icon) { margin-left: auto; }
-.topbar { grid-template-columns: auto minmax(0, 1fr) auto; min-height: 64px; container-type: inline-size; }
-#page-title { font-size: var(--fs-xl); margin: 0; white-space: nowrap; }
+.topbar { grid-template-columns: auto minmax(0, 1fr) auto; min-height: var(--topbar); container-type: inline-size; }
+#page-title { font-size: 18px; margin: 0; white-space: nowrap; }
 .capture-summary { align-items: center; }
-#btn-toggle { min-width: 136px; height: 40px; }
-#btn-toggle.toggle-busy { animation: none; }
+#btn-toggle { min-width: 132px; height: 34px; }
+
 #page-pets .pet-toolbar { flex-wrap: nowrap; gap: var(--space-3); padding: var(--space-3); }
 #page-pets .pet-search-results { display: flex; flex: 1 1 auto; align-items: center; justify-content: flex-end; gap: var(--space-3); width: auto; margin-left: auto; flex-wrap: nowrap; order: 5; }
 #page-pets .pet-toolbar > #pet-view, #page-pets .pet-toolbar > #btn-pet-filters, #page-pets .pet-toolbar > .pet-view-settings, #page-pets .pet-toolbar > .pet-sort-root { flex: none; }
@@ -60,7 +60,7 @@
 .pet-toolbar .pet-search { flex: 1 1 auto; width: auto; max-width: 15em; min-width: 4em; order: 1; }
 .pet-toolbar:has(#pet-view [data-view="card"].active) .pet-tools { width: auto; min-width: 0; flex-wrap: nowrap; gap: var(--space-3); }
 .pet-toolbar .segmented, .pet-toolbar .segmented button, .pet-search input, .pet-view-settings > summary { height: var(--backpack-control); }
-.pet-toolbar .segmented { padding: 0; }
+.pet-toolbar .segmented { padding: 2px; }
 .pet-toolbar .segmented button { padding: 0 var(--space-4); font-size: var(--fs-sm); }
 .pet-view-settings { margin-left: 0; }
 .pet-sort-root { flex: none; display: flex; align-items: center; }
@@ -73,13 +73,13 @@
 #pet-count { width: calc(3em + 13ch + 2 * var(--space-4)); justify-content: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
 #btn-pet-filters { height: var(--backpack-control); }
 #pet-list-root { display: flex; flex: 1; flex-direction: column; min-height: 0; overflow: hidden; }
-.pet-box-navigation { padding: var(--space-3); background: var(--panel); }
+.pet-box-navigation { padding: var(--space-2) var(--space-3); background: transparent; }
 .box-navigation-row { flex-wrap: nowrap; gap: var(--space-1); margin: 0; }
 .box-navigation-row .box-teams, .box-navigation-row .box-number { height: var(--backpack-control); min-height: 0; white-space: nowrap; flex: none; }
 .box-navigation-row .box-teams { width: calc(2em + 4ch + 2 * var(--space-4)); font-variant-numeric: tabular-nums; }
 .box-tab-strip, .page-tab-strip { display: flex; position: relative; flex: 1; min-width: 0; overflow-x: auto; gap: var(--space-2); scrollbar-width: none; }
 .box-tab-strip::-webkit-scrollbar, .page-tab-strip::-webkit-scrollbar { display: none; }
-.box-number { display: block; width: 44px; padding: 0; }
+.box-number { display: block; width: 42px; padding: 0; }
 .box-scroll { flex: none; width: 24px; height: var(--backpack-control); background: transparent; padding: 0; }
 .box-total { flex: none; font-size: var(--fs-xs); color: var(--muted); padding-left: var(--space-2); white-space: nowrap; }
 #page-pets .table-wrap { overflow: auto; }
@@ -88,7 +88,7 @@
 #page-pets .table-wrap.pet-empty-state #pet-empty:not([hidden]) { display: grid; justify-items: center; align-content: center; gap: var(--space-3); width: 100%; min-height: 100%; padding: var(--space-7) var(--space-5); box-sizing: border-box; }
 #page-pets .table-wrap.pet-empty-state #pet-empty > .ui-icon { width: 32px; height: 32px; color: var(--teal); }
 #page-pets .table-wrap.pet-empty-state #pet-empty-copy { max-width: 460px; margin: 0; line-height: 1.6; }
-#pet-grid.game-box-grid { width: 100%; max-width: none; min-width: 864px; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+#pet-grid.game-box-grid { width: 100%; max-width: none; min-width: 0; grid-template-columns: repeat(6, minmax(0, 1fr)); }
 #pet-grid.box-fill-grid { height: 100%; min-height: 672px; grid-template-rows: repeat(5, minmax(0, 1fr)); grid-auto-rows: auto; align-content: stretch; }
 #pet-grid.box-fill-grid > .point-pet { height: 100%; grid-template-rows: 24px minmax(0, 1fr) 16px 22px; align-content: stretch; }
 #pet-grid.box-fill-grid .point-portrait-row { height: 100%; align-items: center; }
@@ -113,7 +113,7 @@
 .direct-filter { padding-bottom: var(--space-5); }
 .filter-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin-top: var(--space-3); }
 #pet-filters .filter-section { padding: 0; border: 0; border-top: 1px solid var(--line-soft); }
-#pet-filters .filter-section > summary { height: 44px; list-style: none; display: grid; grid-template-columns: auto minmax(0, 1fr) 18px; gap: var(--space-3); }
+#pet-filters .filter-section > summary { height: 40px; list-style: none; display: grid; grid-template-columns: auto minmax(0, 1fr) 18px; gap: var(--space-3); }
 #pet-filters .filter-section > summary::-webkit-details-marker { display: none; }
 #pet-filters .filter-section > summary::before { content: none; }
 #pet-filters .filter-section > summary::after { content: ''; width: 18px; height: 18px; background: var(--muted); mask: url('/static/icons/chevron-right.svg') center / contain no-repeat; }
@@ -155,6 +155,8 @@
 }
 @media (max-width: 960px) {
   #page-pets .workspace.split, #page-pets .workspace.split.detail-collapsed { grid-template-columns: minmax(0, 1fr) !important; }
+  #page-pets .pet-toolbar { flex-wrap: wrap; }
+  #page-pets .pet-search-results { order: 0; justify-content: flex-start; flex-basis: 100%; }
   .pet-search-results { width: 100%; }
   .pet-toolbar .segmented button { padding: 0 var(--space-2); }
   #page-pets .filter-rail { gap: 0; }
@@ -200,7 +202,7 @@
   .account-popover { width: min(340px, calc(100vw - var(--sidebar) - var(--space-6))); max-height: calc(100vh - var(--space-8)); }
 }
 
-.quick-settings-dialog { width: min(880px, calc(100vw - 40px)); max-height: min(800px, calc(100vh - 40px)); padding: var(--space-5); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--panel); color: var(--ink); }
+.quick-settings-dialog { width: min(880px, calc(100vw - 40px)); max-height: min(800px, calc(100vh - 40px)); padding: var(--space-6); border: 1px solid var(--line-soft); border-radius: var(--radius-xl); background: var(--panel); color: var(--ink); box-shadow: var(--shadow-pop); }
 .quick-settings-dialog[open] { display: flex; flex-direction: column; gap: var(--space-3); }
 .quick-settings-dialog::backdrop { background: var(--overlay); }
 .quick-settings-dialog header, .quick-settings-dialog footer { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); flex: none; }
@@ -218,3 +220,32 @@
 .saved-shortcuts { display: grid; flex: none; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin-top: var(--space-2); max-height: 240px; overflow: auto; }
 .saved-shortcuts > .chip { display: grid; place-items: center; min-width: 0; width: 100%; height: 34px; padding: var(--space-2); border-radius: var(--radius-sm); font-size: var(--fs-xs); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #pet-filters .medal-choices { max-height: 280px; overflow: auto; }
+
+/* 窄窗（≤1360：侧栏 216 + 画布留白 + 筛选栏 340 后箱位卡仅约 106–116px）
+   箱位卡内部紧凑化，保证三列数值和顶行标记不互相侵占。 */
+@media (max-width: 1360px) {
+  #pet-grid.box-fill-grid > .point-pet { grid-template-rows: 22px minmax(0, 1fr) 14px 20px; }
+  #pet-grid.game-box-grid .point-top { height: 22px; }
+  #pet-grid.game-box-grid .point-nature { max-width: 40px; height: 20px; padding: 0 4px; font-size: 10px; line-height: 20px; }
+  #pet-grid.game-box-grid .point-metrics { padding-top: 3px; display: flex; align-items: baseline; justify-content: space-evenly; gap: 2px; }
+  #pet-grid.game-box-grid .point-metrics > span { flex: 0 1 auto; }
+  #pet-grid.game-box-grid .point-metrics > span + span { border-left: 0; }
+  #pet-grid.game-box-grid .point-metrics b { font-size: 10px; line-height: 14px; }
+  #pet-grid.game-box-grid .point-metrics small { font-size: 9px; line-height: 12px; }
+  #pet-grid.game-box-grid .point-metrics > span + span { border-left-color: color-mix(in srgb, var(--line) 85%, transparent); }
+  #pet-grid.game-box-grid .point-name { font-size: 12px; line-height: 15px; }
+  #pet-grid.game-box-grid .point-egg-group { font-size: 10px; line-height: 16px; }
+}
+
+/* 640 窗口：内容宽约 576，6 列卡宽仅 ~89px。优先保住立绘、名称和三列数值，
+   两侧蛋组/奖牌与顶部居中标记让位，避免元素互相遮挡。 */
+@media (max-width: 640px) {
+  #pet-grid.box-fill-grid .point-groups,
+  #pet-grid.box-fill-grid .point-medals { display: none; }
+  #pet-grid.box-fill-grid .point-portrait-row { grid-template-columns: minmax(0, 1fr); }
+  #pet-grid.game-box-grid .point-markers { display: none; }
+  #pet-grid.game-box-grid .point-name { font-size: 11px; line-height: 14px; }
+  #pet-grid.game-box-grid .point-nature { max-width: 30px; padding: 0 3px; }
+  #pet-grid.game-box-grid .point-metrics b { font-size: 9px; line-height: 13px; }
+  #pet-grid.game-box-grid .point-metrics small { font-size: 8px; line-height: 11px; }
+}
