@@ -172,6 +172,9 @@ class EventLogWriter:
                 except queue.Empty:
                     break
             self._write_batch(batch)
+            # 尾批写完立即释放引用：worker 随后阻塞等新事件，空闲期不能持有已落盘对象。
+            batch = []
+            item = None
             if stop_after:
                 self._close_owned_file()
                 return

@@ -155,6 +155,25 @@ class EventLogWriterTest(unittest.TestCase):
             "按上限分批后仍要完整落盘",
         )
 
+    def test_written_tail_batch_is_released_while_worker_idles(self):
+        """PERF05 返修：尾批落盘后 worker 空闲等新事件，不得继续持有已写入对象。"""
+        import gc
+        import weakref
+
+        writer = self._writer()
+        event = _event()
+        reference = weakref.ref(event)
+        writer.handle_packet(event)
+        deadline = time.monotonic() + 5
+        while writer.count == 0 or writer._queue.qsize():
+            if time.monotonic() > deadline:
+                self.fail("日志未在预算内写入")
+            time.sleep(0.01)
+        del event
+        time.sleep(0.05)  # 等 worker 走完收尾分支进入阻塞等待
+        gc.collect()
+        self.assertIsNone(reference(), "空闲的 worker 仍持有已落盘事件")
+
     def test_close_timeout_does_not_close_file_under_worker(self):
         """回归（P2）：worker 写盘卡死时，close 超时路径不得跨线程关文件。
 
