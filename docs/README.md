@@ -43,6 +43,7 @@
 - [reviews/2026-10-25-wiki-sync.md](reviews/2026-10-25-wiki-sync.md) — 图鉴与 B 站 wiki 同步核查：数据无可见变化不重导入、26 个物种 wiki 无条目、5 个缺图中 4 个同画别名补齐
 - [reviews/MEMORY_PERFORMANCE_PAGE_RESIDENCY_2026-10-26.md](reviews/MEMORY_PERFORMANCE_PAGE_RESIDENCY_2026-10-26.md) — PERF03 页面驻留分摊测量：11 页 10 轮导航平台化、单页隔离归因上界与释放上限实验；本轮只交付测量与决策，不实施离页释放
 - [reviews/MEMORY_PERFORMANCE_DECODE_AUDIT_2026-10-26.md](reviews/MEMORY_PERFORMANCE_DECODE_AUDIT_2026-10-26.md) — PERF06 解码分配复测与消费者审计：峰值等于单个大包解码树（22.7 MiB），结束态 1.5 MiB，结论保持协议表示不变
+- [reviews/MEMORY_PERFORMANCE_RADAR_ACCEPTANCE_2026-10-26.md](reviews/MEMORY_PERFORMANCE_RADAR_ACCEPTANCE_2026-10-26.md) — PERF02 原生雷达窗口验收：真实 WebView2/pywebview 双窗口下消息语义、失效清空、断链心跳与宿主 API 契约通过；真实游戏流量与整机内存对比未覆盖
 
 当前规格、历史 review 与方向（按需查阅）：
 
