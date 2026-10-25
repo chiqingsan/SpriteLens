@@ -28,6 +28,11 @@ def nearby_payload(
     data["source"] = "observed_partial"
     data["coordinate_unit"] = "unverified"
     data["mapping_available"] = bool(static and static.scene_mapping_available)
+    # 属性图标复用背包页的 type-icons 素材；名称 → URL，不换算任何数值。
+    data["type_icons"] = (
+        {info.name: f"/static/type-icons/type-{key}.webp" for key, info in static.type_items()}
+        if static is not None else {}
+    )
     # 只下发展示半径，不换算米制；前端按原始单位过滤。
     data["radar_radius_raw"] = max(1, int(radar_radius_raw))
     data["actors"] = [dict(asdict(actor), actor_id=str(actor.actor_id)) for actor in snapshot.actors]

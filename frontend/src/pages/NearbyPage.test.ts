@@ -120,4 +120,40 @@ describe('附近精灵更新布局稳定性', () => {
     expect(wrapper.get('.nearby-count-note').text()).toBe('')
     wrapper.unmount()
   })
+  it('有牌优先按双牌满、双牌、单牌满、单牌排序，同级保持最近观察', async () => {
+    const mark = (name: string): NearbyMark => ({ label: name, name, source: 'reference' })
+    const actors = [
+      actor('1', 5),                                          // 普通
+      actor('2', 4, [mark('满重'), mark('满分')], 'double'),   // 双牌满
+      actor('3', 3, [mark('大块头')], 'double'),              // 双牌
+      actor('4', 2, [mark('满分')], 'marked'),                // 单牌满
+      actor('5', 1, [mark('粗嗓门')], 'marked'),              // 单牌
+    ]
+    const load = vi.fn().mockResolvedValueOnce(snapshot(1, actors))
+    const wrapper = mount(NearbyPage, { props: { host: { load, openFloating: vi.fn() } } })
+    ;(wrapper.vm as unknown as { update(value: unknown): void }).update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    await nextTick()
+    await wrapper.get('.nearby-sort select').setValue('marks')
+    await nextTick()
+    expect(wrapper.findAll('.nearby-card').map(card => card.attributes('id'))).toEqual([
+      'nearby-actor-2', 'nearby-actor-3', 'nearby-actor-4', 'nearby-actor-5', 'nearby-actor-1',
+    ])
+    wrapper.unmount()
+  })
+
+  it('属性用图标呈现并保留名称作为替代文本', async () => {
+    const icons = { '火': '/static/type-icons/type-1.webp', '水': '/static/type-icons/type-2.webp' }
+    const target = { ...actor('7', 1), type_names: ['火', '水'] }
+    const load = vi.fn().mockResolvedValueOnce({ ...snapshot(1, [target]), type_icons: icons })
+    const wrapper = mount(NearbyPage, { props: { host: { load, openFloating: vi.fn() } } })
+    ;(wrapper.vm as unknown as { update(value: unknown): void }).update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    await nextTick()
+    const rendered = wrapper.findAll('.nearby-type-icon')
+    expect(rendered.map(icon => icon.attributes('src'))).toEqual([icons['火'], icons['水']])
+    expect(rendered.map(icon => icon.attributes('alt'))).toEqual(['火', '水'])
+    wrapper.unmount()
+  })
+
 })

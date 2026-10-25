@@ -56,7 +56,7 @@ describe('参考坐标雷达', () => {
     const hidden = mount(SceneRadar, { props: { data: snapshot([far]) } })
     expect(hidden.findAll('.radar-target')).toHaveLength(0)
   })
-  it('按重点和双牌状态区分雷达目标', () => {
+  it('按标记和双牌状态区分雷达目标', () => {
     const double = actor('3', '双牌精灵', [100, 0, 0], { marks: [
       { label: '大', name: '大块头', source: 'reference' },
       { label: '婉', name: '婉转声', source: 'reference' },
@@ -65,7 +65,7 @@ describe('参考坐标雷达', () => {
     expect(wrapper.find('.radar-target.is-marked').exists()).toBe(true)
     expect(wrapper.find('.radar-target.is-double').exists()).toBe(true)
     expect(wrapper.find('.radar-target.is-double .radar-point').attributes('r')).toBe('7')
-    expect(wrapper.get('.radar-legend').text()).toContain('重点')
+    expect(wrapper.get('.radar-legend').text()).toContain('单牌')
     expect(wrapper.get('.radar-legend').text()).toContain('双牌')
   })
   it('紧凑雷达只在选中目标时显示名称', () => {

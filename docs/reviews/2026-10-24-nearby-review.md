@@ -144,14 +144,16 @@ C04 目标条件 → C05 应用内告警 → C06 雷达校准（米制/方位）
 - **失败语义已统一**：页面与悬浮雷达都「保留同周期已有数据 + 标注可能过期」，仅切号/周期变化/清空指令/无数据失败才清空；文档 `docs/NEARBY_OBSERVATIONS.md` 与 `docs/UI_GUIDE.md` 口径一致。
 - **P0-5 文档口径已改**：删除「战斗后恢复战前快照」；0x014A「全量实体列表」假设改为实测描述（当日仅 2 条、实体主要来自 0x0414 `SpaceAct_ActorEnter`）。
 - **战斗语义已定稿（选项 A）**：`spritelens/services/scene_repository.py` 删除从未写入的 `_battle_backup` / `_battle_restored_from_cache`，4908/4909 分支加注释「不恢复战前快照，保持空态等新观察周期重发」；0x014A 分支只判断 checkpoint 恢复。`docs/SCENE_OBSERVATIONS.md:23-24,46` 与 `docs/NEARBY_OBSERVATIONS.md:9,15` 统一为「清空 + 等待重发」，并注明 2026-10-24 用户决策。现有回归 `tests/test_scene.py:217,239` 已锁定该行为（战后实体/位置为空、phase=awaiting_scene，收到新 0x0414 后 phase=observing）。
+- **附近页信息密度调整（2026-10-25，用户五项要求）**：删除「场景 N · 更新时间」行；「悬浮雷达」按钮收进工具条与「刷新」并排；属性由文字 chip 改为 `/static/type-icons/type-{id}.webp` 图标（`nearby.py` 载荷新增 `type_icons`，前端 18px、`alt`/`title` 保留名称）；雷达图例与点位说明「重点」→「单牌」（领域值不变）；排序改为「最近观察 / 有牌优先」，有牌优先按「双牌满 > 双牌 > 单牌满 > 单牌 > 普通」分组、组内按最近观察；雷达底部单位说明并为一行。
 - **附近页布局已重构（2026-10-25）**：`NearbyPage.vue` 改为视口工作台（`#nearby-root` 100% 高、列表与雷达各自内部滚动、整页不纵向滚动），顶部五段（大标题/状态条/工具条/计数/警告）压成三行——1440×900 的 workspace 起点从 387px 降到 219px；卡片 188px→78px（头像 48、标题行内联等级/属性/标记、内联指标、`#…末 9 位` 编号 + 相对时间）；分栏 1.15 : 0.85，≤900 单列且列表在前、≤640 换行；页面标题改为读屏专用，避免与顶栏重复。`SceneRadar.vue` 改为填充面板、三环刻度（10k/5k/2k 原始单位）、中心「你」、选中+最近 6 个标签（同名聚合 ×N、越界翻转、半透明底），compact 模式行为不变。页内文案同步精简：状态改为短标签 + `title` 解释，未解析更新从黄色横幅改为计数行浅色提示，移除「不完整观察」胶囊与常驻「距离与方向待校准」文案。
 
 ### 验收证据（2026-10-24）
 
 - 真实事件日志回放（`eventlog_20261024_p02.jsonl`，6,658 个相关包、457 秒）：`phase=observing`、场景 103、玩家 (548741,603243,79)、**实体 36**（旧默认 3000 时为 0）、两次 `snapshot()` 完全一致。
 - 真实数据 + 动态推送（每 300ms 重放真实事件包）经 Edge headless CDP 验收：1440×900 与 864×672 均渲染 36 只、雷达 79 个点、无横向溢出；连续 8 次采样期间计数、文案、卡片数与 `scrollTop=120` 全部不变（无闪动、无回顶）。
-- 悬浮雷达 360×460 与最小 280×380：36 只、79 个点、重点胶囊 3 个、无错误提示；关闭主页面 4.5 秒后自动清空并显示失效文案（心跳兜底成立）。
+- 悬浮雷达 360×460 与最小 280×380：36 只、79 个点、单牌/双牌胶囊 3 个、无错误提示；关闭主页面 4.5 秒后自动清空并显示失效文案（心跳兜底成立）。
 - 自动化：`tests.test_scene/test_scene_checkpoint/test_radar_window/test_multi_account_capture/test_web_server` → 65 项 OK；`npx vitest run` → 152 passed / 1 skipped；`tools/frontend.py build`（vue-tsc + vite）通过。
+- 信息密度调整验收（2026-10-25，真实静态资源 + 30 只构造实体，Edge headless）：1440×900 与 864×672 均 `sceneLine=false`、工具栏 `[刷新, 悬浮雷达]`、排序选项 `[最近观察, 有牌优先]`、图例「普通单牌双牌」、属性图标 18px（13 个图标、alt 为属性名）、页面滚动 0、雷达 491×570 / 262×323；截图在 `output/nearby-searchshot/`。`npx vitest run`（NearbyPage/SceneRadar/FloatingRadar）→ 33 passed；Python `test_scene` 等 5 模块 → 67 项 OK。
 - 布局验收（2026-10-25，同一回放 53 只实体、5 档尺寸）：1440×900 与 864×672 均无页面纵向滚动、雷达圆盘完整可见，首屏分别 7 张和 5 张完整卡片；1920×1080 首屏 10 张；1280×800 6 张；640×720 单列且列表在前、无横向滚动。`npx vitest run` → 167 passed / 1 skipped（28 文件）、`vue-tsc --noEmit` 通过、`tools/frontend.py build` 通过。
 
 ### 仍未验证

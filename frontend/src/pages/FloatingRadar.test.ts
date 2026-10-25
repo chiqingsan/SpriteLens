@@ -6,7 +6,7 @@ function channel() { return { onmessage: null, postMessage: vi.fn(), close: vi.f
 const snapshotPayload = (overrides: Record<string, unknown> = {}) => ({
   uid: '1', version: 1, observation_id: 1, phase: 'observing', complete: false, source: 'observed_partial', mapping_available: true, radar_radius_raw: 10000,
   scene_id: 1, updated_at: 1, unresolved_updates: 0, rejected_actors: 0, player_position: [0, 0, null], position_source: 'client_target',
-  actors: [{ actor_id: '9007199254740993', config_id: 1, base_id: 1, name: '重点精灵', icon_url: '', type_names: [], level: 1,
+  actors: [{ actor_id: '9007199254740993', config_id: 1, base_id: 1, name: '单牌精灵', icon_url: '', type_names: [], level: 1,
     height: 0, weight: 0, voice: 100, updated_at: 1, marks: [{ label: '婉', name: '婉转声', source: 'reference' }], attention: 'marked', position: [100, 0, 0] }],
   ...overrides,
 })
@@ -64,20 +64,20 @@ describe('自绘悬浮雷达', () => {
     wrapper.unmount(); resolve(); await flushPromises()
     expect(host.setOpacity).toHaveBeenCalledTimes(1)
   })
-  it('在标题栏显示图例，并用重点胶囊关联雷达目标', async () => {
+  it('在标题栏显示图例，并用单牌胶囊关联雷达目标', async () => {
     const wire = channel()
     const wrapper = mount(FloatingRadar, { props: { channel: wire, host: { close: vi.fn(), setOpacity: vi.fn() } } })
     wire.onmessage?.({ data: { kind: 'snapshot', payload: {
       uid: '1', version: 1, observation_id: 1, phase: 'observing', complete: false, source: 'observed_partial', mapping_available: true, radar_radius_raw: 10000,
       scene_id: 1, updated_at: 1, unresolved_updates: 0, rejected_actors: 0, player_position: [0, 0, null], position_source: 'client_target',
-      actors: [{ actor_id: '9007199254740993', config_id: 1, base_id: 1, name: '重点精灵', icon_url: '/static/pet.png', type_names: [], level: 1,
+      actors: [{ actor_id: '9007199254740993', config_id: 1, base_id: 1, name: '单牌精灵', icon_url: '/static/pet.png', type_names: [], level: 1,
         height: 0, weight: 0, voice: 100, updated_at: 1, marks: [{ label: '婉', name: '婉转声', source: 'reference' }], attention: 'marked', position: [100, 0, 0] }]
     } } } as MessageEvent)
     await flushPromises()
     expect(wrapper.get('.floating-legend').text()).toContain('普通')
     expect(wrapper.get('.floating-legend').text()).toContain('双牌')
-    expect(wrapper.get('.floating-attention-chip').text()).not.toContain('重点精灵')
-    expect(wrapper.get('.floating-attention-chip').attributes('aria-label')).toContain('重点精灵')
+    expect(wrapper.get('.floating-attention-chip').text()).not.toContain('单牌精灵')
+    expect(wrapper.get('.floating-attention-chip').attributes('aria-label')).toContain('单牌精灵')
     expect(wrapper.get('.floating-attention-chip img').attributes('src')).toBe('/static/pet.png')
     expect(wrapper.find('.radar-attention-ring').exists()).toBe(true)
     expect(wrapper.find('.radar-player').exists()).toBe(true)
@@ -85,13 +85,13 @@ describe('自绘悬浮雷达', () => {
     expect(wrapper.get('.radar-target').classes()).toContain('selected')
     wrapper.unmount()
   })
-  it('无重点数据时仍保留固定的胶囊布局槽位', () => {
+  it('无标记数据时仍保留固定的胶囊布局槽位', () => {
     const wrapper = mount(FloatingRadar, { props: { channel: channel(), host: { close: vi.fn(), setOpacity: vi.fn() } } })
     expect(wrapper.get('.floating-attention-slot').exists()).toBe(true)
     expect(wrapper.get('.floating-attention-list').classes()).toContain('is-empty')
     wrapper.unmount()
   })
-  it('重点胶囊按双牌满、双牌、单牌满、单牌排序', async () => {
+  it('有标记胶囊按双牌满、双牌、单牌满、单牌排序', async () => {
     const wire = channel()
     const actor = (actor_id: string, attention: 'marked' | 'double', marks: string[]) => ({
       actor_id, config_id: 1, base_id: 1, name: actor_id, icon_url: '', type_names: [], level: 1,
@@ -106,7 +106,7 @@ describe('自绘悬浮雷达', () => {
     } } } as MessageEvent)
     await flushPromises()
     expect(await wrapper.findAll('.floating-attention-chip').map(chip => chip.attributes('aria-label'))).toEqual([
-      '4，双牌', '2，双牌', '3，重点', '1，重点'
+      '4，双牌', '2，双牌', '3，单牌', '1，单牌'
     ])
     wrapper.unmount()
   })

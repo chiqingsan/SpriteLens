@@ -18,6 +18,7 @@ export interface NearbySnapshot extends NearbySummary {
   scene_id: number | null; updated_at: number | null; complete: false
   unresolved_updates: number; rejected_actors: number; actors: NearbyActor[]
   radar_radius_raw: number
+  type_icons: Record<string, string>
   mapping_available: boolean
 }
 function record(v: unknown): v is Record<string, unknown> { return !!v && typeof v === 'object' }
@@ -33,7 +34,7 @@ function parseMarks(v: unknown): NearbyMark[] {
   return v
 }
 function parseAttention(v: unknown): NearbyAttention {
-  if (v !== 'normal' && v !== 'marked' && v !== 'double') throw Error('附近精灵重点级别无效')
+  if (v !== 'normal' && v !== 'marked' && v !== 'double') throw Error('附近精灵关注级别无效')
   return v
 }
 const phases = ['awaiting_identity', 'awaiting_scene', 'resumed_stale', 'observing', 'battle_unverified', 'disconnected', 'stopped', 'historical_account']
@@ -58,6 +59,7 @@ export function parseNearby(v: unknown): NearbySnapshot {
     || !position(v.player_position) || !(v.position_source === null || typeof v.position_source === 'string')
     || !(v.updated_at === null || typeof v.updated_at === 'number' && Number.isFinite(v.updated_at))
     || typeof v.mapping_available !== 'boolean'
+    || !(v.type_icons === undefined || record(v.type_icons) && Object.values(v.type_icons).every(url => typeof url === 'string'))
     || !integer(v.unresolved_updates) || !integer(v.rejected_actors) || !Array.isArray(v.actors)) throw Error('附近精灵响应格式无效')
   const radius = v.radar_radius_raw
   if (radius !== undefined && !(integer(radius) && radius > 0)) throw Error('附近精灵雷达范围格式无效')
@@ -65,5 +67,5 @@ export function parseNearby(v: unknown): NearbySnapshot {
   return { ...summary, scene_id: v.scene_id, updated_at: v.updated_at, complete: false,
     player_position: v.player_position, position_source: v.position_source,
     unresolved_updates: v.unresolved_updates, rejected_actors: v.rejected_actors,
-    radar_radius_raw: radius === undefined ? 10000 : radius, mapping_available: v.mapping_available, actors }
+    radar_radius_raw: radius === undefined ? 10000 : radius, type_icons: (v.type_icons ?? {}) as Record<string, string>, mapping_available: v.mapping_available, actors }
 }

@@ -5,7 +5,7 @@ import UiIcon from '../components/UiIcon.vue'
 import MedalIcon from '../components/MedalIcon.vue'
 import SceneRadar from '../components/SceneRadar.vue'
 import { useNearby, type NearbyHost } from '../composables/useNearby'
-import type { NearbyMark } from '../types/nearby'
+import type { NearbyActor, NearbyMark } from '../types/nearby'
 
 const props = defineProps<{ host: NearbyHost }>()
 const { data, summary, loading, error, stale, load, update, pause, resume } = useNearby(props.host)
@@ -55,12 +55,19 @@ watch(data, snapshot => {
 })
 const medalMarkNames = new Set(['大块头', '小不点', '婉转声', '粗嗓门'])
 function isMedalMark(mark: NearbyMark) { return medalMarkNames.has(mark.name) }
+// 与悬浮雷达 attentionRank 同一口径：满重或满分且双牌的优先，同级保持最近观察顺序。
+function attentionRank(actor: NearbyActor) {
+  const full = actor.marks.some(mark => mark.name === '满重' || mark.name === '满分')
+  if (actor.attention === 'double') return actor.marks.some(mark => mark.name === '满重') && actor.marks.some(mark => mark.name === '满分') ? 0 : 1
+  return full ? 2 : actor.attention === 'marked' ? 3 : 4
+}
 const rows = computed(() => {
   const needle = search.value.trim().toLocaleLowerCase()
   const filtered = (data.value?.actors || []).filter(row => `${row.name} ${row.config_id ?? ''} ${row.actor_id}`.toLocaleLowerCase().includes(needle))
-  if (sort.value === 'name') return filtered.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN') || a.actor_id.localeCompare(b.actor_id))
   const order = new Map(recentOrder.value.map((id, index) => [id, index]))
-  return filtered.sort((a, b) => (order.get(a.actor_id) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.actor_id) ?? Number.MAX_SAFE_INTEGER))
+  const recent = (a: NearbyActor, b: NearbyActor) => (order.get(a.actor_id) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.actor_id) ?? Number.MAX_SAFE_INTEGER)
+  if (sort.value === 'marks') return filtered.sort((a, b) => attentionRank(a) - attentionRank(b) || recent(a, b))
+  return filtered.sort(recent)
 })
 const listViewport = ref<HTMLElement | null>(null)
 const rowVirtualizerOptions = computed(() => ({
@@ -167,10 +174,6 @@ defineExpose({ update, load, pause, resume })
         <span class="nearby-phase" :class="`is-${phase}`" :title="statusHint">
           <span class="nearby-phase-dot" aria-hidden="true"></span>{{ status }}
         </span>
-        <span class="nearby-scene" title="游戏内场景编号与最后更新时间">场景 {{ data?.scene_id ?? '未知' }} · 更新 {{ time(data?.updated_at ?? null) }}</span>
-      </div>
-      <div class="nearby-heading-actions">
-        <button class="ghost-button small nearby-floating" @click="openFloating"><UiIcon name="eye" />悬浮雷达</button>
       </div>
     </header>
     <div v-if="floatingError || (error && !stale) || (data && !data.mapping_available)" class="nearby-notices">
@@ -180,8 +183,9 @@ defineExpose({ update, load, pause, resume })
     </div>
     <div class="nearby-toolbar">
       <label class="nearby-search"><UiIcon name="search" /><input v-model="search" type="search" aria-label="搜索附近精灵" placeholder="搜索名称、配置或实体编号"></label>
-      <label class="nearby-sort">排序<select v-model="sort" aria-label="附近精灵排序"><option value="recent">最近观察</option><option value="name">精灵名称</option></select></label>
+      <label class="nearby-sort">排序<select v-model="sort" aria-label="附近精灵排序"><option value="recent">最近观察</option><option value="marks">有牌优先</option></select></label>
       <button class="ghost-button small nearby-refresh" :aria-busy="refreshing" :aria-disabled="refreshing" @click="refresh"><UiIcon name="refresh" />刷新</button>
+      <button class="ghost-button small nearby-floating" @click="openFloating"><UiIcon name="eye" />悬浮雷达</button>
     </div>
     <div class="nearby-count">
       <strong>{{ rows.length }} 只<span v-if="search.trim()"> / 已观察 {{ data?.actors.length ?? 0 }} 只</span></strong>
@@ -197,8 +201,8 @@ defineExpose({ update, load, pause, resume })
                 <div class="nearby-card-title">
                   <h3 :title="entry.actor.name">{{ entry.actor.name }}</h3>
                   <span class="nearby-level">Lv.{{ entry.actor.level ?? '?' }}</span>
-                  <div class="nearby-types"><span v-for="type in entry.actor.type_names" :key="type">{{ type }}</span><span v-if="!entry.actor.type_names.length">属性未知</span></div>
-                  <div class="nearby-card-marks" :class="{ 'is-empty': !entry.actor.marks.length && entry.actor.attention !== 'double' }" aria-label="重点标识"><template v-for="mark in entry.actor.marks" :key="mark.name"><MedalIcon v-if="isMedalMark(mark)" :name="mark.name" :source="mark.source" /><span v-else class="nearby-reference-mark" :title="`${mark.name} · 数值参考`">{{ mark.name }}</span></template><span v-if="entry.actor.attention === 'double'" class="nearby-double-mark" title="体型与声音均命中当前参考线，尚未确认游戏奖牌">双牌</span></div>
+                  <div class="nearby-types"><template v-for="type in entry.actor.type_names" :key="type"><img v-if="data?.type_icons[type]" class="nearby-type-icon" :src="data.type_icons[type]" :alt="type" :title="type" loading="lazy"><span v-else>{{ type }}</span></template><span v-if="!entry.actor.type_names.length">属性未知</span></div>
+                  <div class="nearby-card-marks" :class="{ 'is-empty': !entry.actor.marks.length && entry.actor.attention !== 'double' }" aria-label="精灵标记"><template v-for="mark in entry.actor.marks" :key="mark.name"><MedalIcon v-if="isMedalMark(mark)" :name="mark.name" :source="mark.source" /><span v-else class="nearby-reference-mark" :title="`${mark.name} · 数值参考`">{{ mark.name }}</span></template><span v-if="entry.actor.attention === 'double'" class="nearby-double-mark" title="体型与声音均命中当前参考线，尚未确认游戏奖牌">双牌</span></div>
                 </div>
                 <p class="nearby-card-meta"><span>身高 <b>{{ metric(entry.actor.height, 100, 'm') }}</b></span><span aria-hidden="true">·</span><span>体重 <b>{{ metric(entry.actor.weight, 1000, 'kg') }}</b></span><span aria-hidden="true">·</span><span>音量 <b>{{ entry.actor.voice ?? '未知' }}</b></span></p>
                 <footer><span class="nearby-entity" :title="`实体 ${entry.actor.actor_id}`">#{{ shortId(entry.actor.actor_id) }}</span><time :title="time(entry.actor.updated_at)">{{ relativeTime(entry.actor.updated_at) }}</time></footer>
@@ -258,6 +262,7 @@ defineExpose({ update, load, pause, resume })
 .nearby-level { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .nearby-types { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .nearby-types span { background: var(--surface-2); color: var(--muted); border-radius: var(--radius-sm); padding: 0 var(--space-2); font-size: var(--fs-2xs); line-height: 1.7; }
+.nearby-type-icon { width: 18px; height: 18px; flex: none; }
 .nearby-card-marks { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; height: 24px; min-width: 0; }
 .nearby-card-marks > * { flex-shrink: 0; }
 .nearby-card-marks.is-empty { display: none; }

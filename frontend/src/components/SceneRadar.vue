@@ -180,7 +180,7 @@ const projection = computed(() => {
 <template>
   <section class="scene-radar" :class="{ 'is-overlay': compact }" aria-label="附近精灵雷达">
     <header><strong>场景雷达</strong><span>{{ !projection ? '等待位置参考' : data?.position_source === 'client_target' ? '以移动目标位置为参考' : data?.position_source === 'teleport' ? '以传送落点为参考' : '以已观察位置为参考' }}</span></header>
-    <div v-if="!compact" class="radar-legend" aria-label="雷达目标图例"><span><i class="radar-legend-dot" />普通</span><span><i class="radar-legend-dot is-marked" />重点</span><span><i class="radar-legend-dot is-double" />双牌</span></div>
+    <div v-if="!compact" class="radar-legend" aria-label="雷达目标图例"><span><i class="radar-legend-dot" />普通</span><span><i class="radar-legend-dot is-marked" />单牌</span><span><i class="radar-legend-dot is-double" />双牌</span></div>
     <div class="radar-body">
       <svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMid meet" class="scene-radar-scope" role="group" aria-label="参考坐标雷达">
         <circle v-for="radius in RING_RADII" :key="radius" cx="200" cy="200" :r="radius" class="radar-ring" />
@@ -188,8 +188,8 @@ const projection = computed(() => {
         <g v-if="!compact" class="radar-scale" aria-hidden="true"><text v-for="tick in scale" :key="tick.key" class="radar-scale-label" :x="tick.x" :y="tick.y" text-anchor="middle">{{ tick.text }}</text></g>
         <g v-if="projection">
           <g class="radar-center"><path class="radar-player-cross" d="M194 200H206M200 194V206" /><circle cx="200" cy="200" r="5" class="radar-player" /><text v-if="projection.showCenterLabel" class="radar-center-label" x="200" y="200" dy="14" text-anchor="middle">{{ CENTER_LABEL }}</text></g>
-          <g v-for="row in projection.rows" :key="row.actor.actor_id" class="radar-target" :class="[`is-${row.kind}`, `attention-tone-${row.attentionTone}`, { selected: selected === row.actor.actor_id }]" :transform="`translate(${row.x},${row.y})`" tabindex="0" role="button" :aria-label="`${row.actor.name}${row.kind === 'double' ? '，双牌' : row.kind === 'marked' ? '，重点标识' : ''}`" @click="emit('select', row.actor.actor_id)" @keydown.enter="emit('select', row.actor.actor_id)" @keydown.space.prevent="emit('select', row.actor.actor_id)">
-            <title>{{ row.actor.name }} · {{ row.kind === 'double' ? '双牌' : row.kind === 'marked' ? '重点标识' : '普通' }} · Lv.{{ row.actor.level ?? '未知' }}</title><circle r="12" class="radar-hit"/><circle v-if="row.kind !== 'normal'" r="10" class="radar-attention-ring" /><circle :r="row.kind === 'double' ? 7 : row.kind === 'marked' ? 6 : 5" class="radar-point" />
+          <g v-for="row in projection.rows" :key="row.actor.actor_id" class="radar-target" :class="[`is-${row.kind}`, `attention-tone-${row.attentionTone}`, { selected: selected === row.actor.actor_id }]" :transform="`translate(${row.x},${row.y})`" tabindex="0" role="button" :aria-label="`${row.actor.name}${row.kind === 'double' ? '，双牌' : row.kind === 'marked' ? '，单牌' : ''}`" @click="emit('select', row.actor.actor_id)" @keydown.enter="emit('select', row.actor.actor_id)" @keydown.space.prevent="emit('select', row.actor.actor_id)">
+            <title>{{ row.actor.name }} · {{ row.kind === 'double' ? '双牌' : row.kind === 'marked' ? '单牌' : '普通' }} · Lv.{{ row.actor.level ?? '未知' }}</title><circle r="12" class="radar-hit"/><circle v-if="row.kind !== 'normal'" r="10" class="radar-attention-ring" /><circle :r="row.kind === 'double' ? 7 : row.kind === 'marked' ? 6 : 5" class="radar-point" />
           </g>
           <g v-for="label in projection.labels" :key="`label-${label.id}`" class="radar-label" :class="{ selected: label.selected }" aria-hidden="true">
             <rect class="radar-label-bg" :x="label.rect.x" :y="label.rect.y" :width="label.rect.width" :height="label.rect.height" rx="3" /><text class="radar-target-label" :x="label.x" :y="label.y" :text-anchor="label.anchor">{{ label.text }}</text>
@@ -199,18 +199,17 @@ const projection = computed(() => {
       </svg>
     </div>
     <template v-if="!compact">
-      <p v-if="projection">外环 {{ projection.range.toLocaleString('zh-CN') }} 单位 · 已定位 {{ projection.rows.length }} / {{ data?.actors.length ?? 0 }}</p>
+      <p v-if="projection">外环 {{ projection.range.toLocaleString('zh-CN') }} 单位 · 已定位 {{ projection.rows.length }} / {{ data?.actors.length ?? 0 }} · 原始坐标，未校准米制</p>
       <p v-else>进入场景并移动后更新；缺少位置的精灵仍保留在列表。</p>
-      <footer>原始坐标单位，尚未校准为米制。</footer>
-    </template>
+      </template>
   </section>
 </template>
 <style scoped>
 /* 块级容器：填满父面板，父面板固定高度时由内部 flex 分配空间，避免圆盘被裁掉。 */
 .scene-radar { display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; max-width: 100%; padding: var(--space-3); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-sm); }
-.scene-radar > header, .scene-radar > .radar-legend, .scene-radar > p, .scene-radar > footer { flex: none; }
+.scene-radar > header, .scene-radar > .radar-legend, .scene-radar > p { flex: none; }
 .scene-radar header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-3); min-width: 0; }
-.scene-radar header span, .scene-radar p, .scene-radar footer { min-width: 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.6; overflow-wrap: anywhere; }
+.scene-radar header span, .scene-radar p { min-width: 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.6; overflow-wrap: anywhere; }
 /* svg 外层吃掉剩余高度并居中；svg 自身撑满容器，viewBox 等比缩放保证圆盘完整可见。 */
 .radar-body { flex: 1 1 0; min-height: 0; min-width: 0; display: grid; place-items: center; margin: var(--space-2) 0; }
 .scene-radar-scope { display: block; width: 100%; height: 100%; max-width: 100%; max-height: 100%; aspect-ratio: 1; background: var(--surface-1); border-radius: var(--radius-sm); }
@@ -246,7 +245,7 @@ const projection = computed(() => {
 .radar-target.is-double .radar-point { fill: var(--danger); stroke: var(--panel); stroke-width: 2.5; }
 .radar-target.selected .radar-hit, .radar-target:focus-visible .radar-hit { fill: var(--accent); stroke: var(--teal-dark); stroke-width: 2; }
 .radar-label.selected .radar-target-label { font-size: 10px; fill: var(--teal-deep); }
-.scene-radar footer { padding-top: var(--space-3); border-top: 1px solid var(--line-soft); }
+.scene-radar > p { padding-top: var(--space-3); border-top: 1px solid var(--line-soft); }
 .scene-radar.is-overlay { flex: 1; min-height: 0; padding: 0; border: 0; background: transparent; --radar-label-bg: var(--radar-overlay-bg); }
 .is-overlay header { display: none; }
 .is-overlay .radar-legend { flex: none; margin: 0 0 var(--space-2); justify-content: center; }
