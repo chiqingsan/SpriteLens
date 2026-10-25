@@ -63,7 +63,8 @@ function attentionRank(actor: NearbyActor) {
 }
 const rows = computed(() => {
   const needle = search.value.trim().toLocaleLowerCase()
-  const filtered = (data.value?.actors || []).filter(row => `${row.name} ${row.config_id ?? ''} ${row.actor_id}`.toLocaleLowerCase().includes(needle))
+  // 搜索同时匹配进化链名称：搜「恶魔叮」也能看到链上的叮叮恶魔、恶魔男爵。
+  const filtered = (data.value?.actors || []).filter(row => `${row.name} ${row.config_id ?? ''} ${row.actor_id} ${(row.chain_names || []).join(' ')}`.toLocaleLowerCase().includes(needle))
   const order = new Map(recentOrder.value.map((id, index) => [id, index]))
   const recent = (a: NearbyActor, b: NearbyActor) => (order.get(a.actor_id) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.actor_id) ?? Number.MAX_SAFE_INTEGER)
   if (sort.value === 'marks') return filtered.sort((a, b) => attentionRank(a) - attentionRank(b) || recent(a, b))
@@ -130,6 +131,8 @@ const hints: Record<string, string> = {
   observing: '只展示服务器已下发的精灵，未观察到不代表附近没有。',
 }
 const phase = computed(() => summary.value?.phase || 'awaiting_identity')
+// 页面级说明统一收进雷达面板底部，避免页面左右两端各挂一句零散文字。
+const radarNote = '只显示本次连接观察到的精灵，切号或切场景后清空；缺少位置的精灵仍保留在列表。'
 const status = computed(() => labels[phase.value] ?? labels.awaiting_identity!)
 const statusHint = computed(() => hints[phase.value] ?? hints.awaiting_identity!)
 // 未解析更新只影响完整性，放成计数行旁的一句浅色提示，避免整条黄色横幅常驻。
@@ -214,9 +217,8 @@ defineExpose({ update, load, pause, resume })
           <p>{{ search.trim() ? '试试其他名称或编号。' : '进入场景并开始采集后会自动显示。' }}</p>
         </section>
       </div>
-      <div class="nearby-radar-pane"><SceneRadar :data="data" :selected="selected" :radius="data?.radar_radius_raw" @select="selectActor" /></div>
+      <div class="nearby-radar-pane"><SceneRadar :data="data" :selected="selected" :radius="data?.radar_radius_raw" :note="radarNote" @select="selectActor" /></div>
     </div>
-    <p class="nearby-footnote">只显示本次连接观察到的精灵，切号或切场景后清空；缺少位置的精灵仍保留在列表。</p>
   </div>
 </template>
 
@@ -280,8 +282,7 @@ defineExpose({ update, load, pause, resume })
 .nearby-empty-icon .ui-icon { width: 20px; height: 20px; }
 .nearby-empty h3 { font-size: var(--fs-md); margin: 0; }
 .nearby-empty p { max-width: 36ch; }
-.nearby-empty p, .nearby-footnote { margin: 0; color: var(--muted); line-height: 1.6; }
-.nearby-footnote { font-size: var(--fs-2xs); }
+.nearby-empty p { margin: 0; color: var(--muted); line-height: 1.6; }
 .nearby-error, .nearby-warning { margin: 0; padding: var(--space-1) var(--space-3); border-radius: var(--radius-sm); font-size: var(--fs-xs); line-height: 1.5; }
 .nearby-error { background: var(--danger-soft); color: var(--danger-ink); }
 .nearby-warning { background: var(--amber-soft); color: var(--amber-ink); }

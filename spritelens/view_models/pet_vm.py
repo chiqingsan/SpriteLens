@@ -314,6 +314,9 @@ class PetViewModel:
             return pets
         static = self._static
         captured_since = time.time() - filters.captured_days * 86400
+        # 进化链扩展：检索词命中某物种名时，整条链上的宠物都算命中（「恶魔叮」也返回
+        # 叮叮恶魔、恶魔男爵）。空检索词不扩张，避免把全量结果当成命中。
+        chain_ids = static.species_chain_ids(filters.search) if (static and filters.search) else frozenset()
         def matches(pet: Pet) -> bool:
             species = static.species(pet.base_conf_id) if static else None
             if filters.search:
@@ -325,7 +328,7 @@ class PetViewModel:
                     texts.extend((species.name, species.display_name, species.handbook_no, *species.egg_groups))
                     if species.dex_no:
                         texts.append(str(species.dex_no))
-                if not any(needle in text.lower() for text in texts):
+                if not any(needle in text.lower() for text in texts) and pet.base_conf_id not in chain_ids:
                     return False  # 搜索在条件池之外，始终约束整个结果集合。
             checks: list[bool] = []
             if filters.level_min > 1 or filters.level_max < MAX_PET_LEVEL:

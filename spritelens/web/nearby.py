@@ -43,6 +43,8 @@ def nearby_payload(
         row["name"] = species.name if species else f"未收录精灵 · 配置 {row['config_id'] if row['config_id'] is not None else '未知'}"
         row["icon_url"] = pet_images(base_id)["portrait_url"] if species else ""
         row["type_names"] = list(species.type_names) if species else []
+        # 进化链名称：前端搜索时一并匹配，搜「恶魔叮」也能找到链上的其它形态。
+        row["chain_names"] = list(static.chain_names(base_id)) if (static and base_id is not None) else []
         row["marks"] = observation_marks(row["weight"], row["voice"], species.weight_range if species else (0, 0))
         mark_names = {mark["name"] for mark in row["marks"]}
         row["attention"] = "double" if ({"大块头", "小不点"} & mark_names and {"婉转声", "粗嗓门"} & mark_names) else "marked" if mark_names else "normal"

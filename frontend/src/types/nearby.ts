@@ -6,6 +6,7 @@ export interface NearbyActor {
   actor_id: string; config_id: number | null; base_id: number | null
   name: string; icon_url: string; type_names: string[]; level: number | null
   height: number | null; weight: number | null; voice: number | null; updated_at: number
+  chain_names: string[]
   marks: NearbyMark[]; attention: NearbyAttention
 }
 export function nearbyAttentionTone(actorId: string): number {
@@ -48,10 +49,11 @@ function parseActor(v: unknown): NearbyActor {
   if (!record(v) || typeof v.actor_id !== 'string' || !/^\d+$/.test(v.actor_id)
     || !position(v.position) || !optional(v.config_id) || !optional(v.base_id) || typeof v.name !== 'string' || typeof v.icon_url !== 'string'
     || !Array.isArray(v.type_names) || !v.type_names.every(t => typeof t === 'string')
+    || (v.chain_names !== undefined && (!Array.isArray(v.chain_names) || !v.chain_names.every(name => typeof name === 'string')))
     || !optional(v.level) || !optional(v.height) || !optional(v.weight) || !optional(v.voice)
     || typeof v.updated_at !== 'number' || !Number.isFinite(v.updated_at)) throw Error('附近精灵响应格式无效')
   const list = parseMarks(v.marks)
-  return { ...v, marks: list, attention: parseAttention(v.attention) } as NearbyActor
+  return { ...v, chain_names: (v.chain_names ?? []) as string[], marks: list, attention: parseAttention(v.attention) } as NearbyActor
 }
 export function parseNearby(v: unknown): NearbySnapshot {
   const summary = parseNearbySummary(v)

@@ -101,6 +101,19 @@ class PetViewModelTest(unittest.TestCase):
         self.vm.set_search("")
         self.assertEqual(len(self.vm.filtered_pets()), 4)
 
+    def test_search_expands_to_whole_evolution_chain(self):
+        """搜进化链上任一形态，返回整条链上的宠物（「搜恶魔叮也看到叮叮恶魔」）。"""
+        self.static._species["100"] = replace(self.static._species["100"], chain_members=(100, 300))
+        self.static._species["300"] = replace(self.static._species["300"], chain_members=(100, 300))
+        try:
+            self.vm.set_search("火兽")  # 物种 100 的名称，链上还有 300（双系兽）
+            self.assertEqual({p.gid for p in self.vm.filtered_pets()}, {1, 3, 4})
+            self.vm.set_search("双系兽")  # 从链的另一端搜，同样回到整条链
+            self.assertEqual({p.gid for p in self.vm.filtered_pets()}, {1, 3, 4})
+        finally:
+            self.static._species["100"] = replace(self.static._species["100"], chain_members=())
+            self.static._species["300"] = replace(self.static._species["300"], chain_members=())
+
     # -- 维度筛选 ------------------------------------------------------
     def test_gender_composes_and_resets(self):
         self.repo._pets[2] = replace(self.repo._pets[2], gender=2)

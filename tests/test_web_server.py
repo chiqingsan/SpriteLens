@@ -641,6 +641,19 @@ class HandbookPayloadTest(unittest.TestCase):
         """编号无精确命中时仍按子串兜底，避免检索词打空。"""
         self.assertEqual(self._keys(search="兽"), ["100", "200", "300"])
 
+    def test_search_expands_to_whole_evolution_chain(self):
+        """搜索命中链上任一形态时返回整条链，与背包/附近页同一规则。"""
+        self.static._species["100"] = replace(self.static._species["100"], chain_members=(100, 200))
+        self.static._species["200"] = replace(self.static._species["200"], chain_members=(100, 200))
+        try:
+            self.assertEqual(self._keys(search="火兽"), ["100", "200"])
+            self.assertEqual(self._keys(search="烈焰"), ["100", "200"])
+            # 编号精确命中仍优先：不会因为链扩展把其它物种带进来
+            self.assertEqual(self._keys(search="002"), ["100"])
+        finally:
+            self.static._species["100"] = replace(self.static._species["100"], chain_members=())
+            self.static._species["200"] = replace(self.static._species["200"], chain_members=())
+
     def test_egg_and_matchups_come_from_static_tables(self):
         rows = {row["key"]: row for row in self._payload()["species"]}
         egg = rows["100"]["egg"]

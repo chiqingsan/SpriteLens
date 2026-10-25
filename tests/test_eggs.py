@@ -74,6 +74,20 @@ class EggCatalogTests(unittest.TestCase):
         by_search = egg_dex_payload(self.catalog, search="3002")
         self.assertEqual([e["name"] for e in by_search["eggs"]], ["岚鸟"])
 
+    def test_search_expands_to_evolution_chain(self) -> None:
+        """蛋图鉴搜索也按进化链扩展：搜链上另一形态也能找到该蛋。"""
+        for name in ("natures", "types", "skills", "type_chart"):
+            (self.dir_path / f"{name}.json").write_text("{}", encoding="utf-8")
+        (self.dir_path / "species.json").write_text(
+            json.dumps({
+                "3001": {"name": "喵喵", "chain_members": [3001, 3025]},
+                "3025": {"name": "喵老大", "chain_members": [3001, 3025]},
+            }, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        rows = egg_dex_payload(self.catalog, static=StaticData(self.dir_path), search="喵老大")["eggs"]
+        self.assertEqual([row["name"] for row in rows], ["喵喵"])
+
     def test_missing_gender_uses_only_matching_species(self) -> None:
         for name in ("natures", "types", "skills", "type_chart"):
             (self.dir_path / f"{name}.json").write_text("{}", encoding="utf-8")

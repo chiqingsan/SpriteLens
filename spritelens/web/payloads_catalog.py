@@ -28,14 +28,16 @@ def species_icon_url(base_conf_id: int) -> str:
     return pet_images(base_conf_id)["portrait_url"]
 
 
-def _handbook_haystacks(key: str, info) -> tuple[str, ...]:
+def _handbook_haystacks(key: str, info, chain_names: tuple[str, ...] = ()) -> tuple[str, ...]:
     """图鉴可检索字段（全小写）。
 
     卡面印的是 handbook_no，但原实现只匹配 name 与 base_conf_id，导致
     「照着卡面编号搜不到、反而搜出一堆无关物种」；dex_no 同理。
+    chain_names 让同一进化链上的物种互相命中（搜「恶魔叮」也命中叮叮恶魔、
+    恶魔男爵），与背包、附近页的链式搜索保持同一规则。
     """
     return tuple(text.lower() for text in (
-        info.name, info.display_name, key, str(info.dex_no), info.handbook_no,
+        info.name, info.display_name, key, str(info.dex_no), info.handbook_no, *chain_names,
     ) if text)
 
 
@@ -156,6 +158,7 @@ def handbook_payload(
         return True
 
     aliases, catalog_items = _handbook_catalog(static)
+    members_by_id = {key: info for key, info in static.species_items()}
     rows: list[dict] = []
     exact_rows: list[dict] = []
     type_names_seen: set[str] = set()
@@ -173,8 +176,12 @@ def handbook_payload(
             continue
         if needle:
             exact = _handbook_exact_match(needle, key, info)
+            chain_names = tuple(
+                member.name for member_id in info.chain_members
+                if (member := members_by_id.get(str(member_id))) is not None and member.name
+            )
             if not exact and not any(
-                needle in text for text in _handbook_haystacks(key, info)
+                needle in text for text in _handbook_haystacks(key, info, chain_names)
             ):
                 continue
         else:
@@ -694,6 +701,7 @@ def egg_dex_payload(
             male, female = species.gender_ratio
         if keyword and not any(keyword in value.lower() for value in (
             info.name_key, info.name, info.egg_name, str(info.egg_conf_id),
+            *(static.chain_names(int(info.base_id)) if (static is not None and info.base_id) else ()),
         )):
             continue
         if group and group not in info.egg_group_names:

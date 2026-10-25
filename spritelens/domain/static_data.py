@@ -279,6 +279,41 @@ class StaticData:
 
         return tuple(sorted(self._species.items(), key=sort_key))
 
+    def chain_names(self, base_conf_id: int) -> tuple[str, ...]:
+        """该物种所属进化链的全部名称（含自身），用于「搜一词看到整条链」。
+
+        chain_members 缺失时退化为自身名称；未知物种返回空元组，调用方按空处理。
+        """
+        info = self._species.get(str(base_conf_id))
+        if info is None:
+            return ()
+        members = info.chain_members or (base_conf_id,)
+        return tuple(
+            member.name
+            for member in (self._species.get(str(member_id)) for member_id in members)
+            if member is not None and member.name
+        )
+
+    def species_chain_ids(self, needle: str) -> frozenset[int]:
+        """检索词命中某物种名时，返回其整条进化链的 base_conf_id 集合。
+
+        「搜恶魔叮也能搜出叮叮恶魔 / 恶魔男爵」这类链式搜索的领域规则：先按
+        名称/别名匹配物种，再把命中物种的 chain_members 并进结果；链数据缺失
+        时只返回自身 ID。空检索词不扩张，避免全量返回。
+        """
+        text = needle.strip().lower()
+        if not text:
+            return frozenset()
+        ids: set[int] = set()
+        for key, info in self._species.items():
+            if text not in info.name.lower() and text not in info.display_name.lower():
+                continue
+            if info.chain_members:
+                ids.update(info.chain_members)
+            elif key.isdigit():
+                ids.add(int(key))
+        return frozenset(ids)
+
     def nature(self, nature_id: int) -> NatureInfo | None:
         return self._natures.get(nature_id)
 

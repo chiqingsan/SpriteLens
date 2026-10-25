@@ -137,6 +137,8 @@ class SceneTests(unittest.TestCase):
         self.assertTrue(payload["mapping_available"])
         self.assertEqual(payload["actors"][0]["base_id"], 3004)
         self.assertEqual(payload["actors"][0]["name"], "迪莫")
+        # 进化链名称随载荷下发：附近页搜索用同一规则扩展到整条链。
+        self.assertIn("迪莫", payload["actors"][0]["chain_names"])
         old = payload["observation_id"]
         repo.handle_packet(event(0x015C, [field(11, 1), field(12, 2), field(13, 3)]))
         self.assertGreater(repo.snapshot().observation_id, old)

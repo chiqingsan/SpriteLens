@@ -4,7 +4,7 @@ import { useNearby } from './useNearby'
 import { parseNearby } from '../types/nearby'
 
 const summary = { uid: '101', version: 1, observation_id: 1, phase: 'observing' }
-const actor = { actor_id: '9007199254740993', position: [10, 20, null], config_id: 10011, base_id: 3004, name: '迪莫', icon_url: '', type_names: [], level: 0, height: 0, weight: null, voice: -100, updated_at: 1, marks: [{ label: '粗', name: '粗嗓门', source: 'reference' }], attention: 'marked' }
+const actor = { actor_id: '9007199254740993', position: [10, 20, null], config_id: 10011, base_id: 3004, name: '迪莫', icon_url: '', type_names: [], level: 0, height: 0, weight: null, voice: -100, updated_at: 1, marks: [{ label: '粗', name: '粗嗓门', source: 'reference' }], attention: 'marked', chain_names: [] }
 const snapshot = { ...summary, player_position: [0, 0, 0], position_source: 'client_target', complete: false, source: 'observed_partial', mapping_available: true, radar_radius_raw: 10000, scene_id: 1, updated_at: 1, unresolved_updates: 0, rejected_actors: 0, actors: [actor] }
 describe('附近精灵请求归属', () => {
   it('切换到版本较小的账号立即取消旧请求并读取新账号', async () => {

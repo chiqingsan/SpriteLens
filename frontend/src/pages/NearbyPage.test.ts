@@ -9,6 +9,7 @@ function actor(id: string, updated_at: number, marks: NearbyMark[] = [], attenti
   return {
     actor_id: id, config_id: Number(id), base_id: null, name: `精灵${id}`, icon_url: '', type_names: [], level: 1,
     height: 0, weight: 0, voice: 0, updated_at, marks, attention, position: [Number(id), 0, 0],
+    chain_names: [],
   }
 }
 
@@ -16,7 +17,7 @@ function snapshot(version: number, actors: NearbyActor[]): NearbySnapshot & { so
   return {
     source: 'observed_partial' as const, uid: '1', version, observation_id: 1, phase: 'observing', complete: false, mapping_available: true, radar_radius_raw: 10000,
     scene_id: 1, updated_at: version, unresolved_updates: 0, rejected_actors: 0,
-    player_position: [0, 0, 0], position_source: 'client_target', actors,
+    player_position: [0, 0, 0], position_source: 'client_target', actors, type_icons: {},
   }
 }
 
@@ -153,6 +154,20 @@ describe('附近精灵更新布局稳定性', () => {
     const rendered = wrapper.findAll('.nearby-type-icon')
     expect(rendered.map(icon => icon.attributes('src'))).toEqual([icons['火'], icons['水']])
     expect(rendered.map(icon => icon.attributes('alt'))).toEqual(['火', '水'])
+    wrapper.unmount()
+  })
+
+  it('搜索命中进化链中的其它形态时也返回该精灵', async () => {
+    const target = { ...actor('1', 1), name: '恶魔叮', chain_names: ['恶魔叮', '叮叮恶魔', '恶魔男爵'] }
+    const other = { ...actor('2', 2), name: '迪莫', chain_names: ['迪莫'] }
+    const load = vi.fn().mockResolvedValueOnce(snapshot(1, [target, other]))
+    const wrapper = mount(NearbyPage, { props: { host: { load, openFloating: vi.fn() } } })
+    ;(wrapper.vm as unknown as { update(value: unknown): void }).update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    await nextTick()
+    await wrapper.get('input[type="search"]').setValue('恶魔男爵')
+    await nextTick()
+    expect(wrapper.findAll('.nearby-card').map(card => card.attributes('id'))).toEqual(['nearby-actor-1'])
     wrapper.unmount()
   })
 

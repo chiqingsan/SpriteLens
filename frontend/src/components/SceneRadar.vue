@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { nearbyAttentionTone, type NearbyAttention, type NearbyActor, type NearbySnapshot } from '../types/nearby'
-const props = withDefaults(defineProps<{ data: NearbySnapshot | null; selected?: string; compact?: boolean; radius?: number }>(), {
+const props = withDefaults(defineProps<{ data: NearbySnapshot | null; selected?: string; compact?: boolean; radius?: number; note?: string }>(), {
   radius: 10000,
+  note: '',
 })
 const emit = defineEmits<{ select: [id: string] }>()
 
@@ -186,14 +187,16 @@ const projection = computed(() => {
       </svg>
     </div>
     <template v-if="!compact">
+      <p v-if="note" class="radar-note">{{ note }}</p>
       <p v-if="projection">外环 {{ projection.range.toLocaleString('zh-CN') }} 单位 · 已定位 {{ projection.rows.length }} / {{ data?.actors.length ?? 0 }} · 原始坐标，未校准米制</p>
-      </template>
+    </template>
   </section>
 </template>
 <style scoped>
 /* 块级容器：填满父面板，父面板固定高度时由内部 flex 分配空间，避免圆盘被裁掉。 */
 .scene-radar { display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; max-width: 100%; padding: var(--space-3); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-sm); }
 .scene-radar > header, .scene-radar > .radar-legend, .scene-radar > p { flex: none; }
+.scene-radar .radar-note { margin-bottom: var(--space-1); }
 .scene-radar header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-3); min-width: 0; }
 .scene-radar header span, .scene-radar p { min-width: 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.6; overflow-wrap: anywhere; }
 /* svg 外层吃掉剩余高度并居中；svg 自身撑满容器，viewBox 等比缩放保证圆盘完整可见。 */

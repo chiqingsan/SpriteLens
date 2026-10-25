@@ -160,6 +160,8 @@ C04 目标条件 → C05 应用内告警 → C06 雷达校准（米制/方位）
 - **文字整合（2026-10-25）**：计数并入状态行、提示移到标题右侧、页脚合并雷达说明、删除雷达空态重复行；`NearbyPage.vue` -12/+7 行、`SceneRadar.vue` 删 1 行；`vitest` 20 项通过、构建通过、数据态 1440×900 与 864×672 截图 `output/nearby-copy/` 与 `output/nearby-copy-actors/`（`countInline=5 只`、`cards=5`、`radarCaption` 单行、`pageScroll=0`）。
 
 - **雷达标注与中心点（2026-10-25）**：去掉中心「你」文字、中心点改深色实心点+十字；名称只给单牌/双牌（普通点只画点），选中目标必显；`SceneRadar.vue` 同步删中心标签占位逻辑，测试改 14 项；真实数据 1440×900 截图 `output/nearby-radar-rules/`（`labels=['火花','喵喵','鸭吉吉','加油海葵']`、`centerLabel=null`、`playerFill=rgb(52,64,51)`）。已知限制：固定三环刻度文字与恰好落在刻度处的目标标签可能轻微重叠（不影响可读性，后续按需避让）。
+
+- **页脚说明归位 + 进化链搜索（2026-10-25，第三轮）**：删除页面底部整页宽度的说明行，改由 `SceneRadar` 的 `note` 属性渲染在雷达面板内、紧邻单位说明（实测 1440 为 491px、864 为 262px，与雷达同宽，页面不再多一行文字）；附近页 `rows` 过滤加入 actor 的 `chain_names`，搜链上任一形态返回该精灵。验证：`tests.test_pet_vm/test_web_server/test_eggs/test_scene` 56 项、`vitest NearbyPage+SceneRadar` 22 项通过，`vue-tsc` 与构建通过；真实数据截图 `output/nearby-chain/`（`cards=5`、`note` 在雷达面板内、搜「恶魔男爵」返回「叮叮恶魔/恶魔叮」、`pageScroll=false`）。真实静态数据核对：`species_chain_ids('恶魔男爵')={5055,3010,3039}`。
 ### 仍未验证
 
 - 真实桌面 WebView2 进程内的失效/恢复时序、WS 断开 1.5 秒重连窗口不闪动的端到端表现（仅单测与 headless 验证）。
