@@ -21,7 +21,10 @@ _MAX_FIELDS = 2000
 _MAX_TEXT_SHOW = 96
 
 
-@dataclass(frozen=True)
+# 大包会解出数万节点（单个 0x0102 登录包约 5.3 万），实例自身开销直接进入
+# 解码瞬时峰值与进程私有内存；slot 去掉每实例的属性字典（2026-10-26 实测
+# 每节点 201→113 字节深尺寸，单包 wire 树 10.37→5.90 MiB），字段与产出不变。
+@dataclass(frozen=True, slots=True)
 class WireField:
     """一个 wire 级字段；len 字段可能带嵌套 children 或 utf8 文本。"""
 

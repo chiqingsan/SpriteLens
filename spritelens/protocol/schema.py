@@ -53,10 +53,14 @@ def _field_to_dict(
 ) -> dict:
     meta = (defs or {}).get(field.no, {})
     raw = field.value if field.children is None else None
+    # schema 命中时不必先算兜底名称/类型：dict.get 的默认实参会立即求值，
+    # 大包每节点会白算两次（2026-10-26 实测单个 0x0102 包 5.3 万节点）。
+    name = meta["name"] if "name" in meta else field.display_name()
+    type_name = meta["type"] if "type" in meta else _wire_type_name(field.wire_type)
     out: dict = {
         "no": field.no,
-        "name": meta.get("name", field.display_name()),
-        "type": meta.get("type", _wire_type_name(field.wire_type)),
+        "name": name,
+        "type": type_name,
         "value": field.display_value(),
         # raw 为强类型原值（int / bytes），供语义层提取；嵌套节点无 raw
         "raw": raw,
