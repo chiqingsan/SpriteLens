@@ -25,7 +25,7 @@
 
   /* ── 基础表面 ── */
   --bg: #f3f5ef;              /* 窗口底色（环境光在此之上） */
-  --canvas: #ffffff;          /* 浮动工作画布 */
+  --canvas: #fcfcf8;          /* 浮动工作画布（比纯白略暖，衬托面板层次） */
   --canvas-edge: #e6ebde;     /* 画布描边 */
   --panel: #ffffff;
   --line: #e2e7da;
@@ -114,7 +114,7 @@
 /* ══════════ 火花 · 暖陶（huohua） ══════════ */
 :root[data-theme="huohua"] {
   --bg: #f7f2ec;
-  --canvas: #ffffff;
+  --canvas: #fffdfa;
   --canvas-edge: #efe3d8;
   --line: #eadfd5;
   --line-soft: #f3ece6;
@@ -160,7 +160,7 @@
 /* ══════════ 水蓝蓝 · 雾蓝（shuilanlan） ══════════ */
 :root[data-theme="shuilanlan"] {
   --bg: #eef3f7;
-  --canvas: #ffffff;
+  --canvas: #fbfdfe;
   --canvas-edge: #dfe9f0;
   --line: #dbe5ed;
   --line-soft: #e9f0f5;

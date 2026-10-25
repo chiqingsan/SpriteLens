@@ -183,8 +183,10 @@ defineExpose({ update })
 .capture-error { border: 1px solid color-mix(in srgb, var(--danger) 26%, transparent); background: var(--danger-soft); color: var(--danger-ink); }
 .capture-notice { border: 1px solid var(--amber-line); background: var(--amber-soft); color: var(--amber-ink); }
 
-.capture-connection { padding: var(--space-5) var(--space-6); border: 1px solid color-mix(in srgb, var(--teal) 20%, var(--line-soft)); border-radius: var(--radius-lg); background: linear-gradient(180deg, var(--teal-soft), color-mix(in srgb, var(--teal-soft) 40%, var(--panel))); }
-.capture-connection.needs-help { border-color: color-mix(in srgb, var(--amber) 45%, var(--line-soft)); background: linear-gradient(180deg, var(--amber-soft), color-mix(in srgb, var(--amber-soft) 40%, var(--panel))); }
+/* 采集与连接：设置页内的一块。中性表面 + 一枚状态点表达“在/不在采集”，
+   不再用大面积主题色铺底，把强调色留给状态点与主操作。 */
+.capture-connection { padding: var(--space-5) var(--space-6); border: 1px solid color-mix(in srgb, var(--teal) 14%, var(--line-soft)); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--teal-soft) 24%, var(--panel)); }
+.capture-connection.needs-help { border-color: color-mix(in srgb, var(--amber) 40%, var(--line-soft)); background: color-mix(in srgb, var(--amber-soft) 30%, var(--panel)); }
 .capture-connection-main { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-5); }
 .capture-connection-copy { display: flex; gap: var(--space-3); min-width: 0; }
 .capture-connection-copy > div { min-width: 0; }
@@ -193,12 +195,12 @@ defineExpose({ update })
 .capture-connection h3 { margin: 0; color: var(--ink); font-size: var(--fs-md); font-weight: 600; line-height: 1.35; }
 .capture-connection p { margin: var(--space-1) 0 0; color: var(--ink-soft); font-size: var(--fs-xs); line-height: 1.5; overflow-wrap: anywhere; }
 .capture-primary { flex: none; min-width: 104px; }
-.capture-status-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid color-mix(in srgb, var(--teal) 16%, transparent); }
+.capture-status-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--line-soft); }
 .capture-diagnostic-toggle { flex: none; margin-left: auto; }
 .capture-connection button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
 .capture-stages { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); margin: 0; padding: 0; list-style: none; }
-.capture-stages li { position: relative; display: flex; align-items: center; gap: var(--space-2); height: 28px; padding: 0 var(--space-3); border: 1px solid color-mix(in srgb, var(--teal) 16%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--panel) 72%, transparent); color: var(--ink-soft); font-size: var(--fs-2xs); white-space: nowrap; }
+.capture-stages li { position: relative; display: flex; align-items: center; gap: var(--space-2); height: 28px; padding: 0 var(--space-3); border: 1px solid var(--line-soft); border-radius: 999px; background: color-mix(in srgb, var(--panel) 82%, transparent); color: var(--ink-soft); font-size: var(--fs-2xs); white-space: nowrap; }
 .capture-stages li .ui-icon { width: 14px; height: 14px; flex: none; color: var(--muted); }
 .capture-stages .is-ok { border-color: color-mix(in srgb, var(--teal) 30%, transparent); color: var(--teal-dark); }
 .capture-stages .is-ok .ui-icon { color: var(--teal); }
@@ -207,12 +209,12 @@ defineExpose({ update })
 .capture-stage-divider { position: absolute; left: 100%; width: 12px; height: 12px; margin-left: 2px; color: var(--muted-2); }
 .capture-text-button { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--space-1); min-height: 30px; padding: var(--space-1) var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--teal-dark); font-size: var(--fs-xs); font-weight: 500; }
 .capture-text-button:hover { background: color-mix(in srgb, var(--panel) 72%, transparent); }
-.capture-details { margin-top: var(--space-3); padding: var(--space-4); border: 1px solid color-mix(in srgb, var(--teal) 12%, var(--line-soft)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--panel) 68%, transparent); }
+.capture-details { margin-top: var(--space-3); padding: var(--space-4); border: 1px solid var(--line-soft); border-radius: var(--radius-md); background: var(--surface-1); }
 .capture-detail-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-top: var(--space-2); }
 .capture-detail { padding-top: var(--space-3); }
 .capture-detail strong { color: var(--ink-soft); font-size: var(--fs-xs); font-weight: 600; }
 .capture-detail p { margin: var(--space-1) 0 0; color: var(--muted); font-size: var(--fs-2xs); line-height: 1.5; overflow-wrap: anywhere; }
-.capture-advanced { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid color-mix(in srgb, var(--teal) 14%, transparent); }
+.capture-advanced { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--line-soft); }
 .capture-advanced > strong { color: var(--ink-soft); font-size: var(--fs-xs); font-weight: 600; }
 .capture-key-form { display: grid; gap: var(--space-2); margin-top: var(--space-2); }
 .capture-key-form label { color: var(--ink-soft); font-size: var(--fs-2xs); overflow-wrap: anywhere; }
@@ -229,7 +231,7 @@ defineExpose({ update })
 .capture-session-id-col { width: 44%; }
 .capture-details progress { width: 100%; max-width: 24rem; margin-top: var(--space-2); accent-color: var(--teal); }
 
-.capture-behaviors { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: var(--space-5); margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid color-mix(in srgb, var(--teal) 16%, transparent); }
+.capture-behaviors { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: var(--space-5); margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--line-soft); }
 .capture-behavior-group { min-width: 0; }
 .capture-behavior-title { color: var(--ink-soft); font-size: var(--fs-xs); font-weight: 600; }
 .capture-options { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-2); margin-top: var(--space-3); }

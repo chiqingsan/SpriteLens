@@ -269,7 +269,7 @@
     pageNode.__enterTimer = window.setTimeout(function () {
       pageNode.classList.remove("page-enter");
       pageNode.__enterTimer = null;
-    }, 280);
+    }, 520);
     document.querySelectorAll(".nav-item").forEach(function (node) {
       node.classList.toggle("active", node.dataset.page === name);
       if (node.dataset.page === name) { node.setAttribute("aria-current", "page"); }

@@ -50,7 +50,7 @@
 /* 只命中右侧箭头（设置图标是 .ui-icon.nav-icon，不能让它吃到 auto margin 居中） */
 .sidebar-settings > .ui-icon:not(.nav-icon) { margin-left: auto; }
 .topbar { grid-template-columns: auto minmax(0, 1fr) auto; min-height: var(--topbar); container-type: inline-size; }
-#page-title { font-size: 18px; margin: 0; white-space: nowrap; }
+#page-title { font-size: var(--fs-xl); margin: 0; white-space: nowrap; }
 .capture-summary { align-items: center; }
 #btn-toggle { min-width: 132px; height: 34px; }
 
@@ -60,7 +60,7 @@
 .pet-toolbar .pet-tools { display: flex; flex: 1 1 var(--pet-search-width); width: auto; min-width: 0; border: 0; padding: 0; background: transparent; justify-content: flex-end; }
 .pet-toolbar .pet-search { flex: 1 1 auto; width: auto; max-width: 15em; min-width: 4em; order: 1; }
 .pet-toolbar:has(#pet-view [data-view="card"].active) .pet-tools { width: auto; min-width: 0; flex-wrap: nowrap; gap: var(--space-3); }
-.pet-toolbar .segmented, .pet-toolbar .segmented button, .pet-search input, .pet-view-settings > summary { height: var(--backpack-control); }
+.pet-toolbar .segmented, .pet-search input, .pet-view-settings > summary { height: var(--backpack-control); }
 .pet-toolbar .segmented { padding: 2px; }
 .pet-toolbar .segmented button { padding: 0 var(--space-4); font-size: var(--fs-sm); }
 .pet-view-settings { margin-left: 0; }
@@ -101,11 +101,22 @@
 .quick-filter-head h3, .direct-filter h3 { margin: 0; font-size: var(--fs-sm); }
 #pet-filter-actions { display: flex; align-items: center; gap: var(--space-2); }
 .filter-match-mode { padding: 0; }
-.filter-match-mode button { min-width: 34px; padding: var(--space-2); font-size: var(--fs-xs); }
+.filter-match-mode button { min-width: 34px; padding: 0 var(--space-2); font-size: var(--fs-xs); }
 .filter-match-mode, #btn-reset-filters { height: 30px; }
 .quick-filters .chip, .filter-pair .chip { height: 34px; padding: var(--space-2); border-radius: var(--radius-sm); text-align: center; }
 .filter-pair .chip { display: flex; align-items: center; justify-content: center; width: 100%; box-sizing: border-box; }
 .text-button { background: transparent; color: var(--teal-dark); font-size: var(--fs-xs); padding: var(--space-1); }
+/* 快捷条件标题行：设置/重置收起为安静的文字按钮，悬停才出现容器底色 */
+.quick-filter-head .text-button {
+  height: 24px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-weight: 500;
+}
+.quick-filter-head .text-button:hover:not(:disabled) { color: var(--ink); background: var(--surface-2); }
+.quick-filter-head .text-button:disabled { opacity: .45; }
+.quick-filter-head .button-row { gap: var(--space-1); }
 .quick-filters { margin-top: var(--space-3); }
 .shortcut-settings { margin-top: var(--space-3); }
 .saved-shortcuts:empty { display: none; }
@@ -203,7 +214,9 @@
   height: 100%; align-content: stretch; grid-template-rows: repeat(2, minmax(0, 1fr));
 }
 #pet-grid.box-fill-grid .point-groups { gap: 2px; padding: 2px 2px 0; }
-#pet-grid.box-fill-grid .point-medals { gap: 3px; padding-top: 2px; }
+#pet-grid.box-fill-grid .point-medals { gap: 2px; padding-top: 0; display: flex; flex-direction: column; justify-content: center; }
+#pet-grid.box-fill-grid .point-medal-slot { flex: 1 1 0; min-height: 0; }
+#pet-grid.box-fill-grid .point-medal-slot:empty { display: none; }
 #pet-grid.box-fill-grid .point-group-slot,
 #pet-grid.box-fill-grid .point-medal-slot { align-items: center; }
 #pet-grid.box-fill-grid .point-pet .pet-medal.has-icon {
