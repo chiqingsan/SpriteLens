@@ -50,6 +50,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `docs/HANDOFF_DEEPSEEK_2026-10-24.md` | 2026-10-24 数据库数据恢复、伙伴标记和未完成改动交接 |
 | `docs/ROADMAP.md` | 已落实范围、待办顺序与验收；唯一持续任务状态入口 |
 | `docs/reviews/MEMORY_PERFORMANCE_HANDOFF_2026-10-24.md` | 内存/性能审查证据与 PERF01–PERF07 修复交接；任务状态只在 ROADMAP 维护 |
+| `docs/reviews/MEMORY_PERFORMANCE_VERIFICATION_2026-10-25.md` | PERF 系列独立复核、性能对照与验收限制；含 PERF05 尾批引用释放返修及复验证据 |
 | `docs/archive/ROCO_RESOURCES_ANALYSIS.md` | `roco_resources` 解包/逆向报告的功能对照、参考路径和候选实施清单；不代表当前已实现 |
 | `docs/HOME_IMPLEMENTATION_PLAN.md` | Luna6 家园编码规格、数据边界和逐切片验收；不代表修复已完成 |
 | `docs/VUE3_MIGRATION.md` | 已确认的 Vue 前端工程/接口/状态与渐进迁移决策；不代表已实现 |
@@ -207,7 +208,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `domain/measurements.py` | cm/g参考范围转m/kg、范围位置与越界状态 |
 | `view_models/ui_preferences.py` | 主题/视图/显示字段白名单、非法配置降级与严格保存 |
 | `web/static/themes.css` / `appearance.js` | 三套浅色主题、即时切换、显示选项与保存反馈 |
-| `web/static/icons.js` / `icons/` | 本地Tabler SVG与sprite，29枚图标和MIT来源清单 |
+| `web/static/icons.js` / `icons/` | 本地Tabler SVG与sprite，40枚Tabler图标（sprite共44个symbol，含4个手工图标）和MIT来源清单 |
 | `tools/sync_catalog_resources.py` | 保留有效值的ID合并、官方镜像校验、可重复资源导入与报告 |
 | `tools/sync_ui_icons.py` | 固定官方Git版本的少量SVG导入，无运行时网络依赖 |
 | `tests/test_ui_upgrade.py` | 偏好鉴权/并发/失败、快捷与筛选规则及资源合并回归 |
@@ -326,8 +327,10 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | --- | --- |
 | `frontend/src/pages/NearbyPage.vue`、`composables/useNearby.ts`、`types/nearby.ts` | 附近观察列表、搜索/排序、DTO校验、周期清空与请求失效 |
 | `frontend/src/nearbyBridge.ts`、`spritelens/web/static/nearby-page.js` | Vue装配与既有REST/单一WS摘要转发；离页暂停、周期失效、超时与悬浮请求合并 |
+| `spritelens/web/static/nearby-alert.js` | 双牌重点精灵新出现提醒音（单牌只显示标记不发声）：按实体10分钟去重、默认开启并持久化；WebAudio合成双音，无外部音频资源 |
 | `tools/import_scene_catalog.py`、`data/static/scene_npc_pets.json` | 裁剪并记录来源哈希的NPC配置到物种映射；StaticData只读加载 |
 | `frontend/src/nearbyBridge.test.ts` | 主窗/悬浮桥接的慢请求合并、低版本切号、超时与断连失效回归 |
+| `frontend/src/nearbyAlert.test.ts` | 提醒引擎首快照、单牌不响/双牌触发、10分钟去重、开关持久化与壳层端到端响铃回归 |
 | `frontend/src/composables/useNearby.test.ts` | 切号/切周期/离页的晚到响应与失败保留回归 |
 | `docs/NEARBY_OBSERVATIONS.md` | 当前操作、来源、所有权与观察版限制 |
 
