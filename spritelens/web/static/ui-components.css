@@ -364,6 +364,59 @@ select option { background: var(--panel); color: var(--ink); }
 .ui-dialog__body { flex: 1; min-height: 0; overflow: auto; }
 .ui-dialog__foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); flex: none; padding-top: var(--space-3); border-top: 1px solid var(--hairline); }
 
+/* ══════════ 页面骨架 ══════════ */
+.ui-page { height: 100%; min-height: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.ui-page-toolbar {
+  flex: none; min-height: 44px; display: flex; align-items: center;
+  justify-content: space-between; flex-wrap: wrap; gap: var(--space-2) var(--space-4);
+}
+.ui-page-heading { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1) var(--space-4); }
+.ui-page-actions { flex: none; min-width: 0; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-3); }
+.ui-page-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.ui-page-meta { margin: 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.5; }
+
+/* 显示方式：网格 / 列表 图标切换 */
+.ui-view-switch {
+  display: inline-flex; align-items: center; gap: 2px; padding: 2px;
+  border: 1px solid var(--hairline); border-radius: var(--radius-md); background: var(--surface-2);
+}
+.ui-view-switch > button {
+  width: 28px; height: 26px; display: grid; place-items: center;
+  border: 0; border-radius: calc(var(--radius-md) - 2px); background: transparent; color: var(--muted);
+  cursor: pointer; transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+}
+.ui-view-switch > button:hover { color: var(--ink); }
+.ui-view-switch > button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: var(--shadow-1); }
+.ui-view-switch > button .ui-icon { width: 15px; height: 15px; }
+
+/* 密度选择：与工具栏其它控件同高 */
+.ui-density { display: inline-flex; align-items: center; min-width: 0; }
+.ui-density select { height: 30px; padding: 0 var(--space-7) 0 var(--space-3); font-size: var(--fs-2xs); }
+
+/* ══════════ 分页条 ══════════ */
+.ui-pager {
+  flex: none; display: flex; align-items: center; gap: var(--space-1);
+  min-height: 40px; padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--hairline); background: var(--panel);
+}
+.ui-pager--plain { border-bottom: 0; background: transparent; }
+.ui-pager__scroll {
+  width: 24px; height: 28px; display: grid; place-items: center; flex: none;
+  border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted);
+}
+.ui-pager__scroll:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
+.ui-pager__scroll:disabled { opacity: .35; }
+.ui-pager__strip { flex: 1; min-width: 0; display: flex; gap: var(--space-1); overflow-x: auto; scrollbar-width: none; }
+.ui-pager__strip::-webkit-scrollbar { display: none; }
+.ui-pager__num {
+  flex: none; min-width: 32px; height: 28px; padding: 0 var(--space-2);
+  border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted);
+  font: inherit; font-size: var(--fs-xs); line-height: 1; font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.ui-pager__num:hover { background: var(--surface-2); color: var(--ink); }
+.ui-pager__num.active { background: var(--teal); color: var(--white); font-weight: 600; }
+.ui-pager__total { flex: none; padding-left: var(--space-2); color: var(--muted); font-size: var(--fs-3xs); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
 /* ══════════ 滚动 / 骨架 ══════════ */
 .ui-scroll { overflow: auto; overscroll-behavior: contain; min-height: 0; }
 .ui-scroll::-webkit-scrollbar { width: 8px; height: 8px; }

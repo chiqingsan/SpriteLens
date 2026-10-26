@@ -430,3 +430,53 @@
   #page-egg-dex .egg-detail-hero > .dex-art img { left: -2%; width: 68%; }
   #page-egg-dex .egg-detail-hero .handbook-detail-art-groups { right: 42%; }
 }
+
+/* ══════════════ 显示方式：舒适/紧凑、网格/列表 ══════════════ */
+.dex-browser-grid.is-compact { padding: var(--space-3); gap: 6px; }
+#page-handbook .dex-browser-grid.is-compact .dex-browser-card {
+  grid-template-rows: 14px 56px minmax(2.2em, max-content) minmax(20px, max-content) minmax(18px, max-content) minmax(24px, max-content);
+  min-height: 0; padding: 6px 8px; gap: 2px;
+}
+#page-handbook .dex-browser-grid.is-compact .dex-browser-card > .dex-art { width: min(100%, 76px); height: 56px; }
+#page-handbook .dex-browser-grid.is-compact .dex-browser-card > b { min-height: 2.2em; }
+#page-egg-dex .dex-browser-grid.is-compact .dex-browser-card {
+  grid-template-rows: 14px 56px minmax(2.2em, max-content) minmax(20px, max-content) minmax(18px, max-content);
+  min-height: 0; padding: 6px 8px; gap: 2px;
+}
+#page-egg-dex .dex-browser-grid.is-compact .dex-browser-card > .dex-art { width: min(100%, 76px); height: 56px; }
+
+/* 列表视图：与网格共用同一批卡片，换成一行一个信息条 */
+.dex-browser-grid.is-list { display: flex; flex-direction: column; align-content: initial; gap: 2px; padding: var(--space-2); }
+#page-handbook .dex-browser-grid.is-list .dex-browser-card,
+#page-egg-dex .dex-browser-grid.is-list .dex-browser-card {
+  display: grid; grid-template-rows: none;
+  grid-template-columns: 56px 48px minmax(140px, 1.3fr) minmax(118px, 1.1fr) minmax(96px, 1fr) minmax(120px, .9fr);
+  justify-items: start; align-items: center; align-self: stretch;
+  flex: 0 0 auto; min-height: 52px; height: auto; padding: 5px var(--space-3); gap: var(--space-2);
+  border-radius: var(--radius-sm);
+}
+#page-egg-dex .dex-browser-grid.is-list .dex-browser-card { grid-template-columns: 56px 48px minmax(140px, 1.3fr) minmax(118px, 1.1fr) minmax(140px, 1.2fr); }
+#page-egg-dex .dex-browser-grid.is-list .dex-browser-card > .dex-card-groups { justify-self: end; }
+#page-handbook .dex-browser-grid.is-list .dex-browser-card > span:first-child,
+#page-egg-dex .dex-browser-grid.is-list .dex-browser-card > span:first-child { align-self: center; text-align: left; }
+#page-handbook .dex-browser-grid.is-list .dex-browser-card > .dex-card-number,
+#page-egg-dex .dex-browser-grid.is-list .dex-browser-card > .dex-card-number { text-align: left; }
+#page-handbook .dex-browser-grid.is-list .dex-browser-card > .dex-art,
+#page-egg-dex .dex-browser-grid.is-list .dex-browser-card > .dex-art { width: 44px; height: 44px; }
+
+#page-handbook .dex-browser-grid.is-list.is-compact .dex-browser-card,
+#page-egg-dex .dex-browser-grid.is-list.is-compact .dex-browser-card { min-height: 44px; padding: 3px var(--space-3); }
+#page-handbook .dex-browser-grid.is-list.is-compact .dex-browser-card > .dex-art,
+#page-egg-dex .dex-browser-grid.is-list.is-compact .dex-browser-card > .dex-art { width: 36px; height: 36px; }
+#page-handbook .dex-browser-grid.is-list .dex-browser-card > b,
+#page-egg-dex .dex-browser-grid.is-list .dex-browser-card > b { min-height: 0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#page-handbook .dex-browser-grid.is-list .dex-browser-card > div,
+#page-egg-dex .dex-browser-grid.is-list .dex-browser-card > div { width: auto; justify-content: flex-start; }
+#page-handbook .dex-browser-grid.is-list .dex-card-types,
+#page-handbook .dex-browser-grid.is-list .dex-card-groups,
+#page-egg-dex .dex-browser-grid.is-list .dex-card-types,
+#page-egg-dex .dex-browser-grid.is-list .dex-card-groups { min-height: 0; flex-wrap: nowrap; overflow: hidden; }
+#page-handbook .dex-browser-grid.is-list .dex-card-summary { width: auto; min-height: 0; display: flex; gap: var(--space-3); }
+#page-handbook .dex-browser-grid.is-list .dex-card-summary > span { flex-direction: row; gap: 4px; padding: 0; background: none; }
+#page-handbook .dex-browser-grid.is-list .dex-card-summary small,
+#page-handbook .dex-browser-grid.is-list .dex-card-summary b { white-space: nowrap; overflow-wrap: normal; }
