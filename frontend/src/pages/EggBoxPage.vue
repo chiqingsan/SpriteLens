@@ -6,6 +6,7 @@ import { useEggBox } from '../composables/useEggBox'
 import EggBoxCard from '../components/EggBoxCard.vue'
 import EggBoxDetail from '../components/EggBoxDetail.vue'
 import PageInspector from '../components/PageInspector.vue'
+import PageShell from '../components/PageShell.vue'
 import UiIcon from '../components/UiIcon.vue'
 import type { EggBoxAnnotations, EggBoxEntry } from '../types/eggBox'
 import './egg-box.css'
@@ -226,10 +227,9 @@ defineExpose({
 </script>
 
 <template>
-  <div class="eggbox-page">
+  <PageShell class="eggbox-page" :busy="model.loading.value">
     <p v-if="favoriteError" class="eggbox-favorite-error" role="alert">收藏失败：{{ favoriteError }}</p>
-    <section class="eggbox-list-panel" :aria-busy="model.loading.value">
-      <header class="eggbox-list-toolbar">
+    <template #toolbar>
         <div class="eggbox-list-summary">
           <span class="count-badge"><UiIcon name="egg" /> {{ summary }}</span>
           <span v-if="model.data.value?.hatching !== null && model.data.value" class="eggbox-hatching-count">在孵 {{ model.data.value.hatching }} 枚</span>
@@ -250,9 +250,11 @@ defineExpose({
             <input v-model="model.filters.search" type="search" placeholder="搜索蛋名 / 精灵 / 进化链 / 编号">
           </label>
         </div>
-      </header>
+    </template>
 
-      <nav class="eggbox-categories" aria-label="蛋类型筛选">
+    <div class="eggbox-body">
+      <section class="eggbox-list-panel" :aria-busy="model.loading.value">
+        <nav class="eggbox-categories" aria-label="蛋类型筛选">
         <button v-for="category in model.categories.value" :key="category.id" type="button"
           class="eggbox-category" :class="{ active: model.filters.category === category.id }"
           :aria-pressed="model.filters.category === category.id" @click="changeCategory(category.id)">
@@ -306,6 +308,7 @@ defineExpose({
         :favorite-saving="Boolean(model.data.value && favoriteBusy.has(favoriteKey(model.data.value.uid, model.selected.value.instance_id)))"
         @update-annotations="updateAnnotations" @save-annotations="saveAnnotations" />
       <div v-else class="empty-hint eggbox-detail-empty"><UiIcon name="egg" />选择一枚蛋查看详情</div>
-    </PageInspector>
-  </div>
+      </PageInspector>
+    </div>
+  </PageShell>
 </template>

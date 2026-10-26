@@ -4,14 +4,26 @@
 #breeding-planner-root { height: 100%; min-height: 0; }
 
 .planner-page {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  grid-template-rows: minmax(0, 1fr);
-  gap: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   height: 100%;
   min-height: 0;
   overflow: hidden;
 }
+
+.planner-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--space-4);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.planner-page .ui-page-toolbar { padding: 0; border-bottom: 0; }
+
 
 .planner-primary-column {
   display: flex;
@@ -1415,7 +1427,7 @@ dialog.planner-picker {
 
 /* ── 响应式 ─────────────────────────────────────────────────────────────── */
 @media (max-width: 1200px) {
-  .planner-page { grid-template-columns: minmax(0, 1fr) 340px; }
+  .planner-body { grid-template-columns: minmax(0, 1fr) 340px; }
   .planner-canvas-view {
     grid-template-areas:
       "board"
@@ -1430,7 +1442,8 @@ dialog.planner-picker {
 @media (max-width: 960px) {
   #page-planner { height: auto; min-height: 100%; overflow: auto; }
   #breeding-planner-root { height: auto; min-height: 100%; }
-  .planner-page { grid-template-columns: minmax(0, 1fr); height: auto; min-height: 100%; overflow: visible; }
+  .planner-page { height: auto; min-height: 100%; overflow: visible; }
+  .planner-body { grid-template-columns: minmax(0, 1fr); }
   .planner-primary-column { min-height: 0; }
   .planner-main { min-height: 640px; }
   .planner-sidebar { max-height: 680px; }
@@ -1479,3 +1492,6 @@ dialog.planner-picker {
   .planner-outcome-nature-summary { justify-content: flex-start; }
   .planner-outcome-evidence-grid { max-height: 240px; }
 }
+
+/* PageShell：工具行已由 .ui-page-toolbar 提供外框，这里只保留内容布局 */
+.planner-toolbar { min-height: 0; padding: 0; border: 0; border-radius: 0; background: none; }

@@ -52,6 +52,9 @@
 | 对话框 | `ui-dialog[open]` + `__head/__body/__foot` | 原生 `<dialog>`，入场动画 + 背景模糊；需自行 `showModal()` |
 | 滚动/骨架 | `ui-scroll` / `ui-skeleton` | 细滚动条容器 / 加载闪光条（`prefers-reduced-motion` 下停止） |
 | 详情面板（Vue） | `<PageInspector>`（`frontend/src/components/PageInspector.vue`，根类名 `ui-inspector`） | 右侧详情统一外壳：标题 + 副标题 + 操作区 + 关闭；左缘拖拽调宽、双击复位、宽度按 `storage-key` 记忆；窄屏自动切换为抽屉 |
+| 页面骨架（Vue） | `<PageShell>`（`frontend/src/components/PageShell.vue`，根类名 `ui-page`） | 统一页面骨架：`#toolbar` 槽 = 页头/工具行（`ui-page-toolbar`），默认槽 = 页面主体；`:busy` 标记加载中 |
+| 分页（Vue） | `<PagePager>`（`frontend/src/components/PagePager.vue`，类名 `ui-pager`） | 统一分页条：页码条 + 上/下页 + 总数说明；`:page` + `@update:page`；横向滚轮翻页，选中页自动滚入视野 |
+| 显示偏好 | `ui-view-switch`、`useDexDisplay`（`frontend/src/composables/useDexDisplay.ts`） | 网格/列表与舒适/紧凑密度，记忆在 `localStorage["spritelens.dex.view"]` / `["spritelens.dex.density"]`；列表/紧凑样式由页面加 `.is-list` / `.is-compact` |
 
 用法示例：
 
@@ -111,7 +114,7 @@
 
 ## 6. 维护与迁移状态
 
-- 当前状态：全局外壳、导航、按钮/徽章/分段/面板/空态已统一到 token + 组件层；图鉴、蛋仓/家园、配窝/筛选配对/双牌产线、色卡/附近精灵/雷达/采集诊断各自完成页面级现代化，页面 CSS 中的硬编码颜色已清零（游戏资源色与属性色按 `themes.css` 保留）。
+- 当前状态：全局外壳、导航、按钮/徽章/分段/面板/空态已统一到 token + 组件层；图鉴、蛋仓/家园、配窝/筛选配对/双牌产线、色卡/附近精灵/雷达/采集诊断各自完成页面级现代化，页面 CSS 中的硬编码颜色已清零（游戏资源色与属性色按 `themes.css` 保留）。页面骨架与右侧详情已统一（`PageShell` / `PageInspector`），图鉴与蛋图鉴使用同一套分页条和显示偏好。
 - 迁移顺序建议：先小页面（设置/采集诊断）后大页面（背包/图鉴）；每次迁移只动一个页面的类名，改完用 `output/ui_shot.py` 做 1440/1280/960/760/640 三主题截图对比。
 - 新增组件流程：先在 `ui-components.css` 加 `ui-*` 与变体 → 同步本文件 §3 表格 → 页面里替换使用 → 截图验收。
 
@@ -126,3 +129,22 @@
 - 视觉：折叠态设置按钮去底色，仅悬停/选中出底；图标条宽度过渡 200ms，`prefers-reduced-motion` 下瞬时。
 
 > 说明：曾实现的 `Ctrl/⌘+K` 命令面板已按用户要求移除（顶栏按钮、快捷键、`ui-command*` 样式、`shell-ui.js` 内的面板逻辑均删除）；相关图标 `layout-sidebar-left-*` 保留给折叠侧栏，`command` / `corner-down-left` 留在图标源中备用，未再引用。
+
+## 8. 页面骨架与显示偏好
+
+页面骨架统一为 `PageShell`：`#toolbar` 槽放页头与工具行，默认槽放页面主体；`ui-page` 负责占满可用高度、`ui-page-toolbar` 负责单行工具区的换行与间距。
+
+```vue
+<PageShell class="catalog-dex" :busy="loading">
+  <template #toolbar>
+    <div class="ui-page-heading"><h2 class="page-heading">精灵图鉴</h2></div>
+    <div class="ui-page-actions"><input class="field" placeholder="搜索" /></div>
+  </template>
+  <div class="dex-browser-layout">…</div>
+</PageShell>
+```
+
+- 已迁移：图鉴、蛋图鉴、蛋仓、筛选配对、双牌产线、智能配窝、附近精灵、我的家园；背包为原生页面，保留既有 `#page-pets .workspace.split` 结构（工具行与筛选栏由 `backpack-layout.css` 负责），后续如迁移需同步处理 `#pet-detail-root` 的网格列。
+- 分页统一用 `PagePager`；不再在页面内自行实现页码条。图鉴/蛋图鉴的网格/列表、舒适/紧凑由 `useDexDisplay` 驱动，列表与紧凑样式在 `catalog-wiki.css` 中以 `.is-list` / `.is-compact` 提供。
+- 工具行内的分组用 `ui-page-heading`（标题/说明/状态）与 `ui-page-actions`（按钮组）排布；需要两行时让 `ui-page-toolbar` 自然换行，不要固定高度。
+- 迁移页面时不要再用 `.page > .xxx-page` 的旧包装器规则（`height:100%` / `overflow:hidden` 已由 `ui-page` 承担），否则会出现双滚动容器。

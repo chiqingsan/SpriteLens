@@ -1347,3 +1347,36 @@
     grid-template-columns: minmax(0, 1fr) 96px;
   }
 }
+
+/* ── PageShell 迁移：外壳提供工具栏行，页面内只剩「列表 + 详情」 ── */
+.eggbox-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+.eggbox-page .ui-page-toolbar { border-bottom: 0; }
+.eggbox-body {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  flex: 1;
+  min-height: 0;
+}
+.eggbox-page .eggbox-list-summary { padding: 0; }
+.eggbox-page .eggbox-categories { padding-top: var(--space-3); }
+.eggbox-favorite-error { margin: 0; }
+
+@media (max-width: 1360px) {
+  .eggbox-body { grid-template-columns: minmax(0, 1fr) 340px; }
+}
+@media (max-width: 1100px) {
+  .eggbox-body { grid-template-columns: minmax(0, 1fr) 320px; }
+}
+@media (max-width: 960px) {
+  .eggbox-page { display: flex; height: auto; min-height: 100%; }
+  .eggbox-body { display: block; }
+}

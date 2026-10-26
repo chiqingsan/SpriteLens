@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import BreederCard from '../components/BreederCard.vue'
 import BreedingCanvas from '../components/BreedingCanvas.vue'
 import MedalIcon from '../components/MedalIcon.vue'
+import PageShell from '../components/PageShell.vue'
 import UiIcon from '../components/UiIcon.vue'
 import { useBreedingPlanner, type PlannerHost } from '../composables/useBreedingPlanner'
 import type { Goal, Placement } from '../types/breedingPlanner'
@@ -205,16 +206,19 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
 </script>
 
 <template>
-  <div class="planner-page" data-vue-page>
-    <div class="planner-primary-column">
-    <header class="planner-toolbar">
+  <PageShell class="planner-page" data-vue-page>
+    <template #toolbar>
+    <div class="planner-toolbar">
       <div class="planner-tabs" role="group" aria-label="配窝模式"><button :class="{ active: mode === 'target' }" :aria-pressed="mode === 'target'" @click="model.changeMode('target')"><UiIcon name="egg" /><span>按目标配窝</span></button><button :class="{ active: mode === 'selected' }" :aria-pressed="mode === 'selected'" @click="model.changeMode('selected')"><UiIcon name="backpack" /><span>自选精灵</span></button></div>
       <div class="planner-toolbar-actions">
         <button class="ghost-button" :disabled="!!busy || !context?.uid || !unsaved" :title="saveHint" @click="model.save"><span>保存草稿</span></button>
         <div class="planner-generate"><button class="planner-primary primary-button" :disabled="!model.canGenerate.value" :title="generationHint" @click="model.run('solve')"><UiIcon name="arrows-shuffle" /><span>{{ busy === 'solve' ? '正在规划' : plan ? '重新规划' : '生成方案' }}</span></button></div>
         <button class="ghost-button" :disabled="!!busy || (!draft.placements.length && !draft.goals.length && !draft.approved.length)" title="清除方案：清空画布上的窝位；按目标配窝时同时清空培育目标" @click="model.clearPlan"><UiIcon name="trash" /><span>清除方案</span></button>
       </div>
-    </header>
+    </div>
+    </template>
+    <div class="planner-body">
+    <div class="planner-primary-column">
     <div v-if="error" class="planner-notice is-error" role="alert"><UiIcon name="alert-circle" />{{ error }}<button class="breeder-detail-link" :disabled="!!busy" @click="errorAction === 'save' ? model.save() : model.refresh()">{{ errorAction === 'save' ? '重试保存' : '刷新资料' }}</button></div>
     <div v-if="notice" class="planner-notice is-info" role="status"><UiIcon name="info-circle" />{{ notice }}</div>
     <main class="planner-main panel">
@@ -360,5 +364,6 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
       <div class="planner-picker-grid"><BreederCard v-for="parent in pickerRows" :key="parent.gid" :parent="parent" :selected="pickerKind === 'pool' && draft.selected.includes(parent.gid)" @select="choose(parent.gid)" @open="closePicker(); host.openPet($event)" /><div v-if="!pickerRows.length" class="planner-empty">当前观察记录中没有符合筛选的候选。</div></div>
       <footer><span>已选择 {{ draft.selected.length }} 只 · {{ filtered.length }} 个候选</span><div class="planner-actions"><button class="ghost-button" :disabled="page <= 1" @click="page--">上一页</button><span>{{ page }} / {{ Math.max(1, Math.ceil(filtered.length / 24)) }}</span><button class="ghost-button" :disabled="page * 24 >= filtered.length" @click="page++">下一页</button><button class="planner-primary" @click="closePicker()">完成</button></div></footer>
     </dialog>
-  </div>
+    </div>
+  </PageShell>
 </template>

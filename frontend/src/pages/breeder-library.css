@@ -4,12 +4,23 @@
 #breeder-library-root { height: 100%; min-height: 0; }
 
 .breeder-page {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   height: 100%;
   min-height: 0;
 }
+
+.breeder-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: var(--space-4);
+  flex: 1;
+  min-height: 0;
+}
+
+.breeder-page .ui-page-toolbar { min-height: 0; padding: 0; border-bottom: 0; }
+.breeder-page .breeder-search { flex: 1 1 auto; max-width: 460px; }
 
 /* 两个面板都用全局 .panel，这里收回它的下外边距，间距交给 grid。 */
 .breeder-page .breeder-workspace,
@@ -487,13 +498,14 @@
 .breeder-range .dual-range-unit { margin-bottom: 0; font-size: var(--fs-3xs); }
 
 @media (max-width: 1200px) {
-  .breeder-page { grid-template-columns: minmax(0, 1fr) 320px; }
+  .breeder-body { grid-template-columns: minmax(0, 1fr) 320px; }
 }
 
 @media (max-width: 960px) {
   #page-breeder-library { overflow: auto; }
   #breeder-library-root { height: auto; min-height: 100%; }
-  .breeder-page { grid-template-columns: minmax(0, 1fr); height: auto; }
+  .breeder-page { height: auto; }
+  .breeder-body { grid-template-columns: minmax(0, 1fr); }
   .breeder-workspace { height: 620px; }
   .breeder-inspector { max-height: 600px; }
 }

@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { collectionGoals, useCollectionLines, type CollectionHost } from '../composables/useCollectionLines'
 import type { CollectionLine } from '../types/collectionLines'
+import PageShell from '../components/PageShell.vue'
 import UiIcon from '../components/UiIcon.vue'
 import CollectionParentCard from '../components/CollectionParentCard.vue'
 import './collection-lines.css'
@@ -100,9 +101,8 @@ defineExpose({ load, pause, resetAccount })
 </script>
 
 <template>
-  <div class="collection-page" :class="{ 'filters-expanded': isNarrow && filtersOpen && !detail }">
-    <section class="collection-list-panel" :aria-busy="loading">
-      <header class="collection-toolbar">
+  <PageShell class="collection-page" :class="{ 'filters-expanded': isNarrow && filtersOpen && !detail }">
+    <template #toolbar>
         <div class="collection-overview">
           <span class="count-badge"><UiIcon name="checklist" />{{ settings.ignore_missing_male ? '种母收集' : '产线配齐' }} <b>{{ data?.totals.complete ?? '—' }}<span> / {{ data?.totals.eligible ?? '—' }}</span></b></span>
         </div>
@@ -112,7 +112,10 @@ defineExpose({ load, pause, resetAccount })
           <button class="ghost-button small collection-refresh" :disabled="loading" aria-label="刷新产线记录" title="刷新记录" @click="model.load"><UiIcon name="refresh" /></button>
           <div class="collection-pager-controls" aria-label="产线翻页"><button class="ghost-button small" :disabled="page === 1" aria-label="上一页" @click="page--"><UiIcon name="chevron-left" /></button><span>{{ page }} / {{ pages }}</span><button class="ghost-button small" :disabled="page === pages" aria-label="下一页" @click="page++"><UiIcon name="chevron-right" /></button></div>
         </div>
-      </header>
+      </template>
+    <div class="collection-body">
+    <section class="collection-list-panel" :aria-busy="loading">
+      
       <nav class="collection-tabs" aria-label="产线状态"><button v-for="tab in tabs" :key="tab" :class="{ active: status === tab }" :aria-pressed="status === tab" @click="status = tab">
         {{ tab === 'all' ? '全部' : labels[tab] }} <span>{{ tab === 'all' ? data?.lines.length ?? '—' : data?.totals[tab] ?? '—' }}</span></button></nav>
       <div class="collection-list-caption" :class="{ 'has-error': error || saveError }" role="status">
@@ -168,5 +171,6 @@ defineExpose({ load, pause, resetAccount })
         </div>
       </template>
     </aside>
-  </div>
+    </div>
+  </PageShell>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
+import PageShell from '../components/PageShell.vue'
 import UiIcon from '../components/UiIcon.vue'
 import MedalIcon from '../components/MedalIcon.vue'
 import SceneRadar from '../components/SceneRadar.vue'
@@ -170,9 +171,10 @@ defineExpose({ update, load, pause, resume })
 </script>
 
 <template>
-  <div class="nearby-page">
-    <header class="nearby-heading">
-      <div class="nearby-heading-main">
+  <PageShell class="nearby-page">
+    <template #toolbar>
+    <div class="nearby-toolbar-head">
+<div class="nearby-heading-main">
         <h2 class="sr-only">附近精灵</h2>
         <span class="nearby-phase" :class="`is-${phase}`" :title="statusHint">
           <span class="nearby-phase-dot" aria-hidden="true"></span>{{ status }}
@@ -180,11 +182,6 @@ defineExpose({ update, load, pause, resume })
         <span v-if="rows.length" class="nearby-count-inline">{{ rows.length }} 只<span v-if="search.trim()"> / 已观察 {{ data?.actors.length ?? 0 }} 只</span></span>
       </div>
       <span class="nearby-count-note" :class="{ 'is-stale': stale }" :title="countNoteTitle" role="status">{{ countNote }}</span>
-    </header>
-    <div v-if="floatingError || (error && !stale) || (data && !data.mapping_available)" class="nearby-notices">
-      <p v-if="floatingError" class="nearby-error" role="alert">{{ floatingError }}</p>
-      <p v-if="error && !stale" class="nearby-error" role="alert">{{ error }}。当前无可用数据，请刷新重试。</p>
-      <p v-if="data && !data.mapping_available" class="nearby-warning" role="status" title="精灵映射表未加载，名称、头像及体型参考标识可能缺失；原始观察数据仍会保留。">部分精灵资料缺失</p>
     </div>
     <div class="nearby-toolbar">
       <label class="nearby-search"><UiIcon name="search" /><input v-model="search" type="search" aria-label="搜索附近精灵" placeholder="搜索名称、配置或实体编号"></label>
@@ -192,7 +189,8 @@ defineExpose({ update, load, pause, resume })
       <button class="ghost-button small nearby-refresh" :aria-busy="refreshing" :aria-disabled="refreshing" @click="refresh"><UiIcon name="refresh" />刷新</button>
       <button class="ghost-button small nearby-floating" @click="openFloating"><UiIcon name="eye" />悬浮雷达</button>
     </div>
-    <div class="nearby-workspace">
+    </template>
+<div class="nearby-workspace">
       <div ref="listViewport" class="nearby-list-pane">
         <section v-if="rows.length" class="nearby-grid" aria-label="附近精灵列表" :aria-busy="loading">
           <div class="nearby-virtual-space" :style="{ height: `${virtualHeight}px` }">
@@ -219,13 +217,17 @@ defineExpose({ update, load, pause, resume })
       </div>
       <div class="nearby-radar-pane"><SceneRadar :data="data" :selected="selected" :radius="data?.radar_radius_raw" :note="radarNote" @select="selectActor" /></div>
     </div>
-  </div>
+  </PageShell>
 </template>
 
 <style scoped>
 /* 附近页：固定高度、列表单独滚动，雷达面板和列表等高，避免整页滚动裁掉雷达。 */
 :global(#nearby-root) { display: flex; height: 100%; min-height: 0; }
-.nearby-page { display: flex; flex: 1; flex-direction: column; gap: var(--space-3); min-width: 0; min-height: 0; color: var(--ink); }
+.nearby-page { flex: 1 1 auto; min-width: 0; min-height: 0; color: var(--ink); }
+.nearby-page .ui-page-toolbar { min-height: 0; padding: 0; border-bottom: 0; flex-wrap: nowrap; gap: var(--space-3); }
+.nearby-toolbar-head { display: flex; flex: 0 1 auto; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); min-width: 0; }
+.nearby-page .nearby-toolbar { flex: 1 1 auto; flex-wrap: nowrap; justify-content: flex-end; }
+.nearby-page .nearby-search { flex: 1 1 180px; min-width: 120px; }
 
 .nearby-heading { display: flex; flex: none; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); min-height: 26px; }
 .nearby-heading-main { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); min-width: 0; }
@@ -312,6 +314,8 @@ defineExpose({ update, load, pause, resume })
   .nearby-list-pane { height: min(62vh, 520px); }
   .nearby-radar-pane { height: 380px; }
 }
+.nearby-page .ui-page-toolbar, .nearby-page .nearby-toolbar { flex-wrap: wrap; }
+
 @media (max-width: 480px) {
   .nearby-search { flex-basis: 100%; }
   .nearby-card { padding: var(--space-2) var(--space-3); }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useHome, type HomeHost } from '../composables/useHome'
+import PageShell from '../components/PageShell.vue'
 import UiIcon from '../components/UiIcon.vue'
 import type { HomeCouple, HomeResident } from '../types/home'
 import './home.css'
@@ -128,7 +129,7 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
 </script>
 
 <template>
-  <div class="home-page" data-vue-page>
+  <PageShell class="home-page" data-vue-page>
     <div v-if="model.error.value" class="home-notice home-notice--error" role="alert">
       <span>读取家园失败：{{ model.error.value }}</span>
       <button type="button" @click="model.load()">重试</button>
@@ -256,5 +257,5 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
 
       </aside>
     </div>
-  </div>
+  </PageShell>
 </template>
