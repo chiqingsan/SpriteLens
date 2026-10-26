@@ -170,14 +170,40 @@
 .dual-range[data-overlap="true"] input:last-of-type { clip-path: inset(0 0 0 calc(9px + (100% - 18px) * var(--range-ratio))); }
 @media (min-width: 961px) {
   #page-pets .workspace.split, #page-pets .workspace.split.detail-collapsed { height: 100%; min-height: 0; grid-template-columns: minmax(0, 1fr) var(--pet-side-width) !important; }
-  #page-pets .workspace.split.has-detail { grid-template-columns: minmax(0, 1fr) auto !important; }
   #page-pets { overflow: hidden; }
   #page-pets .content-panel { height: 100%; }
   #page-pets .filter-rail, #page-pets .filter-rail.filters-open { display: flex; grid-column: 2; grid-row: 1; }
+  /* 961–1360：详情与筛选共用右列，与 ui.css 的窄屏抽屉规则一致（由于宽度不足，二选一）。 */
+  #page-pets .workspace.split.has-detail { grid-template-columns: minmax(0, 1fr) auto !important; }
   #page-pets .workspace.has-detail .filter-rail { display: none; }
   #page-pets .workspace.split > #pet-detail-root > .ui-inspector { grid-column: 2; grid-row: 1; height: 100%; }
   #page-pets .workspace:has(.filters-open):not(.has-detail) .content-panel { grid-row: 1; }
   #btn-pet-filters, #btn-close-pet-filters { display: none; }
+}
+@media (min-width: 1361px) {
+  /* 宽屏时筛选栏与详情并列：内容列收窄，详情作为第三列常驻。 */
+  #page-pets .workspace.split.has-detail { grid-template-columns: minmax(0, 1fr) var(--pet-side-width) auto !important; grid-template-rows: 100%; height: 100%; min-height: 0; }
+  #page-pets .workspace.split.has-detail > #pet-detail-root { grid-column: 3; grid-row: 1; display: flex; position: static; min-height: 0; }
+  #page-pets .workspace.split.has-detail > #pet-detail-root > .ui-inspector { height: 100%; min-height: 0; border-radius: var(--radius-lg); border: 1px solid var(--line-soft); box-shadow: var(--shadow-1); }
+  #page-pets .workspace.has-detail .content-panel { grid-row: 1; height: 100%; min-height: 0; }
+  #page-pets .workspace.has-detail .filter-rail { display: flex; }
+  #page-pets .workspace.has-detail #pet-grid.game-box-grid,
+  #page-pets .workspace.has-detail #pet-grid.box-fill-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+  #page-pets .workspace.has-detail #pet-grid.box-fill-grid > .point-pet { grid-template-rows: 22px minmax(0, 1fr) 14px 20px; }
+  /* 详情打开时内容列变窄：工具行允许换行，卡片切紧凑排版。 */
+  #page-pets .workspace.has-detail .pet-toolbar { flex-wrap: wrap; }
+  #page-pets .workspace.has-detail .pet-search-results { order: 0; justify-content: flex-start; flex-basis: 100%; width: 100%; }
+  #page-pets .workspace.has-detail .pet-tools { flex: 1 1 auto; }
+  #page-pets .workspace.has-detail .pet-search { max-width: none; }
+  #page-pets .workspace.has-detail #pet-grid.game-box-grid .point-top { height: 22px; }
+  #page-pets .workspace.has-detail #pet-grid.game-box-grid .point-nature { max-width: 42px; height: 20px; padding: 0 4px; font-size: 11px; line-height: 20px; }
+  #page-pets .workspace.has-detail #pet-grid.game-box-grid .point-metrics { padding-top: 3px; display: flex; align-items: baseline; justify-content: space-evenly; gap: 2px; }
+  #page-pets .workspace.has-detail #pet-grid.game-box-grid .point-metrics > span { flex: 0 1 auto; }
+  #page-pets .workspace.has-detail #pet-grid.game-box-grid .point-metrics > span + span { border-left: 0; }
+  #page-pets .workspace.has-detail #pet-grid.game-box-grid .point-metrics b { font-size: 11px; line-height: 15px; }
+  #page-pets .workspace.has-detail #pet-grid.game-box-grid .point-metrics small { font-size: 10px; line-height: 13px; }
+  #page-pets .workspace.has-detail #pet-grid.game-box-grid .point-name { font-size: 13px; line-height: 16px; }
+  #page-pets .workspace.has-detail #pet-grid.game-box-grid .point-egg-group { font-size: 11px; line-height: 16px; }
 }
 @media (max-width: 960px) {
   #page-pets .workspace.split, #page-pets .workspace.split.detail-collapsed { grid-template-columns: minmax(0, 1fr) !important; }
