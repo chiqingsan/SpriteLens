@@ -397,6 +397,16 @@
     border-color var(--motion-fast) var(--motion-ease);
 }
 
+.home-sprite-card.is-linked {
+  border-color: color-mix(in srgb, var(--teal) 58%, var(--hairline));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 15%, transparent), var(--shadow-1);
+}
+
+.home-pair-card.is-linked {
+  border-color: color-mix(in srgb, var(--teal) 58%, var(--hairline));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 13%, transparent), var(--shadow-1);
+}
+
 .home-sprite-card:hover {
   transform: translateY(-2px);
   border-color: color-mix(in srgb, var(--teal) 34%, var(--hairline));

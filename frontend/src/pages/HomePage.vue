@@ -31,6 +31,21 @@ function isAcademy(resident: HomeResident) {
 }
 const sortMode = ref<'level' | 'nature' | 'name'>('level')
 const searchText = ref('')
+const hoveredSprite = ref('')
+const hoveredPairIds = ref<string[]>([])
+function pairMemberIds(group: HomeCouple[]) {
+  const ids = new Set<string>()
+  group.forEach(couple => {
+    ids.add(couple.female_actor_id)
+    couple.male_actor_ids.forEach(id => ids.add(id))
+  })
+  return [...ids]
+}
+function pairLinked(group: HomeCouple[]) {
+  if (!hoveredSprite.value) return false
+  return group.some(couple => couple.female_actor_id === hoveredSprite.value
+    || couple.male_actor_ids.includes(hoveredSprite.value))
+}
 const pairingGroups = computed(() => {
   const groups = new Map<string, HomeCouple[]>()
   homeCouples.value.forEach(couple => groups.set(couple.female_actor_id,
@@ -254,7 +269,8 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
 
         <div v-else class="home-sprite-grid">
           <article v-for="resident in filteredSprites" :key="resident.actor_id" class="home-sprite-card"
-            :class="[`gender-${resident.gender}`, { 'is-academy': isAcademy(resident) }]">
+            :class="[`gender-${resident.gender}`, { 'is-academy': isAcademy(resident), 'is-linked': hoveredPairIds.includes(resident.actor_id) }]"
+            @mouseenter="hoveredSprite = resident.actor_id" @mouseleave="hoveredSprite = ''">
             <div class="home-sprite-art">
               <img v-if="resident.icon_url && !failedImages.has(resident.actor_id)" class="home-sprite-image"
                 :src="resident.icon_url" alt="" loading="lazy" draggable="false" @error="failedImage(resident.actor_id)">
@@ -312,7 +328,8 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
 
         <div v-if="pairingGroups.length" class="home-pairing-grid">
           <article v-for="(group, groupIndex) in pairingGroups" :key="groupIndex" class="home-pair-card"
-            :class="{ 'home-pair-card--academy': group.some(couple => couple.mode !== 'ordinary') }">
+            :class="{ 'home-pair-card--academy': group.some(couple => couple.mode !== 'ordinary'), 'is-linked': pairLinked(group) }"
+            @mouseenter="hoveredPairIds = pairMemberIds(group)" @mouseleave="hoveredPairIds = []">
             <header class="home-pair-head">
               <span class="home-tag home-tag--mode">{{ pairingModeLabel(group) }}</span>
               <span class="home-tag">{{ pairingBasisLabel(group) }}</span>
