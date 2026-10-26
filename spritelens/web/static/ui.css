@@ -199,8 +199,41 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { appearance:
 .slot-missing, .slot-unknown { background: var(--panel); }
 .game-box-grid .point-pet { position: relative; }
 .box-navigation-row > .active { border-color: var(--teal); color: var(--teal-dark); background: var(--teal-soft); }
-.pet-team-heading { grid-column: 1 / -1; font-weight: 600; font-size: var(--fs-sm); align-self: end; padding: var(--space-2); color: var(--ink-soft); }
-#pet-grid.game-box-grid:has(.pet-team-heading) { grid-auto-rows: auto; }
+/* 战队分组：每 6 格一组，外面铺一层减淡的矩形渐变，指示“这一组是一队”。 */
+.pet-team-group {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--ink) 4%, transparent);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(158deg, color-mix(in srgb, var(--teal) 6%, transparent), transparent 58%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--panel) 72%, transparent);
+  transition: border-color var(--motion-base) var(--motion-ease), background-color var(--motion-base) var(--motion-ease);
+}
+.pet-team-group.is-active {
+  border-color: color-mix(in srgb, var(--teal) 20%, transparent);
+  background:
+    linear-gradient(158deg, color-mix(in srgb, var(--teal) 9%, transparent), transparent 62%);
+}
+.pet-team-group-head { display: flex; align-items: center; gap: var(--space-2); min-height: 22px; padding: 0 var(--space-1); }
+.pet-team-name { font-size: var(--fs-sm); font-weight: 600; line-height: 1.3; color: var(--ink-soft); }
+.pet-team-name::before {
+  content: ""; display: inline-block; width: 6px; height: 6px; margin-right: var(--space-2);
+  border-radius: 50%; vertical-align: 1px;
+  background: color-mix(in srgb, var(--teal) 55%, var(--muted));
+}
+.pet-team-group.is-active .pet-team-name { color: var(--teal-dark); }
+.pet-team-group.is-active .pet-team-name::before { background: var(--teal); }
+.pet-team-badge {
+  font-size: var(--fs-3xs); font-weight: 600; line-height: 20px;
+  padding: 0 var(--space-3); border-radius: 999px;
+  color: var(--teal-dark); background: var(--teal-soft);
+}
+.pet-team-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--space-2); }
+.pet-team-grid > .point-pet, .pet-team-grid > .pet-box-slot { min-height: var(--pet-height); }
+#pet-grid.game-box-grid:has(> .pet-team-group) { grid-auto-rows: auto; }
 
 /* ══════════ 背包卡片组件：固定行高，头像/标记/蛋组分区，不叠放 ══════════ */
 .point-pet, .point-grid .point-pet.selected { background: var(--surface-1); }
@@ -232,7 +265,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { appearance:
 .point-pet .point-avatar { width: 100%; max-width: 80px; height: var(--pet-portrait); border-radius: 0; background: transparent; font-size: 28px; overflow: visible; }
 .point-avatar img { transition: transform var(--motion-slow) var(--motion-spring); }
 .point-pet:hover .point-avatar img { transform: scale(1.26); }
-.point-markers { position: absolute; left: 50%; transform: translateX(-50%); display: grid; grid-template-columns: 16px 20px; align-items: center; gap: 4px; height: 22px; }
+.point-markers { position: absolute; left: 50%; transform: translateX(-50%); display: grid; grid-template-columns: 18px 18px; align-items: center; gap: 2px; height: 22px; }
 .point-rarity-slot, .point-color-slot { display: flex; align-items: center; justify-content: center; min-width: 0; height: 22px; }
 .point-medals, .point-groups { display: grid; align-content: start; width: 28px; min-width: 0; }
 .point-groups { grid-template-rows: repeat(2, 22px); gap: 2px; padding: 4px 2px 0; }
@@ -255,10 +288,10 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { appearance:
 .pet-medal.has-icon > span { visibility: hidden; }
 .pet-medal img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .point-pet .pet-medal.has-icon { width: var(--pet-medal); height: var(--pet-medal); }
-.point-markers .pet-rarity img { width: 16px; height: 16px; }
+.point-markers .pet-rarity img { width: 18px; height: 18px; }
 .pet-color-card { display: inline-block; position: relative; width: 38px; height: 24px; flex: none; border-radius: var(--radius-sm); overflow: hidden; vertical-align: middle; background: var(--surface-3); }
 .pet-color-card svg, .pet-color-card img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; }
-.point-pet .pet-color-card { width: 20px; height: 15px; border-radius: 4px; }
+.point-pet .pet-color-card { width: 18px; height: 13px; border-radius: 4px; }
 .point-pet .point-name { font-size: calc(var(--pet-name) - 1px); font-weight: 600; line-height: 22px; width: 100%; max-width: 100%; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .point-pet .point-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; gap: 0; padding-top: 5px; border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent); align-self: start; }
 .point-pet .point-metrics > span { display: flex; align-items: baseline; justify-content: center; gap: 0; min-width: 0; white-space: nowrap; }
@@ -279,7 +312,6 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { appearance:
 .point-pet.selected::after { content: none; }
 .pet-grid.point-grid { grid-template-columns: repeat(auto-fill, minmax(136px, 164px)); gap: var(--space-2); padding: var(--space-3); align-content: start; }
 #pet-grid.game-box-grid { grid-template-columns: repeat(6, minmax(136px, 164px)); min-width: 864px; max-width: 1032px; grid-auto-rows: var(--pet-height); gap: var(--space-2); padding: var(--space-3); }
-#pet-grid.game-box-grid:has(.pet-team-heading) .point-pet, #pet-grid.game-box-grid:has(.pet-team-heading) .pet-box-slot { min-height: var(--pet-height); }
 @container backpack (min-width: 948px) {
   .point-grid { --pet-portrait: 80px; --pet-height: 180px; --pet-medal: 30px; --pet-name: 15px; --pet-number: 13px; }
 }
