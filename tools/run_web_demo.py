@@ -163,28 +163,48 @@ def _demo_home() -> HomeRepository:
     repo._account.observe(PlayerIdentity(101384922, "话绵雨", 60))
     ordinary_nest = "70182c0b68100000"
     academy_nest = "65d37b61f2690"
-    father_a = 0x84182c0b68a0000a
-    mother = 0x84182c0b68a0000b
-    father_b = 0x84182c0b68a0000c
+
+    def actor(index: int) -> int:
+        return 0x84182C0B68A00000 + index
+
+    # 三只精灵起家；再补成 9 只、两个小窝、3 个母本，接近真实家园的密度。
+    layout = (
+        # (instance_id, nest_guid, gender, level)
+        (1000, ordinary_nest, 1, 41),
+        (1001, ordinary_nest, 2, 35),
+        (1003, ordinary_nest, 1, 28),
+        (1005, ordinary_nest, 2, 24),
+        (1007, ordinary_nest, 1, 18),
+        (1002, academy_nest, 1, 22),
+        (1004, academy_nest, 2, 30),
+        (1006, academy_nest, 1, 26),
+        (1008, academy_nest, 2, 20),
+    )
+    residents = tuple(
+        HomeResident(actor_id=actor(index), name="", gender=gender, level=level,
+                     position=(index * 40, index * 30, 1), instance_id=instance_id,
+                     nest_guid=nest_guid)
+        for index, (instance_id, nest_guid, gender, level) in enumerate(layout)
+    )
+    ordinary_ids = tuple(row.actor_id for row in residents if row.nest_guid == ordinary_nest)
+    academy_ids = tuple(row.actor_id for row in residents if row.nest_guid == academy_nest)
+    female_ordinary = actor(1)
+    female_ordinary_b = actor(3)
+    female_academy = actor(6)
     repo._snapshot = HomeSnapshot(
         room_level=10,
-        residents=(
-            HomeResident(actor_id=father_a, name="护主犬", gender=1, level=41,
-                         position=(-882, 1284, 61), instance_id=1000, nest_guid=ordinary_nest),
-            HomeResident(actor_id=mother, name="喵喵", gender=2, level=35,
-                         position=(100, 200, 1), instance_id=1001, nest_guid=ordinary_nest),
-            HomeResident(actor_id=father_b, name="火花", gender=1, level=22,
-                         position=(300, 400, 1), instance_id=1002, nest_guid=academy_nest),
-        ),
+        residents=residents,
         nests=(
             HomeFurniture(config_id=710069, guid=ordinary_nest, kind="ordinary",
-                          name="普通小窝", position=(100, 200, 1),
-                          resident_ids=(father_a, mother)),
+                          name="普通小窝", position=(100, 200, 1), resident_ids=ordinary_ids),
             HomeFurniture(config_id=1001072, guid=academy_nest, kind="academy",
-                          name="学院小窝", position=(300, 400, 1),
-                          resident_ids=(father_b,)),
+                          name="学院小窝", position=(300, 400, 1), resident_ids=academy_ids),
         ),
-        couples=(HomeCouple(female_actor_id=mother, male_actor_ids=(father_a, father_b)),),
+        couples=(
+            HomeCouple(female_actor_id=female_ordinary, male_actor_ids=(actor(0), actor(2))),
+            HomeCouple(female_actor_id=female_ordinary_b, male_actor_ids=(actor(0), actor(2))),
+            HomeCouple(female_actor_id=female_academy, male_actor_ids=(actor(5), actor(7))),
+        ),
         scene_eggs=(HomeSceneEgg(actor_id=0x84182c0b68a00010, furniture_guid=academy_nest,
                                  npc_config_id=3001001),),
     )
