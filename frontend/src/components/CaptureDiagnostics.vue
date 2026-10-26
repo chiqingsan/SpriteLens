@@ -238,7 +238,7 @@ defineExpose({ update })
 .capture-option { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 30px; min-width: 0; padding: var(--space-1) var(--space-3); border: 1px solid var(--line); border-radius: 999px; background: color-mix(in srgb, var(--panel) 72%, transparent); color: var(--ink-soft); font-size: var(--fs-xs); cursor: pointer; }
 .capture-option:hover { border-color: var(--teal); }
 .capture-option.is-selected { border-color: var(--teal); background: var(--panel); color: var(--teal-dark); font-weight: 500; box-shadow: 0 1px 2px color-mix(in srgb, var(--teal) 16%, transparent); }
-.capture-option input { flex: none; width: 15px; height: 15px; margin: 0; accent-color: var(--teal); }
+.capture-option input { flex: none; width: 16px; height: 16px; margin: 0; }
 .capture-option:focus-within { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .capture-record-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: 30px; }
 .capture-record-label { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }

@@ -86,7 +86,7 @@
   cursor: pointer;
 }
 
-.breeder-nature-toggle input { width: 15px; height: 15px; accent-color: var(--teal); }
+.breeder-nature-toggle input { width: 16px; height: 16px; }
 
 /* 刷新按钮只留图标，尺寸与工具栏搜索框对齐 */
 .breeder-toolbar > .ghost-button {

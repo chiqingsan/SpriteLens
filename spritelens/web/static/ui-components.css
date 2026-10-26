@@ -143,6 +143,59 @@
 .ui-switch:has(input:checked)::before { background: var(--teal); }
 .ui-switch:has(input:checked)::after { transform: translateX(12px); }
 
+/* 多选框：原生 checkbox 的统一外观（勾选 = 品牌色实底 + 白色对勾） */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--ink) 24%, transparent);
+  border-radius: 5px;
+  background-color: var(--panel);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.6 8.4l2.9 2.9 5.9-6.8' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 0 0;
+  transition: background-color var(--motion-fast) var(--motion-ease),
+              background-size var(--motion-fast) var(--motion-ease),
+              border-color var(--motion-fast) var(--motion-ease);
+  cursor: pointer;
+  vertical-align: middle;
+}
+input[type="checkbox"]:hover {
+  border-color: color-mix(in srgb, var(--ink) 44%, transparent);
+  background-color: var(--surface-1);
+}
+input[type="checkbox"]:checked {
+  border-color: var(--teal);
+  background-color: var(--teal);
+  background-size: 72%;
+}
+input[type="checkbox"]:checked:hover {
+  border-color: var(--teal-dark);
+  background-color: var(--teal-dark);
+}
+input[type="checkbox"]:indeterminate {
+  border-color: var(--teal);
+  background-color: var(--teal);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8h8' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-size: 72%;
+}
+input[type="checkbox"]:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--focus-ring) 62%, transparent);
+  outline-offset: 2px;
+}
+input[type="checkbox"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+input[type="checkbox"]:active {
+  transform: scale(0.94);
+}
+
 /* ══════════ 工具栏 / 分区标题 ══════════ */
 .ui-toolbar {
   display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3);

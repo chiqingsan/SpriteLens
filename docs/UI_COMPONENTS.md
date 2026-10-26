@@ -41,6 +41,7 @@
 | 分段 | `ui-segmented > button`，当前项加 `.is-active` 或 `aria-pressed="true"` | 工具栏单选组（白色药丸滑块） |
 | 徽章 | `ui-chip` + `--accent/--warn/--danger/--muted/--pill`；`ui-dot--ok/warn/bad`；`ui-status` + `--ok/--warn/--bad` | 标签 / 状态点 / 带点状态胶囊 |
 | 表单 | `ui-field` / `ui-label` / `ui-help` / `ui-input` / `ui-select` / `ui-textarea` / `ui-check` / `ui-switch` | 输入、选择、勾选、开关（`:has(input:checked)`） |
+| 多选框 | 原生 `input[type="checkbox"]`（全局统一外观） | 18px 圆角方块；勾选 = 品牌色实底 + 白色对勾；悬停描边加深、聚焦 2px 光环、禁用半透明；页面内紧凑场景可局部设 `16px` |
 | 工具栏 | `ui-toolbar`(`--flush`/`__spacer`) / `ui-section-head` / `ui-kpi` | 面板工具条 / 分区标题 / 指标块 |
 | 空态 | `ui-empty` + `__icon` / `__title` / `__desc` / `__actions` | 图标 + 标题 + 说明 + 一个主操作（禁止只用一行文字当空态） |
 | 提示条 | `ui-banner` + `--info/--warn/--danger` / `__actions` | 页面内提示，错误用 `role="alert"` |
