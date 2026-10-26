@@ -106,18 +106,19 @@
 .collection-controls .collection-refresh { display: grid; place-items: center; width: 34px; padding: 0; }
 .collection-controls .collection-filter-toggle.active { border-color: color-mix(in srgb, var(--teal) 55%, var(--line-soft)); background: var(--teal-soft); color: var(--teal-dark); }
 
-.collection-pager-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex: none;
-  color: var(--muted);
-  font-size: var(--fs-3xs);
-  font-variant-numeric: tabular-nums;
+.collection-pager {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
-.collection-pager-controls .ghost-button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; }
-.collection-pager-controls > span { min-width: 46px; text-align: center; }
+.collection-pager .ui-pager__strip { flex: 0 1 auto; }
+.collection-pager .ui-pager__num { min-width: 26px; height: 26px; padding: 0 var(--space-1); }
+.collection-pager .ui-pager__scroll { width: 22px; height: 26px; }
+.collection-pager .ui-pager__total { display: none; }
 
 /* 状态分段：surface-2 容器 + 白色激活药丸，替代旧版实底深绿 */
 .collection-tabs {
@@ -647,7 +648,6 @@
   .collection-overview { flex: 0 1 auto; }
   .collection-controls { flex: 1 1 auto; justify-content: flex-end; }
   .collection-search { flex: 1 1 140px; width: auto; min-width: 120px; }
-  .collection-pager-controls > span { min-width: 38px; }
   .collection-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 

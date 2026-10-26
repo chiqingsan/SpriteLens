@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { collectionGoals, useCollectionLines, type CollectionHost } from '../composables/useCollectionLines'
 import type { CollectionLine } from '../types/collectionLines'
 import PageShell from '../components/PageShell.vue'
+import PagePager from '../components/PagePager.vue'
 import UiIcon from '../components/UiIcon.vue'
 import CollectionParentCard from '../components/CollectionParentCard.vue'
 import './collection-lines.css'
@@ -110,7 +111,7 @@ defineExpose({ load, pause, resetAccount })
           <label class="collection-search"><UiIcon name="search" /><input v-model="keyword" type="search" placeholder="搜索精灵 / 图鉴编号" aria-label="搜索进化链"></label>
           <button class="ghost-button small collection-filter-toggle" :class="{ active: filtersOpen && isNarrow }" :aria-expanded="isNarrow ? filtersOpen : undefined" @click="showFilters"><UiIcon name="adjustments" /><span>筛选条件</span></button>
           <button class="ghost-button small collection-refresh" :disabled="loading" aria-label="刷新产线记录" title="刷新记录" @click="model.load"><UiIcon name="refresh" /></button>
-          <div class="collection-pager-controls" aria-label="产线翻页"><button class="ghost-button small" :disabled="page === 1" aria-label="上一页" @click="page--"><UiIcon name="chevron-left" /></button><span>{{ page }} / {{ pages }}</span><button class="ghost-button small" :disabled="page === pages" aria-label="下一页" @click="page++"><UiIcon name="chevron-right" /></button></div>
+          <PagePager class="collection-pager" :page="page" :pages="pages" :page-size="24" unit="条" label="产线页码" @update:page="page = $event" />
         </div>
       </template>
     <div class="collection-body">
