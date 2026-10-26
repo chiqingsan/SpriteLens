@@ -669,6 +669,21 @@
 }
 
 /* 母本—父本连线图：左母本，右父本，支线颜色区分配对 */
+.home-tag {
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.home-tag--mode {
+  background: color-mix(in srgb, var(--teal-soft) 72%, var(--panel));
+  color: var(--teal-deep);
+}
+
 .home-pair-diagram {
   display: grid;
   grid-template-columns: 84px minmax(0, 1fr);
@@ -761,9 +776,10 @@
 .home-pair-father {
   position: relative;
   display: inline-flex;
+  align-self: flex-start;
   align-items: center;
   gap: 6px;
-  min-width: 0;
+  max-width: 100%;
   min-height: 30px;
   padding: 2px 10px 2px 2px;
   border: 1px solid color-mix(in srgb, var(--pair-color) 24%, var(--hairline));
