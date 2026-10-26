@@ -508,25 +508,10 @@ body, .app-shell, .sidebar, .main-shell, .topbar, .content-panel, .filter-rail,
 .page:not(.active):not(.page-cached) { display: none !important; }
 .page.page-cached { display: block; min-height: 0; visibility: hidden; pointer-events: none; }
 .page.page-cached.active { visibility: visible; pointer-events: auto; }
-/* 换页入场（由 app.js 在切换时短暂加 page-enter 类，避免缓存页反复播放） */
+/* 换页入场（由 app.js 在首次进入某页时短暂加 page-enter 类；缓存页切回不重播）。
+   只保留整页级淡入：单张卡片级 opacity/transform 动画会同时拉起几十个合成层，
+   低端 GPU/WebView2 下切页掉帧，而且只有真正渲染了卡片的行会动、空格行不动。 */
 .page.page-enter { animation: page-in var(--motion-base) var(--motion-ease) both; }
-/* 换页级联：内容卡片轻量错峰入场，只在换页窗口内播放，数据更新不重播 */
-.page.page-enter :is(.point-pet, .hb-card, .dex-browser-card) {
-  animation: item-in var(--motion-slow) var(--motion-ease) backwards;
-  animation-delay: var(--stagger, 0ms);
-}
-.page.page-enter :is(.point-pet, .hb-card, .dex-browser-card):nth-child(1) { --stagger: 0ms; }
-.page.page-enter :is(.point-pet, .hb-card, .dex-browser-card):nth-child(2) { --stagger: 14ms; }
-.page.page-enter :is(.point-pet, .hb-card, .dex-browser-card):nth-child(3) { --stagger: 28ms; }
-.page.page-enter :is(.point-pet, .hb-card, .dex-browser-card):nth-child(4) { --stagger: 42ms; }
-.page.page-enter :is(.point-pet, .hb-card, .dex-browser-card):nth-child(5) { --stagger: 56ms; }
-.page.page-enter :is(.point-pet, .hb-card, .dex-browser-card):nth-child(6) { --stagger: 70ms; }
-.page.page-enter :is(.point-pet, .hb-card, .dex-browser-card):nth-child(7) { --stagger: 84ms; }
-.page.page-enter :is(.point-pet, .hb-card, .dex-browser-card):nth-child(8) { --stagger: 98ms; }
-.page.page-enter :is(.point-pet, .hb-card, .dex-browser-card):nth-child(9) { --stagger: 112ms; }
-.page.page-enter :is(.point-pet, .hb-card, .dex-browser-card):nth-child(10) { --stagger: 126ms; }
-.page.page-enter :is(.point-pet, .hb-card, .dex-browser-card):nth-child(11) { --stagger: 140ms; }
-.page.page-enter :is(.point-pet, .hb-card, .dex-browser-card):nth-child(12) { --stagger: 154ms; }
 
 .page .workspace.split { display: grid; grid-template-columns: 236px minmax(0, 1fr) 316px; gap: var(--space-4); align-items: start; }
 /* 背包右侧筛选与详情共用一列，查看详情不改变网格宽度。 */
@@ -980,10 +965,6 @@ dialog[open] { animation: modal-in var(--motion-slow) var(--motion-spring) both;
   to { opacity: 1; transform: none; }
 }
 
-@keyframes item-in {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: none; }
-}
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modal-in {
   from { opacity: 0; transform: translateY(14px) scale(.97); }
