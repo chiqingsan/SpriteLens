@@ -17,8 +17,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-6);
-  padding: var(--space-6) var(--space-8);
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-7);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-xl);
   overflow: hidden;
@@ -47,6 +47,15 @@
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+}
+
+.home-hero-aside {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  margin-left: auto;
 }
 
 .home-hero-eyebrow {
@@ -424,7 +433,7 @@
   line-height: 18px;
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--panel) 82%, transparent);
-  font-size: 11px;
+  font-size: var(--fs-3xs);
   font-weight: 600;
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
@@ -969,31 +978,16 @@
     linear-gradient(165deg, color-mix(in srgb, var(--teal-soft) 82%, var(--panel)), color-mix(in srgb, var(--teal-soft) 32%, var(--panel)));
 }
 
-.home-sprite-card.is-academy .home-sprite-level {
-  background: color-mix(in srgb, var(--teal) 86%, var(--panel));
-  color: var(--on-accent);
-}
-
-.home-sprite-academy {
-  position: absolute;
-  left: 10px;
-  bottom: 7px;
-  z-index: 1;
+.home-academy-chip {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  height: 20px;
-  padding: 0 7px;
+  height: 18px;
+  padding: 0 6px;
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--teal) 92%, var(--panel));
-  color: var(--on-accent);
-  font-size: 10px;
+  background: color-mix(in srgb, var(--teal) 12%, var(--panel));
+  color: var(--teal-deep);
+  font-size: var(--fs-3xs);
   font-weight: 600;
-}
-
-.home-sprite-academy .ui-icon {
-  width: 11px;
-  height: 11px;
 }
 
 .home-sprite-card.is-academy .home-nature-chip {
@@ -1149,14 +1143,26 @@
 
 @container (max-width: 900px) {
   .home-hero {
-    align-items: flex-start;
-    padding-right: 130px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-4);
+    padding-right: var(--space-6);
+  }
+
+  .home-hero-copy {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .home-hero-aside {
+    display: contents;
   }
 
   .home-hero-level {
-    position: absolute;
-    top: var(--space-5);
-    right: var(--space-5);
+    position: relative;
+    grid-column: 2;
+    grid-row: 1;
     width: 92px;
     height: 92px;
   }
@@ -1167,6 +1173,16 @@
 
   .home-hero-level span {
     font-size: 10.5px;
+  }
+
+  .home-hero-meta {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .home-hero-actions {
+    grid-column: 1 / -1;
+    grid-row: 3;
   }
 }
 
@@ -1207,5 +1223,83 @@
 
   .home-section-head {
     align-items: flex-start;
+  }
+}
+
+
+/* 小窝一览（填补左栏余下空间） */
+.home-nests {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--hairline);
+}
+
+.home-nests-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.home-nests-head h2 {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.home-nest-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.home-nest-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--ink-soft);
+  font-size: var(--fs-3xs);
+}
+
+.home-nest-chip .ui-icon {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  color: var(--muted);
+}
+
+.home-nest-chip-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-nest-chip b {
+  margin-left: auto;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.home-nest-chip-kind {
+  flex: none;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--teal) 12%, var(--panel));
+  color: var(--teal-deep);
+  font-size: 11px;
+}
+
+@media (max-width: 1180px) {
+  .home-nest-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

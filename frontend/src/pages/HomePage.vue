@@ -17,6 +17,16 @@ const nests = computed(() => model.data.value?.nests || [])
 const roomLevel = computed(() => model.data.value?.room_level || 0)
 const sceneEggCount = computed(() => model.data.value?.scene_eggs.length || 0)
 const couplesStale = computed(() => Boolean(model.data.value?.couples_stale))
+const nestRows = computed(() => nests.value.map((nest) => {
+  const residents = homeSprites.value.filter((resident) => resident.nest_guid === nest.guid)
+  return {
+    guid: nest.guid,
+    name: nest.name || (nest.kind === 'academy' ? '学院绿窝' : '普通小窝'),
+    kind: nest.kind,
+    count: residents.length,
+    residentNames: residents.map((resident) => resident.name).join('、'),
+  }
+}))
 const academyResidentIds = computed(() => {
   const ids = new Set<string>()
   nests.value.forEach(nest => {
@@ -188,21 +198,23 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
             {{ couplesStale ? '配对关系待刷新' : '快照已同步' }}
           </span>
         </p>
+      </div>
+      <div class="home-hero-aside">
         <div class="home-hero-meta">
           <span class="home-meta-item"><UiIcon name="users" /><b>{{ homeSprites.length }}</b>精灵</span>
           <span class="home-meta-item"><UiIcon name="home" /><b>{{ nests.length }}</b>小窝</span>
           <span class="home-meta-item"><UiIcon name="arrows-shuffle" /><b>{{ pairingGroups.length }}</b>母本</span>
           <span class="home-meta-item"><UiIcon name="egg" /><b>{{ sceneEggCount }}</b>场景蛋</span>
         </div>
+        <div class="home-hero-level" :title="`房间等级 ${roomLevel}`" :aria-label="`房间等级 ${roomLevel}`">
+          <span>房间等级</span>
+          <strong>{{ roomLevel || '—' }}</strong>
+        </div>
         <div class="home-hero-actions">
           <button type="button" class="home-ghost-button" :disabled="model.loading.value" @click="model.load()">
             <UiIcon name="refresh" />{{ model.loading.value ? '读取中…' : '刷新快照' }}
           </button>
         </div>
-      </div>
-      <div class="home-hero-level" :title="`房间等级 ${roomLevel}`" :aria-label="`房间等级 ${roomLevel}`">
-        <span>房间等级</span>
-        <strong>{{ roomLevel || '—' }}</strong>
       </div>
     </section>
 
@@ -246,9 +258,6 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
               <span v-else class="home-sprite-fallback">{{ genderLabel(resident.gender) }}</span>
               <img v-if="rarityIconUrl(resident)" class="home-sprite-rarity" :src="rarityIconUrl(resident)"
                 :alt="resident.is_colorful ? '异色炫彩' : '异色'" :title="resident.is_colorful ? '异色炫彩' : '异色'" draggable="false">
-              <span v-if="isAcademy(resident)" class="home-sprite-academy" title="学院绿窝精灵">
-                <UiIcon name="graduation-cap" />学院
-              </span>
             </div>
             <div class="home-sprite-body">
               <div class="home-sprite-title">
@@ -260,6 +269,7 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
               <div class="home-sprite-meta">
                 <span v-if="speciesLabel(resident)" class="home-sprite-species">{{ speciesLabel(resident) }}</span>
                 <span v-if="resident.nature_name" class="home-nature-chip">{{ resident.nature_name }}</span>
+                <span v-if="isAcademy(resident)" class="home-academy-chip">学院</span>
                 <img v-for="mark in portraitMedals(resident)" :key="mark.name" class="home-medal-icon"
                   :src="`/static/medal-icons/${medalIds[mark.name]}.webp`" :alt="mark.name" :title="mark.name" draggable="false">
               </div>
@@ -284,6 +294,21 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
             </div>
           </article>
         </div>
+
+        <section v-if="nestRows.length" class="home-nests" aria-labelledby="home-nests-title">
+          <header class="home-nests-head">
+            <h2 id="home-nests-title">小窝一览</h2>
+            <span class="home-count">{{ nestRows.length }} 个</span>
+          </header>
+          <div class="home-nest-grid">
+            <span v-for="row in nestRows" :key="row.guid" class="home-nest-chip" :title="row.residentNames || '空小窝'">
+              <UiIcon name="home" />
+              <span class="home-nest-chip-name">{{ row.name }}</span>
+              <b>{{ row.count }}</b>
+              <span v-if="row.kind === 'academy'" class="home-nest-chip-kind">学院</span>
+            </span>
+          </div>
+        </section>
       </section>
 
       <aside class="home-side">
