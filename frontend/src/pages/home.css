@@ -77,16 +77,7 @@
   min-width: 0;
 }
 
-.home-group-toggle {
-  height: 30px;
-  padding: 2px;
-}
 
-.home-group-toggle button {
-  height: 24px;
-  padding: 0 10px;
-  font-size: var(--fs-3xs);
-}
 
 .home-sort {
   height: 30px;
@@ -338,72 +329,6 @@
   border: 1px solid var(--amber-line);
   background: var(--amber-soft);
   color: var(--amber-ink);
-}
-
-/* ── 按小窝分组 ── */
-.home-nest-sections {
-  display: grid;
-  gap: var(--space-3);
-  min-width: 0;
-}
-
-.home-nest-section {
-  display: grid;
-  gap: var(--space-2);
-  min-width: 0;
-  padding: var(--space-2) var(--space-3) var(--space-3);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--surface-1) 62%, var(--panel));
-}
-
-.home-nest-section--academy {
-  border-color: color-mix(in srgb, var(--teal-bright) 26%, var(--hairline));
-  background: color-mix(in srgb, var(--teal-soft) 20%, var(--panel));
-}
-
-.home-nest-heading {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.home-nest-mark {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 22px;
-  height: 22px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--teal-dark);
-}
-
-.home-nest-mark .ui-icon {
-  width: 13px;
-  height: 13px;
-}
-
-.home-nest-section--academy .home-nest-mark {
-  background: color-mix(in srgb, var(--teal-soft) 68%, var(--panel));
-}
-
-.home-nest-heading strong {
-  overflow: hidden;
-  color: var(--ink);
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.home-nest-count {
-  flex: none;
-  margin-left: auto;
-  color: var(--muted);
-  font-size: var(--fs-3xs);
-  font-variant-numeric: tabular-nums;
 }
 
 /* ── 家园精灵卡 ── */

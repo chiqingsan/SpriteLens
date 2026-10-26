@@ -3,7 +3,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { useHome, type HomeHost } from '../composables/useHome'
 import PageShell from '../components/PageShell.vue'
 import UiIcon from '../components/UiIcon.vue'
-import type { HomeCouple, HomeNest, HomeResident } from '../types/home'
+import type { HomeCouple, HomeResident } from '../types/home'
 import './home.css'
 
 const props = defineProps<{ host: HomeHost }>()
@@ -16,14 +16,8 @@ const homeCouples = computed(() => model.data.value?.couples || [])
 const nests = computed(() => model.data.value?.nests || [])
 const sceneEggCount = computed(() => model.data.value?.scene_eggs.length || 0)
 const couplesStale = computed(() => Boolean(model.data.value?.couples_stale))
-const groupMode = ref<'nest' | 'all'>('nest')
 const sortMode = ref<'level' | 'nature' | 'name'>('level')
 const searchText = ref('')
-const nestIndex = computed(() => {
-  const index = new Map<string, HomeNest>()
-  nests.value.forEach(nest => index.set(nest.guid, nest))
-  return index
-})
 const pairingGroups = computed(() => {
   const groups = new Map<string, HomeCouple[]>()
   homeCouples.value.forEach(couple => groups.set(couple.female_actor_id,
@@ -48,24 +42,6 @@ const filteredSprites = computed(() => {
     sorted.sort((left, right) => right.level - left.level || byName(left, right))
   }
   return sorted
-})
-const nestSections = computed(() => {
-  const buckets = new Map<string, { guid: string; name: string; kind: string; residents: HomeResident[] }>()
-  filteredSprites.value.forEach(resident => {
-    const nest = resident.nest_guid ? nestIndex.value.get(resident.nest_guid) : undefined
-    const key = nest ? nest.guid : ''
-    const bucket = buckets.get(key) ?? {
-      guid: key,
-      name: nest?.name || '未归入小窝',
-      kind: nest?.kind || '',
-      residents: [],
-    }
-    bucket.residents.push(resident)
-    buckets.set(key, bucket)
-  })
-  return [...buckets.values()].sort((left, right) =>
-    Number(right.kind === 'academy') - Number(left.kind === 'academy')
-    || left.name.localeCompare(right.name, 'zh-Hans-CN'))
 })
 watch(() => model.data.value?.uid, () => {
   failedImages.value = new Set()
@@ -217,10 +193,6 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
           </span>
         </div>
         <div class="home-tools">
-          <div class="ui-segmented home-group-toggle" role="group" aria-label="精灵分组">
-            <button type="button" :aria-pressed="groupMode === 'nest'" @click="groupMode = 'nest'">按小窝</button>
-            <button type="button" :aria-pressed="groupMode === 'all'" @click="groupMode = 'all'">全部</button>
-          </div>
           <select v-model="sortMode" class="home-sort" aria-label="精灵排序">
             <option value="level">等级优先</option>
             <option value="nature">按性格</option>
@@ -256,69 +228,13 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
             <h2>家园精灵</h2>
             <span class="home-count">{{ filteredSprites.length }}<template v-if="filteredSprites.length !== homeSprites.length"> / {{ homeSprites.length }}</template> 只</span>
           </div>
-          <span class="home-panel-hint">{{ groupMode === 'nest' ? '按小窝分组' : '按快照顺序' }}</span>
+          <span class="home-panel-hint">按快照顺序</span>
         </header>
 
         <div v-if="!filteredSprites.length" class="home-empty-inline">
           <strong>{{ homeSprites.length ? '没有匹配的精灵' : '当前快照没有家园精灵记录' }}</strong>
           <p v-if="homeSprites.length">换个关键词，或清空搜索再看。</p>
           <p v-else>进入家园并等待场景快照更新后再查看。</p>
-        </div>
-
-        <div v-else-if="groupMode === 'nest'" class="home-nest-sections">
-          <section v-for="section in nestSections" :key="section.guid || 'none'" class="home-nest-section"
-            :class="`home-nest-section--${section.kind || 'none'}`">
-            <header class="home-nest-heading">
-              <span class="home-nest-mark">
-                <UiIcon :name="section.kind === 'academy' ? 'graduation-cap' : 'home'" />
-              </span>
-              <strong>{{ section.name }}</strong>
-              <span class="home-nest-count">{{ section.residents.length }} 只</span>
-            </header>
-            <div class="home-resident-grid">
-              <article v-for="resident in section.residents" :key="resident.actor_id" class="home-resident-card"
-                :class="`gender-${resident.gender}`">
-                <div class="home-portrait">
-                  <img v-if="resident.icon_url && !failedImages.has(resident.actor_id)" class="home-resident-image"
-                    :src="resident.icon_url" alt="" loading="lazy" draggable="false" @error="failedImage(resident.actor_id)">
-                  <span v-else class="home-portrait-fallback">{{ genderLabel(resident.gender) }}</span>
-                </div>
-                <div class="home-resident-main">
-                  <div class="home-resident-title">
-                    <strong>{{ resident.name }}</strong>
-                    <span class="home-gender-dot" :class="`gender-${resident.gender}`" :title="genderLabel(resident.gender)" />
-                    <img v-if="rarityIconUrl(resident)" class="home-rarity-icon" :src="rarityIconUrl(resident)"
-                      :alt="resident.is_colorful ? '异色炫彩' : '异色'" :title="resident.is_colorful ? '异色炫彩' : '异色'" draggable="false">
-                    <span class="home-level">Lv.{{ resident.level }}</span>
-                  </div>
-                  <div class="home-resident-meta">
-                    <span v-if="speciesLabel(resident)" class="home-resident-species">{{ speciesLabel(resident) }}</span>
-                    <span v-if="resident.nature_name" class="home-nature-chip">{{ resident.nature_name }}</span>
-                    <img v-for="mark in portraitMedals(resident)" :key="mark.name" class="home-medal-icon"
-                      :src="`/static/medal-icons/${medalIds[mark.name]}.webp`" :alt="mark.name" :title="mark.name" draggable="false">
-                  </div>
-                  <div class="home-metrics">
-                    <span class="home-metric" :class="{ unknown: resident.height_pct === null }">
-                      <span class="home-metric-label"><UiIcon name="ruler-2" />身高</span>
-                      <span class="home-metric-value">{{ compactMeasure(resident.height_text) || measurementPercent(resident.height_pct) }}</span>
-                      <i class="home-metric-track"><b :style="{ width: ratioStyle(resident.height_pct) }"></b></i>
-                    </span>
-                    <span class="home-metric" :class="{ unknown: resident.weight_pct === null }">
-                      <span class="home-metric-label"><UiIcon name="weight" />体重</span>
-                      <span class="home-metric-value">{{ compactMeasure(resident.weight_text) || measurementPercent(resident.weight_pct) }}</span>
-                      <i class="home-metric-track"><b :style="{ width: ratioStyle(resident.weight_pct) }"></b></i>
-                    </span>
-                    <span class="home-metric" :class="{ unknown: resident.voice === null }"
-                      :title="resident.voice === null ? '声音刻度 −100 至 100 dB' : `声音刻度 −100 至 100 dB；当前 ${resident.voice} dB`">
-                      <span class="home-metric-label"><UiIcon name="activity" />声音</span>
-                      <span class="home-metric-value">{{ resident.voice === null ? '—' : `${resident.voice}dB` }}</span>
-                      <i class="home-metric-track"><b :style="{ width: ratioStyle(voiceRatio(resident)) }"></b></i>
-                    </span>
-                  </div>
-                </div>
-              </article>
-            </div>
-          </section>
         </div>
 
         <div v-else class="home-resident-grid">
