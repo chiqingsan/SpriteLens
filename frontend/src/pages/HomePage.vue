@@ -125,26 +125,10 @@ function voiceRangeText(group: HomeCouple[]) {
   return low === high ? `${low} dB` : `${low}~${high} dB`
 }
 
-function startFatherDrag(event: PointerEvent) {
-  if (event.button !== 0) return
-  const row = event.currentTarget as HTMLElement
-  event.preventDefault()
-  row.setPointerCapture(event.pointerId)
-  row.dataset.dragStartX = String(event.clientX)
-  row.dataset.dragStartScroll = String(row.scrollLeft)
-  row.classList.add('dragging')
-}
+const pairPalette = ['var(--teal-deep)', 'var(--amber-ink)', 'var(--male-ink)', 'var(--female-ink)']
 
-function moveFatherDrag(event: PointerEvent) {
-  const row = event.currentTarget as HTMLElement
-  if (!row.hasPointerCapture(event.pointerId)) return
-  row.scrollLeft = Number(row.dataset.dragStartScroll) - (event.clientX - Number(row.dataset.dragStartX))
-}
-
-function stopFatherDrag(event: PointerEvent) {
-  const row = event.currentTarget as HTMLElement
-  if (row.hasPointerCapture(event.pointerId)) row.releasePointerCapture(event.pointerId)
-  row.classList.remove('dragging')
+function pairColor(index: number) {
+  return pairPalette[index % pairPalette.length]
 }
 
 function naturePredictionRows(couple: HomeCouple) {
@@ -330,27 +314,27 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
           <article v-for="(group, groupIndex) in pairingGroups" :key="groupIndex" class="home-pair-card"
             :class="{ 'home-pair-card--academy': group.some(couple => couple.mode !== 'ordinary') }">
             <header class="home-pair-head">
-              <span class="home-pair-avatar">
-                <img v-if="residentFor(group[0].female_actor_id)?.icon_url"
-                  :src="residentFor(group[0].female_actor_id)?.icon_url" alt="">
-                <span v-else>♀</span>
-              </span>
-              <div class="home-pair-title">
-                <strong>{{ group[0].female_name }}</strong>
-                <span class="home-pair-tags">
-                  <span class="home-tag home-tag--mode">{{ pairingModeLabel(group) }}</span>
-                  <span class="home-tag">{{ pairingBasisLabel(group) }}</span>
-                </span>
-              </div>
+              <span class="home-tag home-tag--mode">{{ pairingModeLabel(group) }}</span>
+              <span class="home-tag">{{ pairingBasisLabel(group) }}</span>
             </header>
-            <div class="home-pair-fathers">
-              <span class="home-pair-label">父本</span>
-              <div class="home-father-strip" @pointerdown="startFatherDrag" @pointermove="moveFatherDrag"
-                @pointerup="stopFatherDrag" @pointercancel="stopFatherDrag" @lostpointercapture="stopFatherDrag">
-                <span v-for="father in fathersFor(group)" :key="father.actorId" class="home-father" :title="father.name">
-                  <img v-if="residentFor(father.actorId)?.icon_url" :src="residentFor(father.actorId)?.icon_url" alt="">
-                  <span v-else class="home-father-fallback">♂</span>
-                  <span class="home-father-name">{{ father.name }}</span>
+            <div class="home-pair-diagram" :style="{ '--pair-color': pairColor(groupIndex) }">
+              <div class="home-pair-mother">
+                <span class="home-pair-avatar">
+                  <img v-if="residentFor(group[0].female_actor_id)?.icon_url"
+                    :src="residentFor(group[0].female_actor_id)?.icon_url" alt="">
+                  <span v-else>♀</span>
+                </span>
+                <span class="home-pair-mother-name">{{ group[0].female_name }}</span>
+                <span class="home-pair-role-label">母本</span>
+              </div>
+              <div class="home-pair-branch">
+                <span v-for="father in fathersFor(group)" :key="father.actorId" class="home-pair-father" :title="father.name">
+                  <span class="home-pair-father-avatar">
+                    <img v-if="residentFor(father.actorId)?.icon_url" :src="residentFor(father.actorId)?.icon_url" alt="">
+                    <span v-else>♂</span>
+                  </span>
+                  <span class="home-pair-father-name">{{ father.name }}</span>
+                  <span class="home-pair-father-role">父本</span>
                 </span>
                 <span v-if="!fathersFor(group).length" class="home-couple-missing">父本尚未识别</span>
               </div>
