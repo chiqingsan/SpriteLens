@@ -320,66 +320,10 @@
   font-variant-numeric: tabular-nums;
 }
 
-.home-section-tools {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.home-sort {
-  height: 30px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-xs);
-  background: var(--panel);
-  color: var(--ink-soft);
-  font-size: var(--fs-xs);
-  cursor: pointer;
-}
-
-.home-sort:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 1px;
-}
-
-.home-search {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-pill);
-  background: var(--field-bg);
-  color: var(--muted);
-}
-
-.home-search:focus-within {
-  border-color: color-mix(in srgb, var(--teal) 45%, var(--hairline));
-}
-
-.home-search .ui-icon {
-  width: 14px;
-  height: 14px;
-}
-
-.home-search input {
-  width: 150px;
-  border: none;
-  background: transparent;
-  color: var(--ink);
-  font-size: var(--fs-xs);
-  outline: none;
-}
-
-.home-search input::placeholder {
-  color: var(--muted-2);
-}
-
 /* 精灵卡片网格 */
 .home-sprite-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(212px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
   gap: var(--space-3);
 }
 
@@ -432,7 +376,7 @@
   position: relative;
   display: grid;
   place-items: center;
-  height: 108px;
+  height: 88px;
   background:
     radial-gradient(58% 62% at 50% 44%, color-mix(in srgb, var(--gender-soft, var(--surface-2)) 78%, transparent), transparent 72%),
     linear-gradient(
@@ -455,8 +399,8 @@
 }
 
 .home-sprite-image {
-  width: 84px;
-  height: 84px;
+  width: 72px;
+  height: 72px;
   object-fit: contain;
   transform: translateY(2px);
   filter: drop-shadow(0 8px 10px color-mix(in srgb, var(--ink) 15%, transparent));
@@ -474,11 +418,10 @@
 }
 
 .home-sprite-level {
-  position: absolute;
-  top: 8px;
-  left: 10px;
-  z-index: 1;
-  padding: 1px 7px;
+  flex: none;
+  margin-left: auto;
+  padding: 0 6px;
+  line-height: 18px;
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--panel) 82%, transparent);
   font-size: 11px;
@@ -500,8 +443,8 @@
 .home-sprite-body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: var(--space-3) var(--space-4) var(--space-4);
+  gap: 5px;
+  padding: 9px 12px 11px;
 }
 
 .home-sprite-title {
@@ -521,23 +464,18 @@
   color: var(--ink);
 }
 
-.home-gender-dot {
+.home-gender-mark {
   flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  width: 14px;
+  height: 14px;
 }
 
-.home-gender-dot.gender-1 {
-  background: var(--male-strong);
+.home-sprite-card.gender-1 .home-gender-mark {
+  color: var(--male-strong);
 }
 
-.home-gender-dot.gender-2 {
-  background: var(--female-strong);
-}
-
-.home-gender-dot.gender-0 {
-  background: var(--muted-2);
+.home-sprite-card.gender-2 .home-gender-mark {
+  color: var(--female-strong);
 }
 
 .home-sprite-meta {
@@ -614,8 +552,8 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
@@ -627,7 +565,7 @@
 
 .home-sprite-metric-track {
   display: block;
-  height: 2px;
+  height: 3px;
   overflow: hidden;
   border-radius: var(--radius-pill);
   background: var(--surface-3);
@@ -668,7 +606,26 @@
 }
 
 .home-pair-card--academy {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--teal-soft) 34%, var(--panel)), var(--panel) 72%);
+  position: relative;
+  padding-left: calc(var(--space-4) + 6px);
+  border-color: color-mix(in srgb, var(--teal) 46%, var(--hairline));
+  background: linear-gradient(155deg, color-mix(in srgb, var(--teal-soft) 78%, var(--panel)), color-mix(in srgb, var(--teal-soft) 28%, var(--panel)) 58%, var(--panel));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--teal) 14%, transparent);
+}
+
+.home-pair-card--academy::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  background: linear-gradient(180deg, var(--teal), var(--teal-bright));
+}
+
+.home-pair-card--academy .home-pair-avatar {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--teal) 42%, transparent);
 }
 
 .home-pair-head {
@@ -692,6 +649,20 @@
 .home-tag--mode {
   background: color-mix(in srgb, var(--teal-soft) 72%, var(--panel));
   color: var(--teal-deep);
+}
+
+.home-tag--mode.is-academy {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: color-mix(in srgb, var(--teal) 90%, var(--panel));
+  color: var(--white);
+  font-weight: 600;
+}
+
+.home-tag--mode.is-academy .ui-icon {
+  width: 10px;
+  height: 10px;
 }
 
 .home-pair-diagram {
@@ -1222,12 +1193,12 @@
   }
 
   .home-sprite-art {
-    height: 96px;
+    height: 84px;
   }
 
   .home-sprite-image {
-    width: 72px;
-    height: 72px;
+    width: 64px;
+    height: 64px;
   }
 
   .home-pairing-grid {
@@ -1236,9 +1207,5 @@
 
   .home-section-head {
     align-items: flex-start;
-  }
-
-  .home-search input {
-    width: 110px;
   }
 }

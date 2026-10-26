@@ -29,8 +29,6 @@ function isAcademy(resident: HomeResident) {
   if (academyResidentIds.value.has(String(resident.actor_id))) return true
   return nests.value.some(nest => nest.kind === 'academy' && nest.guid === resident.nest_guid)
 }
-const sortMode = ref<'level' | 'nature' | 'name'>('level')
-const searchText = ref('')
 const hoveredSprite = ref('')
 const hoveredPairIds = ref<string[]>([])
 function pairMemberIds(group: HomeCouple[]) {
@@ -53,23 +51,6 @@ const pairingGroups = computed(() => {
   return [...groups.values()].sort((left, right) =>
     Number(right.some(couple => couple.mode !== 'ordinary'))
     - Number(left.some(couple => couple.mode !== 'ordinary')))
-})
-const filteredSprites = computed(() => {
-  const query = searchText.value.toLowerCase()
-  const rows = homeSprites.value.filter(resident => !query
-    || [resident.name, resident.species_name, resident.nature_name]
-      .some(text => (text || '').toLowerCase().includes(query)))
-  const sorted = [...rows]
-  const byName = (left: HomeResident, right: HomeResident) =>
-    left.name.localeCompare(right.name, 'zh-Hans-CN')
-  if (sortMode.value === 'name') sorted.sort(byName)
-  else if (sortMode.value === 'nature') {
-    sorted.sort((left, right) => (left.nature_name || '')
-      .localeCompare(right.nature_name || '', 'zh-Hans-CN') || byName(left, right))
-  } else {
-    sorted.sort((left, right) => right.level - left.level || byName(left, right))
-  }
-  return sorted
 })
 watch(() => model.data.value?.uid, () => {
   failedImages.value = new Set()
@@ -246,36 +227,23 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
         <header class="home-section-head">
           <div class="home-section-title">
             <h2 id="home-sprites-title">家园精灵</h2>
-            <span class="home-count">{{ filteredSprites.length }}<template v-if="filteredSprites.length !== homeSprites.length"> / {{ homeSprites.length }}</template> 只</span>
-          </div>
-          <div class="home-section-tools">
-            <select v-model="sortMode" class="home-sort" aria-label="精灵排序">
-              <option value="level">等级优先</option>
-              <option value="nature">按性格</option>
-              <option value="name">按名字</option>
-            </select>
-            <label class="home-search">
-              <UiIcon name="search" />
-              <input v-model.trim="searchText" type="search" placeholder="搜索精灵" aria-label="搜索家园精灵">
-            </label>
+            <span class="home-count">{{ homeSprites.length }} 只</span>
           </div>
         </header>
 
-        <div v-if="!filteredSprites.length" class="home-empty-inline">
-          <strong>{{ homeSprites.length ? '没有匹配的精灵' : '当前快照没有家园精灵记录' }}</strong>
-          <p v-if="homeSprites.length">换个关键词，或清空搜索再看。</p>
-          <p v-else>进入家园并等待场景快照更新后再查看。</p>
+        <div v-if="!homeSprites.length" class="home-empty-inline">
+          <strong>当前快照没有家园精灵记录</strong>
+          <p>进入家园并等待场景快照更新后再查看。</p>
         </div>
 
         <div v-else class="home-sprite-grid">
-          <article v-for="resident in filteredSprites" :key="resident.actor_id" class="home-sprite-card"
+          <article v-for="resident in homeSprites" :key="resident.actor_id" class="home-sprite-card"
             :class="[`gender-${resident.gender}`, { 'is-academy': isAcademy(resident), 'is-linked': hoveredPairIds.includes(resident.actor_id) }]"
             @mouseenter="hoveredSprite = resident.actor_id" @mouseleave="hoveredSprite = ''">
             <div class="home-sprite-art">
               <img v-if="resident.icon_url && !failedImages.has(resident.actor_id)" class="home-sprite-image"
                 :src="resident.icon_url" alt="" loading="lazy" draggable="false" @error="failedImage(resident.actor_id)">
               <span v-else class="home-sprite-fallback">{{ genderLabel(resident.gender) }}</span>
-              <span class="home-sprite-level">Lv.{{ resident.level }}</span>
               <img v-if="rarityIconUrl(resident)" class="home-sprite-rarity" :src="rarityIconUrl(resident)"
                 :alt="resident.is_colorful ? '异色炫彩' : '异色'" :title="resident.is_colorful ? '异色炫彩' : '异色'" draggable="false">
               <span v-if="isAcademy(resident)" class="home-sprite-academy" title="学院绿窝精灵">
@@ -285,7 +253,9 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
             <div class="home-sprite-body">
               <div class="home-sprite-title">
                 <strong>{{ resident.name }}</strong>
-                <span class="home-gender-dot" :class="`gender-${resident.gender}`" :title="genderLabel(resident.gender)" />
+                <span class="home-sprite-level">Lv.{{ resident.level }}</span>
+                <UiIcon v-if="resident.gender" class="home-gender-mark"
+                  :name="resident.gender === 1 ? 'gender-male' : 'gender-female'" :title="genderLabel(resident.gender)" />
               </div>
               <div class="home-sprite-meta">
                 <span v-if="speciesLabel(resident)" class="home-sprite-species">{{ speciesLabel(resident) }}</span>
@@ -296,18 +266,18 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
               <div class="home-sprite-metrics">
                 <span class="home-sprite-metric" :class="{ unknown: resident.height_pct === null }">
                   <span class="home-sprite-metric-label"><UiIcon name="ruler-2" />身高</span>
-                  <span class="home-sprite-metric-value">{{ compactMeasure(resident.height_text) || measurementPercent(resident.height_pct) }}</span>
+                  <span class="home-sprite-metric-value" :title="resident.height_text ? `身高 ${resident.height_text}` : '身高未知'">{{ measurementPercent(resident.height_pct) }}</span>
                   <i class="home-sprite-metric-track"><b :style="{ width: ratioStyle(resident.height_pct) }"></b></i>
                 </span>
                 <span class="home-sprite-metric" :class="{ unknown: resident.weight_pct === null }">
                   <span class="home-sprite-metric-label"><UiIcon name="weight" />体重</span>
-                  <span class="home-sprite-metric-value">{{ compactMeasure(resident.weight_text) || measurementPercent(resident.weight_pct) }}</span>
+                  <span class="home-sprite-metric-value" :title="resident.weight_text ? `体重 ${resident.weight_text}` : '体重未知'">{{ measurementPercent(resident.weight_pct) }}</span>
                   <i class="home-sprite-metric-track"><b :style="{ width: ratioStyle(resident.weight_pct) }"></b></i>
                 </span>
                 <span class="home-sprite-metric" :class="{ unknown: resident.voice === null }"
-                  :title="resident.voice === null ? '声音刻度 −100 至 100 dB' : `声音刻度 −100 至 100 dB；当前 ${resident.voice} dB`">
+                  :title="resident.voice === null ? '声音未知' : `声音 ${resident.voice} dB`">
                   <span class="home-sprite-metric-label"><UiIcon name="activity" />声音</span>
-                  <span class="home-sprite-metric-value">{{ resident.voice === null ? '—' : `${resident.voice}dB` }}</span>
+                  <span class="home-sprite-metric-value" :title="resident.voice === null ? '声音未知' : `声音 ${resident.voice} dB`">{{ measurementPercent(voiceRatio(resident)) }}</span>
                   <i class="home-sprite-metric-track"><b :style="{ width: ratioStyle(voiceRatio(resident)) }"></b></i>
                 </span>
               </div>
@@ -331,7 +301,11 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
             :class="{ 'home-pair-card--academy': group.some(couple => couple.mode !== 'ordinary'), 'is-linked': pairLinked(group) }"
             @mouseenter="hoveredPairIds = pairMemberIds(group)" @mouseleave="hoveredPairIds = []">
             <header class="home-pair-head">
-              <span class="home-tag home-tag--mode">{{ pairingModeLabel(group) }}</span>
+              <span class="home-tag home-tag--mode"
+                :class="{ 'is-academy': group.some(couple => couple.mode !== 'ordinary') }">
+                <UiIcon v-if="group.some(couple => couple.mode !== 'ordinary')" name="graduation-cap" />
+                {{ pairingModeLabel(group) }}
+              </span>
               <span class="home-tag">{{ pairingBasisLabel(group) }}</span>
             </header>
             <div class="home-pair-diagram" :style="{ '--pair-color': pairColor(groupIndex) }">
