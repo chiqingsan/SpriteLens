@@ -294,7 +294,7 @@ defineExpose({ update, load, pause, resume })
 .nearby-entity { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nearby-card time { flex: none; }
 
-.nearby-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2); height: 100%; min-height: 180px; padding: var(--space-8); border: 1px dashed var(--line); border-radius: var(--radius-lg); background: var(--panel); text-align: center; }
+.nearby-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); height: 100%; min-height: 240px; padding: var(--space-8); text-align: center; }
 .nearby-empty-icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--surface-2); color: var(--muted); }
 .nearby-empty-icon .ui-icon { width: 20px; height: 20px; }
 .nearby-empty h3 { margin: 0; font-size: var(--fs-md); font-weight: 600; }

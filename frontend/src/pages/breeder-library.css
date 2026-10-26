@@ -391,27 +391,26 @@
 .breeder-empty p { max-width: 280px; margin: 0; line-height: 1.7; }
 
 /* 右侧筛选面板 */
-.breeder-inspector-tabs { display: flex; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line-soft); flex: none; }
+.breeder-inspector-tabs { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line-soft); flex: none; }
 
+/* 这里不是切换页签，而是一个分区标题：去掉大按钮外观，只留图标 + 文案。 */
 .breeder-inspector-tabs > button {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: var(--space-2);
-  flex: 1;
-  min-height: 30px;
+  min-height: 0;
+  padding: 0;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   background: transparent;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-  transition:
-    background-color var(--motion-fast) var(--motion-ease),
-    color var(--motion-fast) var(--motion-ease);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: default;
 }
 
-.breeder-inspector-tabs > button:hover { background: var(--surface-2); color: var(--ink-soft); }
-.breeder-inspector-tabs > button.active { background: var(--surface-2); color: var(--teal-dark); font-weight: 600; }
+.breeder-inspector-tabs > button .ui-icon { color: var(--muted); }
+.breeder-inspector-tabs > button:hover, .breeder-inspector-tabs > button.active { background: transparent; color: var(--ink); }
 
 .breeder-filter-content {
   display: flex;

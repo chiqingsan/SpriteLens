@@ -377,18 +377,17 @@
 .collection-goals .chip {
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-height: 64px;
-  padding: var(--space-2);
+  justify-content: flex-start;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-2) 0 var(--space-3);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-md);
   background: var(--panel);
   color: var(--ink-soft);
-  font-size: var(--fs-2xs);
+  font-size: var(--fs-xs);
   font-weight: 500;
-  text-align: center;
+  text-align: left;
   transition:
     background-color var(--motion-fast) var(--motion-ease),
     border-color var(--motion-fast) var(--motion-ease),
@@ -396,8 +395,8 @@
 }
 
 .collection-goals .chip:hover { border-color: var(--line); background: var(--surface-1); }
-.collection-goals .chip > span { display: flex; align-items: center; gap: 2px; min-height: 26px; }
-.collection-goals img { width: 26px; height: 26px; object-fit: contain; }
+.collection-goals .chip > span { display: flex; align-items: center; gap: 2px; }
+.collection-goals img { width: 20px; height: 20px; object-fit: contain; }
 
 .collection-goals .chip.active {
   border-color: color-mix(in srgb, var(--teal) 55%, var(--line-soft));
