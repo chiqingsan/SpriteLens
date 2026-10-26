@@ -148,3 +148,78 @@
 - 分页统一用 `PagePager`；不再在页面内自行实现页码条。图鉴/蛋图鉴的网格/列表、舒适/紧凑由 `useDexDisplay` 驱动，列表与紧凑样式在 `catalog-wiki.css` 中以 `.is-list` / `.is-compact` 提供。
 - 工具行内的分组用 `ui-page-heading`（标题/说明/状态）与 `ui-page-actions`（按钮组）排布；需要两行时让 `ui-page-toolbar` 自然换行，不要固定高度。
 - 迁移页面时不要再用 `.page > .xxx-page` 的旧包装器规则（`height:100%` / `overflow:hidden` 已由 `ui-page` 承担），否则会出现双滚动容器。
+
+## 9. 常用组合（可直接照抄的页面骨架）
+
+### 9.1 列表页：工具行 + 网格/列表 + 分页 + 详情
+
+```vue
+<PageShell class="catalog-dex" :busy="loading">
+  <template #toolbar>
+    <div class="ui-page-heading">
+      <div class="ui-view-switch" role="group" aria-label="显示方式">
+        <button class="is-active" aria-pressed="true" aria-label="网格">
+          <UiIcon name="layout-grid" />
+        </button>
+        <button aria-pressed="false" aria-label="列表"><UiIcon name="table" /></button>
+      </div>
+      <p class="ui-page-meta">资料条目 {{ total }} 条</p>
+    </div>
+    <div class="ui-page-actions">
+      <input class="field" placeholder="搜索名称 / 编号" />
+      <button class="segmented">属性</button>
+      <button class="segmented">蛋组</button>
+      <select class="ui-density" aria-label="显示密度">…</select>
+      <PagePager :page="page" :pages="pages.length" :page-size="30" unit="只"
+        label="精灵图鉴页码" @update:page="goPage" />
+    </div>
+  </template>
+  <div class="dex-browser-layout">
+    <section class="dex-results" :class="[`is-${view}`, `is-${density}`]">…</section>
+    <PageInspector v-if="detail" storage-key="handbook" title="精灵详情" @close="closeDetail()">
+      <HandbookDetail :item="detail" />
+    </PageInspector>
+  </div>
+</PageShell>
+```
+
+要点：视图/密度状态来自 `useDexDisplay()`（记忆键见 §3）；分页只接 `PagePager`；详情只接 `PageInspector`。
+
+### 9.2 设置页两栏
+
+```html
+<div class="settings-page">
+  <aside class="settings-nav" aria-label="设置分区">
+    <a href="#settings-appearance" aria-current="page">外观</a>
+    <a href="#settings-capture">采集与连接</a>
+    …
+  </aside>
+  <div class="settings-main">
+    <header class="settings-header">…</header>
+    <section id="settings-appearance" class="settings-group">…</section>
+  </div>
+</div>
+```
+
+滚动高亮与平滑定位由 `settings-nav.js` 负责；新增分区只需加锚点与 `id`，脚本会自动纳入滚动监听。
+
+### 9.3 统计概览条
+
+```html
+<section class="home-overview" aria-label="家园概览">
+  <div class="home-stat"><span>房间等级</span><strong>10</strong></div>
+  …
+  <p class="home-overview-note">快照已同步</p>
+</section>
+```
+
+样式在页面 CSS（如 `home.css`）里用 `.home-stat` 组合 `--hairline` / `--radius-lg` / `--fs-xl` 实现，不新建全局类；卡片数量 3–6 个、数值等宽。
+
+## 10. 反模式（代码审查时优先拦下）
+
+- 页面 CSS 里出现 hex/rgb 颜色、圆角/阴影/字号散值 → 应改用 token。
+- 为「后台数据更新」加入场动画或过渡整块骨架 → 违反数据更新稳定性要求，见 `docs/UI_GUIDE.md`。
+- 用 `overflow: hidden` 掩盖布局溢出、用固定高度裁切长名称 → 极限布局测试必须过。
+- 双滚动容器：外层页面 + 内层面板同时 `overflow: auto`。
+- 用 Unicode 字符当图标；新增图标未登记 `tools/sync_ui_icons.py` 直接手改 sprite。
+- 在页面里复制分页/详情/空态结构而不是用 `PagePager` / `PageInspector` / `ui-empty`。
