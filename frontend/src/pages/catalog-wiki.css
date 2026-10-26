@@ -27,7 +27,7 @@
 .dex-filter-button.active small { color: var(--teal-dark); }
 
 /* ══════════════ 结果区与详情区 ══════════════ */
-.dex-browser-layout { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: var(--space-4); padding: 0; overflow: hidden; }
+.dex-browser-layout { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-4); padding: 0; overflow: hidden; }
 .dex-results { min-width: 0; min-height: 0; display: flex; flex-direction: column; position: relative; border: 1px solid var(--line-soft); border-radius: var(--radius-lg); background: var(--surface-1); overflow: hidden; }
 .dex-inspector { min-height: 0; min-width: 0; overflow: auto; padding: var(--space-3); border: 1px solid var(--line-soft); border-radius: var(--radius-lg); background: var(--panel); }
 
@@ -88,9 +88,9 @@
 /* ══════════════ 图鉴页专属覆盖：去掉多层卡片嵌套 ══════════════ */
 #page-handbook .catalog-dex, #page-egg-dex .catalog-dex { background: transparent; border: 0; border-radius: 0; overflow: visible; }
 #page-handbook .dex-toolbar, #page-egg-dex .dex-toolbar { margin-bottom: var(--space-3); border: 0; border-radius: 0; }
-#page-handbook .dex-browser-layout, #page-egg-dex .dex-browser-layout { grid-template-columns: minmax(0, 1fr) 360px; gap: var(--space-4); padding: 0; }
+#page-handbook .dex-browser-layout, #page-egg-dex .dex-browser-layout { grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-4); padding: 0; }
 #page-handbook .dex-results, #page-egg-dex .dex-results { border: 1px solid var(--line-soft); border-radius: var(--radius-lg); background: var(--surface-1); overflow: hidden; }
-#page-handbook .dex-inspector, #page-egg-dex .dex-inspector { container-type: inline-size; border: 1px solid var(--line-soft); border-radius: var(--radius-lg); background: var(--panel); }
+#page-handbook .ui-inspector, #page-egg-dex .ui-inspector { container-type: inline-size; }
 #page-handbook .dex-page-navigation, #page-egg-dex .dex-page-navigation { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line-soft); background: var(--panel); }
 #page-handbook .dex-page-navigation .box-navigation-row, #page-egg-dex .dex-page-navigation .box-navigation-row { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--space-1); min-width: 0; margin: 0; }
 #page-handbook .dex-page-navigation .page-tab-strip, #page-egg-dex .dex-page-navigation .page-tab-strip { display: flex; position: relative; flex: 1; min-width: 0; gap: var(--space-1); overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, transparent 0, #000 2px, #000 calc(100% - 22px), transparent); mask-image: linear-gradient(to right, transparent 0, #000 2px, #000 calc(100% - 22px), transparent); }
@@ -301,7 +301,6 @@
 .dex-empty b { color: var(--ink-soft); font-size: var(--fs-sm); font-weight: 600; }
 .dex-error { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin: var(--space-3); padding: var(--space-2) var(--space-3); border: 1px solid color-mix(in srgb, var(--danger) 26%, var(--line-soft)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--danger-soft) 54%, var(--panel)); color: var(--danger-ink); font-size: var(--fs-xs); }
 .dex-detail-status { padding-bottom: var(--space-2); color: var(--muted); font-size: var(--fs-3xs); }
-.dex-mobile-close { display: none; }
 
 /* ══════════════ 筛选弹层 ══════════════ */
 .dex-filter-dialog { width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 64px); overflow: auto; scrollbar-gutter: stable; border: 1px solid var(--line-soft); border-radius: var(--radius-lg); padding: var(--space-6); background: var(--panel); color: var(--ink); box-shadow: var(--shadow-3); user-select: none; }
@@ -335,10 +334,8 @@
 
 /* ══════════════ 宽度与容器断点 ══════════════ */
 @media (max-width: 1500px) {
-  .dex-browser-layout { grid-template-columns: minmax(0, 1fr) 380px; }
 }
 @media (max-width: 1200px) {
-  .dex-browser-layout { grid-template-columns: minmax(0, 1fr) 340px; }
   .dex-browser-grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
   .dex-toolbar { flex-wrap: wrap; row-gap: var(--space-2); }
   .dex-toolbar-actions { justify-content: flex-start; flex-wrap: wrap; }
@@ -350,15 +347,10 @@
   .mini-gender-content em { width: 22px; height: 22px; }
 }
 @media (max-width: 1200px) {
-  #page-handbook .dex-browser-layout, #page-egg-dex .dex-browser-layout { grid-template-columns: minmax(0, 1fr) 320px; }
   #page-handbook .dex-browser-grid, #page-egg-dex .dex-browser-grid { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); }
 }
 @media (max-width: 960px) {
   .dex-browser-layout { grid-template-columns: minmax(0, 1fr); }
-  .dex-inspector { display: none; }
-  .dex-inspector.drawer-open { display: block; position: fixed; inset: 0 0 0 auto; z-index: 120; width: min(420px, 100vw); border: 0; border-radius: 0; padding: var(--space-4); background: var(--panel); box-shadow: var(--shadow-3); }
-  .desktop-window .dex-inspector.drawer-open { top: var(--window-titlebar); }
-  .dex-mobile-close { display: block; margin-bottom: var(--space-3); }
   .dex-toolbar { flex-wrap: wrap; row-gap: var(--space-2); }
   .dex-toolbar-heading { flex: 1 1 100%; }
   .dex-toolbar-actions { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
@@ -392,7 +384,6 @@
   .dex-matchup-group { grid-template-columns: 1fr; }
   .mini-hero.species { grid-template-columns: 1fr; min-height: 0; }
   .mini-hero.species .mini-visual { width: min(190px, 100%); justify-self: center; }
-  .dex-inspector.drawer-open { width: 100vw; }
 }
 @media (max-width: 640px) {
   #page-handbook .dex-page-navigation .box-total, #page-egg-dex .dex-page-navigation .box-total { display: none; }

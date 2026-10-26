@@ -4,6 +4,7 @@ import type { ApiClient } from '../api/client'
 import { useHandbook } from '../composables/useHandbook'
 import { parseHandbook, type HandbookSpecies } from '../types/handbook'
 import HandbookDetail from '../components/HandbookDetail.vue'
+import PageInspector from '../components/PageInspector.vue'
 import DexPortrait from '../components/DexPortrait.vue'
 import DexTypeBadge from '../components/DexTypeBadge.vue'
 import DexFilterMenu from '../components/DexFilterMenu.vue'
@@ -28,7 +29,7 @@ const detailTarget = ref<string>()
 let detailRequest: AbortController | undefined
 let loadedDetailKey: string | undefined
 let pendingKey: string | undefined
-const content = ref<HTMLElement>(), pageStrip = ref<HTMLElement>(), inspector = ref<HTMLElement>(), closeButton = ref<HTMLButtonElement>()
+const content = ref<HTMLElement>(), pageStrip = ref<HTMLElement>(), inspector = ref<InstanceType<typeof PageInspector> | null>(null)
 const narrow = window.matchMedia('(max-width: 960px)'), modal = ref(narrow.matches), mobileDetail = ref(false)
 let trigger: HTMLElement | undefined
 let inertNodes: HTMLElement[] = []
@@ -60,7 +61,7 @@ async function fetchDetail(key: string) {
 function select(row: HandbookSpecies) {
   if (item.value?.key !== row.key) {
     loadedDetailKey = undefined
-    inspector.value?.scrollTo(0, 0)
+    inspector.value?.body?.scrollTo(0, 0)
     void fetchDetail(row.key)
   } else if (loadedDetailKey !== row.key || detailError.value) void fetchDetail(row.key)
 }
@@ -70,7 +71,7 @@ async function open(row: HandbookSpecies, event: Event) {
   trigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : undefined
   mobileDetail.value = true
   await nextTick(); syncInert()
-  if (modal.value) closeButton.value?.focus({ preventScroll: true })
+  if (modal.value) inspector.value?.focusClose()
 }
 function close(restore = true) {
   mobileDetail.value = false; cancelDetail(); syncInert()
@@ -98,15 +99,15 @@ async function reveal(key: string | number) {
   await fetchDetail(String(key))
   if (!props.active || item.value?.key !== String(key)) return
   await nextTick(); syncInert()
-  inspector.value?.scrollTo(0, 0)
-  if (modal.value) closeButton.value?.focus({ preventScroll: true })
+  inspector.value?.body?.scrollTo(0, 0)
+  if (modal.value) inspector.value?.focusClose()
 }
 function filterGroup(group: string) { groups.value = [group]; page.value = 1 }
 function keydown(event: KeyboardEvent) {
   if (!mobileDetail.value || !modal.value) return
   if (event.key === 'Escape') { event.preventDefault(); close() }
   if (event.key === 'Tab') {
-    const controls = [...(inspector.value?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input, select, summary, [tabindex="0"]') || [])].filter(node => node.getClientRects().length)
+    const controls = [...(inspector.value?.el?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input, select, summary, [tabindex="0"]') || [])].filter(node => node.getClientRects().length)
     const first = controls[0], last = controls[controls.length - 1]
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
@@ -170,13 +171,12 @@ defineExpose({ load, pause, resume, resetAccount, reveal, error })
         </div>
       </section>
       <div v-if="modal && mobileDetail" class="detail-backdrop" @click="close()"></div>
-      <aside ref="inspector" id="hb-detail" class="dex-inspector" :class="{ 'drawer-open': mobileDetail }" :role="modal && mobileDetail ? 'dialog' : 'region'" :aria-modal="modal && mobileDetail || undefined" :aria-busy="detailLoading || undefined" aria-label="精灵详情">
-        <button ref="closeButton" class="ghost-button small dex-mobile-close" @click="close()">关闭详情</button>
+      <PageInspector v-if="!modal || mobileDetail" ref="inspector" title="精灵详情" :meta="item ? `#${item.handbook_no || item.dex_no || '—'}` : undefined" :modal="modal && mobileDetail" storage-key="handbook" :default-width="360" :aria-busy="detailLoading || undefined" @close="close()">
         <div v-if="detailLoading && !item" class="dex-detail-status" role="status">正在加载资料…</div>
         <div v-if="detailError" class="dex-error" role="alert">{{ detailError }}<button v-if="detailTarget" class="ghost-button small" @click="fetchDetail(detailTarget)">重试</button></div>
         <HandbookDetail v-if="item" :item="item" @navigate="reveal" @filter-group="filterGroup" />
         <div v-else class="dex-empty">选择精灵查看详细资料</div>
-      </aside>
+      </PageInspector>
     </div>
   </div>
 </template>

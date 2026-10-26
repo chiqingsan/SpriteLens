@@ -49,6 +49,7 @@
 | 表格 | `ui-table`（`ui-table--dense`） | 粘性表头、行悬停、细描边 |
 | 对话框 | `ui-dialog[open]` + `__head/__body/__foot` | 原生 `<dialog>`，入场动画 + 背景模糊；需自行 `showModal()` |
 | 滚动/骨架 | `ui-scroll` / `ui-skeleton` | 细滚动条容器 / 加载闪光条（`prefers-reduced-motion` 下停止） |
+| 详情面板（Vue） | `<PageInspector>`（`frontend/src/components/PageInspector.vue`，根类名 `ui-inspector`） | 右侧详情统一外壳：标题 + 副标题 + 操作区 + 关闭；左缘拖拽调宽、双击复位、宽度按 `storage-key` 记忆；窄屏自动切换为抽屉 |
 
 用法示例：
 
@@ -61,6 +62,24 @@
   <div class="ui-empty__actions"><button class="ui-btn ui-btn--ghost">刷新</button></div>
 </div>
 ```
+
+### 页面级共享组件（Vue）
+
+图鉴、蛋图鉴、蛋仓三个右侧详情面板统一使用 `PageInspector`；宽度、关闭、焦点与窄屏抽屉行为由组件负责，页面只提供内容与操作：
+
+```vue
+<PageInspector ref="inspector" title="精灵详情" :meta="`#${item.handbook_no}`"
+  :modal="modal && mobileDetail" storage-key="handbook" :default-width="360" @close="close()">
+  <template #actions>
+    <button class="ghost-button small" aria-label="上一枚" @click="moveSelection(-1)">…</button>
+  </template>
+  <HandbookDetail :item="item" />
+</PageInspector>
+```
+
+- 宽度记忆键：`sn.inspector.<storage-key>`；默认 360、范围 280–560，拖拽手柄键盘方向键可调，`Home` 复位。
+- 内容区是唯一滚动容器（`.ui-inspector-body`），需要滚动到顶部时调用 `inspector.value?.body?.scrollTo(0, 0)`；打开窄屏抽屉后调用 `inspector.value?.focusClose()` 聚焦关闭按钮。
+- 背包详情 `PetDetailPanel` 仍是独立实现（`.detail-panel`，带定位按钮与密集信息），后续迁移时保持同样 props 约定。
 
 ## 4. 历史类名 = 同源别名
 

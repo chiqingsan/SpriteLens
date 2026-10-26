@@ -15,19 +15,24 @@
 .eggbox-page {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-4);
   height: 100%;
   min-height: 0;
 }
 
-.eggbox-list-panel,
-.eggbox-detail-panel {
+.eggbox-list-panel {
   min-width: 0;
   min-height: 0;
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-lg);
   background: var(--panel);
+}
+
+.eggbox-detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
 }
 
 .eggbox-list-panel {
@@ -716,15 +721,6 @@
 }
 
 /* ── 详情面板 ── */
-.eggbox-detail-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-  padding: 0 var(--space-5) var(--space-5);
-  overflow: hidden auto;
-  overscroll-behavior: contain;
-}
-
 .eggbox-detail-header {
   position: sticky;
   top: 0;
@@ -1332,23 +1328,6 @@
     background: var(--overlay);
   }
 
-  .eggbox-detail-panel {
-    position: fixed;
-    z-index: 120;
-    inset: 0 0 0 auto;
-    width: min(400px, 100vw);
-    border: 0;
-    border-left: 1px solid var(--line);
-    border-radius: 0;
-    padding: 0 var(--space-5) var(--space-5);
-    background: var(--panel);
-    box-shadow: var(--shadow-pop);
-  }
-
-  .eggbox-detail-panel .eggbox-detail-actions button.eggbox-mobile-close {
-    display: inline-flex;
-    padding: 0 var(--space-3);
-  }
 }
 
 @media (max-width: 640px) {
@@ -1358,10 +1337,6 @@
 
   .eggbox-page {
     gap: var(--space-3);
-  }
-
-  .eggbox-detail-panel {
-    width: 100%;
   }
 
   .eggbox-nature-grid {

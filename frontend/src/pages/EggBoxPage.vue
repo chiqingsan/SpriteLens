@@ -5,6 +5,7 @@ import type { EggBoxHost } from '../composables/useEggBox'
 import { useEggBox } from '../composables/useEggBox'
 import EggBoxCard from '../components/EggBoxCard.vue'
 import EggBoxDetail from '../components/EggBoxDetail.vue'
+import PageInspector from '../components/PageInspector.vue'
 import UiIcon from '../components/UiIcon.vue'
 import type { EggBoxAnnotations, EggBoxEntry } from '../types/eggBox'
 import './egg-box.css'
@@ -14,7 +15,7 @@ const model = useEggBox(props.host)
 const narrow = window.matchMedia('(max-width: 960px)')
 const isNarrow = ref(narrow.matches)
 const mobileDetailOpen = ref(false)
-const detailRef = ref<InstanceType<typeof EggBoxDetail> | null>(null)
+const inspectorRef = ref<InstanceType<typeof PageInspector> | null>(null)
 const favoriteBusy = reactive(new Set<string>())
 const favoriteError = ref('')
 const listViewport = ref<HTMLElement | null>(null)
@@ -97,7 +98,7 @@ async function open(egg: NonNullable<typeof model.selected.value>, event: MouseE
   mobileDetailOpen.value = isNarrow.value
   await nextTick()
   syncInert()
-  if (mobileDetailOpen.value) detailRef.value?.focusClose()
+  if (mobileDetailOpen.value) inspectorRef.value?.focusClose()
 }
 function onResize() {
   isNarrow.value = narrow.matches
@@ -285,15 +286,26 @@ defineExpose({
     </section>
 
     <div v-if="isNarrow && mobileDetailOpen" class="eggbox-detail-backdrop" @click="closeMobileDetail"></div>
-    <aside v-if="!isNarrow || mobileDetailOpen" class="eggbox-detail-panel"
-      :role="isNarrow ? 'dialog' : 'region'" :aria-modal="isNarrow || undefined" aria-label="精灵蛋详情">
-      <EggBoxDetail v-if="model.selected.value" ref="detailRef" :egg="model.selected.value" :position="position"
+    <PageInspector v-if="!isNarrow || mobileDetailOpen" ref="inspectorRef" title="精灵蛋详情"
+      :meta="model.selected.value ? `#${model.selected.value.instance_id}` : undefined"
+      :modal="isNarrow && mobileDetailOpen" storage-key="egg-box" :default-width="360"
+      @close="closeMobileDetail">
+      <template #actions>
+        <template v-if="model.selected.value">
+          <button type="button" class="eggbox-favorite-button eggbox-detail-favorite" :class="{ active: model.selected.value.favorite }"
+            :aria-label="model.selected.value.favorite ? '取消收藏' : '收藏这枚蛋'" :aria-pressed="model.selected.value.favorite"
+            :disabled="Boolean(model.data.value && favoriteBusy.has(favoriteKey(model.data.value.uid, model.selected.value.instance_id)))"
+            @click="toggleFavorite(model.selected.value)"><UiIcon :name="model.selected.value.favorite ? 'star-filled' : 'star'" /></button>
+          <button type="button" class="ghost-button small" aria-label="上一枚" :disabled="position <= 1" @click="moveSelection(-1)"><UiIcon name="chevron-left" /></button>
+          <button type="button" class="ghost-button small" aria-label="下一枚" :disabled="position >= model.visibleEggs.value.length" @click="moveSelection(1)"><UiIcon name="chevron-right" /></button>
+        </template>
+      </template>
+      <EggBoxDetail v-if="model.selected.value" :egg="model.selected.value" :position="position"
         :total="model.visibleEggs.value.length" :nature-options="model.data.value?.nature_options || []"
         :annotations="model.annotationsFor(model.selected.value)" :annotation-error="model.annotationErrorFor(model.selected.value)"
         :favorite-saving="Boolean(model.data.value && favoriteBusy.has(favoriteKey(model.data.value.uid, model.selected.value.instance_id)))"
-        @update-annotations="updateAnnotations" @save-annotations="saveAnnotations" @previous="moveSelection(-1)"
-        @next="moveSelection(1)" @close="closeMobileDetail" @favorite="toggleFavorite" />
+        @update-annotations="updateAnnotations" @save-annotations="saveAnnotations" />
       <div v-else class="empty-hint eggbox-detail-empty"><UiIcon name="egg" />选择一枚蛋查看详情</div>
-    </aside>
+    </PageInspector>
   </div>
 </template>
