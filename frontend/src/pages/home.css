@@ -355,7 +355,7 @@
 
 .home-resident-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(282px, 1fr));
   gap: var(--space-2);
 }
 
@@ -756,6 +756,10 @@
 .home-nature-row.is-unknown i b { background: transparent; }
 
 /* ── 响应式 ── */
+@media (max-width: 1340px) {
+  .home-resident-card { grid-template-columns: 96px minmax(0, 1fr); }
+}
+
 @media (max-width: 1240px) {
   .home-layout { grid-template-columns: minmax(0, 1fr); }
 }
