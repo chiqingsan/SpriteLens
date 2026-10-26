@@ -41,10 +41,12 @@
   --fs-2xl: 28px;  /* 页面大数字 */
 
   /* ── 圆角四档；胶囊与正圆直接写 999px / 50% ── */
-  --radius-sm: 8px;    /* 小徽章、chip、输入框 */
-  --radius-md: 10px;   /* 卡片、按钮、头像（默认档） */
-  --radius-lg: 16px;   /* 面板、弹层 */
-  --radius-xl: 20px;   /* 工作画布、模态框 */
+  --radius-xs: 6px;    /* 极小标签、卡片内嵌色块 */
+  --radius-sm: 8px;    /* 小徽章、chip、输入框、按钮 */
+  --radius-md: 10px;   /* 卡片、头像、弹层（默认档） */
+  --radius-lg: 12px;   /* 面板、列表容器 */
+  --radius-xl: 16px;   /* 工作画布、模态框 */
+  --radius-pill: 999px;/* 状态胶囊、开关、圆点 */
 
   /* ── 描边与阴影：高级感来自「中性 ink 描边 + 叠层小偏移阴影」。
      参考 2026 design-md 的高端产品界面：边界用 ink 透明度 hairline，

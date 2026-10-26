@@ -6,7 +6,7 @@
 .account-information > summary { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-3) var(--space-2); cursor: pointer; list-style: none; border-radius: var(--radius-md); }
 .account-information > summary::-webkit-details-marker { display: none; }
 .account-information > summary:hover { background: var(--surface-1); }
-.account-avatar { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: var(--teal-soft); overflow: hidden; flex: none; }
+.account-avatar { display: grid; place-items: center; width: 42px; height: 42px; border-radius: var(--radius-lg); background: var(--teal-soft); overflow: hidden; flex: none; }
 .account-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .account-avatar > span { color: var(--teal); }
 .account-avatar .ui-icon { display: block; width: 24px; height: 24px; }
@@ -104,7 +104,20 @@
 .filter-match-mode button { min-width: 34px; padding: 0 var(--space-2); font-size: var(--fs-xs); }
 .filter-match-mode, #btn-reset-filters { height: 30px; }
 .quick-filters .chip, .filter-pair .chip { height: 34px; padding: var(--space-2); border-radius: var(--radius-sm); text-align: center; }
-.filter-pair .chip { display: flex; align-items: center; justify-content: center; width: 100%; box-sizing: border-box; }
+.filter-pair .chip { display: flex; align-items: center; justify-content: center; width: 100%; height: 30px; box-sizing: border-box; }
+
+/* 筛选栏内的选中态用浅底强调，不再用整块实色，和 AND/OR 分段保持同一层级。 */
+#pet-filters .chip.active {
+  border-color: color-mix(in srgb, var(--teal) 45%, var(--line-soft));
+  background: color-mix(in srgb, var(--teal-soft) 68%, var(--panel));
+  color: var(--teal-dark);
+  font-weight: 600;
+}
+
+#pet-filters .chip.active:hover {
+  background: color-mix(in srgb, var(--teal-soft) 78%, var(--panel));
+  border-color: color-mix(in srgb, var(--teal) 55%, var(--line-soft));
+}
 .text-button { background: transparent; color: var(--teal-dark); font-size: var(--fs-xs); padding: var(--space-1); }
 /* 快捷条件标题行：设置/重置收起为安静的文字按钮，悬停才出现容器底色 */
 .quick-filter-head .text-button {
