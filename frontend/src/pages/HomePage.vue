@@ -145,7 +145,21 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
       <button type="button" :disabled="model.loading.value" @click="model.load()">{{ model.loading.value ? '读取中…' : '重新读取' }}</button>
     </div>
 
-    <div v-else-if="model.data.value" class="home-layout">
+    <template v-else-if="model.data.value">
+      <section class="home-overview" aria-label="家园概览">
+        <div class="home-stat"><span>房间等级</span><strong>{{ model.data.value.room_level }}</strong></div>
+        <div class="home-stat"><span>家园精灵</span><strong>{{ homeSprites.length }}</strong></div>
+        <div class="home-stat"><span>小窝</span><strong>{{ model.data.value.nests.length }}</strong></div>
+        <div class="home-stat"><span>配对母本</span><strong>{{ pairingGroups.length }}</strong></div>
+        <div class="home-stat"><span>场景蛋</span><strong>{{ model.data.value.scene_eggs.length }}</strong></div>
+        <p class="home-overview-note">
+          <span v-if="model.data.value.couples_stale" class="home-pending-tag">关系待刷新</span>
+          <span v-else>快照已同步</span>
+          <span v-if="model.data.value.pending_deltas">· {{ model.data.value.pending_deltas }} 条变化待合并</span>
+        </p>
+      </section>
+
+      <div class="home-layout">
       <section class="home-panel home-residents-panel">
         <header class="home-panel-heading">
           <div>
@@ -257,5 +271,6 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
 
       </aside>
     </div>
+    </template>
   </PageShell>
 </template>

@@ -833,3 +833,58 @@
     padding: var(--space-6) var(--space-4);
   }
 }
+
+/* ── 概览统计条：房间等级 / 精灵 / 小窝 / 配对 / 场景蛋 ── */
+.home-overview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--space-3);
+  flex: none;
+}
+
+.home-stat {
+  display: flex;
+  flex: 0 1 148px;
+  min-width: 124px;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+
+.home-stat span {
+  color: var(--muted);
+  font-size: var(--fs-3xs);
+  font-weight: 600;
+}
+
+.home-stat strong {
+  color: var(--ink);
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-overview-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 0 auto;
+  color: var(--muted);
+  font-size: var(--fs-2xs);
+}
+
+@media (max-width: 760px) {
+  .home-stat {
+    flex: 1 1 calc(50% - var(--space-3));
+    min-width: 0;
+  }
+  .home-overview-note {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+}
