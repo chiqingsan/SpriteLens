@@ -38,7 +38,7 @@ from spritelens.paths import logs_dir, schema_dir, static_dir
 from spritelens.protocol.opcodes import OpcodeCatalog
 from spritelens.protocol.schema import load_library
 from spritelens.repositories.settings import SettingsRepository
-from spritelens.domain.home import HomeFurniture, HomeResident, HomeSnapshot
+from spritelens.domain.home import HomeCouple, HomeFurniture, HomeResident, HomeSceneEgg, HomeSnapshot
 from spritelens.services.egg_repository import EggBoxRepository
 from spritelens.services.home_repository import HomeRepository
 from spritelens.services.monitor_service import MonitorService
@@ -161,20 +161,32 @@ def _apply_extreme_dataset(static, repository: PetRepository) -> None:
 def _demo_home() -> HomeRepository:
     repo = HomeRepository()
     repo._account.observe(PlayerIdentity(101384922, "话绵雨", 60))
+    ordinary_nest = "70182c0b68100000"
+    academy_nest = "65d37b61f2690"
+    father_a = 0x84182c0b68a0000a
+    mother = 0x84182c0b68a0000b
+    father_b = 0x84182c0b68a0000c
     repo._snapshot = HomeSnapshot(
         room_level=10,
         residents=(
-            HomeResident(actor_id=0x84182c0b68a0000a, name="护主犬", gender=1, level=41,
-                         position=(-882, 1284, 61), instance_id=1000),
-            HomeResident(actor_id=0x84182c0b68a0000b, name="喵喵", gender=2, level=35,
-                         position=(100, 200, 1), instance_id=1001),
+            HomeResident(actor_id=father_a, name="护主犬", gender=1, level=41,
+                         position=(-882, 1284, 61), instance_id=1000, nest_guid=ordinary_nest),
+            HomeResident(actor_id=mother, name="喵喵", gender=2, level=35,
+                         position=(100, 200, 1), instance_id=1001, nest_guid=ordinary_nest),
+            HomeResident(actor_id=father_b, name="火花", gender=1, level=22,
+                         position=(300, 400, 1), instance_id=1002, nest_guid=academy_nest),
         ),
         nests=(
-            HomeFurniture(config_id=710069, guid="70182c0b68100000", kind="ordinary",
-                          name="普通小窝", position=(100, 200, 1)),
-            HomeFurniture(config_id=1001072, guid="65d37b61f2690", kind="academy",
-                          name="学院小窝", position=(300, 400, 1)),
+            HomeFurniture(config_id=710069, guid=ordinary_nest, kind="ordinary",
+                          name="普通小窝", position=(100, 200, 1),
+                          resident_ids=(father_a, mother)),
+            HomeFurniture(config_id=1001072, guid=academy_nest, kind="academy",
+                          name="学院小窝", position=(300, 400, 1),
+                          resident_ids=(father_b,)),
         ),
+        couples=(HomeCouple(female_actor_id=mother, male_actor_ids=(father_a, father_b)),),
+        scene_eggs=(HomeSceneEgg(actor_id=0x84182c0b68a00010, furniture_guid=academy_nest,
+                                 npc_config_id=3001001),),
     )
     repo._version += 1
     return repo
