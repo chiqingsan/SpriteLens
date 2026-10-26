@@ -210,6 +210,7 @@ defineExpose({ update, load, pause, resume })
           </div>
         </section>
         <section v-else class="nearby-empty" aria-live="polite">
+          <p v-if="error && !stale" class="nearby-error" role="alert">{{ error }}</p>
           <span class="nearby-empty-icon"><UiIcon :name="initialLoading ? 'refresh' : 'eye'" /></span>
           <h3>{{ initialLoading ? '正在读取附近观察' : search.trim() ? '没有匹配的精灵' : '尚未观察到附近精灵' }}</h3>
           <p>{{ search.trim() ? '试试其他名称或编号。' : '进入场景并开始采集后会自动显示。' }}</p>
@@ -243,10 +244,7 @@ defineExpose({ update, load, pause, resume })
 .nearby-count-note { flex: 0 1 auto; min-width: 0; overflow: hidden; color: var(--muted); font-size: var(--fs-2xs); text-align: right; text-overflow: ellipsis; white-space: nowrap; }
 .nearby-count-note.is-stale { padding: 1px var(--space-2); border-radius: 999px; background: var(--amber-soft); color: var(--amber-ink); }
 
-.nearby-notices { display: flex; flex: none; flex-direction: column; gap: var(--space-2); }
-.nearby-error, .nearby-warning { margin: 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); font-size: var(--fs-xs); line-height: 1.5; overflow-wrap: anywhere; }
-.nearby-error { border: 1px solid color-mix(in srgb, var(--danger) 26%, transparent); background: var(--danger-soft); color: var(--danger-ink); }
-.nearby-warning { border: 1px solid var(--amber-line); background: var(--amber-soft); color: var(--amber-ink); }
+.nearby-error { max-width: 42ch; margin: 0; padding: var(--space-2) var(--space-3); border: 1px solid color-mix(in srgb, var(--danger) 26%, transparent); border-radius: var(--radius-md); background: var(--danger-soft); color: var(--danger-ink); font-size: var(--fs-xs); line-height: 1.5; overflow-wrap: anywhere; }
 
 .nearby-toolbar { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
 .nearby-search { display: flex; flex: 1 1 240px; align-items: center; gap: var(--space-2); min-width: 0; height: 34px; padding-inline: var(--space-4); border: 1px solid var(--line); border-radius: 999px; background: var(--panel); }
