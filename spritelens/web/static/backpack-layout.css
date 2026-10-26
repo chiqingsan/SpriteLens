@@ -216,7 +216,6 @@
 #pet-grid.box-fill-grid .point-groups { gap: 2px; padding: 2px 2px 0; }
 #pet-grid.box-fill-grid .point-medals { gap: 2px; padding-top: 0; display: flex; flex-direction: column; justify-content: center; }
 #pet-grid.box-fill-grid .point-medal-slot { flex: 1 1 0; min-height: 0; }
-#pet-grid.box-fill-grid .point-medal-slot:empty { display: none; }
 #pet-grid.box-fill-grid .point-group-slot,
 #pet-grid.box-fill-grid .point-medal-slot { align-items: center; }
 #pet-grid.box-fill-grid .point-pet .pet-medal.has-icon {
