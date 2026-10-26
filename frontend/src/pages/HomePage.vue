@@ -17,6 +17,18 @@ const nests = computed(() => model.data.value?.nests || [])
 const roomLevel = computed(() => model.data.value?.room_level || 0)
 const sceneEggCount = computed(() => model.data.value?.scene_eggs.length || 0)
 const couplesStale = computed(() => Boolean(model.data.value?.couples_stale))
+const academyResidentIds = computed(() => {
+  const ids = new Set<string>()
+  nests.value.forEach(nest => {
+    if (nest.kind !== 'academy') return
+    nest.resident_ids.forEach(id => ids.add(String(id)))
+  })
+  return ids
+})
+function isAcademy(resident: HomeResident) {
+  if (academyResidentIds.value.has(String(resident.actor_id))) return true
+  return nests.value.some(nest => nest.kind === 'academy' && nest.guid === resident.nest_guid)
+}
 const sortMode = ref<'level' | 'nature' | 'name'>('level')
 const searchText = ref('')
 const pairingGroups = computed(() => {
@@ -196,6 +208,12 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
             {{ couplesStale ? '配对关系待刷新' : '快照已同步' }}
           </span>
         </p>
+        <div class="home-hero-meta">
+          <span class="home-meta-item"><UiIcon name="users" /><b>{{ homeSprites.length }}</b>精灵</span>
+          <span class="home-meta-item"><UiIcon name="home" /><b>{{ nests.length }}</b>小窝</span>
+          <span class="home-meta-item"><UiIcon name="arrows-shuffle" /><b>{{ pairingGroups.length }}</b>母本</span>
+          <span class="home-meta-item"><UiIcon name="egg" /><b>{{ sceneEggCount }}</b>场景蛋</span>
+        </div>
         <div class="home-hero-actions">
           <button type="button" class="home-ghost-button" :disabled="model.loading.value" @click="model.load()">
             <UiIcon name="refresh" />{{ model.loading.value ? '读取中…' : '刷新快照' }}
@@ -224,26 +242,8 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
     </div>
 
     <template v-else-if="model.data.value">
-      <section class="home-stats" aria-label="家园统计">
-        <article class="home-stat">
-          <span class="home-stat-icon home-stat-icon--sprite"><UiIcon name="users" /></span>
-          <div class="home-stat-copy"><strong>{{ homeSprites.length }}</strong><span>家园精灵</span></div>
-        </article>
-        <article class="home-stat">
-          <span class="home-stat-icon home-stat-icon--nest"><UiIcon name="home" /></span>
-          <div class="home-stat-copy"><strong>{{ nests.length }}</strong><span>小窝</span></div>
-        </article>
-        <article class="home-stat">
-          <span class="home-stat-icon home-stat-icon--mother"><UiIcon name="arrows-shuffle" /></span>
-          <div class="home-stat-copy"><strong>{{ pairingGroups.length }}</strong><span>配对母本</span></div>
-        </article>
-        <article class="home-stat">
-          <span class="home-stat-icon home-stat-icon--egg"><UiIcon name="egg" /></span>
-          <div class="home-stat-copy"><strong>{{ sceneEggCount }}</strong><span>场景蛋</span></div>
-        </article>
-      </section>
-
-      <section class="home-section" aria-labelledby="home-sprites-title">
+      <div class="home-columns">
+      <section class="home-section home-sprites" aria-labelledby="home-sprites-title">
         <header class="home-section-head">
           <div class="home-section-title">
             <h2 id="home-sprites-title">家园精灵</h2>
@@ -270,7 +270,7 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
 
         <div v-else class="home-sprite-grid">
           <article v-for="resident in filteredSprites" :key="resident.actor_id" class="home-sprite-card"
-            :class="`gender-${resident.gender}`">
+            :class="[`gender-${resident.gender}`, { 'is-academy': isAcademy(resident) }]">
             <div class="home-sprite-art">
               <img v-if="resident.icon_url && !failedImages.has(resident.actor_id)" class="home-sprite-image"
                 :src="resident.icon_url" alt="" loading="lazy" draggable="false" @error="failedImage(resident.actor_id)">
@@ -278,6 +278,9 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
               <span class="home-sprite-level">Lv.{{ resident.level }}</span>
               <img v-if="rarityIconUrl(resident)" class="home-sprite-rarity" :src="rarityIconUrl(resident)"
                 :alt="resident.is_colorful ? '异色炫彩' : '异色'" :title="resident.is_colorful ? '异色炫彩' : '异色'" draggable="false">
+              <span v-if="isAcademy(resident)" class="home-sprite-academy" title="学院绿窝精灵">
+                <UiIcon name="graduation-cap" />学院
+              </span>
             </div>
             <div class="home-sprite-body">
               <div class="home-sprite-title">
@@ -313,7 +316,8 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
         </div>
       </section>
 
-      <section class="home-section" aria-labelledby="home-pairing-title">
+      <aside class="home-side">
+      <section class="home-section home-pairing" aria-labelledby="home-pairing-title">
         <header class="home-section-head">
           <div class="home-section-title">
             <h2 id="home-pairing-title">家园配对关系</h2>
@@ -382,6 +386,8 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
           <p>把雌性精灵放进小窝，并让雄性精灵在同一区域活动，配对关系会出现在这里。</p>
         </div>
       </section>
+      </aside>
+      </div>
     </template>
   </PageShell>
 </template>

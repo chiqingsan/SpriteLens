@@ -217,78 +217,65 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 四块统计 */
-.home-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: var(--space-3);
-}
-
-.home-stat {
+/* hero 统计胶囊 */
+.home-hero-meta {
   display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-2);
+}
+
+.home-meta-item {
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-  padding: var(--space-3) var(--space-4);
+  gap: 4px;
+  height: 24px;
+  padding: 0 9px;
   border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg);
-  background: var(--panel);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+  color: var(--muted);
+  font-size: var(--fs-3xs);
 }
 
-.home-stat-icon {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
-  color: var(--ink-soft);
-}
-
-.home-stat-icon--sprite {
-  background: color-mix(in srgb, var(--teal-soft) 66%, var(--panel));
+.home-meta-item .ui-icon {
+  width: 12px;
+  height: 12px;
   color: var(--teal-deep);
 }
 
-.home-stat-icon--nest {
-  background: color-mix(in srgb, var(--amber-soft) 62%, var(--panel));
-  color: var(--amber-ink);
-}
-
-.home-stat-icon--mother {
-  background: color-mix(in srgb, var(--female) 72%, var(--panel));
-  color: var(--female-ink);
-}
-
-.home-stat-icon--egg {
-  background: color-mix(in srgb, var(--male) 66%, var(--panel));
-  color: var(--male-ink);
-}
-
-.home-stat-icon .ui-icon {
-  width: 18px;
-  height: 18px;
-}
-
-.home-stat-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.home-stat-copy strong {
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.1;
+.home-meta-item b {
   color: var(--ink);
+  font-size: var(--fs-xs);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
-.home-stat-copy span {
-  font-size: var(--fs-3xs);
-  color: var(--muted);
+/* 左右两栏 */
+.home-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 388px);
+  gap: var(--space-4);
+  align-items: start;
+  min-width: 0;
+}
+
+.home-sprites {
+  min-width: 0;
+}
+
+.home-side {
+  position: sticky;
+  top: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: calc(100vh - var(--topbar) - var(--space-6));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+  min-width: 0;
+  scrollbar-gutter: stable;
 }
 
 /* 分区标题与工具 */
@@ -645,9 +632,10 @@
 
 /* 配对卡片网格 */
 .home-pairing-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(326px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: var(--space-3);
+  min-width: 0;
 }
 
 .home-pair-card {
@@ -932,6 +920,60 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 学院绿窝精灵 */
+.home-sprite-card.is-academy {
+  border-color: color-mix(in srgb, var(--teal) 44%, var(--hairline));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--teal-soft) 46%, var(--panel)), var(--panel) 62%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--teal) 16%, transparent);
+}
+
+.home-sprite-card.is-academy:hover {
+  border-color: color-mix(in srgb, var(--teal) 62%, var(--hairline));
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--teal) 18%, transparent);
+}
+
+.home-sprite-card.is-academy .home-sprite-art {
+  background:
+    radial-gradient(64% 70% at 50% 44%, color-mix(in srgb, var(--teal-bright) 30%, transparent), transparent 74%),
+    linear-gradient(165deg, color-mix(in srgb, var(--teal-soft) 82%, var(--panel)), color-mix(in srgb, var(--teal-soft) 32%, var(--panel)));
+}
+
+.home-sprite-card.is-academy .home-sprite-level {
+  background: color-mix(in srgb, var(--teal) 86%, var(--panel));
+  color: var(--on-accent);
+}
+
+.home-sprite-academy {
+  position: absolute;
+  left: 10px;
+  bottom: 7px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--teal) 92%, var(--panel));
+  color: var(--on-accent);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.home-sprite-academy .ui-icon {
+  width: 11px;
+  height: 11px;
+}
+
+.home-sprite-card.is-academy .home-nature-chip {
+  background: color-mix(in srgb, var(--teal) 24%, var(--panel));
+  color: var(--teal-deep);
+}
+
+.home-sprite-card.is-academy .home-sprite-metric-track b {
+  background: linear-gradient(90deg, var(--teal-deep), var(--teal-bright));
+}
+
 /* 空态与提示 */
 .home-empty {
   display: flex;
@@ -1054,6 +1096,23 @@
 @container (max-width: 1100px) {
   .home-sprite-grid {
     grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  }
+}
+
+@container (max-width: 1000px) {
+  .home-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .home-side {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .home-pairing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   }
 }
 
