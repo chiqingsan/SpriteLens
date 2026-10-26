@@ -27,7 +27,7 @@ function title(mark: MedalMark) { return mark.name + (mark.source === 'reference
   </span>
   <template v-if="!kind || kind === 'all' || kind === 'medals'">
     <span v-for="(mark, index) in markSlots" :key="mark?.label || index" :class="{ 'point-medal-slot': slots }">
-      <span v-if="mark" class="pet-medal" :class="{ 'has-icon': medalId(mark) && !failed[mark.label] }" :title="title(mark)"><span>{{ mark.label }}</span><img v-if="medalId(mark) && !failed[mark.label]" :src="'/static/medal-icons/mark-' + medalId(mark) + '.webp'" :alt="mark.name" @error="failed[mark.label] = true"></span>
+      <span v-if="mark" class="pet-medal" :class="{ 'has-icon': medalId(mark) && !failed[mark.label] }" :title="title(mark)"><span>{{ mark.label }}</span><img v-if="medalId(mark) && !failed[mark.label]" :src="'/static/medal-icons/' + medalId(mark) + '.webp'" :alt="mark.name" @error="failed[mark.label] = true"></span>
     </span>
   </template>
 </template>

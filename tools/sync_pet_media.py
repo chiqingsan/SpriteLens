@@ -39,33 +39,6 @@ def sync_rarity(web: Path) -> list[dict]:
     return resources
 
 
-def sync_medals(source: Path, web: Path) -> list[dict]:
-    """导入四种普通奖章，裁掉透明边距以统一显示尺寸。"""
-    target = web / "medal-icons"
-    target.mkdir(parents=True, exist_ok=True)
-    resources = []
-    for medal_id, name in ((1001, "大块头"), (1002, "小不点"), (1025, "粗嗓门"), (1026, "婉转声")):
-        origin = source / "assets/medals" / f"{medal_id}.png"
-        with Image.open(origin) as image:
-            image = image.convert("RGBA")
-            bounds = image.getchannel("A").getbbox()
-            if bounds:
-                image = image.crop(bounds)
-            # 统一光学尺寸：最长边固定 112px（放大或缩小），否则不同原画留白会把图标显示得一大一小。
-            scale = 112 / max(image.width, image.height)
-            if scale != 1:
-                image = image.resize((max(1, round(image.width * scale)), max(1, round(image.height * scale))), Image.LANCZOS)
-            normalized = Image.new("RGBA", (128, 128))
-            normalized.paste(image, ((128 - image.width) // 2, (128 - image.height) // 2))
-            normalized.save(target / f"mark-{medal_id}.webp", "WEBP", lossless=True, method=4)
-        resources.append({"key": f"medal-icons/mark-{medal_id}.webp", "name": name,
-                          "sha256": hashlib.sha256(origin.read_bytes()).hexdigest(),
-                          "local": f"/static/medal-icons/mark-{medal_id}.webp",
-                          "transform": "alpha bounds crop + 112px optical fit + centered 128px canvas"})
-    (target / "mark-sources.json").write_text(json.dumps({"source": source.name, "resources": resources}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return resources
-
-
 def sync(source: Path, root: Path = ROOT) -> dict:
     assets = source / "assets"
     manifest = json.loads((assets / "official-resources/manifest.json").read_text(encoding="utf-8"))
@@ -147,7 +120,6 @@ def sync(source: Path, root: Path = ROOT) -> dict:
             sources.append({"key": folder + "/" + name, "sha256": hashlib.sha256(origin.read_bytes()).hexdigest(),
                             "local": "/static/" + target.name + "/" + destination.name})
     sources.extend(sync_rarity(web))
-    sources.extend(sync_medals(source, web))
     report = {"source": source.name, "manifest_version": manifest.get("resourceVersion"),
               "species_total": len(species), "portrait_species": len(index), "missing_mirrors": missing,
               "without_portrait": sorted(set(species) - set(index), key=int), "resources": sources}

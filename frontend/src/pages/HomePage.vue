@@ -172,7 +172,7 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
               <div v-else-if="!resident.species_name" class="home-resident-species">物种资料未收录</div>
               <div v-if="resident.nature_name || portraitMedals(resident).length" class="home-resident-traits">
                 <span v-if="resident.nature_name"><span>性格</span><strong>{{ resident.nature_name }}</strong></span>
-                <img v-for="mark in portraitMedals(resident)" :key="mark.name" class="home-resident-medal-icon" :src="`/static/medal-icons/mark-${medalIds[mark.name]}.webp`" :alt="mark.name" :title="mark.name" draggable="false">
+                <img v-for="mark in portraitMedals(resident)" :key="mark.name" class="home-resident-medal-icon" :src="`/static/medal-icons/${medalIds[mark.name]}.webp`" :alt="mark.name" :title="mark.name" draggable="false">
               </div>
               <div class="home-resident-measurements">
                 <span :class="{ unknown: resident.height_pct === null }" :style="{ '--ratio': Math.max(0, Math.min(1, resident.height_pct ?? 0)) }">
