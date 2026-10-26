@@ -302,13 +302,10 @@
   var navScrollBox = document.querySelector("#main-nav");
   if (navScrollBox) { navScrollBox.addEventListener("scroll", syncNavIndicator, { passive: true }); }
 
-  /* 壳层能力出口：命令面板 / 侧栏折叠等扩展模块只通过这里操作页面。 */
+  /* 壳层能力出口：侧栏折叠等扩展模块只通过这里操作页面。 */
   window.SpriteLensShell = {
     switchPage: switchPage,
-    syncNavIndicator: syncNavIndicator,
-    toggleCapture: function () { $("btn-toggle").click(); },
-    currentPage: function () { return state.page; },
-    toast: toast
+    syncNavIndicator: syncNavIndicator
   };
 
   /* ---------- 顶栏状态 ---------- */

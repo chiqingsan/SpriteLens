@@ -94,25 +94,14 @@
 - 迁移顺序建议：先小页面（设置/采集诊断）后大页面（背包/图鉴）；每次迁移只动一个页面的类名，改完用 `output/ui_shot.py` 做 1440/1280/960/760/640 三主题截图对比。
 - 新增组件流程：先在 `ui-components.css` 加 `ui-*` 与变体 → 同步本文件 §3 表格 → 页面里替换使用 → 截图验收。
 
-## 7. 壳层交互：命令面板与折叠侧栏
+## 7. 壳层扩展：折叠侧栏
 
-壳层新增两组全局交互，实现集中在 `web/static/shell-ui.js`，样式分别在 `ui-components.css`（命令面板组件）与 `app.css`（顶栏搜索按钮、侧栏底栏、折叠态）。
-
-### 7.1 命令面板（Ctrl/⌘ + K）
-
-- 入口：顶栏「搜索与命令」按钮（`#btn-command`，窄窗只留放大镜图标），快捷键 `Ctrl+K` / `⌘K`；`Esc` 关闭，`↑/↓` 选择，`Enter` 执行。
-- 分组：「页面」「操作」「外观」；数据源是 `shell-ui.js` 里的 `PAGES` / `ACTIONS` / `THEMES` 三张表，新增页面或操作时只需追加一项，不要直接操作页面私有状态（切换走 `window.SpriteLensShell.switchPage`，主题走 `window.SpriteLensAppearance.theme`）。
-- 结构：`.ui-command-layer`（fixed 遮罩层）> `.ui-command-backdrop` + `.ui-command`；内部 `.ui-command-input-row` / `.ui-command-list` / `.ui-command-item(.is-active)` / `.ui-command-foot`；快捷键帽用 `.ui-kbd`。
-- 行为约定：打开时记录并恢复焦点；`role="dialog"` + `aria-modal`；列表使用 `role="listbox"` + `aria-selected`；不做逐条入场动画，只做面板整体 200ms 进入，`prefers-reduced-motion` 下瞬时。
-- 后续可选：接入「精灵搜索」（面板输入框复用到背包筛选），当前未实现，避免和页面内搜索抢焦点。
-
-### 7.2 折叠侧栏（Ctrl/⌘ + B）
+壳层扩展脚本 `web/static/shell-ui.js`，折叠态样式在 `app.css`。
 
 - 入口：侧栏底栏右侧按钮 `#btn-rail-toggle`，快捷键 `Ctrl+B` / `⌘B`；状态写入 `localStorage["spritelens.sidebarRail"]`，刷新后保持。
-- 折叠态：`#app.sidebar-rail` 把 `--sidebar` 置 64px；隐藏账号文案/分组标题/设置按钮文字，导航只留图标（hover/focus 用 `title` 提示），账号头像仍可点击打开账号浮层；导航滑块在宽度过渡结束后重新测量。
-- 与既有窄窗规则的关系：`#app.sidebar-rail` 的 id 选择器优先级高于 `:root` 断点与 `body:has(#page-pets.active)` 图标模式，因此任意窗口宽度下都能手动折叠；不会覆盖背包 ≤760 的自动图标模式（那是默认行为，折叠是用户选择）。
+- 折叠态：`#app.sidebar-rail` 把 `--sidebar` 置 64px；隐藏账号文案/分组标题/设置按钮文字，导航只留图标（悬停/聚焦用 `title` 提示），账号头像仍可点击打开账号浮层；导航滑块在宽度过渡结束后重新测量。
+- 与既有窄窗规则的关系：`#app.sidebar-rail` 的 id 选择器优先级高于 `:root` 断点与 `body:has(#page-pets.active)` 图标模式，因此任意窗口宽度下都能手动折叠；不覆盖背包 ≤760 的自动图标模式（那是默认行为，折叠是用户选择）。
 - 无障碍：按钮 `aria-pressed` + `aria-label` 随状态切换；折叠不影响键盘 Tab 顺序。
+- 视觉：折叠态设置按钮去底色，仅悬停/选中出底；图标条宽度过渡 200ms，`prefers-reduced-motion` 下瞬时。
 
-### 7.3 图标登记
-
-`layout-sidebar-left-collapse` / `layout-sidebar-left-expand` / `corner-down-left` / `command` 四个图标已在 `tools/sync_ui_icons.py` 的 `ICONS` 表登记并重新生成 sprite（共 50 个符号），缺失时按 `docs/UI_GUIDE.md` 的图标来源流程补登记。
+> 说明：曾实现的 `Ctrl/⌘+K` 命令面板已按用户要求移除（顶栏按钮、快捷键、`ui-command*` 样式、`shell-ui.js` 内的面板逻辑均删除）；相关图标 `layout-sidebar-left-*` 保留给折叠侧栏，`command` / `corner-down-left` 留在图标源中备用，未再引用。

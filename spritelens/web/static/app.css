@@ -408,19 +408,6 @@ body, .app-shell, .sidebar, .main-shell, .topbar, .content-panel, .filter-rail,
 
 .top-actions { display: flex; gap: var(--space-2); align-items: center; }
 .top-actions button { white-space: nowrap; }
-.top-search-button {
-  display: inline-flex; align-items: center; gap: var(--space-2);
-  height: 32px; padding: 0 var(--space-2) 0 var(--space-3);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--hairline-strong);
-  background: var(--panel);
-  color: var(--muted);
-  font-size: var(--fs-xs);
-  font-weight: 500;
-}
-.top-search-button:hover { border-color: color-mix(in srgb, var(--ink) 22%, transparent); color: var(--ink); }
-.top-search-button .ui-kbd { margin-left: var(--space-1); }
-.top-search-label { display: inline-block; }
 
 /* ── 按钮 ──
    平面风格：纯色填充、无渐变、无投影、无悬停抬升；
@@ -1024,8 +1011,6 @@ details[open] > :not(summary) { animation: reveal-in var(--motion-base) var(--mo
 @media (max-width: 960px) {
   :root { --sidebar: 184px; --canvas-margin: 8px; }
   .topbar { padding: 0 var(--space-4); gap: var(--space-4); }
-  .top-search-label, .top-search-button .ui-kbd { display: none; }
-  .top-search-button { padding: 0 var(--space-2); }
 }
 @media (max-width: 760px) {
   :root { --sidebar: 168px; --canvas-margin: 6px; }
