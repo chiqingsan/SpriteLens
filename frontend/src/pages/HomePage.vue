@@ -15,18 +15,23 @@ const homeSprites = computed(() => model.data.value?.residents || [])
 const homeCouples = computed(() => model.data.value?.couples || [])
 const nests = computed(() => model.data.value?.nests || [])
 const roomLevel = computed(() => model.data.value?.room_level || 0)
-const sceneEggCount = computed(() => model.data.value?.scene_eggs.length || 0)
 const couplesStale = computed(() => Boolean(model.data.value?.couples_stale))
-const nestRows = computed(() => nests.value.map((nest) => {
-  const residents = homeSprites.value.filter((resident) => resident.nest_guid === nest.guid)
-  return {
-    guid: nest.guid,
-    name: nest.name || (nest.kind === 'academy' ? '学院绿窝' : '普通小窝'),
-    kind: nest.kind,
-    count: residents.length,
-    residentNames: residents.map((resident) => resident.name).join('、'),
+const sceneEggCount = computed(() => model.data.value?.scene_eggs.length || 0)
+const failedArtwork = ref(new Set<string>())
+function hasArtwork(resident: HomeResident) {
+  return Boolean(resident.artwork_url) && !failedArtwork.value.has(resident.actor_id)
+}
+function spriteImage(resident: HomeResident) {
+  if (hasArtwork(resident)) return resident.artwork_url
+  return failedImages.value.has(resident.actor_id) ? '' : resident.icon_url
+}
+function spriteError(resident: HomeResident) {
+  if (hasArtwork(resident)) {
+    failedArtwork.value = new Set([...failedArtwork.value, resident.actor_id])
+    return
   }
-}))
+  failedImage(resident.actor_id)
+}
 const academyResidentIds = computed(() => {
   const ids = new Set<string>()
   nests.value.forEach(nest => {
@@ -64,6 +69,7 @@ const pairingGroups = computed(() => {
 })
 watch(() => model.data.value?.uid, () => {
   failedImages.value = new Set()
+  failedArtwork.value = new Set()
 })
 onUnmounted(model.pause)
 
@@ -92,10 +98,6 @@ function speciesLabel(resident: HomeResident) {
 
 function pairingModeLabel(group: HomeCouple[]) {
   return group.some(couple => couple.mode !== 'ordinary') ? '学院配对' : '普通配对'
-}
-
-function pairingBasisLabel(group: HomeCouple[]) {
-  return group.some(couple => couple.pairing_basis === 'scene') ? '场景观察' : '小窝范围'
 }
 
 function residentFor(actorId: string) {
@@ -192,24 +194,19 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
         <p class="home-hero-sub">
           <template v-if="pairingGroups.length">{{ pairingGroups.length }} 个母本正在配对</template>
           <template v-else>还没有配对关系</template>
-          <span class="home-hero-dot" aria-hidden="true">·</span>
-          <span class="home-hero-state" :class="{ 'is-stale': couplesStale }">
-            <UiIcon :name="couplesStale ? 'clock' : 'circle-check'" />
-            {{ couplesStale ? '配对关系待刷新' : '快照已同步' }}
-          </span>
         </p>
       </div>
       <div class="home-hero-aside">
-        <div class="home-hero-meta">
-          <span class="home-meta-item"><UiIcon name="users" /><b>{{ homeSprites.length }}</b>精灵</span>
-          <span class="home-meta-item"><UiIcon name="home" /><b>{{ nests.length }}</b>小窝</span>
-          <span class="home-meta-item"><UiIcon name="arrows-shuffle" /><b>{{ pairingGroups.length }}</b>母本</span>
-          <span class="home-meta-item"><UiIcon name="egg" /><b>{{ sceneEggCount }}</b>场景蛋</span>
+        <div class="home-level" :title="`房间等级 ${roomLevel}`" :aria-label="`房间等级 ${roomLevel}`">
+          <span class="home-level-label">房间等级</span>
+          <strong class="home-level-value">{{ roomLevel || '—' }}</strong>
         </div>
-        <div class="home-hero-level" :title="`房间等级 ${roomLevel}`" :aria-label="`房间等级 ${roomLevel}`">
-          <span>房间等级</span>
-          <strong>{{ roomLevel || '—' }}</strong>
-        </div>
+        <ul class="home-hero-stats" aria-label="家园统计">
+          <li><UiIcon name="users" /><b>{{ homeSprites.length }}</b><span>精灵</span></li>
+          <li><UiIcon name="home" /><b>{{ nests.length }}</b><span>小窝</span></li>
+          <li><UiIcon name="arrows-shuffle" /><b>{{ pairingGroups.length }}</b><span>母本</span></li>
+          <li><UiIcon name="egg" /><b>{{ sceneEggCount }}</b><span>场景蛋</span></li>
+        </ul>
         <div class="home-hero-actions">
           <button type="button" class="home-ghost-button" :disabled="model.loading.value" @click="model.load()">
             <UiIcon name="refresh" />{{ model.loading.value ? '读取中…' : '刷新快照' }}
@@ -253,8 +250,8 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
             :class="[`gender-${resident.gender}`, { 'is-academy': isAcademy(resident), 'is-linked': hoveredPairIds.includes(resident.actor_id) }]"
             @mouseenter="hoveredSprite = resident.actor_id" @mouseleave="hoveredSprite = ''">
             <div class="home-sprite-art">
-              <img v-if="resident.icon_url && !failedImages.has(resident.actor_id)" class="home-sprite-image"
-                :src="resident.icon_url" alt="" loading="lazy" draggable="false" @error="failedImage(resident.actor_id)">
+              <img v-if="spriteImage(resident)" class="home-sprite-image" :class="{ 'is-artwork': hasArtwork(resident) }"
+                :src="spriteImage(resident)" alt="" loading="lazy" draggable="false" @error="spriteError(resident)">
               <span v-else class="home-sprite-fallback">{{ genderLabel(resident.gender) }}</span>
               <img v-if="rarityIconUrl(resident)" class="home-sprite-rarity" :src="rarityIconUrl(resident)"
                 :alt="resident.is_colorful ? '异色炫彩' : '异色'" :title="resident.is_colorful ? '异色炫彩' : '异色'" draggable="false">
@@ -262,13 +259,13 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
             <div class="home-sprite-body">
               <div class="home-sprite-title">
                 <strong>{{ resident.name }}</strong>
+                <span v-if="resident.nature_name" class="home-nature-chip">{{ resident.nature_name }}</span>
                 <span class="home-sprite-level">Lv.{{ resident.level }}</span>
                 <UiIcon v-if="resident.gender" class="home-gender-mark"
                   :name="resident.gender === 1 ? 'gender-male' : 'gender-female'" :title="genderLabel(resident.gender)" />
               </div>
               <div class="home-sprite-meta">
                 <span v-if="speciesLabel(resident)" class="home-sprite-species">{{ speciesLabel(resident) }}</span>
-                <span v-if="resident.nature_name" class="home-nature-chip">{{ resident.nature_name }}</span>
                 <span v-if="isAcademy(resident)" class="home-academy-chip">学院</span>
                 <img v-for="mark in portraitMedals(resident)" :key="mark.name" class="home-medal-icon"
                   :src="`/static/medal-icons/${medalIds[mark.name]}.webp`" :alt="mark.name" :title="mark.name" draggable="false">
@@ -295,20 +292,6 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
           </article>
         </div>
 
-        <section v-if="nestRows.length" class="home-nests" aria-labelledby="home-nests-title">
-          <header class="home-nests-head">
-            <h2 id="home-nests-title">小窝一览</h2>
-            <span class="home-count">{{ nestRows.length }} 个</span>
-          </header>
-          <div class="home-nest-grid">
-            <span v-for="row in nestRows" :key="row.guid" class="home-nest-chip" :title="row.residentNames || '空小窝'">
-              <UiIcon name="home" />
-              <span class="home-nest-chip-name">{{ row.name }}</span>
-              <b>{{ row.count }}</b>
-              <span v-if="row.kind === 'academy'" class="home-nest-chip-kind">学院</span>
-            </span>
-          </div>
-        </section>
       </section>
 
       <aside class="home-side">
@@ -331,7 +314,6 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
                 <UiIcon v-if="group.some(couple => couple.mode !== 'ordinary')" name="graduation-cap" />
                 {{ pairingModeLabel(group) }}
               </span>
-              <span class="home-tag">{{ pairingBasisLabel(group) }}</span>
             </header>
             <div class="home-pair-diagram" :style="{ '--pair-color': pairColor(groupIndex) }">
               <div class="home-pair-mother">
