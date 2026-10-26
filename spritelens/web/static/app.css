@@ -145,7 +145,7 @@ p { margin: 0; }
 
 /* ── 动效层：交互组件统一过渡；hover 抬升、active 按压、focus 描边 ── */
 button, .nav-item, .chip, .hb-card, .filter-tag, .account-option, .theme-choice,
-.status-pill, input, select, summary, .point-pet, .bl-nature, .home-resident, .home-nest {
+.status-pill, input, select, summary, .point-pet, .bl-nature {
   transition:
     transform var(--motion-fast) var(--motion-ease),
     box-shadow var(--motion-base) var(--motion-ease),
@@ -154,7 +154,7 @@ button, .nav-item, .chip, .hb-card, .filter-tag, .account-option, .theme-choice,
     color var(--motion-base) var(--motion-ease),
     opacity var(--motion-fast) var(--motion-ease);
 }
-:is(.hb-card, .bl-nature, .home-resident, .home-nest, .point-pet):not(:disabled):hover {
+:is(.hb-card, .bl-nature, .point-pet):not(:disabled):hover {
   transform: var(--motion-lift);
 }
 button:not(.nav-item):not(:disabled):active { transform: scale(.97); }
@@ -934,20 +934,7 @@ dialog[open] { animation: modal-in var(--motion-slow) var(--motion-spring) both;
 .bl-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 .bl-chips .mm-pet small { color: var(--muted); margin-left: 2px; }
 
-/* 我的家园 */
-.home-residents, .home-nests { display: grid; gap: var(--space-3); }
-.home-resident {
-  display: flex; align-items: center; gap: var(--space-3);
-  border: 1px solid var(--line-soft); border-radius: var(--radius-lg); padding: var(--space-2) var(--space-4); background: var(--panel);
-}
-.home-resident .pc-avatar { width: 34px; height: 34px; border-radius: var(--radius-md); background: var(--surface-3); color: var(--muted-2); }
-.home-resident small { display: block; color: var(--muted); }
-.home-pos { margin-left: auto; font-size: var(--fs-xs); }
-.home-nest {
-  display: flex; align-items: center; justify-content: space-between;
-  border: 1px solid var(--line-soft); border-radius: var(--radius-lg); padding: var(--space-3) var(--space-5); background: var(--panel);
-}
-.home-nest small { display: block; color: var(--muted); margin-top: 1px; }
+/* 我的家园（数据视图由 Vue 页面渲染，旧静态块的样式已移除） */
 
 /* 待实现页占位（.page 默认 display:none，active 时才以 grid 展开） */
 .page.feature-page { display: none; }
