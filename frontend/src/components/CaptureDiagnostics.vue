@@ -254,7 +254,7 @@ defineExpose({ update })
 .capture-network-row { align-items: flex-start; }
 .capture-network-controls { display: grid; gap: var(--space-2); width: min(360px, 58%); min-width: 0; }
 .capture-select-row { display: flex; gap: var(--space-2); min-width: 0; }
-.capture-select-row select { flex: 1; width: 100%; min-width: 0; height: 32px; padding: 0 var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); color: var(--ink); font-size: var(--fs-xs); }
+.capture-select-row select { flex: 1; width: 100%; min-width: 0; height: 32px; padding: 0 30px 0 var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-sm); background-color: var(--panel); color: var(--ink); font-size: var(--fs-xs); }
 .capture-select-row button { flex: none; }
 .capture-port-note { color: var(--muted); font-size: var(--fs-2xs); line-height: 1.5; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .capture-selected-name { overflow-wrap: anywhere; }

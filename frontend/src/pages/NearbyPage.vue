@@ -253,7 +253,7 @@ defineExpose({ update, load, pause, resume })
 .nearby-search input::placeholder { color: var(--muted-2); }
 .nearby-search:focus-within { border-color: var(--teal); box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 14%, transparent); }
 .nearby-sort { display: flex; align-items: center; gap: var(--space-2); min-width: 0; color: var(--muted); font-size: var(--fs-2xs); white-space: nowrap; }
-.nearby-sort select { min-width: 0; max-width: 100%; height: 34px; padding: 0 var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--panel); color: var(--ink-soft); font-size: var(--fs-xs); }
+.nearby-sort select { min-width: 0; max-width: 100%; height: 32px; padding: 0 28px 0 var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); background-color: var(--panel); color: var(--ink-soft); font-size: var(--fs-xs); }
 .nearby-sort select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 .nearby-refresh, .nearby-floating { height: 34px; min-height: 34px; padding: 0 var(--space-4); border-radius: 999px; font-size: var(--fs-xs); white-space: normal; }
 .nearby-refresh { border: 1px solid var(--line); background: var(--panel); color: var(--ink-soft); }

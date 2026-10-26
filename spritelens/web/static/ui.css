@@ -78,7 +78,7 @@ button:not(.nav-item):has(> .ui-icon) { display: inline-flex; align-items: cente
 .filter-section > summary small { margin-left: auto; color: var(--muted); font-weight: 400; font-size: var(--fs-3xs); }
 .filter-section .chip-group { margin-top: var(--space-3); max-height: none; }
 .filter-section #btn-more-natures { margin-top: var(--space-3); }
-#pet-filters .field select { height: 34px; background: var(--surface-1); }
+#pet-filters .field select { height: 32px; background-color: var(--surface-1); }
 .saved-shortcuts { display: grid; gap: var(--space-2); }
 .saved-shortcuts:empty { display: none; }
 .saved-shortcut { display: flex; align-items: stretch; gap: var(--space-1); min-width: 0; }
@@ -359,7 +359,7 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { appearance:
 .settings-control select, .settings-control input {
   min-width: 190px; height: 34px; padding: 0 var(--space-4);
   border: 1px solid var(--hairline); border-radius: var(--radius-sm);
-  background: var(--panel);
+  background-color: var(--panel);
 }
 .settings-status { margin: var(--space-4) 0 0; padding-top: var(--space-3); border-top: 1px solid var(--hairline); font-size: var(--fs-xs); }
 .settings-group #npcap-banner { margin: var(--space-4) 0 0; }
