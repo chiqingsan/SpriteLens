@@ -338,6 +338,7 @@
   display: grid;
   place-items: center;
   height: 78px;
+}
 
 .home-sprite-art::after {
   content: "";
