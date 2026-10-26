@@ -1,20 +1,10 @@
 /* 背包筛选与详情共用右侧列；所有界面颜色复用主题。
    视觉对齐新版外壳：白面板 + 极淡描边 + surface 分层，密度高于图鉴页。 */
 #page-pets .workspace.split { position: relative; }
-#page-pets .workspace.split #pet-detail.detail-panel {
-  position: static; width: auto; max-width: 100%; height: 100%;
-  display: flex; flex-direction: column; padding: 0; min-height: 0; max-height: none; container-type: inline-size;
-  overflow: hidden; border: 1px solid var(--line-soft); border-radius: var(--radius-lg); background: var(--panel);
-  grid-column: 2; grid-row: 1;
-}
-.pet-detail-toolbar { display: flex; align-items: center; justify-content: space-between; padding: var(--space-3) var(--space-4); gap: var(--space-3); flex: none; border-bottom: 1px solid var(--line-soft); background: var(--panel); }
-.pet-detail-toolbar h2 { margin: 0; color: var(--ink); font-size: var(--fs-lg); font-weight: 600; line-height: 1.4; }
-.pet-detail-toolbar > div { display: flex; gap: var(--space-2); }
-.pet-detail-toolbar button { height: 30px; min-width: 30px; }
-.pet-detail-toolbar button[aria-label="关闭详情"] { order: 2; }
-.pet-detail-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
-.pet-detail-body h3 { margin: 0 0 var(--space-2); color: var(--muted); font-size: var(--fs-2xs); font-weight: 600; line-height: 1.5; }
-.pet-detail-body small { color: var(--muted); font-size: var(--fs-3xs); }
+#page-pets .workspace.split > #pet-detail-root > .ui-inspector { container-type: inline-size; }
+#pet-detail .ui-inspector-body { display: flex; flex-direction: column; gap: var(--space-3); }
+#pet-detail .ui-inspector-body h3 { margin: 0 0 var(--space-2); color: var(--muted); font-size: var(--fs-2xs); font-weight: 600; line-height: 1.5; }
+#pet-detail .ui-inspector-body small { color: var(--muted); font-size: var(--fs-3xs); }
 .pet-detail-art { position: relative; height: 248px; flex: none; border: 1px solid color-mix(in srgb, var(--male-strong) 24%, var(--line-soft)); border-radius: var(--radius-lg); background: linear-gradient(158deg, color-mix(in srgb, var(--male) 92%, var(--panel)), color-mix(in srgb, var(--male) 36%, var(--panel))); overflow: hidden; }
 .pet-detail-art.male { background: linear-gradient(158deg, color-mix(in srgb, var(--male) 92%, var(--panel)), color-mix(in srgb, var(--male) 36%, var(--panel))); }
 .pet-detail-art.female { background: linear-gradient(158deg, color-mix(in srgb, var(--female) 92%, var(--panel)), color-mix(in srgb, var(--female) 36%, var(--panel))); border-color: color-mix(in srgb, var(--female-strong) 24%, var(--line-soft)); }
@@ -106,8 +96,7 @@
 .detail-acquisition { display: flex; gap: var(--space-3); flex-wrap: wrap; border-top: 1px solid var(--line-soft); padding-top: var(--space-3); font-size: var(--fs-3xs); color: var(--muted); }
 .detail-acquisition b { font-weight: 400; color: var(--ink-soft); margin-left: var(--space-1); }
 @media (max-width: 960px) {
-  #page-pets .workspace.split #pet-detail.detail-panel { position: fixed; inset: 0 0 0 auto; width: min(var(--pet-side-width), 100vw); height: auto; max-width: none; border: 0; border-radius: 0; z-index: 120; box-shadow: var(--shadow-pop); }
-  .desktop-window #page-pets .workspace.split #pet-detail.detail-panel { top: var(--window-titlebar); }
+  #page-pets .workspace.split.has-detail { grid-template-columns: minmax(0, 1fr); }
   .desktop-window #page-pets .detail-backdrop { top: var(--window-titlebar); }
 }
 @container (max-width: 320px) {

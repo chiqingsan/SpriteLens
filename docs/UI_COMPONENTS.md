@@ -65,7 +65,7 @@
 
 ### 页面级共享组件（Vue）
 
-图鉴、蛋图鉴、蛋仓三个右侧详情面板统一使用 `PageInspector`；宽度、关闭、焦点与窄屏抽屉行为由组件负责，页面只提供内容与操作：
+图鉴、蛋图鉴、蛋仓、精灵背包四个右侧详情面板统一使用 `PageInspector`；宽度、关闭、焦点与窄屏抽屉行为由组件负责，页面只提供内容与操作：
 
 ```vue
 <PageInspector ref="inspector" title="精灵详情" :meta="`#${item.handbook_no}`"
@@ -79,7 +79,7 @@
 
 - 宽度记忆键：`sn.inspector.<storage-key>`；默认 360、范围 280–560，拖拽手柄键盘方向键可调，`Home` 复位。
 - 内容区是唯一滚动容器（`.ui-inspector-body`），需要滚动到顶部时调用 `inspector.value?.body?.scrollTo(0, 0)`；打开窄屏抽屉后调用 `inspector.value?.focusClose()` 聚焦关闭按钮。
-- 背包详情 `PetDetailPanel` 仍是独立实现（`.detail-panel`，带定位按钮与密集信息），后续迁移时保持同样 props 约定。
+- 背包详情 `PetDetailPanel` 已迁移到 `PageInspector`（`storage-key="pets"`，定位按钮通过 `#actions` 插槽传入）；`#pet-detail` 上的内容样式保持，`.workspace.has-detail` 继续由页面切换网格列宽。
 
 ## 4. 历史类名 = 同源别名
 

@@ -157,11 +157,12 @@
 .dual-range[data-overlap="true"] input:last-of-type { clip-path: inset(0 0 0 calc(9px + (100% - 18px) * var(--range-ratio))); }
 @media (min-width: 961px) {
   #page-pets .workspace.split, #page-pets .workspace.split.detail-collapsed { height: 100%; min-height: 0; grid-template-columns: minmax(0, 1fr) var(--pet-side-width) !important; }
+  #page-pets .workspace.split.has-detail { grid-template-columns: minmax(0, 1fr) auto !important; }
   #page-pets { overflow: hidden; }
   #page-pets .content-panel { height: 100%; }
   #page-pets .filter-rail, #page-pets .filter-rail.filters-open { display: flex; grid-column: 2; grid-row: 1; }
   #page-pets .workspace.has-detail .filter-rail { display: none; }
-  #page-pets .workspace.split .detail-panel.detail-open { display: block; position: static; width: auto; border-radius: var(--radius-lg); z-index: auto; box-shadow: none; grid-column: 2; grid-row: 1; }
+  #page-pets .workspace.split > #pet-detail-root > .ui-inspector { grid-column: 2; grid-row: 1; height: 100%; }
   #page-pets .workspace:has(.filters-open):not(.has-detail) .content-panel { grid-row: 1; }
   #btn-pet-filters, #btn-close-pet-filters { display: none; }
 }
