@@ -161,21 +161,20 @@ function key(event: KeyboardEvent, gid: string) {
       </svg>
     </div>
     <div v-if="positions.length" class="planner-canvas-key" aria-label="小窝亲本索引">
+      <div class="planner-canvas-key-scroll">
       <div v-for="(position, index) in positions" :key="position.gid" class="planner-canvas-key-item">
         <button type="button" class="planner-canvas-key-select" :class="[{ active: selected === position.gid }, `gender-${parents.get(position.gid)?.gender}`]" :aria-pressed="selected === position.gid" @click="emit('select', position.gid)">
           <span>{{ index + 1 }}</span>
           <img v-if="parents.get(position.gid)?.icon_url" :src="parents.get(position.gid)!.icon_url" alt="" loading="lazy">
-          <strong class="planner-canvas-key-name" :title="[parents.get(position.gid)?.name || '记录缺失', parents.get(position.gid)?.gender === 1 ? '父本' : '母本', ...parentMarks(position.gid), position.kind === 'academy' ? '学院窝' : '普通窝', parents.get(position.gid)?.nature || '性格未知'].join(' · ')">
+          <strong class="planner-canvas-key-name" :title="[parents.get(position.gid)?.name || '记录缺失', parents.get(position.gid)?.gender === 1 ? '父本' : '母本', ...parentMarks(position.gid), position.kind === 'academy' ? '学院窝' : '普通窝', parents.get(position.gid)?.nature || '性格未知', locationLabel(position.gid)].join(' · ')">
             <span class="planner-canvas-key-label">{{ parents.get(position.gid)?.name || '记录缺失' }}</span>
             <span class="planner-canvas-key-gender" :class="parents.get(position.gid)?.gender === 1 ? 'male' : 'female'" :aria-label="parents.get(position.gid)?.gender === 1 ? '父本' : '母本'"><UiIcon :name="parents.get(position.gid)?.gender === 1 ? 'gender-male' : 'gender-female'" /></span>
             <span v-for="mark in parentMarks(position.gid)" :key="mark" class="planner-canvas-key-mark" :title="mark"><MedalIcon :name="mark" /></span>
           </strong>
-          <small>{{ position.kind === 'academy' ? '学院窝' : '普通窝' }}　{{ parents.get(position.gid)?.nature || '性格未知' }}</small>
+          <small><span v-if="position.kind === 'academy'" class="planner-canvas-key-academy">学院窝</span>{{ parents.get(position.gid)?.nature || '性格未知' }}<span class="planner-canvas-key-location"> · {{ locationLabel(position.gid) }}</span></small>
         </button>
-        <div class="planner-canvas-key-actions">
-          <button type="button" class="planner-canvas-key-locate" :aria-label="`定位${parents.get(position.gid)?.name || '当前精灵'}`" title="在游戏箱位中定位此精灵" @click="emit('locate', position.gid)">定位精灵</button>
-          <span class="planner-canvas-key-location" :title="locationLabel(position.gid)">{{ locationLabel(position.gid) }}</span>
-        </div>
+        <button type="button" class="planner-canvas-key-locate" :aria-label="`定位${parents.get(position.gid)?.name || '当前精灵'}`" :title="`在游戏箱位中定位此精灵 · ${locationLabel(position.gid)}`" @click="emit('locate', position.gid)"><UiIcon name="current-location" /></button>
+      </div>
       </div>
     </div>
     <p class="planner-canvas-caption" role="status"><span v-if="hint" class="planner-warning">{{ hint }}　</span>{{ caption }}<span v-if="links.length && !pending" class="planner-canvas-legend"><i class="planner-legend-swatch" />合格支持<i class="planner-legend-swatch is-interference" />干扰连边</span></p>

@@ -119,6 +119,9 @@ describe('小窝布局草图', () => {
     expect(badges[0]!.text()).toContain('学院')
     expect(badges[1]!.text()).toContain('锁')
     expect(badges[1]!.find('title').text()).toContain('位置锁定')
+    const academyKey = canvas({ positions: [nest('1', 0, 0, 'academy'), nest('2', 2, 0)] }).findAll('.planner-canvas-key-item')
+    expect(academyKey[0]!.find('.planner-canvas-key-academy').text()).toBe('学院窝')
+    expect(academyKey[1]!.find('.planner-canvas-key-academy').exists()).toBe(false)
   })
 
   it('窝位提供精灵名称提示，便于区分重复图片', () => {
@@ -135,10 +138,11 @@ describe('小窝布局草图', () => {
     expect(select.find('.planner-canvas-key-gender').attributes('aria-label')).toBe('母本')
     expect(select.find('.planner-canvas-key-gender .ui-icon use').attributes('href')).toBe('/static/icons/sprite.svg#gender-female')
     expect(select.find('.planner-canvas-key-mark img').attributes('alt')).toBe('大块头')
-    expect(select.find('small').text()).toContain('普通窝')
+    // 普通窝是常态不再逐行标注，只在学院窝上加小标
+    expect(select.find('.planner-canvas-key-academy').exists()).toBe(false)
     expect(select.find('small').text()).toContain('开朗')
     expect(item.find('.planner-canvas-key-locate').exists()).toBe(true)
-    expect(item.find('.planner-canvas-key-actions').find('.planner-canvas-key-location').text()).toBe('第3箱·第3行第2列')
+    expect(item.find('.planner-canvas-key-location').text()).toContain('第3箱·第3行第2列')
     await item.find('.planner-canvas-key-locate').trigger('click')
     expect(wrapper.emitted('locate')).toEqual([['2']])
   })
