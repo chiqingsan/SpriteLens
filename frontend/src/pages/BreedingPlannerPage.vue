@@ -234,10 +234,10 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
         <button v-if="dirty[mode] && !busy" type="button" class="planner-state-badge is-warning" :disabled="!!busy" title="布局或目标已改动，点击按当前条件重新评估" @click="model.run('evaluate')"><UiIcon name="alert-circle" />待重新评估</button>
         <span v-else class="planner-state-badge" :class="stateTone" :title="stateTitle"><UiIcon :name="stateIcon" />{{ stateLabel }}</span>
         <span class="planner-state-metrics">
-          <span class="planner-state-metric" :title="stateTitle"><small>可参与</small><strong>{{ context?.available ? context.parents.length : '—' }}<i>只</i></strong></span>
+          <span class="planner-state-metric" :title="stateTitle"><small>可参与</small><strong>{{ context?.available ? context.parents.length : '—' }}<i v-if="context?.available">只</i></strong></span>
           <span class="planner-state-metric" :title="mode === 'target' ? '已就绪目标 / 已添加目标' : '当前方案里的父本—母本配对数'"><small>{{ mode === 'target' ? '目标就绪' : '配对组' }}</small><strong v-if="plan">{{ mode === 'target' ? `${plan.goals.filter(g => g.ready).length} / ${draft.goals.length}` : plan.edges.length }}<i v-if="mode !== 'target'">组</i></strong><strong v-else class="is-idle">待评估</strong></span>
           <span class="planner-state-metric" title="画布上已入住的父本 / 母本数量"><small>入住</small><strong>{{ placementCounts.males }}<i>父</i> / {{ placementCounts.females }}<i>母</i></strong></span>
-          <span class="planner-state-metric" title="方案里有合格父本的母本数量"><small>有配对母本</small><strong>{{ plan ? plan.metrics.effective_mothers ?? 0 : '—' }}<i>只</i></strong></span>
+          <span class="planner-state-metric" title="方案里有合格父本的母本数量"><small>有配对母本</small><strong>{{ plan ? plan.metrics.effective_mothers ?? 0 : '—' }}<i v-if="plan">只</i></strong></span>
         </span>
         <button v-if="plan" type="button" class="planner-state-link" title="跳到下方的产物与目标支持" @click="outcomes?.scrollIntoView({ block: 'start', behavior: 'smooth' })">{{ dirty[mode] ? '上次结果' : '查看产物' }}<UiIcon name="chevron-down" /></button>
       </div>

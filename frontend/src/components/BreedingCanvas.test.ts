@@ -121,15 +121,12 @@ describe('小窝布局草图', () => {
     expect(pending.findAll('.planner-nest.is-partner')).toHaveLength(0)
     expect(canvas({ selected: '1' }).findAll('.planner-nest.is-partner')).toHaveLength(2)
   })
-  it('选中框位于窝位之上，并内缩成第二道细线以便和配对描边区分', () => {
+  it('选中只加粗窝位自身描边，不再往窝里套第二圈边框', () => {
     const wrapper = canvas({ selected: '3' })
-    const children = Array.from(wrapper.get('svg').element.children)
-    const nestIndex = Math.max(...children.map((child, index) => child.classList.contains('planner-nest') ? index : -1))
-    const selectedIndex = children.findIndex(child => child.classList.contains('planner-selected-outline'))
-    expect(selectedIndex).toBeGreaterThan(nestIndex)
-    // 窝位自身的描边已经承载性别色与选中色，选中框内缩 7 单位画第二道细线，
-    // 和「配对窝位用青色虚线框」形成两种可分辨的信号。
-    expect(wrapper.get('.planner-selected-outline rect').attributes()).toMatchObject({ x: '-25', y: '-25', width: '50', height: '50', rx: '6' })
+    expect(wrapper.find('.planner-nest.selected').exists()).toBe(true)
+    // 一圈候选描边 + 一圈选中描边会看成两条边框：选中态统一由 .planner-nest.selected 表达。
+    expect(wrapper.find('.planner-selected-outline').exists()).toBe(false)
+    expect(wrapper.findAll('svg > g > rect').length).toBe(wrapper.findAll('g.planner-nest').length)
   })
   it('学院窝与锁定窝位用文字角标表达，不靠颜色', () => {
     const badges = canvas({ positions: [nest('1', 0, 0, 'academy'), nest('2', 2, 0, 'normal', 'position')] }).findAll('g.planner-nest-badge')

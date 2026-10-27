@@ -112,14 +112,14 @@
 
 .planner-generate > .planner-primary { width: 128px; min-width: 128px; }
 
-/* 工具栏按钮统一「图标左、文字严格居中」：用三列网格占位，标签变化不推动布局 */
+/* 工具栏按钮统一「图标 + 文字」作为一个整体居中：以前用三列网格把文字钉在正中、
+   图标甩到最左，图标和文字之间空出半截，看着像内容没居中。 */
 .planner-toolbar-actions > .ghost-button,
 .planner-toolbar-actions > .planner-generate > .planner-primary {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  column-gap: var(--space-2);
+  display: inline-flex;
   align-items: center;
-  justify-items: center;
+  justify-content: center;
+  gap: var(--space-2);
   text-align: center;
   line-height: 1.2;
 }
@@ -136,26 +136,8 @@
 
 .planner-toolbar .planner-tabs > button > span { white-space: nowrap; }
 
-.planner-toolbar-actions > .ghost-button > .ui-icon,
-.planner-toolbar-actions > .planner-generate > .planner-primary > .ui-icon {
-  grid-column: 1;
-  grid-row: 1;
-  justify-self: start;
-}
-
 .planner-toolbar-actions > .ghost-button > span,
-.planner-toolbar-actions > .planner-generate > .planner-primary > span {
-  grid-column: 2;
-  grid-row: 1;
-  white-space: nowrap;
-}
-
-.planner-toolbar-actions > .ghost-button::after,
-.planner-toolbar-actions > .planner-generate > .planner-primary::after {
-  content: "";
-  grid-column: 3;
-  grid-row: 1;
-}
+.planner-toolbar-actions > .planner-generate > .planner-primary > span { white-space: nowrap; }
 
 /* ── 提示条 ─────────────────────────────────────────────────────────────── */
 .planner-notice {
@@ -429,9 +411,9 @@ button.planner-state-badge:focus-visible { outline: 2px solid var(--teal); outli
 .planner-nest.academy > rect { fill: color-mix(in srgb, var(--teal-soft) 70%, var(--panel)); stroke: var(--teal); }
 /* 画布不再画连线，配对关系靠「选中即描边」表达：选中某个窝后，与它配对的窝位
    换成青色虚线描边。用虚线而不是再加一圈实线，是因为实线描边已经承载性别色（蓝/粉）
-   与选中态（深青双线），再加实线在雄性窝位上和性别描边几乎分不出来；
+   与选中态（深青加粗），再加实线在雄性窝位上和性别描边几乎分不出来；
    虚线在缩放、彩色与灰度下都能一眼认出「这些是可以配的」。
-   选中窝自己由 .planner-nest.selected 与 .planner-selected-outline 负责，不会走到这里。 */
+   选中窝自己由 .planner-nest.selected 负责，不会走到这里。 */
 .planner-nest.is-partner > rect {
   stroke: var(--teal);
   stroke-width: 3;
@@ -441,10 +423,12 @@ button.planner-state-badge:focus-visible { outline: 2px solid var(--teal); outli
 .planner-nest.dragging { cursor: grabbing; }
 .planner-nest.drop-target > rect { stroke: var(--teal-dark); stroke-dasharray: 6 3; stroke-width: 4; }
 
+/* 选中只用窝位自己那圈描边表达：加粗到 3.5px 再配一层柔光。不再往窝里套一圈细线——
+   那圈线看着像多出来的一道边框，和立绘、角标挤在一起。 */
 .planner-nest.selected > rect,
 .planner-nest:focus-visible > rect {
   stroke: var(--teal-dark);
-  stroke-width: 3;
+  stroke-width: 3.5;
   filter: drop-shadow(0 2px 3px color-mix(in srgb, var(--teal-deep) 25%, transparent));
 }
 
@@ -466,9 +450,6 @@ button.planner-state-badge:focus-visible { outline: 2px solid var(--teal); outli
 .planner-nest.selected .planner-nest-name,
 .planner-nest:focus-visible .planner-nest-name { opacity: 1; }
 
-/* 选中：外框深青 + 内侧再画一圈细线，和「配对窝单圈青色描边」在形状上区分开，
-   不靠红/绿这种额外色相，避免与性别底色、干扰琥珀色打架。 */
-.planner-selected-outline rect { fill: none; stroke: var(--teal-dark); stroke-width: 1.6; opacity: 0.75; pointer-events: none; }
 .planner-drop-preview rect { fill: none; stroke-width: 3; stroke-dasharray: 8 5; }
 .planner-drop-preview.is-valid rect,
 .planner-drop-preview.is-swap rect { stroke: var(--teal-dark); }

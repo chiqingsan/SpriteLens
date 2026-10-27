@@ -39,13 +39,6 @@ onMounted(() => {
   syncCanvasHeight()
 })
 onBeforeUnmount(() => canvasObserver?.disconnect())
-// 说明与配对关系以格子中心为准；拖动中的窝跟随指针位置。
-function center(gid: string) {
-  const position = props.positions.find(item => item.gid === gid)
-  const x = drag.value?.gid === gid ? drag.value.cellX : position?.x
-  const y = drag.value?.gid === gid ? drag.value.cellY : position?.y
-  return x === undefined || y === undefined ? null : { x: x * 32 + 32, y: y * 32 + 32 }
-}
 // 画布上不再画父本连线：17 条线同时铺满画布会糊成一团，弧线、折线、正交线都试过，
 // 都会压住别人的立绘或贴着窝位边框走。配对关系改成「选中即描边」：
 // 选中某个窝后，与它配对的窝位各自亮起青色描边，其余窝位保持原样。
@@ -62,8 +55,6 @@ const edgeCount = computed(() => props.plan?.edges?.length || 0)
 const interferenceCount = computed(() => (props.plan?.edges || []).filter(edge => (props.plan?.mothers || [])
   .some(mother => mother.gid === edge.female && mother.references.some(reference => reference.interference.includes(edge.male)))).length)
 const connected = computed(() => new Set((props.plan?.edges || []).flatMap(edge => [edge.male, edge.female])))
-const selectedPosition = computed(() => props.positions.find(position => position.gid === props.selected) || null)
-const selectedCenter = computed(() => selectedPosition.value ? center(selectedPosition.value.gid) : null)
 const shortName = (gid: string) => {
   const name = props.parents.get(gid)?.name || '记录缺失'
   return name.length > 5 ? `${name.slice(0, 5)}…` : name
@@ -155,7 +146,6 @@ function key(event: KeyboardEvent, gid: string) {
           <g v-if="position.lock" class="planner-nest-badge is-lock" transform="translate(22,22)"><circle r="9" /><text y="4" text-anchor="middle">锁</text><title>{{ position.lock === 'position' ? '位置锁定：不能拖动或换位' : '参与锁定：保持在本方案中' }}</title></g>
           <g class="planner-nest-name" aria-hidden="true"><rect x="-30" y="34" width="60" height="16" rx="8" /><text x="0" y="45" text-anchor="middle">{{ shortName(position.gid) }}</text></g>
         </g>
-        <g v-if="selectedCenter" class="planner-selected-outline" :transform="`translate(${selectedCenter.x},${selectedCenter.y})`" aria-hidden="true"><rect x="-25" y="-25" width="50" height="50" rx="6" /></g>
         <g v-if="dropState" class="planner-drop-preview" :class="`is-${dropState.type}`" :transform="`translate(${dropState.x * 32 + 32},${dropState.y * 32 + 32})`" aria-hidden="true"><rect x="-32" y="-32" width="64" height="64" rx="8" /></g>
       </svg>
     </div>
