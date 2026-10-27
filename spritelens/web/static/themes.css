@@ -1,10 +1,15 @@
-/* 三套初始精灵配色；组件规则共用，游戏资源色保持原值。 */
+/* 三套初始精灵配色；组件规则共用，游戏资源色保持原值。
+   中性色统一走「暖白纸面 + 深墨文字 + 极淡描边」，强调色保留各主题色相。 */
+
 :root {
+  /* ── 雷达浮层（深色，三主题共用） ── */
   --radar-overlay-bg: #17251f;
   --radar-overlay-ink: #eef4e9;
   --radar-overlay-muted: #b7c8b4;
   --radar-overlay-line: #3b5042;
   --radar-overlay-point: #d4eb96;
+
+  /* ── 蛋卡（游戏资源色，保持原值） ── */
   --egg-card-frame: #729569;
   --egg-card-surface: #fcfefb;
   --egg-card-ink: #203b2b;
@@ -17,70 +22,88 @@
   --egg-tag-voice-bg: #eee5fc;
   --egg-tag-voice-line: #cbb5ef;
   --egg-tag-voice-ink: #512b7c;
-  --shadow: 0 2px 8px rgba(52, 64, 51, .04);
-  --shadow-hover: 0 4px 12px rgba(52, 64, 51, .08);
-  --shadow-pop: 0 10px 24px rgba(35, 48, 33, .20);
-  --shadow-inset: inset 0 -6px 12px rgba(0, 0, 0, .12);
-  --bg: #f6f6ed;
-  --panel: #ffffff;          /* 白面板/白输入底（历史散布的 #fff 底色统一走它） */
-  --line: #dce1d1;
-  --line-soft: #edf0e7;      /* 表格内弱分隔，比 --line 浅一档 */
-  --ink: #344033;
-  --ink-soft: #455543;
-  --muted: #64705f;
-  --muted-2: #64705f;        /* 次要文字仍保持可读对比度 */
-  --white: #ffffff;          /* 彩色底上的白字（底色请用 --panel） */
-  --surface-1: #fafbf6;      /* 工具条/分页条底 */
-  --surface-2: #f4f6ee;      /* 常用次级底：行悬停、账号行、chip */
-  --surface-3: #edf0e5;      /* 更深一档：轨道、占位头像、按钮静置底 */
-  --surface-4: #e3e9d8;      /* 按压/悬停最深档 */
-  --sidebar-bg: #eef2e7;
-  --sidebar-text: #455543;
-  --sidebar-muted: #68755f;
-  --sidebar-line: #d8e0ce;
-  --sidebar-hover: #e2e9d8;
-  --selection-mark: #455f35;
-  --teal: #5f7d48;
-  --teal-dark: #455f35;
-  --teal-deep: #34482c;
-  --teal-soft: #edf2df;
-  --teal-bright: #73905a;
+
+  /* ── 基础表面 ── */
+  --bg: #f3f5ef;              /* 窗口底色（环境光在此之上） */
+  --canvas: #fcfcf8;          /* 浮动工作画布（比纯白略暖，衬托面板层次） */
+  --canvas-edge: #e6ebde;     /* 画布描边 */
+  --panel: #ffffff;
+  --line: #e2e7da;
+  --line-soft: #edf1e6;
+  --ink: #1e271d;
+  --ink-soft: #3a4637;
+  --muted: #6a7567;
+  --muted-2: #7c8678;
+  --white: #ffffff;
+  --surface-1: #f8faf4;
+  --surface-2: #f1f4ea;
+  --surface-3: #e8ede0;
+  --surface-4: #dde4d3;
+
+  /* ── 侧栏 ── */
+  --sidebar-bg: #eef2e6;
+  --sidebar-text: #3c4838;
+  --sidebar-muted: #717c6b;
+  --sidebar-line: #dfe5d5;
+  --sidebar-hover: #e7ecdd;
+  --selection-mark: #4c6a3e;
+
+  /* ── 主色 ── */
+  --teal: #4f6f43;
+  --teal-dark: #3b5533;
+  --teal-deep: #2c4027;
+  --teal-soft: #eaf1e1;
+  --teal-bright: #6d905c;
   --focus-ring: #5f7d48;
-  --accent: #e1ec8f;
-  --on-accent: #455543;
-  --amber: #f5a623;
-  --amber-bright: #f7bd63;
-  --amber-soft: #fdf4e3;
-  --amber-line: #f0d9a8;
-  --amber-ink: #7a5a12;
-  --on-amber: #3d2c00;
-  --amber-progress: rgba(122, 90, 18, .16); /* 提示条内进度槽底 */
-  --danger: #e35d6a;
-  --danger-soft: #fdeaec;
-  --danger-hover: #fbdfe2;
-  --danger-ink: #a83843;
-  --positive: #4b7139;
-  --negative: #d0576a;
-  --ok: #8cbd6b;
-  --male: #eaf6ff;
+  --accent: #d9e8c6;          /* 兼容旧引用的强调浅底 */
+  --on-accent: #37452d;
+
+  /* ── 环境光：画布外的极淡色雾 ── */
+  --ambient-1: rgba(150, 178, 118, .22);
+  --ambient-2: rgba(196, 216, 164, .30);
+
+  /* ── 琥珀：处理中 / 提示 ── */
+  --amber: #e09a2e;
+  --amber-bright: #efb45a;
+  --amber-soft: #fdf3e2;
+  --amber-line: #efdbb4;
+  --amber-ink: #74530d;
+  --on-amber: #3a2800;
+  --amber-progress: rgba(116, 83, 13, .16);
+
+  /* ── 危险：只留给真正破坏性操作 ── */
+  --danger: #dd5663;
+  --danger-soft: #fce9ec;
+  --danger-hover: #f9dce0;
+  --danger-ink: #9f313c;
+  --positive: #437a34;
+  --negative: #c64d61;
+  --ok: #7fb35e;
+
+  /* ── 性别：浅底（卡片底色）+ 强色（环形标记）+ ink（小字） ── */
+  --male: #e7f2fb;
   --male-strong: #5b9dd9;
-  --male-ink: #326aa0;
-  --female: #fff0f4;
+  --male-ink: #2c6396;
+  --female: #fceef3;
   --female-strong: #d98ab0;
-  --female-ink: #a13d6b;
-  --deep-1: #2d3c2b;
-  --deep-2: #202b21;
-  --deep-text: #e5ecdc;
+  --female-ink: #9c3a66;
+
+  /* ── 深色家族（浮层/tooltip/代码块） ── */
+  --deep-1: #263323;
+  --deep-2: #1b241a;
+  --deep-text: #e8efdf;
   --deep-text-dim: #c3ceb8;
-  --deep-line: rgba(229, 236, 220, .16);
-  --deep-hover: rgba(229, 236, 220, .10);
   --deep-text-faint: #aebb9f;
+  --deep-line: rgba(232, 239, 223, .14);
+  --deep-hover: rgba(232, 239, 223, .10);
+
   --code-name: #05555f;
   --code-type: #8a6d1f;
   --code-value: #0b3c4a;
   --code-leaf: #607079;
   --code-text: #7a4fb5;
-  --overlay: rgba(32, 43, 33, .45);
+  --overlay: rgba(20, 27, 18, .40);
+
   --radar-attention-0: #587d68;
   --radar-attention-1: #6875a0;
   --radar-attention-2: #9a7055;
@@ -88,92 +111,99 @@
   --radar-attention-4: #8d7a4b;
 }
 
+/* ══════════ 火花 · 暖陶（huohua） ══════════ */
 :root[data-theme="huohua"] {
-  --bg: #faf3ef;
-  --line: #e7d9d0;
-  --line-soft: #f2e7e0;
-  --ink: #48362f;
-  --ink-soft: #614238;
-  --muted: #7e6053;
-  --muted-2: #7e6053;
-  --surface-1: #fdfaf8;
-  --surface-2: #faf1eb;
-  --surface-3: #f2e5dc;
-  --surface-4: #ecd8cd;
-  --sidebar-bg: #f6e9df;
-  --sidebar-text: #664235;
-  --sidebar-muted: #82604c;
-  --sidebar-line: #e5cdbc;
-  --sidebar-hover: #eed8c8;
-  --selection-mark: #914329;
-  --teal: #a64c32;
-  --teal-dark: #823b27;
-  --teal-deep: #603023;
-  --teal-soft: #fae8dd;
-  --teal-bright: #bc6545;
-  --focus-ring: #a64c32;
-  --accent: #f5d5b2;
-  --on-accent: #663c2b;
+  --bg: #f7f2ec;
+  --canvas: #fffdfa;
+  --canvas-edge: #efe3d8;
+  --line: #eadfd5;
+  --line-soft: #f3ece6;
+  --ink: #2a211c;
+  --ink-soft: #52423a;
+  --muted: #7b675d;
+  --muted-2: #8a766c;
+  --surface-1: #fdfaf6;
+  --surface-2: #f8f1ea;
+  --surface-3: #f1e7de;
+  --surface-4: #e9dbcf;
+  --sidebar-bg: #f3e9e1;
+  --sidebar-text: #5b4136;
+  --sidebar-muted: #8a6f62;
+  --sidebar-line: #ead9cb;
+  --sidebar-hover: #f0e2d6;
+  --selection-mark: #8f4328;
+  --teal: #a24a2e;
+  --teal-dark: #843a25;
+  --teal-deep: #5f2c1d;
+  --teal-soft: #f8e8dd;
+  --teal-bright: #bb6446;
+  --focus-ring: #a24a2e;
+  --accent: #f2d6c1;
+  --on-accent: #5b3527;
+  --ambient-1: rgba(214, 160, 122, .20);
+  --ambient-2: rgba(240, 205, 175, .28);
   --deep-1: #482e24;
   --deep-2: #32211c;
   --deep-text: #f3e7de;
   --deep-text-dim: #d7c1b3;
   --deep-text-faint: #c3a697;
-  --overlay: rgba(54, 33, 26, .45);
+  --overlay: rgba(48, 30, 23, .40);
   --code-name: #89432d;
   --code-value: #653929;
   --code-type: #826010;
   --code-leaf: #7e6053;
+  --code-text: #7a4fb5;
   --deep-line: rgba(243, 231, 222, .16);
   --deep-hover: rgba(243, 231, 222, .10);
-  --shadow: 0 2px 8px rgba(54, 33, 26, .04);
-  --shadow-hover: 0 4px 12px rgba(54, 33, 26, .08);
-  --shadow-pop: 0 10px 24px rgba(54, 33, 26, .20);
 }
 
+/* ══════════ 水蓝蓝 · 雾蓝（shuilanlan） ══════════ */
 :root[data-theme="shuilanlan"] {
-  --bg: #f0f6fa;
-  --line: #d4e1e9;
-  --line-soft: #e7eff5;
-  --ink: #293f4e;
-  --ink-soft: #39566a;
-  --muted: #5a7384;
-  --muted-2: #5a7384;
+  --bg: #eef3f7;
+  --canvas: #fbfdfe;
+  --canvas-edge: #dfe9f0;
+  --line: #dbe5ed;
+  --line-soft: #e9f0f5;
+  --ink: #172630;
+  --ink-soft: #33495a;
+  --muted: #5f7686;
+  --muted-2: #70889a;
   --surface-1: #f8fbfd;
-  --surface-2: #edf4f9;
-  --surface-3: #e4eef5;
-  --surface-4: #d7e6f1;
-  --sidebar-bg: #e5f0f7;
-  --sidebar-text: #34566e;
-  --sidebar-muted: #567488;
-  --sidebar-line: #cbdfea;
-  --sidebar-hover: #d6e7f2;
-  --selection-mark: #235e87;
-  --teal: #286d9b;
-  --teal-dark: #225775;
-  --teal-deep: #1e435b;
-  --teal-soft: #e1f0fa;
-  --teal-bright: #4387b4;
-  --focus-ring: #286d9b;
-  --accent: #c4e5f6;
-  --on-accent: #294f69;
+  --surface-2: #eef4f8;
+  --surface-3: #e4edf3;
+  --surface-4: #d6e3ec;
+  --sidebar-bg: #e9f1f7;
+  --sidebar-text: #2f4d62;
+  --sidebar-muted: #617c8f;
+  --sidebar-line: #d3e1eb;
+  --sidebar-hover: #dfeaf2;
+  --selection-mark: #1f5679;
+  --teal: #286b96;
+  --teal-dark: #1f5679;
+  --teal-deep: #174158;
+  --teal-soft: #e0eef8;
+  --teal-bright: #4388b3;
+  --focus-ring: #286b96;
+  --accent: #cfe6f4;
+  --on-accent: #23485f;
+  --ambient-1: rgba(122, 170, 205, .20);
+  --ambient-2: rgba(168, 205, 228, .30);
   --deep-1: #223d4f;
   --deep-2: #182c3a;
   --deep-text: #e4f0f8;
   --deep-text-dim: #b9d0df;
   --deep-text-faint: #9eb9cc;
-  --overlay: rgba(25, 47, 65, .45);
+  --overlay: rgba(20, 38, 52, .42);
   --code-name: #235f87;
   --code-value: #234558;
   --code-type: #816723;
   --code-leaf: #5a7384;
+  --code-text: #7a4fb5;
   --deep-line: rgba(228, 240, 248, .16);
   --deep-hover: rgba(228, 240, 248, .10);
-  --shadow: 0 2px 8px rgba(25, 47, 65, .04);
-  --shadow-hover: 0 4px 12px rgba(25, 47, 65, .08);
-  --shadow-pop: 0 10px 24px rgba(25, 47, 65, .20);
 }
 
-.theme-miaomiao { --theme-preview: #edf2df; --theme-border: #73905a; }
-.theme-huohua { --theme-preview: #fae8dd; --theme-border: #bc6545; }
-.theme-shuilanlan { --theme-preview: #e1f0fa; --theme-border: #4387b4; }
+/* 主题选择卡预览色 */
+.theme-miaomiao { --theme-preview: #eef2e6; --theme-border: #6d905c; }
+.theme-huohua { --theme-preview: #f8e8dd; --theme-border: #bb6446; }
+.theme-shuilanlan { --theme-preview: #e0eef8; --theme-border: #4388b3; }

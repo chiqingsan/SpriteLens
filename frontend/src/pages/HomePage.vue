@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useHome, type HomeHost } from '../composables/useHome'
+import PageShell from '../components/PageShell.vue'
 import UiIcon from '../components/UiIcon.vue'
 import type { HomeCouple, HomeResident } from '../types/home'
 import './home.css'
@@ -12,6 +13,52 @@ const visibleMedalNames = new Set(['大块头', '小不点', '婉转声', '粗�
 const medalIds: Record<string, number> = { '大块头': 1001, '小不点': 1002, '婉转声': 1026, '粗嗓门': 1025 }
 const homeSprites = computed(() => model.data.value?.residents || [])
 const homeCouples = computed(() => model.data.value?.couples || [])
+const nests = computed(() => model.data.value?.nests || [])
+const roomLevel = computed(() => model.data.value?.room_level || 0)
+const couplesStale = computed(() => Boolean(model.data.value?.couples_stale))
+const sceneEggCount = computed(() => model.data.value?.scene_eggs.length || 0)
+const failedArtwork = ref(new Set<string>())
+function hasArtwork(resident: HomeResident) {
+  return Boolean(resident.artwork_url) && !failedArtwork.value.has(resident.actor_id)
+}
+function spriteImage(resident: HomeResident) {
+  if (hasArtwork(resident)) return resident.artwork_url
+  return failedImages.value.has(resident.actor_id) ? '' : resident.icon_url
+}
+function spriteError(resident: HomeResident) {
+  if (hasArtwork(resident)) {
+    failedArtwork.value = new Set([...failedArtwork.value, resident.actor_id])
+    return
+  }
+  failedImage(resident.actor_id)
+}
+const academyResidentIds = computed(() => {
+  const ids = new Set<string>()
+  nests.value.forEach(nest => {
+    if (nest.kind !== 'academy') return
+    nest.resident_ids.forEach(id => ids.add(String(id)))
+  })
+  return ids
+})
+function isAcademy(resident: HomeResident) {
+  if (academyResidentIds.value.has(String(resident.actor_id))) return true
+  return nests.value.some(nest => nest.kind === 'academy' && nest.guid === resident.nest_guid)
+}
+const hoveredSprite = ref('')
+const hoveredPairIds = ref<string[]>([])
+function pairMemberIds(group: HomeCouple[]) {
+  const ids = new Set<string>()
+  group.forEach(couple => {
+    ids.add(couple.female_actor_id)
+    couple.male_actor_ids.forEach(id => ids.add(id))
+  })
+  return [...ids]
+}
+function pairLinked(group: HomeCouple[]) {
+  if (!hoveredSprite.value) return false
+  return group.some(couple => couple.female_actor_id === hoveredSprite.value
+    || couple.male_actor_ids.includes(hoveredSprite.value))
+}
 const pairingGroups = computed(() => {
   const groups = new Map<string, HomeCouple[]>()
   homeCouples.value.forEach(couple => groups.set(couple.female_actor_id,
@@ -22,6 +69,7 @@ const pairingGroups = computed(() => {
 })
 watch(() => model.data.value?.uid, () => {
   failedImages.value = new Set()
+  failedArtwork.value = new Set()
 })
 onUnmounted(model.pause)
 
@@ -44,8 +92,12 @@ function rarityIconUrl(resident: HomeResident) {
   return resident.is_shiny ? '/static/rarity/shiny-fit.webp' : ''
 }
 
+function speciesLabel(resident: HomeResident) {
+  return resident.species_name && resident.species_name !== resident.name ? resident.species_name : ''
+}
+
 function pairingModeLabel(group: HomeCouple[]) {
-  return group.some(couple => couple.mode !== 'ordinary') ? '学院绿窝配对' : '普通配对'
+  return group.some(couple => couple.mode !== 'ordinary') ? '学院配对' : '普通配对'
 }
 
 function residentFor(actorId: string) {
@@ -81,26 +133,10 @@ function voiceRangeText(group: HomeCouple[]) {
   return low === high ? `${low} dB` : `${low}~${high} dB`
 }
 
-function startFatherDrag(event: PointerEvent) {
-  if (event.button !== 0) return
-  const row = event.currentTarget as HTMLElement
-  event.preventDefault()
-  row.setPointerCapture(event.pointerId)
-  row.dataset.dragStartX = String(event.clientX)
-  row.dataset.dragStartScroll = String(row.scrollLeft)
-  row.classList.add('dragging')
-}
+const pairPalette = ['var(--teal-deep)', 'var(--amber-ink)', 'var(--male-ink)', 'var(--female-ink)']
 
-function moveFatherDrag(event: PointerEvent) {
-  const row = event.currentTarget as HTMLElement
-  if (!row.hasPointerCapture(event.pointerId)) return
-  row.scrollLeft = Number(row.dataset.dragStartScroll) - (event.clientX - Number(row.dataset.dragStartX))
-}
-
-function stopFatherDrag(event: PointerEvent) {
-  const row = event.currentTarget as HTMLElement
-  if (row.hasPointerCapture(event.pointerId)) row.releasePointerCapture(event.pointerId)
-  row.classList.remove('dragging')
+function pairColor(index: number) {
+  return pairPalette[index % pairPalette.length]
 }
 
 function naturePredictionRows(couple: HomeCouple) {
@@ -112,12 +148,30 @@ function naturePredictionRows(couple: HomeCouple) {
   ]
 }
 
+function natureRowsFor(group: HomeCouple[]) {
+  return group.flatMap(couple => naturePredictionRows(couple))
+    .sort((left, right) => right.percent - left.percent)
+}
+
 function percentText(value: number) {
   return `${Number(value.toFixed(2))}%`
 }
 
+function compactMeasure(text: string) {
+  return text ? text.replace(/\s+(m|kg|dB)$/, '$1') : ''
+}
+
 function measurementPercent(ratio: number | null) {
   return ratio === null ? '—' : `${Math.round(Math.max(0, Math.min(1, ratio)) * 100)}%`
+}
+
+function ratioStyle(ratio: number | null) {
+  if (ratio === null) return '0%'
+  return `${Math.round(Math.max(0, Math.min(1, ratio)) * 100)}%`
+}
+
+function voiceRatio(resident: HomeResident) {
+  return resident.voice === null ? null : (resident.voice + 100) / 200
 }
 
 function resetAccount() {
@@ -128,7 +182,35 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
 </script>
 
 <template>
-  <div class="home-page" data-vue-page>
+  <PageShell class="home-page" data-vue-page>
+    <section class="home-hero" aria-labelledby="home-title">
+      <div class="home-hero-copy">
+        <span class="home-hero-eyebrow"><UiIcon name="home" />我的家园</span>
+        <h1 id="home-title">
+          <strong>{{ homeSprites.length || '—' }}</strong> 只精灵
+          <span class="home-hero-sep">/</span>
+          <strong>{{ nests.length || '—' }}</strong> 个小窝
+        </h1>
+        <p class="home-hero-sub">
+          <template v-if="pairingGroups.length">{{ pairingGroups.length }} 个母本正在配对</template>
+          <template v-else>还没有配对关系</template>
+          <span class="home-hero-sub-sep" aria-hidden="true">·</span>
+          <span>{{ sceneEggCount }} 个场景蛋</span>
+        </p>
+      </div>
+      <div class="home-hero-aside">
+        <div class="home-level" :title="`房间等级 ${roomLevel}`" :aria-label="`房间等级 ${roomLevel}`">
+          <span class="home-level-label">房间等级</span>
+          <strong class="home-level-value">{{ roomLevel || '—' }}</strong>
+        </div>
+        <div class="home-hero-actions">
+          <button type="button" class="home-ghost-button" :disabled="model.loading.value" @click="model.load()">
+            <UiIcon name="refresh" />{{ model.loading.value ? '读取中…' : '刷新快照' }}
+          </button>
+        </div>
+      </div>
+    </section>
+
     <div v-if="model.error.value" class="home-notice home-notice--error" role="alert">
       <span>读取家园失败：{{ model.error.value }}</span>
       <button type="button" @click="model.load()">重试</button>
@@ -144,117 +226,148 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
       <button type="button" :disabled="model.loading.value" @click="model.load()">{{ model.loading.value ? '读取中…' : '重新读取' }}</button>
     </div>
 
-    <div v-else-if="model.data.value" class="home-layout">
-      <section class="home-panel home-residents-panel">
-        <header class="home-panel-heading">
-          <div>
-            <h2>家园精灵</h2>
-            <span class="home-sprite-count">{{ homeSprites.length }} 只</span>
+    <template v-else-if="model.data.value">
+      <div class="home-columns">
+      <section class="home-section home-sprites" aria-labelledby="home-sprites-title">
+        <header class="home-section-head">
+          <div class="home-section-title">
+            <h2 id="home-sprites-title">家园精灵</h2>
+            <span class="home-count">{{ homeSprites.length }} 只</span>
           </div>
         </header>
-        <div v-if="homeSprites.length" class="home-resident-grid">
-          <article v-for="resident in homeSprites" :key="resident.actor_id" class="home-resident-card" :class="`gender-${resident.gender}`">
-            <div class="home-resident-art">
-              <div class="home-portrait">
-                <img v-if="resident.icon_url && !failedImages.has(resident.actor_id)" class="home-resident-image" :src="resident.icon_url" alt="" loading="lazy" draggable="false" @error="failedImage(resident.actor_id)">
-              </div>
+
+        <div v-if="!homeSprites.length" class="home-empty-inline">
+          <strong>当前快照没有家园精灵记录</strong>
+          <p>进入家园并等待场景快照更新后再查看。</p>
+        </div>
+
+        <div v-else class="home-sprite-grid">
+          <article v-for="resident in homeSprites" :key="resident.actor_id" class="home-sprite-card"
+            :class="[`gender-${resident.gender}`, { 'is-academy': isAcademy(resident), 'is-linked': hoveredPairIds.includes(resident.actor_id) }]"
+            @mouseenter="hoveredSprite = resident.actor_id" @mouseleave="hoveredSprite = ''">
+            <div class="home-sprite-art">
+              <span v-if="isAcademy(resident)" class="home-sprite-academy" title="学院绿窝">
+                <UiIcon name="graduation-cap" />学院
+              </span>
+              <img v-if="spriteImage(resident)" class="home-sprite-image" :class="{ 'is-artwork': hasArtwork(resident) }"
+                :src="spriteImage(resident)" alt="" loading="lazy" draggable="false" @error="spriteError(resident)">
+              <span v-else class="home-sprite-fallback">{{ genderLabel(resident.gender) }}</span>
+              <img v-if="rarityIconUrl(resident)" class="home-sprite-rarity" :src="rarityIconUrl(resident)"
+                :alt="resident.is_colorful ? '异色炫彩' : '异色'" :title="resident.is_colorful ? '异色炫彩' : '异色'" draggable="false">
             </div>
-            <div class="home-resident-copy">
-              <div class="home-resident-title">
+            <div class="home-sprite-body">
+              <div class="home-sprite-title">
                 <strong>{{ resident.name }}</strong>
-                <img v-if="rarityIconUrl(resident)" class="home-rarity-icon" :src="rarityIconUrl(resident)" :alt="resident.is_colorful ? '异色炫彩' : '异色'" :title="resident.is_colorful ? '异色炫彩' : '异色'" draggable="false">
-                <span class="home-gender-symbol" :class="`gender-${resident.gender}`" :aria-label="genderLabel(resident.gender)" :title="genderLabel(resident.gender)">
-                  <UiIcon v-if="resident.gender === 1 || resident.gender === 2" :name="resident.gender === 1 ? 'gender-male' : 'gender-female'" />
-                  <span v-if="resident.gender !== 1 && resident.gender !== 2">{{ genderLabel(resident.gender) }}</span>
-                </span>
+                <span v-if="resident.nature_name" class="home-nature-chip">{{ resident.nature_name }}</span>
+                <span class="home-sprite-level">Lv.{{ resident.level }}</span>
+                <UiIcon v-if="resident.gender" class="home-gender-mark"
+                  :name="resident.gender === 1 ? 'gender-male' : 'gender-female'" :title="genderLabel(resident.gender)" />
               </div>
-              <div v-if="resident.species_name && resident.species_name !== resident.name" class="home-resident-species">{{ resident.species_name }}</div>
-              <div v-else-if="!resident.species_name" class="home-resident-species">物种资料未收录</div>
-              <div v-if="resident.nature_name || portraitMedals(resident).length" class="home-resident-traits">
-                <span v-if="resident.nature_name"><span>性格</span><strong>{{ resident.nature_name }}</strong></span>
-                <img v-for="mark in portraitMedals(resident)" :key="mark.name" class="home-resident-medal-icon" :src="`/static/medal-icons/mark-${medalIds[mark.name]}.webp`" :alt="mark.name" :title="mark.name" draggable="false">
+              <div v-if="speciesLabel(resident) || portraitMedals(resident).length" class="home-sprite-meta">
+                <span v-if="speciesLabel(resident)" class="home-sprite-species">{{ speciesLabel(resident) }}</span>
+                <img v-for="mark in portraitMedals(resident)" :key="mark.name" class="home-medal-icon"
+                  :src="`/static/medal-icons/${medalIds[mark.name]}.webp`" :alt="mark.name" :title="mark.name" draggable="false">
               </div>
-              <div class="home-resident-measurements">
-                <span :class="{ unknown: resident.height_pct === null }" :style="{ '--ratio': Math.max(0, Math.min(1, resident.height_pct ?? 0)) }">
-                  <UiIcon name="ruler-2" /><span>身高</span><strong>{{ measurementPercent(resident.height_pct) }}</strong><i><b></b></i>
+              <div class="home-sprite-metrics">
+                <span class="home-sprite-metric" :class="{ unknown: resident.height_pct === null }">
+                  <span class="home-sprite-metric-label"><UiIcon name="ruler-2" />身高</span>
+                  <span class="home-sprite-metric-value" :title="resident.height_text ? `身高 ${resident.height_text}` : '身高未知'">{{ measurementPercent(resident.height_pct) }}</span>
+                  <i class="home-sprite-metric-track"><b :style="{ width: ratioStyle(resident.height_pct) }"></b></i>
                 </span>
-                <span :class="{ unknown: resident.weight_pct === null }" :style="{ '--ratio': Math.max(0, Math.min(1, resident.weight_pct ?? 0)) }">
-                  <UiIcon name="weight" /><span>体重</span><strong>{{ measurementPercent(resident.weight_pct) }}</strong><i><b></b></i>
+                <span class="home-sprite-metric" :class="{ unknown: resident.weight_pct === null }">
+                  <span class="home-sprite-metric-label"><UiIcon name="weight" />体重</span>
+                  <span class="home-sprite-metric-value" :title="resident.weight_text ? `体重 ${resident.weight_text}` : '体重未知'">{{ measurementPercent(resident.weight_pct) }}</span>
+                  <i class="home-sprite-metric-track"><b :style="{ width: ratioStyle(resident.weight_pct) }"></b></i>
                 </span>
-                <span :class="{ unknown: resident.voice === null }" :style="resident.voice === null ? undefined : { '--ratio': Math.max(0, Math.min(1, (resident.voice + 100) / 200)) }" :title="resident.voice === null ? '声音刻度 −100 至 100 dB' : `声音刻度 −100 至 100 dB；当前 ${resident.voice} dB`">
-                  <UiIcon name="activity" /><span>声音</span><strong>{{ resident.voice === null ? '—' : measurementPercent((resident.voice + 100) / 200) }}</strong><i><b v-if="resident.voice !== null"></b></i>
+                <span class="home-sprite-metric" :class="{ unknown: resident.voice === null }"
+                  :title="resident.voice === null ? '声音未知' : `声音 ${resident.voice} dB`">
+                  <span class="home-sprite-metric-label"><UiIcon name="activity" />声音</span>
+                  <span class="home-sprite-metric-value" :title="resident.voice === null ? '声音未知' : `声音 ${resident.voice} dB`">{{ measurementPercent(voiceRatio(resident)) }}</span>
+                  <i class="home-sprite-metric-track"><b :style="{ width: ratioStyle(voiceRatio(resident)) }"></b></i>
                 </span>
               </div>
             </div>
           </article>
         </div>
-        <div v-else class="home-empty-inline">
-          <strong>当前快照没有家园精灵记录</strong>
-          <p>进入家园并等待场景快照更新后再查看。</p>
-        </div>
+
       </section>
 
       <aside class="home-side">
-        <section class="home-panel home-breeding-panel">
-          <header class="home-panel-heading">
-            <div><h2>家园配对关系</h2><span class="home-couple-count">{{ pairingGroups.length }} 个母本</span></div>
-            <span v-if="model.data.value.couples_stale" class="home-pending-tag">关系待刷新</span>
-          </header>
-          <div v-if="pairingGroups.length" class="home-couple-list">
-            <section v-for="(group, groupIndex) in pairingGroups" :key="groupIndex" class="home-couple-group" :class="{ 'home-couple-group--academy': group.some(couple => couple.mode !== 'ordinary') }">
-              <div class="home-couple-heading">
-                <strong>{{ pairingModeLabel(group) }}</strong>
-              </div>
-              <div class="home-pair-parents">
-                <div class="home-pair-parent home-pair-mother">
-                  <small>母本：</small>
-                  <div class="home-pair-portrait">
-                    <img v-if="residentFor(group[0].female_actor_id)?.icon_url" :src="residentFor(group[0].female_actor_id)?.icon_url" alt="">
-                    <span v-else>♀</span>
-                  </div>
-                  <strong>{{ group[0].female_name }}</strong>
-                </div>
-                <div class="home-pair-fathers" @pointerdown="startFatherDrag" @pointermove="moveFatherDrag" @pointerup="stopFatherDrag" @pointercancel="stopFatherDrag" @lostpointercapture="stopFatherDrag">
-                  <small>父本：</small>
-                  <div class="home-pair-father-list">
-                    <div v-for="father in fathersFor(group)" :key="father.actorId" class="home-pair-parent">
-                      <div class="home-pair-portrait">
-                        <img v-if="residentFor(father.actorId)?.icon_url" :src="residentFor(father.actorId)?.icon_url" alt="">
-                        <span v-else>♂</span>
-                      </div>
-                      <strong>{{ father.name }}</strong>
-                    </div>
-                  </div>
-                  <div v-if="!fathersFor(group).length" class="home-pair-missing">父本尚未识别</div>
-                </div>
-              </div>
-              <div class="home-pair-egg">
-                <div class="home-pair-egg-name">
-                  <span>生蛋</span>
-                  <img v-if="residentFor(group[0].female_actor_id)?.egg_icon_url" :src="residentFor(group[0].female_actor_id)?.egg_icon_url" alt="">
-                  <strong>{{ residentFor(group[0].female_actor_id)?.egg_name || '蛋种待确认' }}</strong>
-                </div>
-                <div class="home-pair-estimates">
-                  <span>蛋重 {{ eggWeightText(group[0].female_actor_id) }}</span>
-                  <span>分贝 {{ voiceRangeText(group) }}</span>
-                </div>
-              </div>
-              <div v-for="(couple, coupleIndex) in group" :key="`${couple.female_actor_id}:${coupleIndex}`" class="home-pair-nature">
-                <div class="home-nature-list" aria-label="性格概率">
-                  <div v-for="row in naturePredictionRows(couple)" :key="row.name" class="home-nature-item" :class="`nature-${row.name === '随机' ? 'random' : row.name === '待确认' ? 'unknown' : 'known'}`" :title="`${row.name} ${percentText(row.percent)}`">
-                    <strong>{{ row.name }}</strong>
-                    <span class="home-nature-track"><i :style="{ width: `${Math.max(0, Math.min(100, row.percent))}%` }"></i></span>
-                    <span class="home-nature-percent">{{ percentText(row.percent) }}</span>
-                  </div>
-                </div>
-              </div>
-            </section>
+      <section class="home-section home-pairing" aria-labelledby="home-pairing-title">
+        <header class="home-section-head">
+          <div class="home-section-title">
+            <h2 id="home-pairing-title">家园配对关系</h2>
+            <span class="home-count">{{ pairingGroups.length }} 个母本</span>
           </div>
-          <p v-else-if="model.data.value.couples_stale">家园变化后配对记录尚未刷新。</p>
-          <p v-else>当前完整快照没有记录产蛋配对关系。</p>
-        </section>
+          <span v-if="couplesStale" class="home-pending-tag">关系待刷新</span>
+        </header>
 
+        <div v-if="pairingGroups.length" class="home-pairing-grid">
+          <article v-for="(group, groupIndex) in pairingGroups" :key="groupIndex" class="home-pair-card"
+            :class="{ 'home-pair-card--academy': group.some(couple => couple.mode !== 'ordinary'), 'is-linked': pairLinked(group) }"
+            @mouseenter="hoveredPairIds = pairMemberIds(group)" @mouseleave="hoveredPairIds = []">
+            <header class="home-pair-head">
+              <span class="home-tag home-tag--mode"
+                :class="{ 'is-academy': group.some(couple => couple.mode !== 'ordinary') }">
+                <UiIcon v-if="group.some(couple => couple.mode !== 'ordinary')" name="graduation-cap" />
+                {{ pairingModeLabel(group) }}
+              </span>
+            </header>
+            <div class="home-pair-diagram" :style="{ '--pair-color': pairColor(groupIndex) }">
+              <div class="home-pair-mother">
+                <span class="home-pair-avatar">
+                  <img v-if="residentFor(group[0].female_actor_id)?.icon_url"
+                    :src="residentFor(group[0].female_actor_id)?.icon_url" alt="">
+                  <span v-else>♀</span>
+                </span>
+                <span class="home-pair-mother-name">{{ group[0].female_name }}</span>
+                <span class="home-pair-role-label">母本</span>
+              </div>
+              <div class="home-pair-branch">
+                <span v-for="father in fathersFor(group)" :key="father.actorId" class="home-pair-father" :title="father.name">
+                  <span class="home-pair-father-avatar">
+                    <img v-if="residentFor(father.actorId)?.icon_url" :src="residentFor(father.actorId)?.icon_url" alt="">
+                    <span v-else>♂</span>
+                  </span>
+                  <span class="home-pair-father-name">{{ father.name }}</span>
+                  <span class="home-pair-father-role">父本</span>
+                </span>
+                <span v-if="!fathersFor(group).length" class="home-couple-missing">父本尚未识别</span>
+              </div>
+            </div>
+            <div class="home-pair-egg">
+              <span class="home-pair-label">生蛋</span>
+              <img v-if="residentFor(group[0].female_actor_id)?.egg_icon_url" class="home-egg-icon"
+                :src="residentFor(group[0].female_actor_id)?.egg_icon_url" alt="">
+              <UiIcon v-else name="egg" class="home-egg-mark" />
+              <strong>{{ residentFor(group[0].female_actor_id)?.egg_name || '蛋种待确认' }}</strong>
+              <span class="home-pair-range">{{ eggWeightText(group[0].female_actor_id) }}</span>
+              <span class="home-pair-range">{{ voiceRangeText(group) }}</span>
+            </div>
+            <details class="home-pair-nature">
+              <summary>
+                <span>性格概率</span>
+                <span class="home-pair-nature-count">{{ natureRowsFor(group).length }} 项</span>
+                <UiIcon name="chevron-right" class="home-nature-chevron" />
+              </summary>
+              <div class="home-nature-list">
+                <span v-for="row in natureRowsFor(group)" :key="row.name" class="home-nature-item"
+                  :class="{ 'nature-random': row.name === '随机', 'nature-unknown': row.name === '待确认' }">
+                  <strong>{{ row.name }}</strong>
+                  <span class="home-nature-track"><i :style="{ width: `${Math.max(4, Math.min(100, row.percent))}%` }"></i></span>
+                  <span class="home-nature-percent">{{ percentText(row.percent) }}</span>
+                </span>
+              </div>
+            </details>
+          </article>
+        </div>
+        <div v-else class="home-empty-inline">
+          <strong>暂时没有配对关系</strong>
+          <p>把雌性精灵放进小窝，并让雄性精灵在同一区域活动，配对关系会出现在这里。</p>
+        </div>
+      </section>
       </aside>
-    </div>
-  </div>
+      </div>
+    </template>
+  </PageShell>
 </template>

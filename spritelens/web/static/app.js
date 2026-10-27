@@ -185,6 +185,48 @@
   var autoRefreshes = Object.create(null);
 
   /* ---------- 导航 ---------- */
+
+  /* ---------- 侧栏选中滑块：pills 在导航项之间滑动 ---------- */
+  var navIndicator = null;
+  var navIndicatorFirst = true;
+
+  function ensureNavIndicator() {
+    if (navIndicator) { return navIndicator; }
+    var sidebar = document.querySelector(".sidebar");
+    if (!sidebar) { return null; }
+    navIndicator = document.createElement("span");
+    navIndicator.className = "nav-indicator";
+    navIndicator.setAttribute("aria-hidden", "true");
+    sidebar.insertBefore(navIndicator, sidebar.firstChild);
+    return navIndicator;
+  }
+
+  function syncNavIndicator() {
+    var pill = ensureNavIndicator();
+    var sidebar = document.querySelector(".sidebar");
+    var active = document.querySelector(".nav-item.active");
+    if (!pill || !sidebar || !active) {
+      if (pill) { pill.removeAttribute("data-ready"); }
+      return;
+    }
+    var base = sidebar.getBoundingClientRect();
+    var rect = active.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      pill.removeAttribute("data-ready");
+      return;
+    }
+    if (navIndicatorFirst) { pill.style.transition = "none"; }
+    pill.style.width = rect.width + "px";
+    pill.style.height = rect.height + "px";
+    pill.style.transform = "translate(" + (rect.left - base.left) + "px," + (rect.top - base.top) + "px)";
+    if (navIndicatorFirst) {
+      void pill.offsetWidth;
+      pill.style.transition = "";
+      navIndicatorFirst = false;
+    }
+    pill.setAttribute("data-ready", "1");
+  }
+
   function switchPage(name, revealGid) {
     if (state.page === name) {
       if (name === "handbook" && revealGid) { handbookPage.load(revealGid); }
@@ -217,11 +259,28 @@
     document.querySelectorAll(".page").forEach(function (node) {
       node.classList.toggle("active", node.id === "page-" + name);
     });
+    // 换页入场：每个页面只在首次进入时播一次整页淡入，之后切回直接显示（不重播）。
+    // 不再给单张卡片加错峰动画——几十个卡片级 opacity/transform 动画会同时拉起几十个
+    // 合成层，低端 GPU/WebView2 下切页掉帧；且只有渲染了卡片的行会动，空格行不动。
+    var pageNode = $("page-" + name);
+    var enterTimer = pageNode.__enterTimer;
+    if (enterTimer) { window.clearTimeout(enterTimer); }
+    pageNode.classList.remove("page-enter");
+    if (!pageNode.dataset.entered) {
+      pageNode.dataset.entered = "1";
+      pageNode.classList.add("page-enter");
+      pageNode.__enterTimer = window.setTimeout(function () {
+        pageNode.classList.remove("page-enter");
+        pageNode.__enterTimer = null;
+      }, 260);
+    }
     document.querySelectorAll(".nav-item").forEach(function (node) {
       node.classList.toggle("active", node.dataset.page === name);
       if (node.dataset.page === name) { node.setAttribute("aria-current", "page"); }
       else { node.removeAttribute("aria-current"); }
     });
+    syncNavIndicator();
+    window.requestAnimationFrame(syncNavIndicator);
     if (name === "pets") {
       petFilters.activate();
       if (revealGid) { petInventory.reveal(revealGid).catch(function (err) { toast("精灵定位失败：" + err.message, true); }); }
@@ -242,6 +301,16 @@
   document.querySelectorAll(".nav-item").forEach(function (node) {
     node.addEventListener("click", function () { switchPage(node.dataset.page); });
   });
+
+  window.addEventListener("resize", syncNavIndicator);
+  var navScrollBox = document.querySelector("#main-nav");
+  if (navScrollBox) { navScrollBox.addEventListener("scroll", syncNavIndicator, { passive: true }); }
+
+  /* 壳层能力出口：侧栏折叠等扩展模块只通过这里操作页面。 */
+  window.SpriteLensShell = {
+    switchPage: switchPage,
+    syncNavIndicator: syncNavIndicator
+  };
 
   /* ---------- 顶栏状态 ---------- */
   function renderRole(identity, cached) {

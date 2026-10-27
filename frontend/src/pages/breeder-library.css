@@ -1,83 +1,521 @@
+/* 筛选配对：左右两列候选父本 / 母本 + 右侧筛选面板
+   视觉规则：白纸卡片 + 极淡描边 + 柔和阴影；选中用 teal 描边 + 很浅的 teal 底，不用实底。 */
 #page-breeder-library { min-height: 0; overflow: hidden; padding: var(--space-5); }
 #breeder-library-root { height: 100%; min-height: 0; }
-.breeder-page { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: var(--space-5); height: 100%; min-height: 0; }
-.breeder-workspace, .breeder-inspector { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 0; overflow: hidden; }
-.breeder-toolbar { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-5); flex: none; }
-.breeder-search { display: flex; align-items: center; gap: var(--space-3); flex: 1; min-width: 0; height: 32px; padding: 0 var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-1); color: var(--muted); }
-.breeder-search input { min-width: 0; width: 100%; padding: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: var(--fs-xs); }
-.breeder-search:focus-within { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+
+.breeder-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+.breeder-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: var(--space-4);
+  flex: 1;
+  min-height: 0;
+}
+
+.breeder-page .ui-page-toolbar { min-height: 0; padding: 0; border-bottom: 0; }
+.breeder-page .breeder-search { flex: 1 1 auto; max-width: 460px; }
+
+/* 两个面板都用全局 .panel，这里收回它的下外边距，间距交给 grid。 */
+.breeder-page .breeder-workspace,
+.breeder-page .breeder-inspector {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+
 .breeder-page .ui-icon { width: 16px; height: 16px; flex: none; }
-.breeder-nature-toggle { display: flex; align-items: center; gap: var(--space-2); flex: none; color: var(--ink-soft); font-size: var(--fs-xs); white-space: nowrap; }
-.breeder-nature-toggle input { accent-color: var(--teal); }
-.breeder-toolbar > button { display: grid; place-items: center; padding: var(--space-3); height: 32px; }
-.breeder-status { display: flex; align-items: center; gap: var(--space-3); min-height: 32px; padding: var(--space-2) var(--space-5); border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); color: var(--muted); font-size: var(--fs-3xs); flex: none; }
-.breeder-status > span { margin-left: auto; }
-.breeder-status.has-error, .breeder-notice { background: var(--amber-soft); color: var(--amber-ink); }
-.breeder-notice { padding: var(--space-3) var(--space-5); font-size: var(--fs-xs); }
-.breeder-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); flex: 1; min-height: 0; }
-.breeder-column { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
-.breeder-column + .breeder-column { border-left: 1px solid var(--line); }
-.breeder-column > header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 48px; padding: var(--space-3) var(--space-5); flex: none; }
-.breeder-column-title, .breeder-column-actions { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+
+/* 工具栏：搜索为主，性格开关与刷新为辅 */
+.breeder-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--line-soft);
+  flex: none;
+}
+
+.breeder-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--muted);
+  transition:
+    border-color var(--motion-fast) var(--motion-ease),
+    background-color var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-fast) var(--motion-ease);
+}
+
+.breeder-search:focus-within {
+  border-color: var(--teal);
+  background: var(--panel);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 14%, transparent);
+}
+
+.breeder-search input {
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--fs-sm);
+}
+
+.breeder-nature-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  color: var(--ink-soft);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.breeder-nature-toggle input { width: 16px; height: 16px; }
+
+/* 刷新按钮只留图标，尺寸与工具栏搜索框对齐 */
+.breeder-toolbar > .ghost-button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: var(--radius-md);
+}
+
+/* 状态行：一行灰字，只做信息，不抢视觉 */
+.breeder-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 30px;
+  padding: var(--space-1) var(--space-4);
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-size: var(--fs-3xs);
+  flex: none;
+}
+
+.breeder-status > span { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+.breeder-status.has-error { color: var(--amber-ink); background: color-mix(in srgb, var(--amber-soft) 70%, var(--panel)); }
+
+.breeder-notice {
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid color-mix(in srgb, var(--amber) 30%, var(--line-soft));
+  background: color-mix(in srgb, var(--amber-soft) 70%, var(--panel));
+  color: var(--amber-ink);
+  font-size: var(--fs-xs);
+  flex: none;
+}
+
+/* 双列候选区：中间用一条极淡分隔线，不做重边框 */
+.breeder-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  flex: 1;
+  min-height: 0;
+}
+
+.breeder-column { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.breeder-column + .breeder-column { border-left: 1px solid var(--line-soft); }
+
+.breeder-column > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 46px;
+  padding: var(--space-2) var(--space-4);
+  flex: none;
+}
+
+.breeder-column-title,
+.breeder-column-actions { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .breeder-column-title { flex: none; }
-.breeder-column-actions { justify-content: flex-end; flex: 1; }
-.breeder-column h2 { margin: 0; font-size: var(--fs-md); }
-.breeder-column-actions > small { min-width: 0; overflow: hidden; color: var(--muted); font-size: var(--fs-3xs); text-overflow: ellipsis; white-space: nowrap; }
+.breeder-column-actions { flex: 1; justify-content: flex-end; }
+
+.breeder-column h2 { margin: 0; font-size: var(--fs-md); font-weight: 600; }
+
+.breeder-column-actions > small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--fs-3xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .breeder-column.gender-1 > header .breeder-column-title > .ui-icon { color: var(--male-ink); }
 .breeder-column.gender-2 > header .breeder-column-title > .ui-icon { color: var(--female-ink); }
-.breeder-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); grid-auto-rows: max-content; align-content: start; align-items: start; gap: var(--space-3); flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 0 var(--space-4) var(--space-4); }
+
+.breeder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  grid-auto-rows: max-content;
+  align-content: start;
+  align-items: start;
+  gap: var(--space-3);
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+/* 空态在列里垂直居中，只作用于纯空态列 */
 .breeder-grid:has(> .breeder-empty:only-child) { align-content: center; }
-.breeder-card { position: relative; min-width: 0; border: 1px solid var(--male); border-radius: var(--radius-md); background: var(--egg-card-surface); overflow: hidden; }
-.breeder-card.gender-2 { border-color: var(--female); }
-.breeder-card:hover { border-color: var(--teal-bright); }
-.breeder-card.selected { border-color: var(--teal); background: color-mix(in srgb, var(--teal-soft) 32%, var(--egg-card-surface)); box-shadow: inset 0 0 0 1px var(--teal); }
-.breeder-card-select { display: flex; align-items: center; gap: var(--space-3); width: 100%; min-width: 0; padding: var(--space-4); border: 0; background: transparent; text-align: left; color: var(--ink); }
-.breeder-card-select:focus-visible, .breeder-detail-link:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-.breeder-portrait { display: grid; place-items: center; width: 64px; height: 72px; flex: none; color: var(--muted); font-size: var(--fs-xl); background: var(--surface-1); border-radius: var(--radius-md); }
+
+/* 候选卡：白底、细描边，信息靠字重与留白分层 */
+.breeder-card {
+  position: relative;
+  min-width: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  overflow: hidden;
+  transition:
+    border-color var(--motion-fast) var(--motion-ease),
+    background-color var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-base) var(--motion-ease);
+}
+
+.breeder-card:hover {
+  border-color: color-mix(in srgb, var(--teal) 34%, var(--line-soft));
+  box-shadow: var(--shadow-1);
+}
+
+.breeder-card.selected {
+  border-color: var(--teal);
+  background: color-mix(in srgb, var(--teal-soft) 34%, var(--panel));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 10%, transparent);
+}
+
+.breeder-card-select {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+
+.breeder-card-select:focus-visible,
+.breeder-detail-link:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+
+.breeder-portrait {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 64px;
+  flex: none;
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--muted);
+  font-size: var(--fs-lg);
+}
+
 .breeder-portrait img { width: 100%; height: 100%; object-fit: contain; }
-.breeder-copy { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; flex: 1; }
+
+.breeder-copy { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+
 .breeder-card-title { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
-.breeder-card-title strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); }
-.breeder-card-title small { color: var(--muted); font-size: var(--fs-3xs); }
-.breeder-card-title > .ui-icon { margin-left: auto; width: 14px; height: 14px; color: var(--male-ink); }
+
+.breeder-card-title strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.breeder-card-title small {
+  color: var(--muted);
+  font-size: var(--fs-3xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.breeder-card-title > .ui-icon { width: 14px; height: 14px; margin-left: auto; color: var(--male-ink); }
 .gender-2 .breeder-card-title > .ui-icon { color: var(--female-ink); }
-.breeder-traits { display: flex; align-items: center; gap: var(--space-2); min-height: 24px; }
-.breeder-traits > .chip { padding: var(--space-0) var(--space-2); font-size: var(--fs-3xs); background: var(--egg-tag-nature-bg); color: var(--egg-tag-nature-ink); border-color: var(--egg-tag-nature-line); }
-.breeder-traits img { width: 24px; height: 24px; object-fit: contain; }
-.breeder-groups { color: var(--muted); font-size: var(--fs-3xs); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.breeder-measures { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); color: var(--ink-soft); font-size: var(--fs-3xs); font-variant-numeric: tabular-nums; }
+
+.breeder-traits { display: flex; align-items: center; gap: var(--space-2); min-height: 22px; }
+
+.breeder-traits > .chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--egg-tag-nature-line);
+  border-radius: var(--radius-sm);
+  background: var(--egg-tag-nature-bg);
+  color: var(--egg-tag-nature-ink);
+  font-size: var(--fs-3xs);
+  line-height: 18px;
+}
+
+.breeder-traits img { width: 22px; height: 22px; object-fit: contain; }
+
+.breeder-groups {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--fs-3xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.breeder-measures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--space-3);
+  color: var(--ink-soft);
+  font-size: var(--fs-3xs);
+  font-variant-numeric: tabular-nums;
+}
+
 .breeder-measures > span { white-space: nowrap; }
-.breeder-rarity { color: var(--teal-dark); font-size: var(--fs-3xs); }
-.breeder-card > footer { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) var(--space-4); border-top: 1px solid var(--line-soft); }
-.breeder-card > footer small { min-width: 0; color: var(--muted); font-size: var(--fs-3xs); }
-.breeder-detail-link { display: inline-flex; align-items: center; gap: var(--space-1); flex: none; padding: var(--space-1); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--teal-dark); font-size: var(--fs-xs); cursor: pointer; }
+
+.breeder-rarity { color: var(--teal-dark); font-size: var(--fs-3xs); font-weight: 500; }
+
+.breeder-card > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
+  border-top: 1px solid var(--line-soft);
+}
+
+.breeder-card > footer small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--fs-3xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.breeder-detail-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: none;
+  min-height: auto;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--teal-dark);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease);
+}
+
+.breeder-detail-link:hover { background: var(--teal-soft); color: var(--teal-dark); }
 .breeder-detail-link .ui-icon { width: 12px; height: 12px; }
-.breeder-selected-mark { position: absolute; left: var(--space-2); top: var(--space-2); color: var(--teal-dark); background: var(--teal-soft); border-radius: 50%; pointer-events: none; }
-.breeder-pagination { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-1); flex: none; color: var(--muted); font-size: var(--fs-3xs); font-variant-numeric: tabular-nums; }
-.breeder-pagination > span { min-width: 38px; text-align: center; }
-.breeder-pagination .ghost-button { display: grid; place-items: center; padding: var(--space-1); }
-.breeder-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-4); padding: var(--space-7) var(--space-5); color: var(--muted); text-align: center; font-size: var(--fs-xs); }
-.breeder-empty > .ui-icon { width: 32px; height: 32px; color: var(--teal); }
-.breeder-empty p { margin: 0; line-height: 1.7; }
-.breeder-inspector-tabs { display: flex; padding: var(--space-3); gap: var(--space-2); border-bottom: 1px solid var(--line); flex: none; }
-.breeder-inspector-tabs > button { display: flex; align-items: center; justify-content: center; gap: var(--space-2); flex: 1; min-height: 34px; border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--muted); font-size: var(--fs-xs); }
-.breeder-inspector-tabs > button.active { color: var(--teal-dark); background: var(--teal-soft); border-color: var(--teal); }
-.breeder-filter-content { display: flex; flex-direction: column; gap: var(--space-6); padding: var(--space-5); min-height: 0; overflow: auto; }
+
+.breeder-selected-mark {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  width: 18px;
+  height: 18px;
+  color: var(--teal-dark);
+  background: var(--panel);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--teal) 45%, transparent);
+  pointer-events: none;
+}
+
+.breeder-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  flex: none;
+  color: var(--muted);
+  font-size: var(--fs-3xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.breeder-pagination > span { min-width: 34px; text-align: center; }
+
+.breeder-pagination .ghost-button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+}
+
+.breeder-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-5);
+  color: var(--muted);
+  text-align: center;
+  font-size: var(--fs-xs);
+}
+
+.breeder-empty > .ui-icon { width: 28px; height: 28px; margin-bottom: var(--space-1); color: var(--teal); opacity: .55; }
+.breeder-empty strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
+.breeder-empty p { max-width: 280px; margin: 0; line-height: 1.7; }
+
+/* 右侧筛选面板 */
+.breeder-inspector-tabs { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line-soft); flex: none; }
+
+/* 这里不是切换页签，而是一个分区标题：去掉大按钮外观，只留图标 + 文案。 */
+.breeder-inspector-tabs > button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: default;
+}
+
+.breeder-inspector-tabs > button .ui-icon { color: var(--muted); }
+.breeder-inspector-tabs > button:hover, .breeder-inspector-tabs > button.active { background: transparent; color: var(--ink); }
+
+.breeder-filter-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-height: 0;
+  padding: var(--space-4);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
 .breeder-section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); font-size: var(--fs-xs); }
-.breeder-page h3 { margin: 0 0 var(--space-4); font-size: var(--fs-xs); }
-.breeder-page h3 > small { margin-left: var(--space-2); font-weight: 400; color: var(--muted); font-size: var(--fs-3xs); }
-.breeder-chips, .breeder-shared-groups { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.breeder-chips > .chip, .breeder-shared-groups > .chip { padding: var(--space-2) var(--space-3); min-height: 28px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-1); color: var(--ink-soft); font-size: var(--fs-xs); }
-.breeder-chips > .chip.active { background: var(--teal-soft); border-color: var(--teal); color: var(--teal-dark); }
-.breeder-help { margin: var(--space-3) 0 0; color: var(--muted); font-size: var(--fs-3xs); line-height: 1.8; }
-.breeder-range { padding: var(--space-4) var(--space-2); font-size: var(--fs-xs); }
+.breeder-section-heading > strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
+.breeder-section-heading .breeder-detail-link { padding: 0; font-size: var(--fs-2xs); }
+
+.breeder-page h3 { margin: 0 0 var(--space-3); color: var(--ink-soft); font-size: var(--fs-xs); font-weight: 600; }
+.breeder-page h3 > small { margin-left: var(--space-2); color: var(--muted); font-size: var(--fs-3xs); font-weight: 400; }
+
+.breeder-chips,
+.breeder-shared-groups { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+.breeder-chips > .chip,
+.breeder-shared-groups > .chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--ink-soft);
+  font-size: var(--fs-2xs);
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease);
+}
+
+.breeder-chips > .chip:hover,
+.breeder-shared-groups > .chip:hover { border-color: var(--line); background: var(--surface-1); color: var(--ink); }
+
+.breeder-chips > .chip.active,
+.breeder-shared-groups > .chip.active {
+  border-color: color-mix(in srgb, var(--teal) 55%, var(--line-soft));
+  background: var(--teal-soft);
+  color: var(--teal-dark);
+  font-weight: 600;
+}
+
+.breeder-help { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--fs-3xs); line-height: 1.7; }
+
+.breeder-ranges { display: flex; flex-direction: column; }
+
+.breeder-range { padding: var(--space-3) 0; font-size: var(--fs-xs); }
 .breeder-range + .breeder-range { border-top: 1px solid var(--line-soft); }
-.breeder-range-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
-.breeder-range-heading > span { color: var(--ink-soft); font-weight: 600; }
-.breeder-range-heading > b { min-width: 100px; text-align: right; color: var(--muted); font-size: var(--fs-3xs); font-weight: 400; font-variant-numeric: tabular-nums; }
+
+.breeder-range-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.breeder-range-heading > span { color: var(--ink-soft); font-weight: 500; }
+.breeder-range-heading > b {
+  min-width: 100px;
+  color: var(--muted);
+  font-size: var(--fs-3xs);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 .breeder-range-heading > b.active { color: var(--teal-dark); font-weight: 600; }
-.breeder-range .dual-range { margin: var(--space-3) 0; }
+.breeder-range .dual-range { margin: var(--space-2) 0; }
 .breeder-range .dual-range-unit { margin-bottom: 0; font-size: var(--fs-3xs); }
-@media (max-width: 1200px) { .breeder-page { grid-template-columns: minmax(0, 1fr) 320px; } }
-@media (max-width: 960px) { #page-breeder-library { overflow: auto; } #breeder-library-root { height: auto; min-height: 100%; } .breeder-page { grid-template-columns: minmax(0, 1fr); height: auto; } .breeder-workspace { height: 620px; } .breeder-inspector { max-height: 620px; } }
-@media (max-width: 560px) { .breeder-columns { grid-template-columns: minmax(0, 1fr); overflow: auto; } .breeder-column { min-height: 360px; } .breeder-column + .breeder-column { border-left: 0; border-top: 1px solid var(--line); } .breeder-toolbar { flex-wrap: wrap; } .breeder-search { flex-basis: 100%; } .breeder-nature-toggle { margin-right: auto; } .breeder-status { flex-wrap: wrap; } }
+
+@media (max-width: 1200px) {
+  .breeder-body { grid-template-columns: minmax(0, 1fr) 320px; }
+}
+
+@media (max-width: 960px) {
+  #page-breeder-library { overflow: auto; }
+  #breeder-library-root { height: auto; min-height: 100%; }
+  .breeder-page { height: auto; }
+  .breeder-body { grid-template-columns: minmax(0, 1fr); }
+  .breeder-workspace { height: 620px; }
+  .breeder-inspector { max-height: 600px; }
+}
+
+@media (max-width: 560px) {
+  .breeder-columns { grid-template-columns: minmax(0, 1fr); overflow: auto; }
+  .breeder-column { min-height: 360px; }
+  .breeder-column + .breeder-column { border-left: 0; border-top: 1px solid var(--line-soft); }
+  .breeder-toolbar { flex-wrap: wrap; }
+  .breeder-search { flex-basis: 100%; }
+  .breeder-nature-toggle { margin-right: auto; }
+  .breeder-status { flex-wrap: wrap; }
+}

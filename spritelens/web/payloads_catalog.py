@@ -458,6 +458,7 @@ def home_payload(home_repo, static: StaticData | None, pet_repository=None, egg_
             if egg is not None and egg.weight_high > egg.weight_low else None,
             "egg_groups": list(species.egg_groups) if species is not None else [],
             "icon_url": species_icon_url(base_conf_id),
+            "artwork_url": pet_images(base_conf_id)["artwork_url"],
             "species_name": species.name if species else "",
         })
     nests = [

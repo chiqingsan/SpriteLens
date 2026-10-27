@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import type { EggBoxAnnotations, EggBoxEntry, EggBoxRange, EggNest, EggBoxVoiceTag } from '../types/eggBox'
 import EggBoxArtwork from './EggBoxArtwork.vue'
 import UiIcon from './UiIcon.vue'
@@ -21,8 +21,6 @@ const emit = defineEmits<{
   updateAnnotations: [value: EggBoxAnnotations]
   saveAnnotations: []
 }>()
-const closeButton = ref<HTMLButtonElement>()
-
 function rangePercent(value: number, range: EggBoxRange | null) {
   if (value <= 0 || !range) return null
   return (value - range.min) / (range.max - range.min) * 100
@@ -97,23 +95,10 @@ function updateNote(event: Event) {
   emit('updateAnnotations', { ...props.annotations, note: (event.currentTarget as HTMLTextAreaElement).value })
 }
 
-defineExpose({ focusClose: () => closeButton.value?.focus({ preventScroll: true }) })
 </script>
 
 <template>
-  <header class="eggbox-detail-header">
-    <div class="eggbox-detail-title"><h2>精灵蛋详情</h2><span>#{{ egg.instance_id }}</span></div>
-    <div class="eggbox-detail-actions">
-      <span class="sr-only">第 {{ position }} 枚，共 {{ total }} 枚</span>
-      <button type="button" class="eggbox-favorite-button eggbox-detail-favorite" :class="{ active: egg.favorite }"
-        :aria-label="egg.favorite ? '取消收藏' : '收藏这枚蛋'" :aria-pressed="egg.favorite" :disabled="favoriteSaving"
-        @click="emit('favorite', egg)"><UiIcon :name="egg.favorite ? 'star-filled' : 'star'" /></button>
-      <button type="button" class="ghost-button small" aria-label="上一枚" :disabled="total < 2" @click="emit('previous')"><UiIcon name="chevron-left" /></button>
-      <button type="button" class="ghost-button small" aria-label="下一枚" :disabled="total < 2" @click="emit('next')"><UiIcon name="chevron-right" /></button>
-      <button ref="closeButton" type="button" class="ghost-button small eggbox-mobile-close" @click="emit('close')"><UiIcon name="x" />关闭</button>
-    </div>
-  </header>
-
+  <div class="eggbox-detail-content">
   <section class="eggbox-detail-hero">
     <EggBoxArtwork :egg="egg" size="hero" />
     <div class="eggbox-detail-identity">
@@ -214,4 +199,5 @@ defineExpose({ focusClose: () => closeButton.value?.focus({ preventScroll: true 
       </dl>
     </div>
   </section>
+  </div>
 </template>

@@ -35,9 +35,9 @@ describe('蛋蛋图鉴页面布局契约', () => {
     const wrapper = mount(EggDexPage, { props: { api, active: true } })
     await flushPromises()
 
-    expect(wrapper.find('.box-total').text()).toContain('每页 30 枚')
+    expect(wrapper.find('.ui-pager__total').text()).toContain('每页 30 枚')
     expect(wrapper.findAll('#ed-grid > button')).toHaveLength(30)
-    expect(wrapper.findAll('.dex-page-navigation')).toHaveLength(1)
+    expect(wrapper.find('.ui-pager').exists()).toBe(true)
     expect(wrapper.find('.dex-pager').exists()).toBe(false)
     expect(wrapper.findAll('.dex-card-number')).toHaveLength(30)
     expect(wrapper.find('.dex-card-number').text()).toBe('No.002 · 普通')

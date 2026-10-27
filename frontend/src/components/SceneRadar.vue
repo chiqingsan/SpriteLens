@@ -319,4 +319,20 @@ const debugPosition = computed(() => {
 .is-overlay .radar-player-cross { stroke: var(--radar-overlay-ink); }
 /* 悬浮雷达紧凑窗只在调试图标开启时多显示一行原始坐标，供游戏内就地记录地标。 */
 .is-overlay .radar-debug { margin-top: var(--space-1); text-align: center; color: var(--radar-overlay-ink); }
+/* 结构分支的交互态：不改变覆盖层与地图投影，只补充悬停/焦点反馈和小窗文字补偿。 */
+.radar-target:hover .radar-hit { fill: color-mix(in srgb, var(--teal) 10%, transparent); }
+.radar-target:focus-visible .radar-hit,
+.radar-target.selected .radar-hit { fill: color-mix(in srgb, var(--teal) 16%, transparent); stroke: var(--teal); stroke-width: 1.5; }
+.is-overlay .radar-ring, .is-overlay .radar-axis { stroke: var(--radar-overlay-line); }
+.is-overlay .scene-radar text { fill: var(--radar-overlay-muted); }
+.is-overlay .radar-label-bg { fill: var(--radar-overlay-bg); fill-opacity: .85; }
+.is-overlay .radar-target:hover .radar-hit { fill: color-mix(in srgb, var(--radar-overlay-point) 16%, transparent); }
+.is-overlay .radar-target.selected .radar-hit,
+.is-overlay .radar-target:focus-visible .radar-hit { fill: color-mix(in srgb, var(--radar-overlay-point) 22%, transparent); stroke: var(--radar-overlay-point); }
+/* SVG 字号会随画布等比缩放；空态提示不受标签底片几何约束，窄窗时适当放大。 */
+.is-overlay .scene-radar-scope > text { font-size: 16px; }
+@media (max-width: 1200px) {
+  .scene-radar:not(.is-overlay) .radar-scale-label { font-size: 13px; }
+  .scene-radar:not(.is-overlay) .scene-radar-scope > text { font-size: 15px; }
+}
 </style>

@@ -29,7 +29,8 @@
 6. `CODEBASE_MAP.md` — 文件级代码地图
 7. `PROTOCOL_NOTES.md` — 排障自查清单、未解事项、版本适配指引
 8. `UI_GUIDE.md` — 前端视觉与组件规范（改 UI 前必读：token 速查/组件清单/反面清单）
-9. [VUE3_MIGRATION.md](VUE3_MIGRATION.md) — 已确认的 Vue 3 技术方向、配套工程、接口/状态与逐页迁移边界（工程与蛋图鉴已落地）
+9. [UI_COMPONENTS.md](UI_COMPONENTS.md) — 通用组件层（`ui-*`）契约、token 速查、历史类名别名表与迁移规则
+10. [VUE3_MIGRATION.md](VUE3_MIGRATION.md) — 已确认的 Vue 3 技术方向、配套工程、接口/状态与逐页迁移边界（工程与蛋图鉴已落地）
 
 - [FRONTEND_DEVELOPMENT.md](FRONTEND_DEVELOPMENT.md) — 前端安装/构建/验收、生成文件与临时桥所有权
 - [HOME_IMPLEMENTATION_PLAN.md](HOME_IMPLEMENTATION_PLAN.md) — Luna6 家园编码交接：场景/账号归属修复、增量合并、资料预测、卡片交互、地图与桌面验收；持续任务状态见 ROADMAP 的 F04-U2

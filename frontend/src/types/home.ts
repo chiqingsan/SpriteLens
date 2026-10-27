@@ -22,6 +22,7 @@ export interface HomeResident {
   egg_weight_range: { min: number; max: number } | null
   egg_groups: string[]
   icon_url: string
+  artwork_url: string
   species_name: string
 }
 

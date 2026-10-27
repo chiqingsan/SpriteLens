@@ -38,7 +38,7 @@ from spritelens.paths import logs_dir, schema_dir, static_dir
 from spritelens.protocol.opcodes import OpcodeCatalog
 from spritelens.protocol.schema import load_library
 from spritelens.repositories.settings import SettingsRepository
-from spritelens.domain.home import HomeFurniture, HomeResident, HomeSnapshot
+from spritelens.domain.home import HomeCouple, HomeFurniture, HomeResident, HomeSceneEgg, HomeSnapshot
 from spritelens.services.egg_repository import EggBoxRepository
 from spritelens.services.home_repository import HomeRepository
 from spritelens.services.monitor_service import MonitorService
@@ -161,20 +161,52 @@ def _apply_extreme_dataset(static, repository: PetRepository) -> None:
 def _demo_home() -> HomeRepository:
     repo = HomeRepository()
     repo._account.observe(PlayerIdentity(101384922, "话绵雨", 60))
+    ordinary_nest = "70182c0b68100000"
+    academy_nest = "65d37b61f2690"
+
+    def actor(index: int) -> int:
+        return 0x84182C0B68A00000 + index
+
+    # 三只精灵起家；再补成 9 只、两个小窝、3 个母本，接近真实家园的密度。
+    layout = (
+        # (instance_id, nest_guid, gender, level)
+        (1000, ordinary_nest, 1, 41),
+        (1001, ordinary_nest, 2, 35),
+        (1003, ordinary_nest, 1, 28),
+        (1005, ordinary_nest, 2, 24),
+        (1007, ordinary_nest, 1, 18),
+        (1002, academy_nest, 1, 22),
+        (1004, academy_nest, 2, 30),
+        (1006, academy_nest, 1, 26),
+        (1008, academy_nest, 2, 20),
+    )
+    residents = tuple(
+        HomeResident(actor_id=actor(index), name="", gender=gender, level=level,
+                     position=(index * 40, index * 30, 1), instance_id=instance_id,
+                     nest_guid=nest_guid)
+        for index, (instance_id, nest_guid, gender, level) in enumerate(layout)
+    )
+    ordinary_ids = tuple(row.actor_id for row in residents if row.nest_guid == ordinary_nest)
+    academy_ids = tuple(row.actor_id for row in residents if row.nest_guid == academy_nest)
+    female_ordinary = actor(1)
+    female_ordinary_b = actor(3)
+    female_academy = actor(6)
     repo._snapshot = HomeSnapshot(
         room_level=10,
-        residents=(
-            HomeResident(actor_id=0x84182c0b68a0000a, name="护主犬", gender=1, level=41,
-                         position=(-882, 1284, 61)),
-            HomeResident(actor_id=0x84182c0b68a0000b, name="喵喵", gender=2, level=35,
-                         position=(100, 200, 1)),
-        ),
+        residents=residents,
         nests=(
-            HomeFurniture(config_id=710069, guid="70182c0b68100000", kind="ordinary",
-                          name="普通小窝", position=(100, 200, 1)),
-            HomeFurniture(config_id=150011, guid="65d37b61f2690", kind="furniture",
-                          name="家具 #150011", position=(300, 400, 1)),
+            HomeFurniture(config_id=710069, guid=ordinary_nest, kind="ordinary",
+                          name="普通小窝", position=(100, 200, 1), resident_ids=ordinary_ids),
+            HomeFurniture(config_id=1001072, guid=academy_nest, kind="academy",
+                          name="学院小窝", position=(300, 400, 1), resident_ids=academy_ids),
         ),
+        couples=(
+            HomeCouple(female_actor_id=female_ordinary, male_actor_ids=(actor(0), actor(2))),
+            HomeCouple(female_actor_id=female_ordinary_b, male_actor_ids=(actor(0), actor(2))),
+            HomeCouple(female_actor_id=female_academy, male_actor_ids=(actor(5), actor(7))),
+        ),
+        scene_eggs=(HomeSceneEgg(actor_id=0x84182c0b68a00010, furniture_guid=academy_nest,
+                                 npc_config_id=3001001),),
     )
     repo._version += 1
     return repo

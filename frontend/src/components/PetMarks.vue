@@ -14,6 +14,8 @@ const special = computed(() => /^(s[1-4]|1000)$/.test(props.pet.color_card?.card
 const cardValid = computed(() => props.pet.color_card && (special.value || /^#[0-9a-f]{6}$/i.test(props.pet.color_card.base_color) && /^#[0-9a-f]{6}$/i.test(props.pet.color_card.mix_color)))
 const pattern = computed(() => ({ 1: 'sparkle_four', 2: 'heart', 3: 'diamond', 4: 'star_outline' }[props.pet.color_card?.particle_id as 1]))
 const marks = computed(() => props.slots ? ['大小', '粗婉'].map(group => props.pet.medal_marks.find(mark => group.includes(mark.label))) : props.pet.medal_marks)
+// 槽位模式固定两格：单枚奖章与双枚奖章占用同一尺寸的上半格，不会因数量放大缩小。
+const markSlots = computed<Array<MedalMark | undefined>>(() => props.slots ? [marks.value[0], marks.value[1]] : marks.value)
 function medalId(mark: MedalMark) { return { '大': 1001, '小': 1002, '粗': 1025, '婉': 1026 }[mark.label as '大'] }
 function title(mark: MedalMark) { return mark.name + (mark.source === 'reference' ? ' · 体型/声音参考标记' : ' · 当前佩戴') }
 </script>
@@ -24,8 +26,8 @@ function title(mark: MedalMark) { return mark.name + (mark.source === 'reference
     <template v-if="!special"><svg viewBox="0 0 100 60" preserveAspectRatio="none" aria-hidden="true"><rect width="100" height="60" :fill="pet.color_card.mix_color"></rect><path d="M0 30 Q25 12 50 30 T100 30 V60 H0 Z" :fill="pet.color_card.base_color"></path></svg><img v-if="pattern && !failed['pattern-' + pattern]" :src="'/static/color-cards/pattern_' + pattern + '.webp'" alt="" @error="failed['pattern-' + pattern] = true"></template>
   </span>
   <template v-if="!kind || kind === 'all' || kind === 'medals'">
-    <span v-for="(mark, index) in marks" :key="mark?.label || index" :class="{ 'point-medal-slot': slots }">
-      <span v-if="mark" class="pet-medal" :class="{ 'has-icon': medalId(mark) && !failed[mark.label] }" :title="title(mark)"><span>{{ mark.label }}</span><img v-if="medalId(mark) && !failed[mark.label]" :src="'/static/medal-icons/mark-' + medalId(mark) + '.webp'" :alt="mark.name" @error="failed[mark.label] = true"></span>
+    <span v-for="(mark, index) in markSlots" :key="mark?.label || index" :class="{ 'point-medal-slot': slots }">
+      <span v-if="mark" class="pet-medal" :class="{ 'has-icon': medalId(mark) && !failed[mark.label] }" :title="title(mark)"><span>{{ mark.label }}</span><img v-if="medalId(mark) && !failed[mark.label]" :src="'/static/medal-icons/' + medalId(mark) + '.webp'" :alt="mark.name" @error="failed[mark.label] = true"></span>
     </span>
   </template>
 </template>

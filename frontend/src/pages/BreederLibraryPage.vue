@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount } from 'vue'
 import { useBreederLibrary, type BreederHost } from '../composables/useBreederLibrary'
 import BreederCard from '../components/BreederCard.vue'
 import DualRangeSlider from '../components/DualRangeSlider.vue'
+import PageShell from '../components/PageShell.vue'
 import UiIcon from '../components/UiIcon.vue'
 import './breeder-library.css'
 
@@ -28,13 +29,15 @@ defineExpose({ load: model.load, pause, resetAccount })
 </script>
 
 <template>
-  <div class="breeder-page" data-vue-page>
-    <section class="breeder-workspace panel">
-      <header class="breeder-toolbar">
+  <PageShell class="breeder-page" data-vue-page>
+    <template #toolbar>
         <label class="breeder-search"><UiIcon name="search" /><input v-model="filters.search" type="search" aria-label="搜索配种精灵" placeholder="名称、性格、蛋组或个体 ID"></label>
         <label class="breeder-nature-toggle"><input v-model="filters.same_nature" type="checkbox">性格一致</label>
         <button class="ghost-button" title="刷新背包观察记录" aria-label="刷新筛选配对" @click="model.refresh"><UiIcon name="refresh" /></button>
-      </header>
+      </template>
+    <div class="breeder-body">
+    <section class="breeder-workspace panel">
+      
       <div class="breeder-status" :class="{ 'has-error': error || invalidRange }" role="status">
         <template v-if="invalidRange">请填写有效范围：声音 −100～100 dB，体型 0～100%，最小值不大于最大值。</template>
         <template v-else-if="error">{{ error }}<button class="breeder-detail-link" @click="model.refresh">重试</button></template>
@@ -68,5 +71,6 @@ defineExpose({ load: model.load, pause, resetAccount })
         </section>
       </div>
     </aside>
-  </div>
+    </div>
+  </PageShell>
 </template>

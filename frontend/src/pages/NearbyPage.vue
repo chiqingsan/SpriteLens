@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
+import PageShell from '../components/PageShell.vue'
 import UiIcon from '../components/UiIcon.vue'
 import MedalIcon from '../components/MedalIcon.vue'
 import SceneRadar from '../components/SceneRadar.vue'
@@ -271,19 +272,20 @@ defineExpose({ update, load, pause, resume })
 </script>
 
 <template>
-  <div class="nearby-page">
-    <header class="nearby-heading">
-      <div class="nearby-heading-main">
-        <h2 class="sr-only">附近精灵</h2>
-        <span class="nearby-phase" :class="`is-${phase}`" :title="statusHint">
-          <span class="nearby-phase-dot" aria-hidden="true"></span>{{ status }}
-        </span>
-        <span v-if="summary" class="nearby-account" :title="`当前观察账号 ${summary.uid}；切换账号后附近观察会重置`">账号 {{ shortId(summary.uid) }}</span>
-        <span v-if="rows.length" class="nearby-count-inline">{{ rows.length }} 只<span v-if="search.trim()"> / 已观察 {{ data?.actors.length ?? 0 }} 只</span></span>
-      </div>
-      <span class="nearby-count-note" :class="{ 'is-stale': stale, 'is-error': error && !stale || floatingError || coverageError || summary?.coverage_error, 'is-warning': Boolean(stoppedNote) || Boolean(data && (!data.mapping_available || data.coverage_paused)) }" :title="countNoteTitle" role="status">{{ countNote }}</span>
-    </header>
-    <div class="nearby-toolbar">
+  <PageShell class="nearby-page">
+    <template #toolbar>
+      <header class="nearby-heading">
+        <div class="nearby-heading-main">
+          <h2 class="sr-only">附近精灵</h2>
+          <span class="nearby-phase" :class="`is-${phase}`" :title="statusHint">
+            <span class="nearby-phase-dot" aria-hidden="true"></span>{{ status }}
+          </span>
+          <span v-if="summary" class="nearby-account" :title="`当前观察账号 ${summary.uid}；切换账号后附近观察会重置`">账号 {{ shortId(summary.uid) }}</span>
+          <span v-if="rows.length" class="nearby-count-inline">{{ rows.length }} 只<span v-if="search.trim()"> / 已观察 {{ data?.actors.length ?? 0 }} 只</span></span>
+        </div>
+        <span class="nearby-count-note" :class="{ 'is-stale': stale, 'is-error': error && !stale || floatingError || coverageError || summary?.coverage_error, 'is-warning': Boolean(stoppedNote) || Boolean(data && (!data.mapping_available || data.coverage_paused)) }" :title="countNoteTitle" role="status">{{ countNote }}</span>
+      </header>
+      <div class="nearby-toolbar">
       <label class="nearby-search"><UiIcon name="search" /><input v-model="search" type="search" aria-label="搜索附近精灵" placeholder="搜索名称、配置或实体编号"></label>
       <label class="nearby-sort">排序<select v-model="sort" aria-label="附近精灵排序"><option value="recent">最近观察</option><option value="marks">有牌优先</option></select></label>
       <button class="ghost-button small nearby-refresh" :aria-busy="refreshing" :aria-disabled="refreshing" :disabled="refreshing" @click="refresh"><UiIcon name="refresh" />刷新</button>
@@ -291,7 +293,8 @@ defineExpose({ update, load, pause, resume })
       <button v-if="alertHost" class="ghost-button small nearby-alert" type="button" :aria-pressed="alertOn" :title="alertOn ? '发现双牌重点精灵时播放提示音；点击关闭' : '声音提醒已关闭；点击开启并试听'" @click="toggleAlert"><UiIcon :name="alertOn ? 'bell' : 'bell-off'" />提醒音{{ alertOn ? '开' : '关' }}</button>
       <button v-if="host.resetCoverage" class="ghost-button small nearby-clear-coverage" type="button" :disabled="!canClearCoverage" :aria-busy="clearingCoverage || undefined" title="清除当前地图的本次足迹；只影响覆盖层，不重置附近列表与观察周期" @click="clearCoverage"><UiIcon name="trash" />清除足迹</button>
       <button v-if="mapsError" type="button" class="ghost-button small" @click="refreshMaps"><UiIcon name="refresh" />重试地图清单</button>
-    </div>
+      </div>
+    </template>
     <div class="nearby-workspace" :class="{ 'is-map': viewMode === 'map' }">
       <div ref="listViewport" class="nearby-list-pane">
         <section v-if="rows.length" class="nearby-grid" aria-label="附近精灵列表" :aria-busy="loading">
@@ -332,13 +335,14 @@ defineExpose({ update, load, pause, resume })
         </div>
       </div>
     </div>
-  </div>
+  </PageShell>
 </template>
 
 <style scoped>
 /* 页面占满 app shell 的 `.page` 内容区：固定高度、内部滚动，避免整页纵向滚动把雷达裁掉。 */
 :global(#nearby-root) { display: flex; height: 100%; min-height: 0; }
 .nearby-page { display: flex; flex-direction: column; flex: 1; gap: var(--space-3); min-height: 0; min-width: 0; color: var(--ink); container: nearby / inline-size; }
+.nearby-page .ui-page-toolbar { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding: 0; border-bottom: 0; }
 .nearby-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
 .nearby-heading-main { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; min-width: 0; }
 /* 顶栏已经显示页面名，重复的大标题只留给读屏，避免同一屏出现两次「附近精灵」。 */
