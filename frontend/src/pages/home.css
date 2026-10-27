@@ -9,6 +9,7 @@
   gap: var(--space-4);
   min-width: 0;
   container-type: inline-size;
+  container-name: home-page;
 }
 
 /* hero：环境渐变 + 房间等级环 */
@@ -192,6 +193,17 @@
   gap: var(--space-4);
   align-items: start;
   min-width: 0;
+}
+
+/* 左栏：家园总览在上、家园精灵在下。自身作为查询容器，
+   让总览按「左栏可用宽度」收缩，而不是按整页宽度。 */
+.home-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  container-type: inline-size;
+  container-name: home-main;
 }
 
 .home-sprites {
@@ -1053,14 +1065,14 @@
   color: var(--amber-ink);
 }
 
-/* 容器响应式 */
-@container (max-width: 1100px) {
+/* 容器响应式：整页宽度决定几栏；左栏宽度决定「家园总览」怎么排 */
+@container home-page (max-width: 1100px) {
   .home-sprite-grid {
     grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
   }
 }
 
-@container (max-width: 1000px) {
+@container home-page (max-width: 1000px) {
   .home-columns {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1077,7 +1089,7 @@
   }
 }
 
-@container (max-width: 900px) {
+@container home-main (max-width: 700px) {
   .home-hero {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -1102,11 +1114,7 @@
   }
 }
 
-@container (max-width: 640px) {
-  .home-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
+@container home-main (max-width: 520px) {
   .home-hero {
     padding: var(--space-5);
     padding-right: var(--space-6);
@@ -1120,6 +1128,12 @@
     font-size: 26px;
   }
 
+  .home-hero-aside {
+    width: 100%;
+  }
+}
+
+@container home-page (max-width: 640px) {
   .home-sprite-grid {
     grid-template-columns: repeat(auto-fill, minmax(164px, 1fr));
   }

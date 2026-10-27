@@ -183,34 +183,6 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
 
 <template>
   <PageShell class="home-page" data-vue-page>
-    <section class="home-hero" aria-labelledby="home-title">
-      <div class="home-hero-copy">
-        <span class="home-hero-eyebrow"><UiIcon name="home" />我的家园</span>
-        <h1 id="home-title">
-          <strong>{{ homeSprites.length || '—' }}</strong> 只精灵
-          <span class="home-hero-sep">/</span>
-          <strong>{{ nests.length || '—' }}</strong> 个小窝
-        </h1>
-        <p class="home-hero-sub">
-          <template v-if="pairingGroups.length">{{ pairingGroups.length }} 个母本正在配对</template>
-          <template v-else>还没有配对关系</template>
-          <span class="home-hero-sub-sep" aria-hidden="true">·</span>
-          <span>{{ sceneEggCount }} 个场景蛋</span>
-        </p>
-      </div>
-      <div class="home-hero-aside">
-        <div class="home-level" :title="`房间等级 ${roomLevel}`" :aria-label="`房间等级 ${roomLevel}`">
-          <span class="home-level-label">房间等级</span>
-          <strong class="home-level-value">{{ roomLevel || '—' }}</strong>
-        </div>
-        <div class="home-hero-actions">
-          <button type="button" class="home-ghost-button" :disabled="model.loading.value" @click="model.load()">
-            <UiIcon name="refresh" />{{ model.loading.value ? '读取中…' : '刷新快照' }}
-          </button>
-        </div>
-      </div>
-    </section>
-
     <div v-if="model.error.value" class="home-notice home-notice--error" role="alert">
       <span>读取家园失败：{{ model.error.value }}</span>
       <button type="button" @click="model.load()">重试</button>
@@ -228,145 +200,175 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
 
     <template v-else-if="model.data.value">
       <div class="home-columns">
-      <section class="home-section home-sprites" aria-labelledby="home-sprites-title">
-        <header class="home-section-head">
-          <div class="home-section-title">
-            <h2 id="home-sprites-title">家园精灵</h2>
-            <span class="home-count">{{ homeSprites.length }} 只</span>
-          </div>
-        </header>
-
-        <div v-if="!homeSprites.length" class="home-empty-inline">
-          <strong>当前快照没有家园精灵记录</strong>
-          <p>进入家园并等待场景快照更新后再查看。</p>
-        </div>
-
-        <div v-else class="home-sprite-grid">
-          <article v-for="resident in homeSprites" :key="resident.actor_id" class="home-sprite-card"
-            :class="[`gender-${resident.gender}`, { 'is-academy': isAcademy(resident), 'is-linked': hoveredPairIds.includes(resident.actor_id) }]"
-            @mouseenter="hoveredSprite = resident.actor_id" @mouseleave="hoveredSprite = ''">
-            <div class="home-sprite-art">
-              <span v-if="isAcademy(resident)" class="home-sprite-academy" title="学院绿窝">
-                <UiIcon name="graduation-cap" />学院
-              </span>
-              <img v-if="spriteImage(resident)" class="home-sprite-image" :class="{ 'is-artwork': hasArtwork(resident) }"
-                :src="spriteImage(resident)" alt="" loading="lazy" draggable="false" @error="spriteError(resident)">
-              <span v-else class="home-sprite-fallback">{{ genderLabel(resident.gender) }}</span>
-              <img v-if="rarityIconUrl(resident)" class="home-sprite-rarity" :src="rarityIconUrl(resident)"
-                :alt="resident.is_colorful ? '异色炫彩' : '异色'" :title="resident.is_colorful ? '异色炫彩' : '异色'" draggable="false">
+        <div class="home-main">
+          <section class="home-hero" aria-labelledby="home-title">
+            <div class="home-hero-copy">
+              <span class="home-hero-eyebrow"><UiIcon name="home" />家园总览</span>
+              <h1 id="home-title">
+                <strong>{{ homeSprites.length || '—' }}</strong> 只精灵
+                <span class="home-hero-sep">/</span>
+                <strong>{{ nests.length || '—' }}</strong> 个小窝
+              </h1>
+              <p class="home-hero-sub">
+                <template v-if="pairingGroups.length">{{ pairingGroups.length }} 个母本正在配对</template>
+                <template v-else>还没有配对关系</template>
+                <span class="home-hero-sub-sep" aria-hidden="true">·</span>
+                <span>{{ sceneEggCount }} 个场景蛋</span>
+              </p>
             </div>
-            <div class="home-sprite-body">
-              <div class="home-sprite-title">
-                <strong>{{ resident.name }}</strong>
-                <span v-if="resident.nature_name" class="home-nature-chip">{{ resident.nature_name }}</span>
-                <span class="home-sprite-level">Lv.{{ resident.level }}</span>
-                <UiIcon v-if="resident.gender" class="home-gender-mark"
-                  :name="resident.gender === 1 ? 'gender-male' : 'gender-female'" :title="genderLabel(resident.gender)" />
+            <div class="home-hero-aside">
+              <div class="home-level" :title="`房间等级 ${roomLevel}`" :aria-label="`房间等级 ${roomLevel}`">
+                <span class="home-level-label">房间等级</span>
+                <strong class="home-level-value">{{ roomLevel || '—' }}</strong>
               </div>
-              <div v-if="speciesLabel(resident) || portraitMedals(resident).length" class="home-sprite-meta">
-                <span v-if="speciesLabel(resident)" class="home-sprite-species">{{ speciesLabel(resident) }}</span>
-                <img v-for="mark in portraitMedals(resident)" :key="mark.name" class="home-medal-icon"
-                  :src="`/static/medal-icons/${medalIds[mark.name]}.webp`" :alt="mark.name" :title="mark.name" draggable="false">
-              </div>
-              <div class="home-sprite-metrics">
-                <span class="home-sprite-metric" :class="{ unknown: resident.height_pct === null }">
-                  <span class="home-sprite-metric-label"><UiIcon name="ruler-2" />身高</span>
-                  <span class="home-sprite-metric-value" :title="resident.height_text ? `身高 ${resident.height_text}` : '身高未知'">{{ measurementPercent(resident.height_pct) }}</span>
-                  <i class="home-sprite-metric-track"><b :style="{ width: ratioStyle(resident.height_pct) }"></b></i>
-                </span>
-                <span class="home-sprite-metric" :class="{ unknown: resident.weight_pct === null }">
-                  <span class="home-sprite-metric-label"><UiIcon name="weight" />体重</span>
-                  <span class="home-sprite-metric-value" :title="resident.weight_text ? `体重 ${resident.weight_text}` : '体重未知'">{{ measurementPercent(resident.weight_pct) }}</span>
-                  <i class="home-sprite-metric-track"><b :style="{ width: ratioStyle(resident.weight_pct) }"></b></i>
-                </span>
-                <span class="home-sprite-metric" :class="{ unknown: resident.voice === null }"
-                  :title="resident.voice === null ? '声音未知' : `声音 ${resident.voice} dB`">
-                  <span class="home-sprite-metric-label"><UiIcon name="activity" />声音</span>
-                  <span class="home-sprite-metric-value" :title="resident.voice === null ? '声音未知' : `声音 ${resident.voice} dB`">{{ measurementPercent(voiceRatio(resident)) }}</span>
-                  <i class="home-sprite-metric-track"><b :style="{ width: ratioStyle(voiceRatio(resident)) }"></b></i>
-                </span>
+              <div class="home-hero-actions">
+                <button type="button" class="home-ghost-button" :disabled="model.loading.value" @click="model.load()">
+                  <UiIcon name="refresh" />{{ model.loading.value ? '读取中…' : '刷新快照' }}
+                </button>
               </div>
             </div>
-          </article>
-        </div>
+          </section>
 
-      </section>
-
-      <aside class="home-side">
-      <section class="home-section home-pairing" aria-labelledby="home-pairing-title">
-        <header class="home-section-head">
-          <div class="home-section-title">
-            <h2 id="home-pairing-title">家园配对关系</h2>
-            <span class="home-count">{{ pairingGroups.length }} 个母本</span>
-          </div>
-          <span v-if="couplesStale" class="home-pending-tag">关系待刷新</span>
-        </header>
-
-        <div v-if="pairingGroups.length" class="home-pairing-grid">
-          <article v-for="(group, groupIndex) in pairingGroups" :key="groupIndex" class="home-pair-card"
-            :class="{ 'home-pair-card--academy': group.some(couple => couple.mode !== 'ordinary'), 'is-linked': pairLinked(group) }"
-            @mouseenter="hoveredPairIds = pairMemberIds(group)" @mouseleave="hoveredPairIds = []">
-            <header class="home-pair-head">
-              <span class="home-tag home-tag--mode"
-                :class="{ 'is-academy': group.some(couple => couple.mode !== 'ordinary') }">
-                <UiIcon v-if="group.some(couple => couple.mode !== 'ordinary')" name="graduation-cap" />
-                {{ pairingModeLabel(group) }}
-              </span>
+          <section class="home-section home-sprites" aria-labelledby="home-sprites-title">
+            <header class="home-section-head">
+              <div class="home-section-title">
+                <h2 id="home-sprites-title">家园精灵</h2>
+                <span class="home-count">{{ homeSprites.length }} 只</span>
+              </div>
             </header>
-            <div class="home-pair-diagram" :style="{ '--pair-color': pairColor(groupIndex) }">
-              <div class="home-pair-mother">
-                <span class="home-pair-avatar">
-                  <img v-if="residentFor(group[0].female_actor_id)?.icon_url"
-                    :src="residentFor(group[0].female_actor_id)?.icon_url" alt="">
-                  <span v-else>♀</span>
-                </span>
-                <span class="home-pair-mother-name">{{ group[0].female_name }}</span>
-                <span class="home-pair-role-label">母本</span>
-              </div>
-              <div class="home-pair-branch">
-                <span v-for="father in fathersFor(group)" :key="father.actorId" class="home-pair-father" :title="father.name">
-                  <span class="home-pair-father-avatar">
-                    <img v-if="residentFor(father.actorId)?.icon_url" :src="residentFor(father.actorId)?.icon_url" alt="">
-                    <span v-else>♂</span>
+
+            <div v-if="!homeSprites.length" class="home-empty-inline">
+              <strong>当前快照没有家园精灵记录</strong>
+              <p>进入家园并等待场景快照更新后再查看。</p>
+            </div>
+
+            <div v-else class="home-sprite-grid">
+              <article v-for="resident in homeSprites" :key="resident.actor_id" class="home-sprite-card"
+                :class="[`gender-${resident.gender}`, { 'is-academy': isAcademy(resident), 'is-linked': hoveredPairIds.includes(resident.actor_id) }]"
+                @mouseenter="hoveredSprite = resident.actor_id" @mouseleave="hoveredSprite = ''">
+                <div class="home-sprite-art">
+                  <span v-if="isAcademy(resident)" class="home-sprite-academy" title="学院绿窝">
+                    <UiIcon name="graduation-cap" />学院
                   </span>
-                  <span class="home-pair-father-name">{{ father.name }}</span>
-                  <span class="home-pair-father-role">父本</span>
-                </span>
-                <span v-if="!fathersFor(group).length" class="home-couple-missing">父本尚未识别</span>
-              </div>
+                  <img v-if="spriteImage(resident)" class="home-sprite-image" :class="{ 'is-artwork': hasArtwork(resident) }"
+                    :src="spriteImage(resident)" alt="" loading="lazy" draggable="false" @error="spriteError(resident)">
+                  <span v-else class="home-sprite-fallback">{{ genderLabel(resident.gender) }}</span>
+                  <img v-if="rarityIconUrl(resident)" class="home-sprite-rarity" :src="rarityIconUrl(resident)"
+                    :alt="resident.is_colorful ? '异色炫彩' : '异色'" :title="resident.is_colorful ? '异色炫彩' : '异色'" draggable="false">
+                </div>
+                <div class="home-sprite-body">
+                  <div class="home-sprite-title">
+                    <strong>{{ resident.name }}</strong>
+                    <span v-if="resident.nature_name" class="home-nature-chip">{{ resident.nature_name }}</span>
+                    <span class="home-sprite-level">Lv.{{ resident.level }}</span>
+                    <UiIcon v-if="resident.gender" class="home-gender-mark"
+                      :name="resident.gender === 1 ? 'gender-male' : 'gender-female'" :title="genderLabel(resident.gender)" />
+                  </div>
+                  <div v-if="speciesLabel(resident) || portraitMedals(resident).length" class="home-sprite-meta">
+                    <span v-if="speciesLabel(resident)" class="home-sprite-species">{{ speciesLabel(resident) }}</span>
+                    <img v-for="mark in portraitMedals(resident)" :key="mark.name" class="home-medal-icon"
+                      :src="`/static/medal-icons/${medalIds[mark.name]}.webp`" :alt="mark.name" :title="mark.name" draggable="false">
+                  </div>
+                  <div class="home-sprite-metrics">
+                    <span class="home-sprite-metric" :class="{ unknown: resident.height_pct === null }">
+                      <span class="home-sprite-metric-label"><UiIcon name="ruler-2" />身高</span>
+                      <span class="home-sprite-metric-value" :title="resident.height_text ? `身高 ${resident.height_text}` : '身高未知'">{{ measurementPercent(resident.height_pct) }}</span>
+                      <i class="home-sprite-metric-track"><b :style="{ width: ratioStyle(resident.height_pct) }"></b></i>
+                    </span>
+                    <span class="home-sprite-metric" :class="{ unknown: resident.weight_pct === null }">
+                      <span class="home-sprite-metric-label"><UiIcon name="weight" />体重</span>
+                      <span class="home-sprite-metric-value" :title="resident.weight_text ? `体重 ${resident.weight_text}` : '体重未知'">{{ measurementPercent(resident.weight_pct) }}</span>
+                      <i class="home-sprite-metric-track"><b :style="{ width: ratioStyle(resident.weight_pct) }"></b></i>
+                    </span>
+                    <span class="home-sprite-metric" :class="{ unknown: resident.voice === null }"
+                      :title="resident.voice === null ? '声音未知' : `声音 ${resident.voice} dB`">
+                      <span class="home-sprite-metric-label"><UiIcon name="activity" />声音</span>
+                      <span class="home-sprite-metric-value" :title="resident.voice === null ? '声音未知' : `声音 ${resident.voice} dB`">{{ measurementPercent(voiceRatio(resident)) }}</span>
+                      <i class="home-sprite-metric-track"><b :style="{ width: ratioStyle(voiceRatio(resident)) }"></b></i>
+                    </span>
+                  </div>
+                </div>
+              </article>
             </div>
-            <div class="home-pair-egg">
-              <span class="home-pair-label">生蛋</span>
-              <img v-if="residentFor(group[0].female_actor_id)?.egg_icon_url" class="home-egg-icon"
-                :src="residentFor(group[0].female_actor_id)?.egg_icon_url" alt="">
-              <UiIcon v-else name="egg" class="home-egg-mark" />
-              <strong>{{ residentFor(group[0].female_actor_id)?.egg_name || '蛋种待确认' }}</strong>
-              <span class="home-pair-range">{{ eggWeightText(group[0].female_actor_id) }}</span>
-              <span class="home-pair-range">{{ voiceRangeText(group) }}</span>
+
+          </section>
+        </div>
+
+        <aside class="home-side">
+          <section class="home-section home-pairing" aria-labelledby="home-pairing-title">
+          <header class="home-section-head">
+            <div class="home-section-title">
+              <h2 id="home-pairing-title">家园精灵配对关系</h2>
+              <span class="home-count">{{ pairingGroups.length }} 个母本</span>
             </div>
-            <details class="home-pair-nature">
-              <summary>
-                <span>性格概率</span>
-                <span class="home-pair-nature-count">{{ natureRowsFor(group).length }} 项</span>
-                <UiIcon name="chevron-right" class="home-nature-chevron" />
-              </summary>
-              <div class="home-nature-list">
-                <span v-for="row in natureRowsFor(group)" :key="row.name" class="home-nature-item"
-                  :class="{ 'nature-random': row.name === '随机', 'nature-unknown': row.name === '待确认' }">
-                  <strong>{{ row.name }}</strong>
-                  <span class="home-nature-track"><i :style="{ width: `${Math.max(4, Math.min(100, row.percent))}%` }"></i></span>
-                  <span class="home-nature-percent">{{ percentText(row.percent) }}</span>
+            <span v-if="couplesStale" class="home-pending-tag">关系待刷新</span>
+          </header>
+
+          <div v-if="pairingGroups.length" class="home-pairing-grid">
+            <article v-for="(group, groupIndex) in pairingGroups" :key="groupIndex" class="home-pair-card"
+              :class="{ 'home-pair-card--academy': group.some(couple => couple.mode !== 'ordinary'), 'is-linked': pairLinked(group) }"
+              @mouseenter="hoveredPairIds = pairMemberIds(group)" @mouseleave="hoveredPairIds = []">
+              <header class="home-pair-head">
+                <span class="home-tag home-tag--mode"
+                  :class="{ 'is-academy': group.some(couple => couple.mode !== 'ordinary') }">
+                  <UiIcon v-if="group.some(couple => couple.mode !== 'ordinary')" name="graduation-cap" />
+                  {{ pairingModeLabel(group) }}
                 </span>
+              </header>
+              <div class="home-pair-diagram" :style="{ '--pair-color': pairColor(groupIndex) }">
+                <div class="home-pair-mother">
+                  <span class="home-pair-avatar">
+                    <img v-if="residentFor(group[0].female_actor_id)?.icon_url"
+                      :src="residentFor(group[0].female_actor_id)?.icon_url" alt="">
+                    <span v-else>♀</span>
+                  </span>
+                  <span class="home-pair-mother-name">{{ group[0].female_name }}</span>
+                  <span class="home-pair-role-label">母本</span>
+                </div>
+                <div class="home-pair-branch">
+                  <span v-for="father in fathersFor(group)" :key="father.actorId" class="home-pair-father" :title="father.name">
+                    <span class="home-pair-father-avatar">
+                      <img v-if="residentFor(father.actorId)?.icon_url" :src="residentFor(father.actorId)?.icon_url" alt="">
+                      <span v-else>♂</span>
+                    </span>
+                    <span class="home-pair-father-name">{{ father.name }}</span>
+                    <span class="home-pair-father-role">父本</span>
+                  </span>
+                  <span v-if="!fathersFor(group).length" class="home-couple-missing">父本尚未识别</span>
+                </div>
               </div>
-            </details>
-          </article>
-        </div>
-        <div v-else class="home-empty-inline">
-          <strong>暂时没有配对关系</strong>
-          <p>把雌性精灵放进小窝，并让雄性精灵在同一区域活动，配对关系会出现在这里。</p>
-        </div>
-      </section>
-      </aside>
+              <div class="home-pair-egg">
+                <span class="home-pair-label">生蛋</span>
+                <img v-if="residentFor(group[0].female_actor_id)?.egg_icon_url" class="home-egg-icon"
+                  :src="residentFor(group[0].female_actor_id)?.egg_icon_url" alt="">
+                <UiIcon v-else name="egg" class="home-egg-mark" />
+                <strong>{{ residentFor(group[0].female_actor_id)?.egg_name || '蛋种待确认' }}</strong>
+                <span class="home-pair-range">{{ eggWeightText(group[0].female_actor_id) }}</span>
+                <span class="home-pair-range">{{ voiceRangeText(group) }}</span>
+              </div>
+              <details class="home-pair-nature">
+                <summary>
+                  <span>性格概率</span>
+                  <span class="home-pair-nature-count">{{ natureRowsFor(group).length }} 项</span>
+                  <UiIcon name="chevron-right" class="home-nature-chevron" />
+                </summary>
+                <div class="home-nature-list">
+                  <span v-for="row in natureRowsFor(group)" :key="row.name" class="home-nature-item"
+                    :class="{ 'nature-random': row.name === '随机', 'nature-unknown': row.name === '待确认' }">
+                    <strong>{{ row.name }}</strong>
+                    <span class="home-nature-track"><i :style="{ width: `${Math.max(4, Math.min(100, row.percent))}%` }"></i></span>
+                    <span class="home-nature-percent">{{ percentText(row.percent) }}</span>
+                  </span>
+                </div>
+              </details>
+            </article>
+          </div>
+          <div v-else class="home-empty-inline">
+            <strong>暂时没有配对关系</strong>
+            <p>把雌性精灵放进小窝，并让雄性精灵在同一区域活动，配对关系会出现在这里。</p>
+          </div>
+          </section>
+        </aside>
       </div>
     </template>
   </PageShell>
