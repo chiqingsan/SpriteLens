@@ -452,19 +452,21 @@
 .collection-parent-options { display: grid; gap: var(--space-2); }
 
 .collection-parent-options .chip:has(> .ui-icon) {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   gap: var(--space-2);
   min-height: 34px;
-  padding: var(--space-2) var(--space-3);
+  /* 左右留出勾选图标的固定位置：内容按整个 chip 居中，图标绝对定位不参与排版 */
+  padding: var(--space-2) var(--space-6);
   border: 1px solid var(--field-line);
   border-radius: var(--radius-sm);
   background: var(--panel);
   color: var(--ink-soft);
   font-size: var(--fs-xs);
   font-weight: 500;
-  text-align: left;
+  text-align: center;
 }
 
 .collection-parent-options .chip:hover { border-color: var(--field-line-hover); background: var(--surface-1); color: var(--ink); }
@@ -476,9 +478,13 @@
   color: var(--teal-dark);
 }
 
-/* 勾选位置始终留白，避免选中瞬间挤压文字 */
+/* 勾选图标绝对定位在右侧，常驻渲染只切透明度：选中不会把居中的文字挤走 */
 .collection-parent-options .collection-option-check {
-  margin-left: auto;
+  position: absolute;
+  right: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  margin: 0;
   color: var(--teal-dark);
   transition: opacity var(--motion-fast) var(--motion-ease);
 }
