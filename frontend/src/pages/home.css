@@ -256,14 +256,14 @@
   border-color: color-mix(in srgb, var(--teal) 58%, var(--hairline));
 }
 
-/* 全身图铺满卡片上半部；名称等信息层叠压在图上，不再是图下面的上下结构 */
+/* 全身图在卡片上半部居中；名称等信息层叠压在图上，不再是图下面的上下结构 */
 .home-sprite-art {
   position: relative;
   display: grid;
-  place-items: end center;
+  place-items: center;
   flex: 1 1 auto;
-  min-height: 172px;
-  padding: 6px 8px 2px;
+  min-height: 136px;
+  padding: 5px 8px;
 }
 
 /* 底部纱罩用卡片自身的性别底色向上渐隐，文字压在图上但仍能看见精灵下半身 */
@@ -277,9 +277,9 @@
   padding: 8px 10px 8px;
   background: linear-gradient(
     to top,
-    color-mix(in srgb, var(--gender-soft, var(--surface-2)) 94%, transparent) 0%,
-    color-mix(in srgb, var(--gender-soft, var(--surface-2)) 80%, transparent) 52%,
-    color-mix(in srgb, var(--gender-soft, var(--surface-2)) 38%, transparent) 100%
+    color-mix(in srgb, var(--gender-soft, var(--surface-2)) 90%, transparent) 0%,
+    color-mix(in srgb, var(--gender-soft, var(--surface-2)) 76%, transparent) 52%,
+    color-mix(in srgb, var(--gender-soft, var(--surface-2)) 34%, transparent) 100%
   );
 }
 
@@ -292,7 +292,7 @@
   z-index: -1;
   background: linear-gradient(
     to top,
-    color-mix(in srgb, var(--gender-soft, var(--surface-2)) 38%, transparent),
+    color-mix(in srgb, var(--gender-soft, var(--surface-2)) 34%, transparent),
     transparent
   );
   pointer-events: none;
@@ -301,9 +301,9 @@
 .home-sprite-overline {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
-  min-height: 15px;
+  min-height: 19px;
 }
 
 .home-sprite-caption {
@@ -325,7 +325,7 @@
   position: relative;
   z-index: 1;
   width: auto;
-  height: 140px;
+  height: 118px;
   image-rendering: auto;
   object-fit: contain;
   filter: drop-shadow(0 3px 4px color-mix(in srgb, var(--ink) 18%, transparent));
@@ -338,7 +338,7 @@
 
 .home-sprite-image.is-artwork {
   width: auto;
-  height: 142px;
+  height: 120px;
   max-width: 100%;
 }
 
@@ -406,7 +406,7 @@
 .home-sprite-medals {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   flex: none;
 }
 
@@ -446,13 +446,13 @@
 
 .home-medal-icon {
   flex: none;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 
 .home-sprite-overline .home-medal-icon {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
 }
 
 /* 指标带成为卡片底栏：图在上、指标在下，但名称信息压在图上 */
@@ -1134,18 +1134,6 @@
     grid-template-columns: repeat(auto-fill, minmax(164px, 1fr));
   }
 
-  .home-sprite-art {
-    min-height: 160px;
-    padding: 5px 6px 3px;
-  }
-
-  .home-sprite-image {
-    height: 132px;
-  }
-
-  .home-sprite-image.is-artwork {
-    height: 134px;
-  }
 
   .home-pairing-grid {
     grid-template-columns: minmax(0, 1fr);
