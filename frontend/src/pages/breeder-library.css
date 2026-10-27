@@ -38,24 +38,34 @@
 
 .breeder-page .ui-icon { width: 16px; height: 16px; flex: none; }
 
-/* 工具栏：搜索占左侧，记录摘要靠右收尾，开关与刷新并成一组并加细竖线分界。
-   旧版把搜索、裸 checkbox、刷新分散在整条空板子上，三截互不相干，
-   所以摘要搬到右侧、开关换成 .ui-switch 轨道，行动作合成一个视觉单元。 */
+/* 候选区做成「浅色托盘 + 白卡」：卡面与面板同色时整屏白对白，只能靠一根描边分区，
+   看久了很累；托盘用 surface-2，白卡与托盘之间有 8px 空隙，卡面自己就能立起来。 */
+.breeder-page .breeder-workspace { background: var(--surface-2); }
+
+/* 工具栏做成一条浅色「控制带」：下方是两个白面板，控件如果直接漂在页面底色上，
+   搜索框、裸文字、圆钮三种权重混在一条空板子里，和面板不是一个体系。
+   控制带用 surface-2 底 + 大圆角，内部控件一律白底描边，视觉上成为面板之上的第一层。 */
 .breeder-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
   width: 100%;
   min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 6%, transparent);
 }
 
 /* 外观统一由 .ui-search 承担，这里只给工具栏里的搜索框定宽度。
    搜索框吃掉工具栏的剩余宽度（上限 720px），避免右侧记录摘要与动作之间留出
    一条比控件还宽的空带 —— 那正是旧版看上去「三截互不相干」的主因。 */
-.breeder-toolbar .breeder-search { flex: 1 1 240px; min-width: 168px; max-width: 720px; }
+.breeder-toolbar .breeder-search { flex: 1 1 240px; min-width: 168px; max-width: 520px; }
 
 .breeder-toolbar-summary {
-  margin: 0;
+  margin: 0 0 0 auto;
   padding-left: var(--space-1);
   min-width: 0;
   overflow: hidden;
@@ -73,16 +83,15 @@
   align-items: center;
   gap: var(--space-3);
   flex: none;
-  margin-left: auto;
   padding-left: var(--space-4);
-  border-left: 1px solid var(--line-soft);
+  border-left: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
 }
 
 /* 性格开关：轨道交给 .ui-switch；外面套一层与刷新按钮同高的胶囊，
    让它是「控件」而不是一行跟着搜索框跑的裸文字。 */
 .breeder-nature-toggle {
   gap: var(--space-2);
-  height: 30px;
+  height: 34px;
   padding: 0 var(--space-3);
   border: 1px solid var(--field-line);
   border-radius: 999px;
@@ -94,6 +103,14 @@
     border-color var(--motion-fast) var(--motion-ease),
     background-color var(--motion-fast) var(--motion-ease),
     color var(--motion-fast) var(--motion-ease);
+}
+
+/* .ui-switch 的旋钮是按「label 高度 = 轨道高度」定位的，套进 34px 胶囊后
+   绝对定位的旋钮会跑到胶囊左上角，所以这里把它重新对准轨道中线。 */
+.breeder-nature-toggle::after {
+  top: 50%;
+  left: var(--space-3);
+  margin-top: -7px;
 }
 
 .breeder-nature-toggle:hover { border-color: var(--field-line-hover); }
@@ -150,7 +167,7 @@
 }
 
 .breeder-column { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-.breeder-column + .breeder-column { border-left: 1px solid var(--line-soft); }
+.breeder-column + .breeder-column { border-left: 1px solid color-mix(in srgb, var(--ink) 9%, transparent); }
 
 .breeder-column > header {
   display: flex;
@@ -199,15 +216,15 @@
 /* 空态在列里垂直居中，只作用于纯空态列 */
 .breeder-grid:has(> .breeder-empty:only-child) { align-content: center; }
 
-/* 候选卡：白卡落在白面板上，--line-soft 几乎看不出边界（对白底仅 1.15:1），
-   描边改用墨色 22% + 1px 淡影，卡片之间才有分隔感。 */
+/* 候选卡：白卡落在 surface-2 托盘上，靠面差 + 墨色 24% 描边 + 1px 淡影三层分开，
+   不再是「白纸一条淡线」。 */
 .breeder-card {
   position: relative;
   min-width: 0;
-  border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 24%, transparent);
   border-radius: var(--radius-lg);
   background: var(--panel);
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 5%, transparent);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--ink) 8%, transparent);
   overflow: hidden;
   transition:
     border-color var(--motion-fast) var(--motion-ease),
@@ -249,7 +266,8 @@
   height: 64px;
   flex: none;
   border-radius: var(--radius-md);
-  background: var(--surface-1);
+  /* 白卡上的立绘托底：用托盘同色，精灵不会陷进白色里 */
+  background: var(--surface-2);
   color: var(--muted);
   font-size: var(--fs-lg);
 }
@@ -323,7 +341,7 @@
   justify-content: space-between;
   gap: var(--space-2);
   padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
-  border-top: 1px solid var(--line-soft);
+  border-top: 1px solid color-mix(in srgb, var(--ink) 9%, transparent);
 }
 
 .breeder-card > footer small {
