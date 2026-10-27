@@ -39,12 +39,15 @@
 .breeder-page .ui-icon { width: 16px; height: 16px; flex: none; }
 
 /* 候选区做成「浅色托盘 + 白卡」：卡面与面板同色时整屏白对白，只能靠一根描边分区，
-   看久了很累；托盘用 surface-2，白卡与托盘之间有 8px 空隙，卡面自己就能立起来。 */
-.breeder-page .breeder-workspace { background: var(--surface-2); }
+   看久了很累。托盘取 surface-2 与 surface-3 的中间值（比 surface-2 再深一格），
+   让白卡与托盘的面差达到可见的 1.15:1，卡片之间的 8px 空隙也变成可读的分隔。 */
+.breeder-page .breeder-workspace {
+  background: color-mix(in srgb, var(--surface-2) 40%, var(--surface-3));
+}
 
 /* 工具栏做成一条浅色「控制带」：下方是两个白面板，控件如果直接漂在页面底色上，
    搜索框、裸文字、圆钮三种权重混在一条空板子里，和面板不是一个体系。
-   控制带用 surface-2 底 + 大圆角，内部控件一律白底描边，视觉上成为面板之上的第一层。 */
+   控制带用白底 + 墨色 14% 描边 + 大圆角，与下方白面板同材质，靠描边和 1px 淡影浮在上层。 */
 .breeder-toolbar {
   display: flex;
   align-items: center;
@@ -216,15 +219,15 @@
 /* 空态在列里垂直居中，只作用于纯空态列 */
 .breeder-grid:has(> .breeder-empty:only-child) { align-content: center; }
 
-/* 候选卡：白卡落在 surface-2 托盘上，靠面差 + 墨色 24% 描边 + 1px 淡影三层分开，
-   不再是「白纸一条淡线」。 */
+/* 候选卡：白卡落在浅色托盘上，靠面差 + 墨色 30% 描边 + 1px 淡影三层分开，
+   不再是「白纸一条淡线」；30% 让描边对白底达到 1.87:1，1× 下也能一眼看到卡片边界。 */
 .breeder-card {
   position: relative;
   min-width: 0;
-  border: 1px solid color-mix(in srgb, var(--ink) 24%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
   border-radius: var(--radius-lg);
   background: var(--panel);
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--ink) 8%, transparent);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--ink) 10%, transparent);
   overflow: hidden;
   transition:
     border-color var(--motion-fast) var(--motion-ease),
