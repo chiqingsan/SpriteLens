@@ -215,7 +215,10 @@ describe('附近精灵更新布局稳定性', () => {
     ;(wrapper.vm as unknown as { update(value: unknown): void }).update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
     await flushPromises()
     await nextTick()
-    await wrapper.get('.nearby-sort select').setValue('marks')
+    // 自制下拉的选项面板 teleport 到 body，点击要走原生 DOM
+    await wrapper.get('.nearby-sort').trigger('click')
+    const sortOptions = [...document.body.querySelectorAll<HTMLButtonElement>('.ui-picker__option')]
+    sortOptions.find(option => option.textContent?.includes('有牌优先'))!.click()
     await nextTick()
     expect(wrapper.findAll('.nearby-card').map(card => card.attributes('id'))).toEqual([
       'nearby-actor-2', 'nearby-actor-3', 'nearby-actor-4', 'nearby-actor-5', 'nearby-actor-1',
@@ -282,7 +285,7 @@ describe('附近精灵提醒音开关', () => {
     const host = { load: vi.fn().mockResolvedValue(snapshot(1, [])) }
     const wrapper = mount(NearbyPage, { props: { host } })
     expect(wrapper.find('.nearby-alert').exists()).toBe(false)
-    expect(wrapper.findAll('.nearby-toolbar > button').map(item => item.text())).toEqual(['刷新', '悬浮雷达'])
+    expect(wrapper.findAll('.nearby-toolbar > button:not(.ui-picker)').map(item => item.text())).toEqual(['刷新', '悬浮雷达'])
     wrapper.unmount()
   })
 })

@@ -6,6 +6,7 @@ import MedalIcon from '../components/MedalIcon.vue'
 import PageShell from '../components/PageShell.vue'
 import UiIcon from '../components/UiIcon.vue'
 import UiSearch from '../components/UiSearch.vue'
+import UiSelect from '../components/UiSelect.vue'
 import { useBreedingPlanner, type PlannerHost } from '../composables/useBreedingPlanner'
 import type { Goal, Placement } from '../types/breedingPlanner'
 import './breeder-library.css'
@@ -92,6 +93,34 @@ const stateIcon = computed(() => busy.value ? 'clock' : (plan.value?.status || r
 const stateTitle = computed(() => [`${context.value?.source === 'history' ? '历史观察背包' : '当前账号已观察背包'} · ${context.value?.pet_count ?? '—'} 只`, '传说精灵、迪莫、通行证精灵、活动精灵等不可生蛋精灵不会计入可参与配窝数量'].join(' · '))
 const kindName: Record<string, string> = { exact: '合格组合', iterative: '迭代参考', unknown: '资料待补' }
 const currentGroups = computed(() => [...new Set(context.value?.parents.flatMap(p => p.groups) || [])].sort())
+// 自制下拉的选项表：原生 select 里的 <option> 改成数据，渲染与取值都交给 UiSelect。
+const genderOptions = [{ value: '', label: '全部性别' }, { value: '1', label: '父本' }, { value: '2', label: '母本' }]
+const pickerNatureOptions = computed(() => [{ value: '', label: '全部性格' }, ...(context.value?.natures || []).map(item => ({ value: item.name, label: item.name }))])
+const groupOptions = computed(() => [{ value: '', label: '全部蛋组' }, ...currentGroups.value.map(name => ({ value: name, label: name }))])
+const medalOptions = [{ value: '', label: '全部奖牌' }, ...['大块头', '小不点', '婉转声', '粗嗓门'].map(name => ({ value: name, label: name }))]
+const markOptions = [{ value: '', label: '不限' }, { value: '大块头', label: '大块头' }, { value: '小不点', label: '小不点' }]
+const voiceOptions = [{ value: '', label: '不限' }, { value: '婉转声', label: '婉转声' }, { value: '粗嗓门', label: '粗嗓门' }]
+const goalNatureOptions = computed(() => [{ value: 0, label: '不限' }, ...(context.value?.natures || []).map(item => ({ value: item.id, label: item.name }))])
+const priorityOptions = [{ value: 0, label: '普通' }, { value: 1, label: '优先' }]
+const participationOptions = [{ value: 'best', label: '择优参与' }, { value: 'all', label: '全部参与' }]
+const primaryGoalOptions = computed(() => [
+  { value: '', label: '自动分配主目标' },
+  ...draft.value.goals.map(goal => ({ value: goal.goal_id, label: `${eggName(goal.egg_key)} ${goal.size_mark} ${goal.voice_mark}` })),
+])
+// 提示行交给 placeholder：选项里放一条 value '' 的空操作会让下拉多出一行“选了等于没选”。
+const swapOptions = computed(() => [
+  ...draft.value.placements
+    .filter(position => position.gid !== selected.value && position.lock !== 'position')
+    .map(position => ({ value: position.gid, label: `${parentName(position.gid)} · ${position.kind === 'academy' ? '学院' : '普通'}` })),
+])
+function setPickerFilter(field: 'gender' | 'nature' | 'group' | 'medal', value: string | number | null) {
+  const next = String(value ?? '')
+  if (field === 'gender') gender.value = next
+  else if (field === 'nature') nature.value = next
+  else if (field === 'group') group.value = next
+  else medal.value = next
+  page.value = 1
+}
 const filtered = computed(() => context.value?.parents.filter(p => {
   if (pickerKind.value === 'replace' && draft.value.placements.some(pos => pos.gid === p.gid)) return false
   if (pickerKind.value === 'add' && draft.value.placements.some(pos => pos.gid === p.gid)) return false
@@ -255,8 +284,8 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
          <div v-else class="planner-empty planner-start"><UiIcon name="egg" /><strong>{{ mode === 'target' ? '从培育目标开始规划' : '选择精灵，分析配窝方案' }}</strong><p>{{ mode === 'target' ? '在右侧添加目标蛋，按需设置奖牌与性格，再生成方案。' : '在右侧选择参与精灵，确认参与方式与小窝容量，再生成方案。' }}</p><small>① {{ mode === 'target' ? '添加目标' : '选择精灵' }}　→　② 确认条件　→　③ 生成方案</small></div>
         <section v-if="selectedPosition" class="planner-resident">
           <header><strong>{{ parentName(selected) }}</strong><span>{{ selectedParent?.gender === 1 ? '父本' : '母本' }} · {{ selectedParent?.nature || '性格未知' }}</span><button class="breeder-detail-link" @click="host.openPet(selected)">背包详情</button></header>
-          <div class="planner-actions"><button class="chip" :class="{ active: selectedPosition.lock }" :aria-pressed="!!selectedPosition.lock" @click="cycleLock">{{ { '': '未锁定', participation: '锁定参与', position: '锁定位置' }[selectedPosition.lock] }}</button><button class="ghost-button" :disabled="!!selectedPosition.lock" @click="showPicker('replace')">替换亲本</button><button class="ghost-button" :disabled="!!selectedPosition.lock" @click="removeParent">移出</button><select aria-label="交换到窝位" :value="''" :disabled="selectedPosition.lock === 'position'" @change="swap(($event.target as HTMLSelectElement).value)"><option value="">交换到另一窝位…</option><option v-for="pos in draft.placements.filter(p => p.gid !== selected && p.lock !== 'position')" :key="pos.gid" :value="pos.gid">{{ parentName(pos.gid) }} · {{ pos.kind === 'academy' ? '学院' : '普通' }}</option></select></div>
-           <div v-if="mode === 'target' && selectedParent?.gender === 2" class="planner-coordinate"><label>母本主目标<select aria-label="母本主目标" :value="selectedPosition.primary_goal_id" @change="updatePosition({ primary_goal_id: ($event.target as HTMLSelectElement).value })"><option value="">自动分配主目标</option><option v-for="goal in draft.goals" :key="goal.goal_id" :value="goal.goal_id">{{ eggName(goal.egg_key) }} {{ goal.size_mark }} {{ goal.voice_mark }}</option></select></label></div>
+          <div class="planner-actions"><button class="chip" :class="{ active: selectedPosition.lock }" :aria-pressed="!!selectedPosition.lock" @click="cycleLock">{{ { '': '未锁定', participation: '锁定参与', position: '锁定位置' }[selectedPosition.lock] }}</button><button class="ghost-button" :disabled="!!selectedPosition.lock" @click="showPicker('replace')">替换亲本</button><button class="ghost-button" :disabled="!!selectedPosition.lock" @click="removeParent">移出</button><UiSelect size="xs" :options="swapOptions" :model-value="''" label="交换到窝位" placeholder="交换到另一窝位" :disabled="selectedPosition.lock === 'position'" @change="swap(String($event ?? ''))" /></div>
+           <div v-if="mode === 'target' && selectedParent?.gender === 2" class="planner-coordinate"><label>母本主目标<UiSelect size="sm" :options="primaryGoalOptions" :model-value="selectedPosition.primary_goal_id" label="母本主目标" @change="updatePosition({ primary_goal_id: String($event ?? '') })" /></label></div>
         </section>
         <section v-if="plan || draft.placements.length" ref="outcomes" class="planner-outcomes" :class="{ 'is-stale': dirty[mode] }">
           <header><strong>产物与目标支持</strong><small>{{ dirty[mode] ? '下方为上次分析，等待重评' : '奖牌为规划支持，性格为模型参考' }}</small></header>
@@ -355,10 +384,10 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
               <section class="planner-goal-options" :class="{ 'is-editing': editingGoalIds.has(goal.goal_id) }" :aria-label="`${eggName(goal.egg_key)}附加条件`">
                 <button type="button" class="planner-goal-toggle" :aria-expanded="editingGoalIds.has(goal.goal_id)" @click="toggleGoalEditor(goal.goal_id)"><span class="planner-goal-toggle-label"><UiIcon :name="editingGoalIds.has(goal.goal_id) ? 'chevron-down' : 'chevron-right'" />附加条件</span><span class="planner-goal-action">{{ editingGoalIds.has(goal.goal_id) ? '保存' : '编辑' }}</span></button>
                 <div v-if="editingGoalIds.has(goal.goal_id)" class="planner-goal-fields">
-                  <label>体型奖牌<select v-model="goal.size_mark"><option value="">不限</option><option>大块头</option><option>小不点</option></select></label>
-                  <label>声音奖牌<select v-model="goal.voice_mark"><option value="">不限</option><option>婉转声</option><option>粗嗓门</option></select></label>
-                  <label>目标性格<select v-model.number="goal.nature_id"><option :value="0">不限</option><option v-for="n in context?.natures" :key="n.id" :value="n.id">{{ n.name }}</option></select></label>
-                  <label>优先级<select v-model.number="goal.priority"><option :value="0">普通</option><option :value="1">优先</option></select></label>
+                  <label>体型奖牌<UiSelect size="xs" :options="markOptions" :model-value="goal.size_mark" label="体型奖牌" @change="goal.size_mark = String($event ?? '')" /></label>
+                  <label>声音奖牌<UiSelect size="xs" :options="voiceOptions" :model-value="goal.voice_mark" label="声音奖牌" @change="goal.voice_mark = String($event ?? '')" /></label>
+                  <label>目标性格<UiSelect size="xs" :options="goalNatureOptions" :model-value="goal.nature_id" label="目标性格" @change="goal.nature_id = Number($event ?? 0)" /></label>
+                  <label>优先级<UiSelect size="xs" :options="priorityOptions" :model-value="goal.priority" label="优先级" @change="goal.priority = Number($event ?? 0)" /></label>
                 </div>
               </section>
           </article>
@@ -366,7 +395,7 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
         <template v-else>
           <div class="planner-section-title"><strong>参与精灵</strong><span class="count-badge">{{ draft.selected.length }}</span></div>
           <button class="planner-add-pool ghost-button" :disabled="!context?.available || !!busy" @click="showPicker('pool')">{{ draft.selected.length ? '管理参与精灵' : '＋ 选择参与精灵' }}</button>
-          <label class="planner-participation">参与方式<select v-model="draft.participation"><option value="best">择优参与</option><option value="all">全部参与</option></select></label>
+          <label class="planner-participation">参与方式<UiSelect size="sm" :options="participationOptions" :model-value="draft.participation" label="参与方式" @change="draft.participation = $event === 'all' ? 'all' : 'best'" /></label>
           <p class="planner-participation-help">{{ draft.participation === 'best' ? '从已选精灵中挑选配对，可保留空窝；未采用原因会列在结果中。' : '尝试让全部所选精灵入住；容量不足或不兼容时会在结果中说明。' }}</p>
           <p v-if="draft.participation === 'all' && draft.selected.length > draft.capacity + Number(draft.academy)" class="planner-warning planner-participation-help" role="status">已选 {{ draft.selected.length }} 只，超过 {{ draft.capacity + Number(draft.academy) }} 窝容量；请增加容量或减少选择。</p>
           <p v-if="plan" class="planner-participation-help">{{ dirty[mode] ? '待重新规划 · ' : '' }}当前布局采用 {{ selectedInPlan }} / {{ draft.selected.length }} 只所选精灵</p>
@@ -385,7 +414,7 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
     </aside>
     <dialog ref="picker" class="planner-picker" aria-labelledby="planner-picker-title" aria-modal="true" @click="($event.target === picker) && closePicker()">
       <header><strong id="planner-picker-title">{{ pickerKind === 'pool' ? '选择参与配窝的精灵' : pickerKind === 'replace' ? '替换当前亲本' : '添加亲本到布局' }}</strong><button class="ghost-button" aria-label="关闭选择精灵" @click="closePicker()"><UiIcon name="x" /></button></header>
-      <div class="planner-picker-filters"><UiSearch ref="pickerSearch" v-model="search" class="planner-picker-search" label="查找候选精灵" placeholder="名称、性格、蛋组或个体ID" @update:model-value="page = 1" /><select v-model="gender" aria-label="候选性别" @change="page = 1"><option value="">全部性别</option><option value="1">父本</option><option value="2">母本</option></select><select v-model="nature" aria-label="候选性格" @change="page = 1"><option value="">全部性格</option><option v-for="n in context?.natures" :key="n.id">{{ n.name }}</option></select><select v-model="group" aria-label="候选蛋组" @change="page = 1"><option value="">全部蛋组</option><option v-for="name in currentGroups" :key="name">{{ name }}</option></select><select v-model="medal" aria-label="候选奖牌" @change="page = 1"><option value="">全部奖牌</option><option v-for="name in ['大块头', '小不点', '婉转声', '粗嗓门']" :key="name">{{ name }}</option></select></div>
+      <div class="planner-picker-filters"><UiSearch ref="pickerSearch" v-model="search" class="planner-picker-search" label="查找候选精灵" placeholder="名称、性格、蛋组或个体ID" @update:model-value="page = 1" /><UiSelect size="sm" :options="genderOptions" :model-value="gender" label="候选性别" @change="setPickerFilter('gender', $event)" /><UiSelect size="sm" :options="pickerNatureOptions" :model-value="nature" label="候选性格" @change="setPickerFilter('nature', $event)" /><UiSelect size="sm" :options="groupOptions" :model-value="group" label="候选蛋组" @change="setPickerFilter('group', $event)" /><UiSelect size="sm" :options="medalOptions" :model-value="medal" label="候选奖牌" @change="setPickerFilter('medal', $event)" /></div>
       <div class="planner-picker-grid"><BreederCard v-for="parent in pickerRows" :key="parent.gid" :parent="parent" :selected="pickerKind === 'pool' && draft.selected.includes(parent.gid)" @select="choose(parent.gid)" @open="closePicker(); host.openPet($event)" /><div v-if="!pickerRows.length" class="planner-empty">当前观察记录中没有符合筛选的候选。</div></div>
       <footer><span>已选择 {{ draft.selected.length }} 只 · {{ filtered.length }} 个候选</span><div class="planner-actions"><button class="ghost-button" :disabled="page <= 1" @click="page--">上一页</button><span>{{ page }} / {{ Math.max(1, Math.ceil(filtered.length / 24)) }}</span><button class="ghost-button" :disabled="page * 24 >= filtered.length" @click="page++">下一页</button><button class="planner-primary" @click="closePicker()">完成</button></div></footer>
     </dialog>

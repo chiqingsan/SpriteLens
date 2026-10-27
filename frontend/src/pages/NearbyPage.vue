@@ -4,6 +4,7 @@ import { useVirtualizer } from '@tanstack/vue-virtual'
 import PageShell from '../components/PageShell.vue'
 import UiIcon from '../components/UiIcon.vue'
 import UiSearch from '../components/UiSearch.vue'
+import UiSelect from '../components/UiSelect.vue'
 import MedalIcon from '../components/MedalIcon.vue'
 import SceneRadar from '../components/SceneRadar.vue'
 import SceneMap from '../components/SceneMap.vue'
@@ -66,6 +67,7 @@ async function selectActor(id: string) {
   document.getElementById(`nearby-actor-${id}`)?.scrollIntoView({ block: 'nearest', behavior: 'auto' })
 }
 const search = ref(''), sort = ref('recent'), failedImages = ref(new Set<string>())
+const sortOptions = [{ value: 'recent', label: '最近观察' }, { value: 'marks', label: '有牌优先' }]
 const recentOrder = ref<string[]>([])
 let recentObservation: number | null = null
 watch(data, snapshot => {
@@ -288,7 +290,7 @@ defineExpose({ update, load, pause, resume })
       </header>
       <div class="nearby-toolbar">
       <UiSearch v-model="search" class="nearby-search" label="搜索附近精灵" placeholder="搜索名称、配置或实体编号" />
-      <label class="nearby-sort">排序<select v-model="sort" aria-label="附近精灵排序"><option value="recent">最近观察</option><option value="marks">有牌优先</option></select></label>
+      <UiSelect class="nearby-sort" :options="sortOptions" :model-value="sort" label="附近精灵排序" @change="sort = $event === 'marks' ? 'marks' : 'recent'" />
       <button class="ghost-button small nearby-refresh" :aria-busy="refreshing" :aria-disabled="refreshing" :disabled="refreshing" @click="refresh"><UiIcon name="refresh" />刷新</button>
       <button class="ghost-button small nearby-floating" @click="openFloating"><UiIcon name="eye" />悬浮雷达</button>
       <button v-if="alertHost" class="ghost-button small nearby-alert" type="button" :aria-pressed="alertOn" :title="alertOn ? '发现双牌重点精灵时播放提示音；点击关闭' : '声音提醒已关闭；点击开启并试听'" @click="toggleAlert"><UiIcon :name="alertOn ? 'bell' : 'bell-off'" />提醒音{{ alertOn ? '开' : '关' }}</button>
@@ -358,8 +360,7 @@ defineExpose({ update, load, pause, resume })
 .nearby-toolbar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; min-width: 0; }
 /* 外观统一由 .ui-search 承担；这里只决定它在工具条里的伸缩比例（原先的 999px 胶囊与同排 10px 圆角按钮不一致） */
 .nearby-search { flex: 1 1 240px; min-width: 0; }
-.nearby-sort { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-xs); min-width: 0; max-width: 100%; }
-.nearby-sort select { min-width: 0; max-width: 100%; min-height: 34px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); padding-inline: var(--space-3); }
+.nearby-sort { min-width: 0; max-width: 100%; font-size: var(--fs-xs); }
 .nearby-refresh, .nearby-floating { background: var(--panel); border: 1px solid var(--teal); color: var(--teal-dark); min-height: 34px; min-width: 0; max-width: 100%; white-space: normal; }
 /* 提醒音是偏好项，固定在工具条末尾。开/关都显示四个汉字、图标盒同为 18px，切换只换底色/描边，不改变按钮尺寸。 */
 .nearby-alert { background: var(--panel); border: 1px solid var(--line); color: var(--ink); min-height: 34px; min-width: 0; max-width: 100%; white-space: nowrap; }

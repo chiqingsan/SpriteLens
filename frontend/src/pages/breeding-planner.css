@@ -307,16 +307,9 @@ button.planner-state-badge:focus-visible { outline: 2px solid var(--teal); outli
   font-size: var(--fs-3xs);
 }
 
-.planner-actions select {
-  height: 28px;
-  max-width: 100%;
-  padding: 0 24px 0 var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background-color: var(--panel);
-  color: var(--ink-soft);
-  font-size: var(--fs-3xs);
-}
+/* 交换窝位的下拉：外观交给 .ui-picker；不参与收缩，空间不足时整条换行，
+   而不是把「交换到另一窝位」压成省略号 */
+.planner-actions .ui-picker { flex: 0 0 auto; min-width: 0; max-width: 100%; }
 
 .planner-actions .chip {
   display: inline-flex;
@@ -649,17 +642,7 @@ button.planner-state-badge:focus-visible { outline: 2px solid var(--teal); outli
 
 .planner-coordinate > label { display: flex; align-items: center; gap: var(--space-2); flex: 1; min-width: 0; color: var(--ink-soft); font-size: var(--fs-2xs); font-weight: 500; }
 
-.planner-coordinate select {
-  flex: 1;
-  min-width: 0;
-  height: 30px;
-  padding: 0 24px 0 var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background-color: var(--panel);
-  color: var(--ink);
-  font-size: var(--fs-2xs);
-}
+.planner-coordinate .ui-picker { flex: 1; min-width: 0; }
 
 /* ── 产物分析 ───────────────────────────────────────────────────────────── */
 .planner-outcomes { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-4); }
@@ -1227,34 +1210,14 @@ button.planner-state-badge:focus-visible { outline: 2px solid var(--teal); outli
 .planner-goal-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin-top: var(--space-2); }
 .planner-goal-fields > label { display: flex; flex-direction: column; gap: 2px; min-width: 0; color: var(--muted); font-size: var(--fs-3xs); }
 
-.planner-goal-fields select {
-  width: 100%;
-  height: 28px;
-  min-width: 0;
-  padding: 0 24px 0 var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background-color: var(--panel);
-  color: var(--ink);
-  font-size: var(--fs-2xs);
-}
+.planner-goal-fields .ui-picker { width: 100%; min-width: 0; }
 
 /* 参与精灵 */
 .planner-add-pool { width: 100%; margin-bottom: var(--space-2); }
 
 .planner-participation { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); color: var(--ink-soft); font-size: var(--fs-2xs); font-weight: 500; }
 
-.planner-participation select {
-  flex: 1;
-  min-width: 0;
-  height: 30px;
-  padding: 0 var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background: var(--panel);
-  color: var(--ink);
-  font-size: var(--fs-2xs);
-}
+.planner-participation .ui-picker { flex: 1; min-width: 0; }
 
 .planner-participation-help { margin: 0 0 var(--space-2); padding: var(--space-2); border-radius: var(--radius-sm); background: var(--surface-1); color: var(--muted); font-size: var(--fs-3xs); line-height: 1.6; }
 .planner-participation-help.planner-warning { background: color-mix(in srgb, var(--amber-soft) 62%, var(--panel)); color: var(--amber-ink); }
@@ -1329,21 +1292,10 @@ dialog.planner-picker {
 
 .planner-picker-filters { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); flex: none; padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--line-soft); background: var(--surface-1); }
 
-.planner-picker-filters select {
-  height: 32px;
-  padding: 0 var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background: var(--panel);
-  color: var(--ink);
-  font-size: var(--fs-2xs);
-}
+.planner-picker-filters .ui-picker { min-width: 100px; }
 
 /* 搜索框跟弹窗里的下拉保持同一行高与圆角档，避免 30/32px 混排 */
 .planner-picker-filters .planner-picker-search { flex: 1 1 200px; min-width: 140px; height: 32px; border-radius: var(--radius-sm); }
-.planner-picker-filters select { min-width: 100px; }
-
-.planner-picker-filters select:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 14%, transparent); }
 
 .planner-picker-grid {
   display: grid;
@@ -1417,7 +1369,6 @@ dialog.planner-picker {
 .planner-picker-grid::-webkit-scrollbar-thumb:hover { background: var(--teal-bright); }
 
 .planner-page input:focus-visible,
-.planner-page select:focus-visible,
 .planner-page .planner-tabs > button:focus-visible,
 .planner-page .planner-canvas-key-select:focus-visible,
 .planner-page .planner-outcome-expand:focus-visible,
@@ -1426,8 +1377,7 @@ dialog.planner-picker {
 .planner-page .planner-parent-chip:focus-visible,
 .planner-page .planner-egg-choices > button:focus-visible,
 .planner-page .planner-canvas-key-locate:focus-visible,
-.planner-picker input:focus-visible,
-.planner-picker select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.planner-picker input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
 /* ── 响应式 ─────────────────────────────────────────────────────────────── */
 @media (max-width: 1200px) {

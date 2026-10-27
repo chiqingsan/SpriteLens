@@ -40,10 +40,10 @@
 | 按钮 | `ui-btn` + `--primary` / `--ghost` / `--quiet` / `--danger` / `--sm` / `--lg`；`ui-icon-btn` | 主操作 / 次级 / 弱动作 / 危险；纯图标按钮 |
 | 分段 | `ui-segmented > button`，当前项加 `.is-active` 或 `aria-pressed="true"` | 工具栏单选组（白色药丸滑块） |
 | 徽章 | `ui-chip` + `--accent/--warn/--danger/--muted/--pill`；`ui-dot--ok/warn/bad`；`ui-status` + `--ok/--warn/--bad` | 标签 / 状态点 / 带点状态胶囊 |
-| 表单 | `ui-field` / `ui-label` / `ui-help` / `ui-input` / `ui-select` / `ui-textarea` / `ui-check` / `ui-switch` | 输入、选择、勾选、开关（`:has(input:checked)`） |
+| 表单 | `ui-field` / `ui-label` / `ui-help` / `ui-input` / `ui-textarea` / `ui-check` / `ui-switch` | 输入、选择、勾选、开关（`:has(input:checked)`） |
 | 搜索框 | `ui-search`（`--compact`）/ `__icon` / `__input` / `__clear`；Vue 组件 `<UiSearch>`（`frontend/src/components/UiSearch.vue`） | 34px 高、10px 圆角；描边/底色/焦点光晕都由**外层容器**承载，内部 `input` 复位 `appearance`（WebView2 会自绘原生 searchfield 白框，形成双边框）；清空按钮常驻占位只切 `visibility`，宽度不跳动 |
 | 多选框 | 原生 `input[type="checkbox"]`（全局统一外观） | 18px 圆角方块；勾选 = 品牌色实底 + 白色对勾；悬停描边加深、聚焦 2px 光环、禁用半透明；页面内紧凑场景可局部设 `16px` |
-| 下拉框 | 原生 `<select>`（全局统一外观） | 32px 高、10px 圆角、白色面板底 + 细描边；右侧统一 chevron，展开时整体弹层圆角 10、选中项浅色底 + 品品牌色浅底；旧浏览器自动回退到 CSS 背景箭头 |
+| 下拉框 | `ui-picker`（`--xs` / `--sm`；`.is-empty` 为占位态）/ `__trigger` / `__panel` / `__list` / `__option`（`.is-selected`、右侧 `circle-check`）；Vue 组件 `<UiSelect>`（`frontend/src/components/UiSelect.vue`） | 自制下拉，页面里不再有原生 `<select>`。三档尺寸 34/30/28px、10px 圆角；面板 `position: fixed` + Teleport（`document.body`，在 `<dialog>` 内则挂到 dialog，避开 top layer），空间不足自动向上翻并夹取到视口内；触发器支持 ↑↓/Home/End/Enter/Esc/Tab 与 `aria-activedescendant`，`role="combobox"` + `aria-haspopup="listbox"` + `aria-expanded`；面板 120ms 淡入位移，列表滚动条墨色 18% 不压住勾选图标。静态页历史样式 `select` / `.ui-select`（含 `::picker(select)` 渐进增强）保留未删 |
 | 工具栏 | `ui-toolbar`(`--flush`/`__spacer`) / `ui-section-head` / `ui-kpi` | 面板工具条 / 分区标题 / 指标块 |
 | 空态 | `ui-empty` + `__icon` / `__title` / `__desc` / `__actions` | 图标 + 标题 + 说明 + 一个主操作（禁止只用一行文字当空态） |
 | 提示条 | `ui-banner` + `--info/--warn/--danger` / `__actions` | 页面内提示，错误用 `role="alert"` |
