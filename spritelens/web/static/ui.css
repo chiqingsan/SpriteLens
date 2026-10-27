@@ -239,7 +239,14 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { appearance:
 .point-pet, .point-grid .point-pet.selected { background: var(--surface-1); }
 .point-pet.male, .point-grid .point-pet.male.selected { background: color-mix(in srgb, var(--male) 62%, var(--panel)); }
 .point-pet.female, .point-grid .point-pet.female.selected { background: color-mix(in srgb, var(--female) 62%, var(--panel)); }
-.point-grid { --pet-portrait: 64px; --pet-height: 164px; --pet-medal: 28px; --pet-name: 14px; --pet-number: 12px; }
+.point-grid {
+  /* 随容器连续变化，避免窗口拖动跨断点时卡片突然跳高/跳矮。 */
+  --pet-portrait: clamp(64px, 8.5cqw, 80px);
+  --pet-height: clamp(164px, 19cqw, 180px);
+  --pet-medal: clamp(28px, 3.15cqw, 30px);
+  --pet-name: clamp(14px, 1.58cqw, 15px);
+  --pet-number: clamp(12px, 1.37cqw, 13px);
+}
 .point-pet { position: relative; border: 1px solid var(--hairline); border-radius: var(--radius-md); justify-items: center; }
 .point-pet:hover { border-color: color-mix(in srgb, var(--teal) 42%, var(--hairline)); box-shadow: var(--shadow-2); z-index: 2; }
 .point-grid .point-pet:hover { transform: none; }
@@ -312,10 +319,6 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { appearance:
 .point-pet.selected::after { content: none; }
 .pet-grid.point-grid { grid-template-columns: repeat(auto-fill, minmax(136px, 164px)); gap: var(--space-2); padding: var(--space-3); align-content: start; }
 #pet-grid.game-box-grid { grid-template-columns: repeat(6, minmax(136px, 164px)); min-width: 864px; max-width: 1032px; grid-auto-rows: var(--pet-height); gap: var(--space-2); padding: var(--space-3); }
-@container backpack (min-width: 948px) {
-  .point-grid { --pet-portrait: 80px; --pet-height: 180px; --pet-medal: 30px; --pet-name: 15px; --pet-number: 13px; }
-}
-
 /* ══════════ 设置页：左侧分区导航 + 右侧设置列表 ══════════ */
 #page-capture { padding: var(--space-6); }
 .settings-page { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: var(--space-6); width: min(1120px, 100%); margin: 0 auto; }
