@@ -236,7 +236,7 @@
 #pet-grid.box-fill-grid .point-groups, #pet-grid.box-fill-grid .point-medals { width: 28px; }
 #pet-grid.box-fill-grid .point-avatar { max-width: 96px; }
 #pet-grid.box-fill-grid .point-name { font-size: var(--fs-xs); line-height: 16px; }
-#pet-grid.game-box-grid .point-egg-group { font-size: 12px; line-height: 20px; }
+#pet-grid.game-box-grid .point-egg-group { font-size: var(--fs-3xs); line-height: 20px; }
 /* 箱位填充模式：卡片高度随窗口收缩时，肖像行可能只有约 44px 高，
    左右两列（蛋组/奖牌）改为跟随行高等比收缩，避免固定 28px 奖牌压到名字行。 */
 #pet-grid.box-fill-grid .point-groups,

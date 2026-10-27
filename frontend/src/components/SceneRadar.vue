@@ -271,10 +271,10 @@ const debugPosition = computed(() => {
 .radar-ring, .radar-axis { fill: none; stroke: var(--line); stroke-width: 1; }
 .radar-ring { stroke-dasharray: 2 4; }
 .radar-axis { stroke-dasharray: 4 5; }
-.scene-radar text { fill: var(--muted); font-size: 11px; }
-.radar-scale-label { font-size: 10px; font-weight: 600; }
+.scene-radar text { fill: var(--muted); font-size: var(--fs-3xs); }
+.radar-scale-label { font-size: var(--fs-3xs); font-weight: 600; }
 .radar-player-cross { fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-linecap: round; }
-.scene-radar .radar-target-label { font-size: 9px; font-weight: 700; fill: var(--ink); pointer-events: none; }
+.scene-radar .radar-target-label { font-size: var(--fs-3xs); font-weight: 700; fill: var(--ink); pointer-events: none; }
 /* 标签底色沿用面板/悬浮层底色：避免标签与点位、网格线粘连。 */
 .scene-radar { --radar-label-bg: var(--panel); }
 .radar-label-bg { fill: var(--radar-label-bg); fill-opacity: .86; }
@@ -286,7 +286,7 @@ const debugPosition = computed(() => {
 .radar-legend-dot.is-double { width: 11px; height: 11px; background: var(--danger); border: 1px solid var(--danger-ink); }
 .radar-player { fill: var(--teal-deep); stroke: var(--panel); stroke-width: 3; }
 .radar-player-icon { color: var(--panel); width: 14px; height: 14px; }
-.scene-radar .radar-self-label { fill: var(--panel); font-size: 11px; font-weight: 700; paint-order: stroke; stroke: var(--teal-deep); stroke-width: 4; stroke-linejoin: round; }
+.scene-radar .radar-self-label { fill: var(--panel); font-size: var(--fs-3xs); font-weight: 700; paint-order: stroke; stroke: var(--teal-deep); stroke-width: 4; stroke-linejoin: round; }
 .radar-target { cursor: pointer; outline: none; }
 .radar-label { pointer-events: none; }
 .radar-hit { fill: transparent; }
@@ -300,7 +300,7 @@ const debugPosition = computed(() => {
 .radar-target.is-marked .radar-point { fill: var(--amber); }
 .radar-target.is-double .radar-point { fill: var(--danger); stroke: var(--panel); stroke-width: 2.5; }
 .radar-target.selected .radar-hit, .radar-target:focus-visible .radar-hit { fill: var(--accent); stroke: var(--teal-dark); stroke-width: 2; }
-.radar-label.selected .radar-target-label { font-size: 10px; fill: var(--teal-deep); }
+.radar-label.selected .radar-target-label { font-size: var(--fs-3xs); fill: var(--teal-deep); }
 .scene-radar > p { margin: 0; padding: 8px var(--space-3); border-top: 1px solid var(--line-soft); }
 .scene-radar.is-overlay { flex: 1; min-height: 0; padding: 0; border: 0; background: transparent; --radar-label-bg: var(--radar-overlay-bg); }
 .is-overlay header { display: none; }

@@ -371,7 +371,7 @@ onMounted(() => { if (props.active) void resume(); else pause() })
 .matrix-empty { align-self: center; color: var(--muted-2); font-size: var(--fs-xs); opacity: .5; }
 
 .color-card { position: relative; display: block; width: min(100%, 126px); aspect-ratio: 280 / 153; margin: auto; overflow: hidden; border-radius: var(--radius-sm); background: var(--surface-2); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 12%, transparent); cursor: pointer; isolation: isolate; }
-.color-card-count { position: absolute; right: 4px; bottom: 4px; z-index: 3; padding: 1px 5px; border-radius: 999px; background: color-mix(in srgb, var(--teal-deep) 88%, transparent); color: var(--white); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.color-card-count { position: absolute; right: 4px; bottom: 4px; z-index: 3; padding: 1px 5px; border-radius: 999px; background: color-mix(in srgb, var(--teal-deep) 88%, transparent); color: var(--white); font-size: var(--fs-3xs); font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .color-inspector { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow-y: auto; border: 1px solid var(--line-soft); border-radius: var(--radius-lg); background: var(--panel); color: var(--ink); scrollbar-gutter: stable; }
 .inspector-header { display: flex; flex: none; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line-soft); }

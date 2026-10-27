@@ -613,7 +613,7 @@
 
 .eggbox-card-tag-row--dense .eggbox-card-tag {
   padding: 0 var(--space-0);
-  font-size: 11px;
+  font-size: var(--fs-3xs);
 }
 
 .eggbox-card-tag--nature {

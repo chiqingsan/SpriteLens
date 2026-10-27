@@ -418,20 +418,20 @@
   filter: drop-shadow(0 2px 3px color-mix(in srgb, var(--teal-deep) 25%, transparent));
 }
 
-.planner-nest-number { fill: var(--ink-soft); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.planner-nest-number { fill: var(--ink-soft); font-size: var(--fs-3xs); font-weight: 600; font-variant-numeric: tabular-nums; }
 .planner-nest-gender { overflow: visible; }
 
 .planner-nest-badge rect,
 .planner-nest-badge circle { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; }
-.planner-nest-badge text { fill: var(--ink-soft); font-size: 11px; font-weight: 600; }
+.planner-nest-badge text { fill: var(--ink-soft); font-size: var(--fs-3xs); font-weight: 600; }
 .planner-nest-badge.is-academy rect { fill: var(--teal); stroke: var(--teal); }
-.planner-nest-badge.is-academy text { fill: var(--white); font-size: 9px; }
+.planner-nest-badge.is-academy text { fill: var(--white); font-size: var(--fs-3xs); }
 .planner-nest-badge.is-lock circle { fill: var(--amber-soft); stroke: var(--amber-ink); }
 .planner-nest-badge.is-lock text { fill: var(--amber-ink); }
 
 .planner-nest-name { opacity: 0; pointer-events: none; transition: opacity var(--motion-fast) var(--motion-ease); }
 .planner-nest-name rect { fill: var(--panel); stroke: var(--teal); stroke-width: 1; }
-.planner-nest-name text { fill: var(--ink); font-size: 10px; font-weight: 600; }
+.planner-nest-name text { fill: var(--ink); font-size: var(--fs-3xs); font-weight: 600; }
 .planner-nest:hover .planner-nest-name,
 .planner-nest.selected .planner-nest-name,
 .planner-nest:focus-visible .planner-nest-name { opacity: 1; }
@@ -468,6 +468,7 @@
   display: grid;
   grid-area: key;
   grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: minmax(64px, max-content);
   align-content: start;
   gap: var(--space-1);
   min-width: 0;
@@ -479,7 +480,7 @@
   overscroll-behavior: contain;
 }
 
-.planner-canvas-key-item { position: relative; min-width: 0; min-height: 0; }
+.planner-canvas-key-item { position: relative; min-width: 0; min-height: 64px; }
 
 .planner-canvas-key-select {
   display: grid;
@@ -1477,14 +1478,9 @@ dialog.planner-picker {
   .planner-egg-choices > button > img { width: 32px; height: 32px; }
 }
 
-/* 侧栏/画布在窄容器里收窄，操作按钮改为下方一行，避免压住名字 */
+/* 窄容器仍保持卡片右侧操作区，列表只通过滚动承载更多窝位，不改变结构 */
 @container (max-width: 600px) {
   .planner-canvas-key { height: 300px; }
-  .planner-canvas-key-item { display: flex; flex-direction: column; }
-  .planner-canvas-key-select { min-height: 46px; padding-right: var(--space-3); }
-  .planner-canvas-key-actions { position: static; grid-template-columns: max-content minmax(0, 1fr); grid-template-rows: auto; gap: var(--space-1); width: auto; margin: 0 2px 2px; }
-  .planner-canvas-key-locate { width: auto; min-height: 22px; padding: 0 var(--space-2); }
-  .planner-canvas-key-location { min-height: 22px; }
 }
 
 @container (max-width: 420px) {
