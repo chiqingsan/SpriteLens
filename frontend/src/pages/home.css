@@ -256,11 +256,62 @@
   border-color: color-mix(in srgb, var(--teal) 58%, var(--hairline));
 }
 
+/* 全身图铺满卡片上半部；名称等信息层叠压在图上，不再是图下面的上下结构 */
 .home-sprite-art {
   position: relative;
   display: grid;
-  place-items: center;
-  height: 78px;
+  place-items: end center;
+  flex: 1 1 auto;
+  min-height: 172px;
+  padding: 6px 8px 2px;
+}
+
+/* 底部纱罩用卡片自身的性别底色向上渐隐，文字压在图上但仍能看见精灵下半身 */
+.home-sprite-overlay {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px 8px;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--gender-soft, var(--surface-2)) 94%, transparent) 0%,
+    color-mix(in srgb, var(--gender-soft, var(--surface-2)) 80%, transparent) 52%,
+    color-mix(in srgb, var(--gender-soft, var(--surface-2)) 38%, transparent) 100%
+  );
+}
+
+/* 纱罩向上延伸一段，避免信息行离图底太近、也不会出现硬边 */
+.home-sprite-overlay::before {
+  content: "";
+  position: absolute;
+  inset: -34px 0 auto 0;
+  height: 34px;
+  z-index: -1;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--gender-soft, var(--surface-2)) 38%, transparent),
+    transparent
+  );
+  pointer-events: none;
+}
+
+.home-sprite-overline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 15px;
+}
+
+.home-sprite-caption {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 
@@ -273,8 +324,8 @@
 .home-sprite-image {
   position: relative;
   z-index: 1;
-  width: 72px;
-  height: 72px;
+  width: auto;
+  height: 140px;
   image-rendering: auto;
   object-fit: contain;
   filter: drop-shadow(0 3px 4px color-mix(in srgb, var(--ink) 18%, transparent));
@@ -287,7 +338,7 @@
 
 .home-sprite-image.is-artwork {
   width: auto;
-  height: 74px;
+  height: 142px;
   max-width: 100%;
 }
 
@@ -296,7 +347,7 @@
 }
 
 .home-sprite-fallback {
-  font-size: 26px;
+  font-size: 30px;
   font-weight: 700;
   color: var(--gender-ink, var(--muted));
 }
@@ -325,20 +376,7 @@
   filter: drop-shadow(0 2px 4px color-mix(in srgb, var(--ink) 22%, transparent));
 }
 
-.home-sprite-body {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px 11px 10px;
-}
-
-/* 名称独占一行，性格/奖牌与等级/性别落在第二行两端 */
-.home-sprite-title {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-}
-
+/* 名称可压缩省略；等级/性别不参与收缩，永远贴在行尾 */
 .home-sprite-name {
   flex: 0 1 auto;
   min-width: 0;
@@ -348,27 +386,11 @@
   font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--ink);
+  /* 压在全身图上：一层极淡亮边保证任何图案上都读得清 */
+  text-shadow: 0 1px 0 color-mix(in srgb, var(--panel) 78%, transparent);
 }
 
-.home-sprite-sub {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  white-space: nowrap;
-}
-
-/* 左簇（性格/奖牌）可压缩；右簇（等级/性别）不参与收缩，永远贴在行尾 */
-.home-sprite-tags {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.home-sprite-sub .home-nature-chip {
+.home-sprite-caption .home-nature-chip {
   flex: 0 1 auto;
   min-width: 0;
   height: 18px;
@@ -380,14 +402,12 @@
   line-height: 18px;
 }
 
-/* 奖牌排在名称之后、等级之前，空间不足时由左簇整体裁切，不挤右侧 */
+/* 奖牌在纱罩顶部一行，左对齐；种类名推右 */
 .home-sprite-medals {
   display: inline-flex;
   align-items: center;
   gap: 3px;
   flex: none;
-  min-width: 0;
-  overflow: hidden;
 }
 
 .home-gender-mark {
@@ -404,16 +424,9 @@
   color: var(--female-strong);
 }
 
-.home-sprite-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 20px;
-  overflow: hidden;
-}
-
 .home-sprite-species {
   min-width: 0;
+  margin-left: auto;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -437,15 +450,16 @@
   height: 16px;
 }
 
-.home-sprite-title .home-medal-icon {
-  width: 15px;
-  height: 15px;
+.home-sprite-overline .home-medal-icon {
+  width: 14px;
+  height: 14px;
 }
 
+/* 指标带成为卡片底栏：图在上、指标在下，但名称信息压在图上 */
 .home-sprite-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  padding-top: 6px;
+  padding: 7px 11px 9px;
   border-top: 1px solid var(--hairline);
 }
 
@@ -1121,16 +1135,16 @@
   }
 
   .home-sprite-art {
-    height: 74px;
+    min-height: 160px;
+    padding: 5px 6px 3px;
   }
 
   .home-sprite-image {
-    width: 64px;
-    height: 64px;
+    height: 132px;
   }
 
   .home-sprite-image.is-artwork {
-    height: 66px;
+    height: 134px;
   }
 
   .home-pairing-grid {

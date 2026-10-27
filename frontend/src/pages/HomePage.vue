@@ -243,44 +243,41 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
                   <span v-else class="home-sprite-fallback">{{ genderLabel(resident.gender) }}</span>
                   <img v-if="rarityIconUrl(resident)" class="home-sprite-rarity" :src="rarityIconUrl(resident)"
                     :alt="resident.is_colorful ? '异色炫彩' : '异色'" :title="resident.is_colorful ? '异色炫彩' : '异色'" draggable="false">
-                </div>
-                <div class="home-sprite-body">
-                  <div class="home-sprite-title">
-                    <strong class="home-sprite-name" :title="resident.name">{{ resident.name }}</strong>
-                  </div>
-                  <div class="home-sprite-sub">
-                    <span class="home-sprite-tags">
-                      <span v-if="resident.nature_name" class="home-nature-chip">{{ resident.nature_name }}</span>
+                  <div class="home-sprite-overlay">
+                    <div v-if="portraitMedals(resident).length || speciesLabel(resident)" class="home-sprite-overline">
                       <span v-if="portraitMedals(resident).length" class="home-sprite-medals">
                         <img v-for="mark in portraitMedals(resident)" :key="mark.name" class="home-medal-icon"
                           :src="`/static/medal-icons/${medalIds[mark.name]}.webp`" :alt="mark.name" :title="mark.name" draggable="false">
                       </span>
-                    </span>
-                    <span class="home-sprite-level">Lv.{{ resident.level }}</span>
-                    <UiIcon v-if="resident.gender" class="home-gender-mark"
-                      :name="resident.gender === 1 ? 'gender-male' : 'gender-female'" :title="genderLabel(resident.gender)" />
+                      <span v-if="speciesLabel(resident)" class="home-sprite-species" :title="speciesLabel(resident)">{{ speciesLabel(resident) }}</span>
+                    </div>
+                    <div class="home-sprite-caption">
+                      <strong class="home-sprite-name" :title="resident.name">{{ resident.name }}</strong>
+                      <span v-if="resident.nature_name" class="home-nature-chip home-sprite-nature"
+                        :title="resident.nature_name">{{ resident.nature_name }}</span>
+                      <span class="home-sprite-level">Lv.{{ resident.level }}</span>
+                      <UiIcon v-if="resident.gender" class="home-gender-mark"
+                        :name="resident.gender === 1 ? 'gender-male' : 'gender-female'" :title="genderLabel(resident.gender)" />
+                    </div>
                   </div>
-                  <div v-if="speciesLabel(resident)" class="home-sprite-meta">
-                    <span class="home-sprite-species">{{ speciesLabel(resident) }}</span>
-                  </div>
-                  <div class="home-sprite-metrics">
-                    <span class="home-sprite-metric" :class="{ unknown: resident.height_pct === null }">
-                      <span class="home-sprite-metric-label"><UiIcon name="ruler-2" />身高</span>
-                      <span class="home-sprite-metric-value" :title="resident.height_text ? `身高 ${resident.height_text}` : '身高未知'">{{ measurementPercent(resident.height_pct) }}</span>
-                      <i class="home-sprite-metric-track"><b :style="{ width: ratioStyle(resident.height_pct) }"></b></i>
-                    </span>
-                    <span class="home-sprite-metric" :class="{ unknown: resident.weight_pct === null }">
-                      <span class="home-sprite-metric-label"><UiIcon name="weight" />体重</span>
-                      <span class="home-sprite-metric-value" :title="resident.weight_text ? `体重 ${resident.weight_text}` : '体重未知'">{{ measurementPercent(resident.weight_pct) }}</span>
-                      <i class="home-sprite-metric-track"><b :style="{ width: ratioStyle(resident.weight_pct) }"></b></i>
-                    </span>
-                    <span class="home-sprite-metric" :class="{ unknown: resident.voice === null }"
-                      :title="resident.voice === null ? '声音未知' : `声音 ${resident.voice} dB`">
-                      <span class="home-sprite-metric-label"><UiIcon name="activity" />声音</span>
-                      <span class="home-sprite-metric-value" :title="resident.voice === null ? '声音未知' : `声音 ${resident.voice} dB`">{{ measurementPercent(voiceRatio(resident)) }}</span>
-                      <i class="home-sprite-metric-track"><b :style="{ width: ratioStyle(voiceRatio(resident)) }"></b></i>
-                    </span>
-                  </div>
+                </div>
+                <div class="home-sprite-metrics">
+                      <span class="home-sprite-metric" :class="{ unknown: resident.height_pct === null }">
+                        <span class="home-sprite-metric-label"><UiIcon name="ruler-2" />身高</span>
+                        <span class="home-sprite-metric-value" :title="resident.height_text ? `身高 ${resident.height_text}` : '身高未知'">{{ measurementPercent(resident.height_pct) }}</span>
+                        <i class="home-sprite-metric-track"><b :style="{ width: ratioStyle(resident.height_pct) }"></b></i>
+                      </span>
+                      <span class="home-sprite-metric" :class="{ unknown: resident.weight_pct === null }">
+                        <span class="home-sprite-metric-label"><UiIcon name="weight" />体重</span>
+                        <span class="home-sprite-metric-value" :title="resident.weight_text ? `体重 ${resident.weight_text}` : '体重未知'">{{ measurementPercent(resident.weight_pct) }}</span>
+                        <i class="home-sprite-metric-track"><b :style="{ width: ratioStyle(resident.weight_pct) }"></b></i>
+                      </span>
+                      <span class="home-sprite-metric" :class="{ unknown: resident.voice === null }"
+                        :title="resident.voice === null ? '声音未知' : `声音 ${resident.voice} dB`">
+                        <span class="home-sprite-metric-label"><UiIcon name="activity" />声音</span>
+                        <span class="home-sprite-metric-value" :title="resident.voice === null ? '声音未知' : `声音 ${resident.voice} dB`">{{ measurementPercent(voiceRatio(resident)) }}</span>
+                        <i class="home-sprite-metric-track"><b :style="{ width: ratioStyle(voiceRatio(resident)) }"></b></i>
+                      </span>
                 </div>
               </article>
             </div>
