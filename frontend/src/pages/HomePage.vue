@@ -194,6 +194,8 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
         <p class="home-hero-sub">
           <template v-if="pairingGroups.length">{{ pairingGroups.length }} 个母本正在配对</template>
           <template v-else>还没有配对关系</template>
+          <span class="home-hero-sub-sep" aria-hidden="true">·</span>
+          <span>{{ sceneEggCount }} 个场景蛋</span>
         </p>
       </div>
       <div class="home-hero-aside">
@@ -201,12 +203,6 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
           <span class="home-level-label">房间等级</span>
           <strong class="home-level-value">{{ roomLevel || '—' }}</strong>
         </div>
-        <ul class="home-hero-stats" aria-label="家园统计">
-          <li><UiIcon name="users" /><b>{{ homeSprites.length }}</b><span>精灵</span></li>
-          <li><UiIcon name="home" /><b>{{ nests.length }}</b><span>小窝</span></li>
-          <li><UiIcon name="arrows-shuffle" /><b>{{ pairingGroups.length }}</b><span>母本</span></li>
-          <li><UiIcon name="egg" /><b>{{ sceneEggCount }}</b><span>场景蛋</span></li>
-        </ul>
         <div class="home-hero-actions">
           <button type="button" class="home-ghost-button" :disabled="model.loading.value" @click="model.load()">
             <UiIcon name="refresh" />{{ model.loading.value ? '读取中…' : '刷新快照' }}
@@ -250,6 +246,9 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
             :class="[`gender-${resident.gender}`, { 'is-academy': isAcademy(resident), 'is-linked': hoveredPairIds.includes(resident.actor_id) }]"
             @mouseenter="hoveredSprite = resident.actor_id" @mouseleave="hoveredSprite = ''">
             <div class="home-sprite-art">
+              <span v-if="isAcademy(resident)" class="home-sprite-academy" title="学院绿窝">
+                <UiIcon name="graduation-cap" />学院
+              </span>
               <img v-if="spriteImage(resident)" class="home-sprite-image" :class="{ 'is-artwork': hasArtwork(resident) }"
                 :src="spriteImage(resident)" alt="" loading="lazy" draggable="false" @error="spriteError(resident)">
               <span v-else class="home-sprite-fallback">{{ genderLabel(resident.gender) }}</span>
@@ -264,9 +263,8 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
                 <UiIcon v-if="resident.gender" class="home-gender-mark"
                   :name="resident.gender === 1 ? 'gender-male' : 'gender-female'" :title="genderLabel(resident.gender)" />
               </div>
-              <div class="home-sprite-meta">
+              <div v-if="speciesLabel(resident) || portraitMedals(resident).length" class="home-sprite-meta">
                 <span v-if="speciesLabel(resident)" class="home-sprite-species">{{ speciesLabel(resident) }}</span>
-                <span v-if="isAcademy(resident)" class="home-academy-chip">学院</span>
                 <img v-for="mark in portraitMedals(resident)" :key="mark.name" class="home-medal-icon"
                   :src="`/static/medal-icons/${medalIds[mark.name]}.webp`" :alt="mark.name" :title="mark.name" draggable="false">
               </div>
