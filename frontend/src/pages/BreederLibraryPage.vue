@@ -5,6 +5,7 @@ import BreederCard from '../components/BreederCard.vue'
 import DualRangeSlider from '../components/DualRangeSlider.vue'
 import PageShell from '../components/PageShell.vue'
 import UiIcon from '../components/UiIcon.vue'
+import UiSearch from '../components/UiSearch.vue'
 import './breeder-library.css'
 
 const props = defineProps<{ host: BreederHost }>()
@@ -31,7 +32,7 @@ defineExpose({ load: model.load, pause, resetAccount })
 <template>
   <PageShell class="breeder-page" data-vue-page>
     <template #toolbar>
-        <label class="breeder-search"><UiIcon name="search" /><input v-model="filters.search" type="search" aria-label="搜索配种精灵" placeholder="名称、性格、蛋组或个体 ID"></label>
+        <UiSearch v-model="filters.search" class="breeder-search" label="搜索配种精灵" placeholder="名称、性格、蛋组或个体 ID" />
         <label class="breeder-nature-toggle"><input v-model="filters.same_nature" type="checkbox">性格一致</label>
         <button class="ghost-button" title="刷新背包观察记录" aria-label="刷新筛选配对" @click="model.refresh"><UiIcon name="refresh" /></button>
       </template>

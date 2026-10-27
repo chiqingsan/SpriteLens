@@ -12,6 +12,7 @@ import DexPortrait from '../components/DexPortrait.vue'
 import DexTypeBadge from '../components/DexTypeBadge.vue'
 import DexFilterMenu from '../components/DexFilterMenu.vue'
 import UiIcon from '../components/UiIcon.vue'
+import UiSearch from '../components/UiSearch.vue'
 import './catalog-wiki.css'
 
 const props = defineProps<{ api: ApiClient; active: boolean }>()
@@ -134,7 +135,7 @@ defineExpose({ load, pause, resume, resetAccount, reveal, error })
         <p id="hb-count" class="ui-page-meta">资料条目 {{ data?.total || 0 }} 只 · {{ filtered.length === data?.total ? '浏览完整资料库' : `找到 ${filtered.length} 个结果` }}</p>
       </div>
       <div class="dex-toolbar-actions">
-        <input id="hb-search" v-model="filters.search" type="search" placeholder="搜索精灵名称、形态或编号" aria-label="搜索精灵图鉴">
+        <UiSearch id="hb-search" v-model="filters.search" label="搜索精灵图鉴" placeholder="搜索精灵名称、形态或编号" />
         <DexFilterMenu label="属性" :options="typeOptions" :model-value="filters.type ? [filters.type] : []" :active="active" @update:model-value="filters.type = $event[0] || ''" />
         <DexFilterMenu v-model="groups" v-model:mode="groupMode" label="蛋组" :options="groupOptions" multiple :active="active" />
         <label class="ui-density"><span class="sr-only">卡片密度</span><select v-model="density" aria-label="卡片密度"><option value="comfortable">舒适</option><option value="compact">紧凑</option></select></label>

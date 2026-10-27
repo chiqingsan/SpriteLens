@@ -3,12 +3,12 @@ import { ref, watch } from 'vue'
 import type { PetFilterModel } from '../composables/usePetFilters'
 import DualRangeSlider from './DualRangeSlider.vue'
 import UiIcon from './UiIcon.vue'
+import UiSearch from './UiSearch.vue'
 
 const { model } = defineProps<{ model: PetFilterModel }>()
 const { filters, options, fixed, selectedMedals } = model
 const specialitiesOpen = ref(false)
 const specialityDetails = ref<HTMLDetailsElement | null>(null)
-function value(event: Event) { return (event.target as HTMLInputElement).value }
 function setSortDirection(desc: boolean) { if (filters.desc !== desc) model.patch({ desc }) }
 function syncSpecialitiesOpen(event: Event) {
   specialitiesOpen.value = (event.currentTarget as HTMLDetailsElement).open
@@ -22,11 +22,9 @@ watch(() => model.active.value, active => {
 
 <template>
   <Teleport to="#pet-search-controls">
-    <label class="pet-search"><span class="sr-only">搜索名字、编号或图鉴 ID</span>
-      <input
-        id="f-search" :value="filters.search" type="text" placeholder="搜索名字 / 编号 / 图鉴 ID"
-        autocomplete="off" @input="model.search(value($event))">
-    </label>
+    <UiSearch
+      id="f-search" class="pet-search" :model-value="filters.search" label="搜索名字、编号或图鉴 ID"
+      placeholder="搜索名字 / 编号 / 图鉴 ID" @update:model-value="model.search($event)" />
   </Teleport>
   <Teleport to="#pet-sort-root">
     <label class="inline-field pet-sort-field" :hidden="fixed">排序

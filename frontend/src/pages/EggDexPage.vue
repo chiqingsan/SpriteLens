@@ -12,6 +12,7 @@ import DexPortrait from '../components/DexPortrait.vue'
 import DexTypeBadge from '../components/DexTypeBadge.vue'
 import DexFilterMenu from '../components/DexFilterMenu.vue'
 import UiIcon from '../components/UiIcon.vue'
+import UiSearch from '../components/UiSearch.vue'
 import './catalog-wiki.css'
 
 const props = defineProps<{ api: ApiClient; active: boolean }>()
@@ -155,7 +156,7 @@ defineExpose({ load, pause, resume, reveal, error })
         <p id="ed-count" class="ui-page-meta">资料条目 {{ data?.total || 0 }} 种 · {{ filtered.length === data?.total ? '浏览完整资料库' : `找到 ${filtered.length} 个结果` }}</p>
       </div>
       <div class="dex-toolbar-actions">
-        <input id="ed-search" v-model="filters.search" type="search" placeholder="搜索蛋名、精灵或编号" aria-label="搜索蛋蛋图鉴">
+        <UiSearch id="ed-search" v-model="filters.search" label="搜索蛋蛋图鉴" placeholder="搜索蛋名、精灵或编号" />
         <DexFilterMenu label="蛋类型" :options="typeOptions" :model-value="filters.egg_type ? [filters.egg_type] : []" :active="active" @update:model-value="filters.egg_type = $event[0] || ''" />
         <DexFilterMenu v-model="groups" v-model:mode="groupMode" label="蛋组" :options="groupOptions" multiple :active="active" />
         <button ref="moreFiltersButton" class="dex-filter-button dex-more-filter-trigger" :class="{ active: moreFiltersActive }" type="button" aria-haspopup="dialog" :aria-expanded="moreFiltersOpen" @click="openMoreFilters"><small>更多筛选</small><b>{{ moreFiltersSummary }}</b><UiIcon name="adjustments" /></button>

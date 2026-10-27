@@ -1082,24 +1082,8 @@
 .planner-configured-title { margin-top: var(--space-3); }
 .planner-configured-title .count-badge { background: var(--teal); color: var(--white); }
 
-/* 搜索与目标蛋列表 */
-.planner-search {
-  width: 100%;
-  height: 34px;
-  margin-bottom: var(--space-2);
-  padding: 0 var(--space-3);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
-  background: var(--surface-1);
-  color: var(--ink);
-  font-size: var(--fs-sm);
-  transition:
-    border-color var(--motion-fast) var(--motion-ease),
-    background-color var(--motion-fast) var(--motion-ease),
-    box-shadow var(--motion-fast) var(--motion-ease);
-}
-
-.planner-search:focus { outline: none; border-color: var(--teal); background: var(--panel); box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 14%, transparent); }
+/* 搜索与目标蛋列表（外观由 .ui-search 承担） */
+.planner-search { width: 100%; margin-bottom: var(--space-2); }
 
 .planner-egg-choices {
   display: grid;
@@ -1325,7 +1309,6 @@ dialog.planner-picker {
 
 .planner-picker-filters { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); flex: none; padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--line-soft); background: var(--surface-1); }
 
-.planner-picker-filters input,
 .planner-picker-filters select {
   height: 32px;
   padding: 0 var(--space-2);
@@ -1336,10 +1319,10 @@ dialog.planner-picker {
   font-size: var(--fs-2xs);
 }
 
-.planner-picker-filters input { flex: 1 1 200px; min-width: 140px; }
+/* 搜索框跟弹窗里的下拉保持同一行高与圆角档，避免 30/32px 混排 */
+.planner-picker-filters .planner-picker-search { flex: 1 1 200px; min-width: 140px; height: 32px; border-radius: var(--radius-sm); }
 .planner-picker-filters select { min-width: 100px; }
 
-.planner-picker-filters input:focus,
 .planner-picker-filters select:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 14%, transparent); }
 
 .planner-picker-grid {

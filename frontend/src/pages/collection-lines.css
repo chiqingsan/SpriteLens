@@ -67,40 +67,8 @@
 
 .collection-controls { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 
-.collection-search {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 220px;
-  height: 34px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
-  background: var(--surface-1);
-  color: var(--muted);
-  transition:
-    border-color var(--motion-fast) var(--motion-ease),
-    background-color var(--motion-fast) var(--motion-ease),
-    box-shadow var(--motion-fast) var(--motion-ease);
-}
-
-.collection-search:focus-within {
-  border-color: var(--teal);
-  background: var(--panel);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 14%, transparent);
-}
-
-.collection-search input {
-  width: 100%;
-  min-width: 0;
-  height: 100%;
-  padding: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--ink);
-  font-size: var(--fs-sm);
-}
+/* 外观统一由 .ui-search 承担，这里只决定它在工具栏里的宽度 */
+.collection-controls .ui-search { flex: none; width: 220px; }
 
 .collection-controls .ghost-button { height: 34px; }
 .collection-controls .collection-refresh { display: grid; place-items: center; width: 34px; padding: 0; }
@@ -455,14 +423,12 @@
   font-weight: 600;
 }
 
-.collection-rule-note { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--fs-3xs); line-height: 1.6; }
-
 .collection-group-options { max-height: none; gap: var(--space-2); }
 
 .collection-group-options .chip {
   min-height: 26px;
   padding: 0 var(--space-2);
-  border: 1px solid var(--line-soft);
+  border: 1px solid var(--hairline-strong);
   border-radius: var(--radius-sm);
   background: var(--panel);
   color: var(--ink-soft);
@@ -470,10 +436,10 @@
   font-weight: 500;
 }
 
-.collection-group-options .chip:hover { border-color: var(--line); background: var(--surface-1); color: var(--ink); }
+.collection-group-options .chip:hover { border-color: color-mix(in srgb, var(--ink) 26%, transparent); background: var(--surface-1); color: var(--ink); }
 
 .collection-group-options .chip.active {
-  border-color: color-mix(in srgb, var(--teal) 55%, var(--line-soft));
+  border-color: color-mix(in srgb, var(--teal) 55%, var(--hairline-strong));
   background: var(--teal-soft);
   color: var(--teal-dark);
   font-weight: 600;
@@ -482,17 +448,17 @@
 .collection-sound { display: flex; width: 100%; }
 .collection-sound button { flex: 1; min-width: 0; font-size: var(--fs-xs); }
 
-/* 统计条件：左对齐的开关行 */
+/* 统计条件：左对齐的开关行。勾选图标常驻渲染，只切换显隐，选中时文字不位移 */
 .collection-parent-options { display: grid; gap: var(--space-2); }
 
-.collection-parent-options .chip {
+.collection-parent-options .chip:has(> .ui-icon) {
   display: flex;
   align-items: center;
   justify-content: flex-start;
   gap: var(--space-2);
   min-height: 34px;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line-soft);
+  border: 1px solid var(--hairline-strong);
   border-radius: var(--radius-sm);
   background: var(--panel);
   color: var(--ink-soft);
@@ -501,33 +467,23 @@
   text-align: left;
 }
 
-.collection-parent-options .chip:hover { border-color: var(--line); background: var(--surface-1); color: var(--ink); }
+.collection-parent-options .chip:hover { border-color: color-mix(in srgb, var(--ink) 26%, transparent); background: var(--surface-1); color: var(--ink); }
 .collection-parent-options .ui-icon { width: 15px; height: 15px; }
 
 .collection-parent-options .chip.active {
-  border-color: color-mix(in srgb, var(--teal) 55%, var(--line-soft));
+  border-color: color-mix(in srgb, var(--teal) 55%, var(--hairline-strong));
   background: color-mix(in srgb, var(--teal-soft) 62%, var(--panel));
   color: var(--teal-dark);
-  font-weight: 600;
 }
 
-.collection-parent-options .chip.active .ui-icon:last-child { margin-left: auto; }
-
-.collection-rules summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  color: var(--muted);
-  list-style: none;
-  cursor: pointer;
-  font-size: var(--fs-xs);
+/* 勾选位置始终留白，避免选中瞬间挤压文字 */
+.collection-parent-options .collection-option-check {
+  margin-left: auto;
+  color: var(--teal-dark);
+  transition: opacity var(--motion-fast) var(--motion-ease);
 }
 
-.collection-rules summary::-webkit-details-marker { display: none; }
-.collection-rules summary .ui-icon { width: 16px; height: 16px; transition: transform var(--motion-fast) var(--motion-ease); }
-.collection-rules[open] summary .ui-icon { transform: rotate(90deg); }
-.collection-rules p { margin: var(--space-2) 0 0; color: var(--muted); font-size: var(--fs-3xs); line-height: 1.7; }
+.collection-parent-options .collection-option-check.is-off { opacity: 0; }
 
 /* 产线详情 */
 .collection-detail-hero {
@@ -682,7 +638,7 @@
   .collection-toolbar { flex-wrap: nowrap; gap: var(--space-3); }
   .collection-overview { flex: 0 1 auto; }
   .collection-controls { flex: 1 1 auto; justify-content: flex-end; }
-  .collection-search { flex: 1 1 140px; width: auto; min-width: 120px; }
+  .collection-controls .ui-search { flex: 1 1 140px; width: auto; min-width: 120px; }
 }
 
 @media (max-width: 960px) {
@@ -696,7 +652,7 @@
   .collection-overview { flex: 1 1 100%; }
   .collection-controls { flex: 1; flex-wrap: wrap; }
   /* 搜索框与页码条同时 flex:1 时，页码条按 max-content 抢走空间，把「筛选条件」挤成竖排两行 */
-  .collection-search { flex: 1 1 160px; width: auto; min-width: 0; }
+  .collection-controls .ui-search { flex: 1 1 160px; width: auto; min-width: 0; }
   .collection-controls .ghost-button { flex: none; white-space: nowrap; }
   .collection-side.mobile-filters { grid-row: 1; max-height: 320px; }
   .collection-page.filters-expanded .collection-body { grid-template-rows: auto minmax(0, 1fr); }

@@ -5,6 +5,7 @@ import BreedingCanvas from '../components/BreedingCanvas.vue'
 import MedalIcon from '../components/MedalIcon.vue'
 import PageShell from '../components/PageShell.vue'
 import UiIcon from '../components/UiIcon.vue'
+import UiSearch from '../components/UiSearch.vue'
 import { useBreedingPlanner, type PlannerHost } from '../composables/useBreedingPlanner'
 import type { Goal, Placement } from '../types/breedingPlanner'
 import './breeder-library.css'
@@ -319,7 +320,7 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
         </section>
         <template v-if="mode === 'target'">
            <div class="planner-section-title"><strong>添加目标蛋</strong><small>点击添加 · 最多 30 个</small></div>
-           <input v-model="eggSearch" type="search" class="planner-search" placeholder="搜索蛋名或蛋组，点击添加" aria-label="查找目标蛋">
+           <UiSearch v-model="eggSearch" class="planner-search" label="查找目标蛋" placeholder="搜索蛋名或蛋组，点击添加" />
            <div class="planner-egg-choices"><button v-for="egg in visibleEggChoices" :key="egg.egg_key" type="button" :disabled="draft.goals.length >= 30" @click="addGoal(egg.egg_key)"><img :src="egg.icon_url" alt="" @error="($event.target as HTMLImageElement).style.visibility = 'hidden'"><span><strong>{{ egg.name }}</strong><small>{{ egg.groups.join(' / ') }} · 已观察母本 {{ motherCounts.get(egg.egg_key) || 0 }} 只</small></span><span aria-hidden="true">＋</span></button><p v-if="!eggChoices.length" class="planner-muted">没有匹配的目标蛋</p></div>
            <small v-if="eggChoices.length > 24" class="planner-muted">仅显示前 24 项，搜索蛋名可查找其他目标。</small>
            <div v-if="!draft.goals.length" class="planner-sidebar-empty">点击上方目标蛋即可添加；奖牌、性格默认不限。</div>
@@ -360,7 +361,7 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
     </aside>
     <dialog ref="picker" class="planner-picker" aria-labelledby="planner-picker-title" aria-modal="true" @click="($event.target === picker) && closePicker()">
       <header><strong id="planner-picker-title">{{ pickerKind === 'pool' ? '选择参与配窝的精灵' : pickerKind === 'replace' ? '替换当前亲本' : '添加亲本到布局' }}</strong><button class="ghost-button" aria-label="关闭选择精灵" @click="closePicker()"><UiIcon name="x" /></button></header>
-      <div class="planner-picker-filters"><input ref="pickerSearch" v-model="search" type="search" placeholder="名称、性格、蛋组或个体ID" aria-label="查找候选精灵" @input="page = 1"><select v-model="gender" aria-label="候选性别" @change="page = 1"><option value="">全部性别</option><option value="1">父本</option><option value="2">母本</option></select><select v-model="nature" aria-label="候选性格" @change="page = 1"><option value="">全部性格</option><option v-for="n in context?.natures" :key="n.id">{{ n.name }}</option></select><select v-model="group" aria-label="候选蛋组" @change="page = 1"><option value="">全部蛋组</option><option v-for="name in currentGroups" :key="name">{{ name }}</option></select><select v-model="medal" aria-label="候选奖牌" @change="page = 1"><option value="">全部奖牌</option><option v-for="name in ['大块头', '小不点', '婉转声', '粗嗓门']" :key="name">{{ name }}</option></select></div>
+      <div class="planner-picker-filters"><UiSearch ref="pickerSearch" v-model="search" class="planner-picker-search" label="查找候选精灵" placeholder="名称、性格、蛋组或个体ID" @update:model-value="page = 1" /><select v-model="gender" aria-label="候选性别" @change="page = 1"><option value="">全部性别</option><option value="1">父本</option><option value="2">母本</option></select><select v-model="nature" aria-label="候选性格" @change="page = 1"><option value="">全部性格</option><option v-for="n in context?.natures" :key="n.id">{{ n.name }}</option></select><select v-model="group" aria-label="候选蛋组" @change="page = 1"><option value="">全部蛋组</option><option v-for="name in currentGroups" :key="name">{{ name }}</option></select><select v-model="medal" aria-label="候选奖牌" @change="page = 1"><option value="">全部奖牌</option><option v-for="name in ['大块头', '小不点', '婉转声', '粗嗓门']" :key="name">{{ name }}</option></select></div>
       <div class="planner-picker-grid"><BreederCard v-for="parent in pickerRows" :key="parent.gid" :parent="parent" :selected="pickerKind === 'pool' && draft.selected.includes(parent.gid)" @select="choose(parent.gid)" @open="closePicker(); host.openPet($event)" /><div v-if="!pickerRows.length" class="planner-empty">当前观察记录中没有符合筛选的候选。</div></div>
       <footer><span>已选择 {{ draft.selected.length }} 只 · {{ filtered.length }} 个候选</span><div class="planner-actions"><button class="ghost-button" :disabled="page <= 1" @click="page--">上一页</button><span>{{ page }} / {{ Math.max(1, Math.ceil(filtered.length / 24)) }}</span><button class="ghost-button" :disabled="page * 24 >= filtered.length" @click="page++">下一页</button><button class="planner-primary" @click="closePicker()">完成</button></div></footer>
     </dialog>

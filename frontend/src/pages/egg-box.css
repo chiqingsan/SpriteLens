@@ -122,47 +122,11 @@
   background: var(--surface-2);
 }
 
+/* 外观统一由 .ui-search 承担（compact 档 30px），这里只定列表控件行里的宽度 */
 .eggbox-search {
-  display: flex;
-  align-items: center;
   flex: 1 1 180px;
-  gap: var(--space-2);
   min-width: 130px;
   max-width: 320px;
-  height: 30px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
-  background: var(--panel);
-  color: var(--muted);
-  transition: border-color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease);
-}
-
-.eggbox-search .ui-icon {
-  width: 14px;
-  height: 14px;
-  color: var(--muted-2);
-}
-
-.eggbox-search input {
-  width: 100%;
-  min-width: 0;
-  height: 100%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  font-size: var(--fs-xs);
-  outline: none;
-}
-
-.eggbox-search input::placeholder {
-  color: var(--muted-2);
-}
-
-.eggbox-search:focus-within {
-  border-color: var(--teal);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 16%, transparent);
 }
 
 /* ── 类型筛选：轻量胶囊，不用实心主色 ── */

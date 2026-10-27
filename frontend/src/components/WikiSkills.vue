@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { WikiSkill } from '../types/wikiReference'
+import UiSearch from './UiSearch.vue'
 const { skills } = defineProps<{ skills: WikiSkill[] }>()
 const search = ref(''), source = ref(''), type = ref('')
 const types = computed(() => [...new Set(skills.map(row => row.type))])
@@ -10,7 +11,7 @@ const filtered = computed(() => skills.filter(row => (!source.value || row.sourc
 </script>
 <template>
   <div class="wiki-skill-filters">
-    <input v-model="search" type="search" placeholder="搜索技能名称 / 效果" aria-label="搜索技能">
+    <UiSearch v-model="search" label="搜索技能" placeholder="搜索技能名称 / 效果" />
     <select v-model="source" aria-label="技能来源">
       <option value="">
         全部来源
