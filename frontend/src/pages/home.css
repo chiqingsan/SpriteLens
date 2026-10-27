@@ -301,9 +301,9 @@
 .home-sprite-overline {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   min-width: 0;
-  min-height: 19px;
+  min-height: 24px;
 }
 
 .home-sprite-caption {
@@ -406,7 +406,7 @@
 .home-sprite-medals {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   flex: none;
 }
 
@@ -446,13 +446,14 @@
 
 .home-medal-icon {
   flex: none;
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
+  filter: drop-shadow(0 1px 2px color-mix(in srgb, var(--ink) 26%, transparent));
 }
 
 .home-sprite-overline .home-medal-icon {
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
 }
 
 /* 指标带成为卡片底栏：图在上、指标在下，但名称信息压在图上 */
