@@ -9,6 +9,7 @@ const props = defineProps<{ positions: Placement[]; parents: Map<string, Breeder
 const emit = defineEmits<{ select: [gid: string]; move: [gid: string, x: number, y: number, targetGid: string | null]; locate: [gid: string] }>()
 const drag = ref<{ gid: string; x: number; y: number; moved: boolean; cellX: number; cellY: number } | null>(null)
 const hint = ref('')
+const hovered = ref('')
 const canvasElement = ref<HTMLElement | null>(null)
 const canvasHeight = ref(0)
 let canvasObserver: ResizeObserver | null = null
@@ -46,20 +47,52 @@ function center(gid: string) {
   const y = drag.value?.gid === gid ? drag.value.cellY : position?.y
   return x === undefined || y === undefined ? null : { x: x * 32 + 32, y: y * 32 + 32 }
 }
-function insetPoint(from: { x: number; y: number }, to: { x: number; y: number }, distance = 28) {
+// 父本连线画成一条略微外鼓的弧，端点落在 64×64 窝位的边框上：
+// 直线会一笔横穿别人的立绘，正交折线又会贴着方块边框走、看着像多画了一条边；
+// 弧线只在两端进/出方块，中段从格子之间扫过，方向一眼可读。
+// 默认只铺一层很淡的骨架，选中或悬停某个窝时它的配对才亮起来，避免 17 条线糊成一团。
+const WIRE_HALF = 32
+const WIRE_MIN_SPAN = 6
+function wire(from: { x: number; y: number }, to: { x: number; y: number }) {
   const dx = to.x - from.x, dy = to.y - from.y
   const length = Math.hypot(dx, dy)
-  if (!length) return from
-  return { x: from.x + dx / length * distance, y: from.y + dy / length * distance }
+  if (!length) return null
+  const ux = dx / length, uy = dy / length
+  const edge = Math.min(ux ? WIRE_HALF / Math.abs(ux) : Infinity, uy ? WIRE_HALF / Math.abs(uy) : Infinity)
+  const inset = Math.max(WIRE_MIN_SPAN, Math.min(edge, length / 2 - WIRE_MIN_SPAN))
+  const a = { x: from.x + ux * inset, y: from.y + uy * inset }
+  const b = { x: to.x - ux * inset, y: to.y - uy * inset }
+  const bow = Math.min(34, length * 0.2) * (dx >= 0 ? 1 : -1)
+  const cx = (a.x + b.x) / 2 - uy * bow
+  const cy = (a.y + b.y) / 2 + ux * bow
+  return { d: `M${a.x.toFixed(1)} ${a.y.toFixed(1)}Q${cx.toFixed(1)} ${cy.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`, nodes: [a, b] }
 }
 const links = computed(() => (props.plan?.edges || []).flatMap(edge => {
   const male = center(edge.male), female = center(edge.female)
   if (!male || !female) return []
-  const start = insetPoint(male, female), end = insetPoint(female, male)
+  const ends = wire(male, female)
+  if (!ends) return []
   const interference = (props.plan?.mothers || []).some(mother => mother.gid === edge.female && mother.references.some(reference => reference.interference.includes(edge.male)))
-  const dim = !!props.selected && props.selected !== edge.male && props.selected !== edge.female
-  return [{ key: `${edge.male}:${edge.female}`, x1: start.x, y1: start.y, x2: end.x, y2: end.y, interference, dim }]
-}))
+  // 连线默认只留一层很淡的骨架，选中（或悬停）某个窝后它的配对才亮起来：
+  // 17 条连线按 0.9 不透明度同时铺满画布会糊成一团，读不出版式。
+  const focus = props.selected || hovered.value
+  const active = !!focus && (focus === edge.male || focus === edge.female)
+  const dim = !!focus && !active
+  return [{ key: `${edge.male}:${edge.female}`, ...ends, interference, dim, active }]
+  // 选中亲本的连线后画，避免被相邻连线的高光遮住
+}).sort((a, b) => Number(a.active) - Number(b.active)))
+// 聚焦某个窝时，用虚线环圈出它的配对对象：连线在相邻窝位上会贴着边框走，
+// 只有线没有环时很难一眼看出另一端是哪个窝。
+const partnerCenters = computed(() => {
+  const focus = props.selected || hovered.value
+  if (!focus) return []
+  const partners = new Set<string>()
+  for (const edge of props.plan?.edges || []) {
+    if (edge.male === focus) partners.add(edge.female)
+    else if (edge.female === focus) partners.add(edge.male)
+  }
+  return Array.from(partners).map(gid => center(gid)).filter((point): point is { x: number; y: number } => !!point)
+})
 const connected = computed(() => new Set((props.plan?.edges || []).flatMap(edge => [edge.male, edge.female])))
 const selectedPosition = computed(() => props.positions.find(position => position.gid === props.selected) || null)
 const selectedCenter = computed(() => selectedPosition.value ? center(selectedPosition.value.gid) : null)
@@ -79,7 +112,7 @@ const caption = computed(() => {
   const nests = `共 ${props.positions.length} 个小窝（普通 ${props.positions.length - academy}／学院 ${academy}），按 2×2 占地、中心吸附半格摆放。`
   if (!props.plan) return `${nests}拖动窝位可移到空位或与另一窝交换，Enter 选择。`
   const interference = links.value.filter(link => link.interference).length
-  return `${nests}${props.pending ? '布局已改动，正在重新评估…' : `当前 ${links.value.length} 条父本连线${interference ? `，其中 ${interference} 条为干扰连边（虚线）` : ''}。`}拖动窝位可交换，Enter 选择。`
+  return `${nests}${props.pending ? '布局已改动，正在重新评估…' : `当前 ${links.value.length} 条父本连线${interference ? `，其中 ${interference} 条为干扰连边（虚线）` : ''}，悬停或选中窝位可高亮它的配对。`}拖动窝位可交换，Enter 选择。`
 })
 
 // 2×2 占地下，间距小于 2 格视为重叠。
@@ -143,7 +176,7 @@ function key(event: KeyboardEvent, gid: string) {
         <rect class="planner-board-grid" :x="boardBounds.x" :y="boardBounds.y" :width="boardBounds.size" :height="boardBounds.size" fill="url(#planner-grid)" />
         <g v-for="(position, index) in positions" :key="position.gid" class="planner-nest" :class="[{ selected: selected === position.gid, academy: position.kind === 'academy', dragging: drag?.gid === position.gid, 'drop-target': dropState?.targetGid === position.gid, unrelated: !!plan && !connected.has(position.gid) }, `gender-${parents.get(position.gid)?.gender}`]"
           :transform="`translate(${(drag?.gid === position.gid ? drag.cellX : position.x) * 32 + 32},${(drag?.gid === position.gid ? drag.cellY : position.y) * 32 + 32})`" :data-gid="position.gid" tabindex="0" role="button" :aria-label="`${index + 1}号，${parents.get(position.gid)?.name || '当前记录未找到'}，${parents.get(position.gid)?.gender === 1 ? '父本' : '母本'}${position.lock ? '，已锁定' : ''}，Enter 选择，也可拖动到空位或与另一窝交换位置`"
-          @focus="emit('select', position.gid)" @pointerdown="pointerDown($event, position.gid)" @pointermove="pointerMove" @pointerup="pointerUp" @pointercancel="drag = null" @keydown="key($event, position.gid)">
+          @focus="emit('select', position.gid)" @pointerenter="hovered = position.gid" @pointerleave="hovered = ''" @pointerdown="pointerDown($event, position.gid)" @pointermove="pointerMove" @pointerup="pointerUp" @pointercancel="drag = null" @keydown="key($event, position.gid)">
           <rect x="-32" y="-32" width="64" height="64" rx="8" />
           <title>{{ parents.get(position.gid)?.name || '记录缺失' }}</title>
           <text x="-25" y="-17" class="planner-nest-number">{{ index + 1 }}</text>
@@ -155,7 +188,11 @@ function key(event: KeyboardEvent, gid: string) {
           <g v-if="position.lock" class="planner-nest-badge is-lock" transform="translate(22,22)"><circle r="9" /><text y="4" text-anchor="middle">锁</text><title>{{ position.lock === 'position' ? '位置锁定：不能拖动或换位' : '参与锁定：保持在本方案中' }}</title></g>
           <g class="planner-nest-name" aria-hidden="true"><rect x="-30" y="34" width="60" height="16" rx="8" /><text x="0" y="45" text-anchor="middle">{{ shortName(position.gid) }}</text></g>
         </g>
-        <g v-if="!pending" class="planner-canvas-links" aria-hidden="true"><line v-for="link in links" :key="link.key" class="planner-edge" :class="{ interference: link.interference, dim: link.dim }" :x1="link.x1" :y1="link.y1" :x2="link.x2" :y2="link.y2" /></g>
+        <g v-if="!pending" class="planner-canvas-links" aria-hidden="true">
+          <path v-for="link in links" :key="link.key" class="planner-edge" :class="{ interference: link.interference, dim: link.dim, active: link.active }" :d="link.d" />
+          <g v-for="link in links" :key="`node-${link.key}`" class="planner-edge-nodes" :class="{ interference: link.interference, dim: link.dim, active: link.active }"><circle :cx="link.nodes[0].x" :cy="link.nodes[0].y" r="2.8" /><circle :cx="link.nodes[1].x" :cy="link.nodes[1].y" r="2.8" /></g>
+          <g v-for="(point, index) in partnerCenters" :key="`partner-${index}`" class="planner-partner-ring" :transform="`translate(${point.x},${point.y})`"><rect x="-32" y="-32" width="64" height="64" rx="8" /></g>
+        </g>
         <g v-if="selectedCenter" class="planner-selected-outline" :transform="`translate(${selectedCenter.x},${selectedCenter.y})`" aria-hidden="true"><rect x="-32" y="-32" width="64" height="64" rx="8" /></g>
         <g v-if="dropState" class="planner-drop-preview" :class="`is-${dropState.type}`" :transform="`translate(${dropState.x * 32 + 32},${dropState.y * 32 + 32})`" aria-hidden="true"><rect x="-32" y="-32" width="64" height="64" rx="8" /></g>
       </svg>

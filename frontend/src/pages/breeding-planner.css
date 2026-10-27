@@ -370,10 +370,35 @@
 .planner-canvas text { font-family: var(--font-ui); }
 .planner-grid-line { stroke: var(--line-soft); stroke-width: 0.5; opacity: 0.7; }
 
+/* 父本连线：正交折线 + 圆角，走格线，交叉成十字而不是斜穿成一团 X；细线 + 端点定位点，
+   只保留 1.6px 主线，压在立绘上也不糊。 */
 .planner-canvas-links { pointer-events: none; }
-.planner-edge { stroke: var(--teal); stroke-width: 3; opacity: 0.6; transition: opacity var(--motion-base) var(--motion-ease); }
-.planner-edge.dim { opacity: 0.12; }
-.planner-edge.interference { stroke: var(--amber-ink); stroke-dasharray: 6 4; opacity: 0.5; }
+.planner-edge {
+  fill: none;
+  stroke: var(--teal);
+  stroke-width: 1.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.12;
+  transition:
+    opacity var(--motion-base) var(--motion-ease),
+    stroke-width var(--motion-base) var(--motion-ease);
+}
+.planner-edge.dim { opacity: 0.04; }
+.planner-edge.active { stroke-width: 2.2; opacity: 0.95; }
+.planner-edge.interference { stroke: var(--amber-ink); stroke-dasharray: 5 4; opacity: 0.55; }
+.planner-edge-nodes circle { fill: var(--teal); opacity: 0.2; transition: opacity var(--motion-base) var(--motion-ease); }
+.planner-edge-nodes.dim circle { opacity: 0.06; }
+.planner-edge-nodes.active circle { opacity: 1; }
+.planner-edge-nodes.interference circle { fill: var(--amber-ink); }
+/* 配对对象用虚线环标出，选中窝自己仍是实线描边，两者不混 */
+.planner-partner-ring rect {
+  fill: none;
+  stroke: var(--teal);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  opacity: 0.75;
+}
 
 .planner-canvas-outside {
   grid-area: warning;
@@ -458,7 +483,7 @@
 }
 
 .planner-canvas-legend { display: inline-flex; align-items: center; gap: var(--space-1); margin-left: var(--space-2); color: var(--muted); }
-.planner-legend-swatch { display: inline-block; width: 16px; height: 0; margin: 0 var(--space-1); border-top: 3px solid var(--teal); border-radius: 2px; opacity: 0.8; }
+.planner-legend-swatch { display: inline-block; width: 16px; height: 0; margin: 0 var(--space-1); border-top: 2px solid var(--teal); border-radius: 2px; opacity: 0.8; }
 .planner-legend-swatch.is-interference { border-top-style: dashed; border-top-color: var(--amber-ink); }
 
 .planner-warning { color: var(--amber-ink); font-weight: 500; }
