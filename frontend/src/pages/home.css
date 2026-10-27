@@ -1,6 +1,17 @@
 /* 家园：精灵图鉴式总览（重做版） */
+/* #page-home 里还有一层 #home-root 挂载点，高度必须逐层传下去，
+   否则整页高度是内容撑开的，两栏各自滚动就落不了地。 */
 #page-home {
+  display: flex;
+  flex-direction: column;
   padding: var(--space-4);
+}
+
+#page-home > #home-root {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .home-page {
@@ -12,7 +23,7 @@
   container-name: home-page;
 }
 
-/* hero：环境渐变 + 房间等级环 */
+/* hero：环境渐变 + 家园总览数字 */
 .home-hero {
   position: relative;
   display: flex;
@@ -48,48 +59,6 @@
   flex-direction: column;
   gap: 6px;
   min-width: 0;
-}
-
-.home-hero-aside {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-left: auto;
-  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-}
-
-.home-level {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
-  padding-right: var(--space-5);
-  border-right: 1px solid var(--hairline);
-}
-
-.home-level-label {
-  font-size: var(--fs-3xs);
-  font-weight: 500;
-  line-height: 1.2;
-  color: var(--muted);
-}
-
-.home-level-value {
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--teal-deep);
-  font-variant-numeric: tabular-nums;
-}
-
-.home-hero-actions {
-  display: inline-flex;
-  align-items: center;
 }
 
 .home-hero-eyebrow {
@@ -140,49 +109,6 @@
 
 .home-hero-sub-sep {
   color: var(--hairline-strong);
-}
-
-.home-hero-actions {
-  margin-top: var(--space-3);
-}
-
-.home-ghost-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 var(--space-4);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--panel) 76%, transparent);
-  color: var(--ink-soft);
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    border-color var(--motion-fast) var(--motion-ease),
-    color var(--motion-fast) var(--motion-ease),
-    background-color var(--motion-fast) var(--motion-ease);
-}
-
-.home-ghost-button:hover {
-  border-color: color-mix(in srgb, var(--teal) 40%, var(--hairline));
-  color: var(--ink);
-}
-
-.home-ghost-button:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 1px;
-}
-
-.home-ghost-button:disabled {
-  opacity: 0.55;
-  cursor: progress;
-}
-
-.home-ghost-button .ui-icon {
-  width: 14px;
-  height: 14px;
 }
 
 /* hero 统计胶囊 */
@@ -269,6 +195,9 @@
 /* 精灵卡片网格 */
 .home-sprite-grid {
   display: grid;
+  /* 行高按内容定死：网格被限制高度时行不会被压扁（卡片自带 overflow:hidden，
+     auto 行会把内容裁掉），多出来的行交给网格自身滚动 */
+  grid-auto-rows: max-content;
   grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
   gap: var(--space-3);
 }
@@ -297,25 +226,34 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 13%, transparent), var(--shadow-1);
 }
 
+/* 性别底色：雄=浅蓝、雌=浅粉；--male/--female 本来就是给卡片底色准备的浅色 */
+.home-sprite-card.gender-1 {
+  --gender-soft: var(--male);
+  --gender-ink: var(--male-ink);
+  background: var(--male);
+  border-color: color-mix(in srgb, var(--male-strong) 24%, var(--hairline));
+}
+
+.home-sprite-card.gender-2 {
+  --gender-soft: var(--female);
+  --gender-ink: var(--female-ink);
+  background: var(--female);
+  border-color: color-mix(in srgb, var(--female-strong) 24%, var(--hairline));
+}
+
+.home-sprite-card.gender-0 {
+  --gender-soft: var(--surface-2);
+  --gender-ink: var(--muted);
+}
+
 .home-sprite-card:hover {
   transform: translateY(-2px);
   border-color: color-mix(in srgb, var(--teal) 34%, var(--hairline));
   box-shadow: var(--shadow-2);
 }
 
-.home-sprite-card.gender-1 {
-  --gender-soft: var(--male);
-  --gender-ink: var(--male-ink);
-}
-
-.home-sprite-card.gender-2 {
-  --gender-soft: var(--female);
-  --gender-ink: var(--female-ink);
-}
-
-.home-sprite-card.gender-0 {
-  --gender-soft: var(--surface-2);
-  --gender-ink: var(--muted);
+.home-sprite-card.is-linked {
+  border-color: color-mix(in srgb, var(--teal) 58%, var(--hairline));
 }
 
 .home-sprite-art {
@@ -394,22 +332,27 @@
   padding: 8px 11px 10px;
 }
 
-.home-sprite-title .home-nature-chip {
-  height: 18px;
-  padding: 0 6px;
-  font-size: var(--fs-3xs);
-  line-height: 18px;
-}
-
 .home-sprite-title {
   display: flex;
   align-items: center;
-  gap: 6px;
+  flex-wrap: nowrap;
+  gap: 5px;
   min-width: 0;
+  white-space: nowrap;
 }
 
-.home-sprite-title strong {
+/* 左簇（名称/性格/奖牌）可压缩；右簇（等级/性别）不参与收缩，永远贴在行尾 */
+.home-sprite-tags {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.home-sprite-tags > strong {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
@@ -417,6 +360,28 @@
   font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--ink);
+}
+
+.home-sprite-title .home-nature-chip {
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 18px;
+  padding: 0 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-3xs);
+  line-height: 18px;
+}
+
+/* 奖牌排在名称之后、等级之前，空间不足时由左簇整体裁切，不挤右侧 */
+.home-sprite-medals {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .home-gender-mark {
@@ -464,6 +429,11 @@
   flex: none;
   width: 16px;
   height: 16px;
+}
+
+.home-sprite-title .home-medal-icon {
+  width: 15px;
+  height: 15px;
 }
 
 .home-sprite-metrics {
@@ -897,22 +867,15 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 学院绿窝精灵 */
+/* 学院绿窝精灵：只加青色描边和徽标，底色继续交给性别（雄蓝/雌粉） */
 .home-sprite-card.is-academy {
   border-color: color-mix(in srgb, var(--teal) 44%, var(--hairline));
-  background: linear-gradient(180deg, color-mix(in srgb, var(--teal-soft) 46%, var(--panel)), var(--panel) 62%);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--teal) 16%, transparent);
 }
 
 .home-sprite-card.is-academy:hover {
   border-color: color-mix(in srgb, var(--teal) 62%, var(--hairline));
   box-shadow: 0 10px 22px color-mix(in srgb, var(--teal) 18%, transparent);
-}
-
-.home-sprite-card.is-academy .home-sprite-art {
-  background:
-    radial-gradient(64% 70% at 50% 44%, color-mix(in srgb, var(--teal-bright) 30%, transparent), transparent 74%),
-    linear-gradient(165deg, color-mix(in srgb, var(--teal-soft) 82%, var(--panel)), color-mix(in srgb, var(--teal-soft) 32%, var(--panel)));
 }
 
 .home-sprite-academy {
@@ -1065,6 +1028,48 @@
   color: var(--amber-ink);
 }
 
+/* 宽屏两栏：整页高度锁定在窗口内（页面本身不滚），
+   左侧精灵区与右侧配对栏各自内部滚动 —— 修掉窗口底部的大面积空白。 */
+@container home-page (min-width: 1001px) {
+  .home-columns {
+    flex: 1 1 auto;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .home-main {
+    min-height: 0;
+  }
+
+  .home-hero {
+    flex: none;
+  }
+
+  .home-sprites {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .home-sprite-grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    align-content: start;
+    padding-right: 2px;
+    scrollbar-gutter: stable;
+  }
+
+  .home-side {
+    position: static;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+  }
+}
+
 /* 容器响应式：整页宽度决定几栏；左栏宽度决定「家园总览」怎么排 */
 @container home-page (max-width: 1100px) {
   .home-sprite-grid {
@@ -1089,31 +1094,6 @@
   }
 }
 
-@container home-main (max-width: 700px) {
-  .home-hero {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-4);
-  }
-
-  .home-hero-copy {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .home-hero-aside {
-    grid-column: 1;
-    grid-row: 2;
-    flex-wrap: wrap;
-    margin-left: 0;
-    padding: var(--space-3) var(--space-4) var(--space-3) var(--space-5);
-  }
-
-  .home-hero-actions {
-    margin-left: auto;
-  }
-}
-
 @container home-main (max-width: 520px) {
   .home-hero {
     padding: var(--space-5);
@@ -1126,10 +1106,6 @@
 
   .home-hero h1 strong {
     font-size: 26px;
-  }
-
-  .home-hero-aside {
-    width: 100%;
   }
 }
 

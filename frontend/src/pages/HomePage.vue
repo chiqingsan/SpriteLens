@@ -14,7 +14,6 @@ const medalIds: Record<string, number> = { '大块头': 1001, '小不点': 1002,
 const homeSprites = computed(() => model.data.value?.residents || [])
 const homeCouples = computed(() => model.data.value?.couples || [])
 const nests = computed(() => model.data.value?.nests || [])
-const roomLevel = computed(() => model.data.value?.room_level || 0)
 const couplesStale = computed(() => Boolean(model.data.value?.couples_stale))
 const sceneEggCount = computed(() => model.data.value?.scene_eggs.length || 0)
 const failedArtwork = ref(new Set<string>())
@@ -216,17 +215,6 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
                 <span>{{ sceneEggCount }} 个场景蛋</span>
               </p>
             </div>
-            <div class="home-hero-aside">
-              <div class="home-level" :title="`房间等级 ${roomLevel}`" :aria-label="`房间等级 ${roomLevel}`">
-                <span class="home-level-label">房间等级</span>
-                <strong class="home-level-value">{{ roomLevel || '—' }}</strong>
-              </div>
-              <div class="home-hero-actions">
-                <button type="button" class="home-ghost-button" :disabled="model.loading.value" @click="model.load()">
-                  <UiIcon name="refresh" />{{ model.loading.value ? '读取中…' : '刷新快照' }}
-                </button>
-              </div>
-            </div>
           </section>
 
           <section class="home-section home-sprites" aria-labelledby="home-sprites-title">
@@ -258,16 +246,20 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
                 </div>
                 <div class="home-sprite-body">
                   <div class="home-sprite-title">
-                    <strong>{{ resident.name }}</strong>
-                    <span v-if="resident.nature_name" class="home-nature-chip">{{ resident.nature_name }}</span>
+                    <span class="home-sprite-tags">
+                      <strong :title="resident.name">{{ resident.name }}</strong>
+                      <span v-if="resident.nature_name" class="home-nature-chip">{{ resident.nature_name }}</span>
+                      <span v-if="portraitMedals(resident).length" class="home-sprite-medals">
+                        <img v-for="mark in portraitMedals(resident)" :key="mark.name" class="home-medal-icon"
+                          :src="`/static/medal-icons/${medalIds[mark.name]}.webp`" :alt="mark.name" :title="mark.name" draggable="false">
+                      </span>
+                    </span>
                     <span class="home-sprite-level">Lv.{{ resident.level }}</span>
                     <UiIcon v-if="resident.gender" class="home-gender-mark"
                       :name="resident.gender === 1 ? 'gender-male' : 'gender-female'" :title="genderLabel(resident.gender)" />
                   </div>
-                  <div v-if="speciesLabel(resident) || portraitMedals(resident).length" class="home-sprite-meta">
-                    <span v-if="speciesLabel(resident)" class="home-sprite-species">{{ speciesLabel(resident) }}</span>
-                    <img v-for="mark in portraitMedals(resident)" :key="mark.name" class="home-medal-icon"
-                      :src="`/static/medal-icons/${medalIds[mark.name]}.webp`" :alt="mark.name" :title="mark.name" draggable="false">
+                  <div v-if="speciesLabel(resident)" class="home-sprite-meta">
+                    <span class="home-sprite-species">{{ speciesLabel(resident) }}</span>
                   </div>
                   <div class="home-sprite-metrics">
                     <span class="home-sprite-metric" :class="{ unknown: resident.height_pct === null }">
