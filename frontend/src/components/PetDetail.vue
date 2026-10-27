@@ -5,6 +5,7 @@ import PetDetailHero from './PetDetailHero.vue'
 import PetDetailStats from './PetDetailStats.vue'
 import PetMeasurementRow from './PetMeasurementRow.vue'
 import PetDetailEvolution from './PetDetailEvolution.vue'
+import UiSegmented from './UiSegmented.vue'
 const { pet, boxes } = defineProps<{ pet: Pet; boxes: PetBox[] }>()
 const egg = ref(false)
 const measurementFields = computed(() => egg.value ? ['height', 'weight'] as const : ['height', 'weight', 'voice'] as const)
@@ -29,7 +30,7 @@ const acquired = computed(() => pet.add_time ? new Date(pet.add_time * 1000).toL
     </section>
   </div>
   <section class="detail-measurements">
-    <header><h3>体型与声音</h3><div class="segmented"><button :class="{ active: !egg }" :aria-pressed="!egg" @click="egg = false">精灵范围</button><button :class="{ active: egg }" :aria-pressed="egg" @click="egg = true">精灵蛋范围</button></div></header>
+    <header><h3>体型与声音</h3><UiSegmented aria-label="范围"><button :class="{ active: !egg }" :aria-pressed="!egg" @click="egg = false">精灵范围</button><button :class="{ active: egg }" :aria-pressed="egg" @click="egg = true">精灵蛋范围</button></UiSegmented></header>
     <PetMeasurementRow v-for="field in measurementFields" :key="field" :field="field" :measurement="pet.detail.measurements[field]" :reference-only="egg" :limits="egg && field !== 'voice' ? pet.detail.egg_limits[field] : pet.detail.measurements[field].limits" />
   </section>
   <PetDetailEvolution :pet="pet" />

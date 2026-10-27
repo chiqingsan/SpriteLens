@@ -11,6 +11,8 @@ import UiIcon from './UiIcon.vue'
 const { item } = defineProps<{ item: HandbookSpecies }>()
 const emit = defineEmits<{ navigate: [key: string | number]; filterGroup: [group: string] }>()
 const familyRoot = ref<HTMLElement | null>(null)
+const showShiny = ref(false)
+watch(() => item.key, () => { showShiny.value = false })
 let familyDrag: { pointerId: number; startX: number; startScrollLeft: number; moved: boolean; container: HTMLElement } | null = null
 let suppressFamilyClick = false
 let familyFrame = 0
@@ -75,12 +77,15 @@ onBeforeUnmount(() => { window.removeEventListener('resize', requestFamilySync);
 <template>
   <div class="dex-mini">
     <section class="handbook-detail-hero" :aria-label="`${displayName}资料`">
-      <DexPortrait :src="item.artwork_url || item.icon_url" :name="displayName" eager />
+      <DexPortrait :src="showShiny ? item.shiny_artwork_url : (item.artwork_url || item.icon_url)" :name="displayName" eager />
       <div class="handbook-detail-art-top"><div class="handbook-detail-art-heading"><div class="handbook-detail-art-title"><h3>{{ displayName }}</h3><small>No.{{ dexText }}</small></div><b>{{ stage }}</b></div>
         <div class="handbook-detail-art-meta"><div class="handbook-detail-types"><DexTypeBadge v-for="(name, index) in item.type_names" :key="name" :name="name" :color="item.type_colors[index]" :icon-url="item.type_icons?.[name]" /></div></div>
       </div>
       <div class="handbook-detail-art-groups"><small>蛋组</small><button v-for="group in item.egg_groups" :key="group" @click="emit('filterGroup', group)">{{ displayGroup(group) }}</button><span v-if="!item.egg_groups.length">暂无蛋组</span></div>
-      <div class="handbook-detail-art-shiny"><small>形态 · {{ form }}</small><b>异色 · {{ item.has_shiny ? '有异色' : '无异色' }}</b></div>
+      <div class="handbook-variant-controls">
+        <button v-if="item.has_shiny && item.shiny_artwork_url" type="button" class="handbook-shiny-toggle" :aria-label="showShiny ? '查看原色' : '查看异色'" :title="showShiny ? '查看原色' : '查看异色'" :aria-pressed="showShiny" @click="showShiny = !showShiny"><img src="/static/rarity/shiny-fit.webp" alt=""></button>
+        <div class="handbook-detail-art-shiny"><small>形态 · {{ form }}</small><b>异色 · {{ item.has_shiny ? '有异色' : '无异色' }}</b></div>
+      </div>
     </section>
     <section v-if="item.egg" class="handbook-detail-summary" aria-label="图鉴摘要">
       <button v-if="item.egg" class="handbook-related-entry" data-goto-page="egg-dex" :data-catalog-id="item.egg.egg_conf_id" :title="`${item.egg.name} · ${item.egg.hatch_label}`"><DexPortrait :src="item.egg.icon_url || ''" :name="item.egg.name" /><span><small>对应精灵蛋 · {{ item.egg.hatch_label }}</small><b>{{ item.egg.name }}</b><i>打开蛋图鉴 <UiIcon name="chevron-right" /></i></span></button>

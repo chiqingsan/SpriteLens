@@ -7,12 +7,19 @@ import './pet-detail.css'
 const props = defineProps<{ model: PetsModel; open: boolean; enabled: boolean; trigger: HTMLElement | null }>()
 const emit = defineEmits<{ close: [restore?: boolean]; locate: [id: number] }>()
 const pet = computed(() => props.model.selected.value === null ? null : props.model.find(props.model.selected.value))
-const detailedPet = computed(() => {
+const loadedDetail = computed(() => {
   const loaded = props.model.detail.value
-  return loaded && loaded.gid === pet.value?.gid && loaded.uid === props.model.data.value?.uid
-    && loaded.version >= props.model.data.value?.version ? loaded.pet : null
+  return loaded && loaded.uid === props.model.data.value?.uid ? loaded : null
 })
-const place = computed(() => pet.value?.location ?? null)
+const detailedPet = computed(() => loadedDetail.value?.pet ?? null)
+const detailIsCurrent = computed(() => {
+  const loaded = loadedDetail.value, snapshot = props.model.data.value
+  return loaded !== null && loaded.gid === pet.value?.gid && loaded.version >= (snapshot?.version || 0)
+})
+// 与图鉴详情保持同一策略：请求新详情期间保留上一份完整数据，
+// 标题、定位按钮和内容一起在新详情到达后替换，避免出现新旧数据拼接。
+const panelPet = computed(() => detailedPet.value ?? pet.value)
+const place = computed(() => panelPet.value?.location ?? null)
 const showing = computed(() => props.open && props.enabled && !!pet.value)
 const inspector = ref<InstanceType<typeof PageInspector> | null>(null)
 const narrow = window.matchMedia('(max-width: 960px)'), modal = ref(narrow.matches)
@@ -65,7 +72,7 @@ onUnmounted(() => { inert.forEach(node => { node.inert = false }); workspace().c
       id="pet-detail"
       ref="inspector"
       title="精灵详情"
-      :meta="'#' + String(pet.gid).padStart(4, '0')"
+      :meta="panelPet ? '#' + String(panelPet.gid).padStart(4, '0') : undefined"
       :modal="modal"
       storage-key="pets"
       :default-width="360"
@@ -76,9 +83,14 @@ onUnmounted(() => { inert.forEach(node => { node.inert = false }); workspace().c
       <template #actions>
         <button v-if="place" type="button" class="ghost-button small" :aria-label="'team_id' in place ? '定位到出战背包' : '定位到此箱'" :data-locate-team="'team_id' in place ? place.team_id : undefined" :data-locate-box="'box_id' in place ? place.box_id : undefined" @click="locate">{{ 'team_id' in place ? '定位到出战背包' : '定位到此箱' }}</button>
       </template>
-      <PetDetail v-if="detailedPet" :pet="detailedPet" :boxes="model.data.value!.backpack.boxes" @locate="emit('locate', $event)" />
-      <p v-else-if="model.detailBusy.value" class="filter-note">正在加载详情…</p>
-      <div v-else class="filter-note" role="status">
+      <div v-if="detailedPet" class="pet-detail-content" :class="{ 'is-refreshing': !detailIsCurrent || model.detailBusy.value }">
+        <PetDetail :pet="detailedPet" :boxes="model.data.value!.backpack.boxes" @locate="emit('locate', $event)" />
+        <div v-if="!detailIsCurrent || model.detailBusy.value" class="pet-detail-refresh" role="status">
+          {{ model.detailBusy.value ? '正在更新详情…' : model.detailError.value || '详情暂不可用' }}
+        </div>
+      </div>
+      <p v-else-if="model.detailBusy.value" class="filter-note pet-detail-placeholder" role="status">正在加载详情…</p>
+      <div v-else class="filter-note pet-detail-placeholder" role="status">
         <p>{{ model.detailError.value || '详情暂不可用' }}</p>
         <button type="button" class="ghost-button small" @click="model.loadDetail(pet!.gid)">重试</button>
       </div>

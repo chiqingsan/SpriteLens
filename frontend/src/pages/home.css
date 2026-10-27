@@ -72,7 +72,7 @@
 }
 
 .home-level-label {
-  font-size: 11px;
+  font-size: var(--fs-3xs);
   font-weight: 500;
   line-height: 1.2;
   color: var(--muted);
@@ -385,7 +385,7 @@
 .home-sprite-title .home-nature-chip {
   height: 18px;
   padding: 0 6px;
-  font-size: 11px;
+  font-size: var(--fs-3xs);
   line-height: 18px;
 }
 
@@ -434,7 +434,7 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: 11px;
+  font-size: var(--fs-3xs);
   color: var(--muted);
 }
 
@@ -443,7 +443,7 @@
   padding: 1px 6px;
   border-radius: var(--radius-xs);
   background: color-mix(in srgb, var(--teal-soft) 70%, var(--panel));
-  font-size: 11px;
+  font-size: var(--fs-3xs);
   font-weight: 500;
   color: var(--teal-deep);
 }
@@ -481,7 +481,7 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 10.5px;
+  font-size: var(--fs-3xs);
   color: var(--muted-2);
   white-space: nowrap;
 }
@@ -571,7 +571,7 @@
   border-radius: var(--radius-pill);
   background: var(--surface-2);
   color: var(--muted);
-  font-size: 10.5px;
+  font-size: var(--fs-3xs);
   line-height: 1.6;
   white-space: nowrap;
 }
@@ -663,7 +663,7 @@
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--female) 66%, var(--panel));
   color: var(--female-ink);
-  font-size: 10px;
+  font-size: var(--fs-3xs);
   line-height: 1.4;
 }
 
@@ -722,7 +722,7 @@
   border-radius: 50%;
   background: color-mix(in srgb, var(--male) 74%, var(--panel));
   color: var(--male-ink);
-  font-size: 11px;
+  font-size: var(--fs-3xs);
 }
 
 .home-pair-father-avatar img {
@@ -742,19 +742,19 @@
 }
 
 .home-pair-father-role {
-  font-size: 10px;
+  font-size: var(--fs-3xs);
   color: var(--male-ink);
 }
 
 .home-couple-missing {
   padding-left: 18px;
-  font-size: 11px;
+  font-size: var(--fs-3xs);
   color: var(--muted-2);
 }
 
 .home-pair-label {
   flex: none;
-  font-size: 10.5px;
+  font-size: var(--fs-3xs);
   color: var(--muted-2);
   white-space: nowrap;
 }
@@ -783,14 +783,14 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: 12px;
+  font-size: var(--fs-3xs);
   font-weight: 600;
   color: var(--ink);
 }
 
 .home-pair-range {
   white-space: nowrap;
-  font-size: 10.5px;
+  font-size: var(--fs-3xs);
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
@@ -808,7 +808,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: var(--fs-3xs);
   color: var(--muted);
   cursor: pointer;
   list-style: none;
@@ -845,7 +845,7 @@
   grid-template-columns: 44px minmax(0, 1fr) 42px;
   align-items: center;
   gap: 6px;
-  font-size: 10.5px;
+  font-size: var(--fs-3xs);
 }
 
 .home-nature-item strong {
@@ -916,7 +916,7 @@
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--teal) 18%, var(--panel));
   color: var(--teal-deep);
-  font-size: 10px;
+  font-size: var(--fs-3xs);
   font-weight: 600;
   line-height: 1;
 }
@@ -1048,7 +1048,7 @@
   padding: 2px 8px;
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--amber-soft) 66%, var(--panel));
-  font-size: 10.5px;
+  font-size: var(--fs-3xs);
   font-weight: 500;
   color: var(--amber-ink);
 }

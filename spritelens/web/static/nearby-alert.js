@@ -35,7 +35,7 @@
     var known = new Map();
     var cooldown = new Map();
     var lastUid = null, lastObservation = null, lastVersion = null, lastCycle = "";
-    var audio = null, listening = false;
+    var audio = null, listening = false, audioWarmup = null;
 
     function audioContext() {
       if (audio) { return audio; }
@@ -78,7 +78,7 @@
         tone(context, 1318.51, start + 0.11, 0.3, 0.12);
       } catch (error) { /* 音频不可用绝不影响附近页 */ }
     }
-    function unlock() { resumeAudio(); }
+    function unlock() { stopListening(); if (enabledState) { resumeAudio(); } }
     function listen() {
       if (listening || typeof window.addEventListener !== "function") { return; }
       listening = true;
@@ -144,6 +144,7 @@
       if (target === enabledState) { return enabledState; }
       enabledState = target;
       writeEnabled(storage, target);
+      if (!target && audioWarmup !== null) { window.cancelIdleCallback(audioWarmup); audioWarmup = null; }
       if (target) {
         /* 先标记基线再试听：试听本身就是用户手势，正好解锁浏览器音频。 */
         baselineNext = true;
@@ -153,6 +154,7 @@
     }
     function dispose() {
       stopListening();
+      if (audioWarmup !== null) { window.cancelIdleCallback(audioWarmup); audioWarmup = null; }
       if (audio) {
         var context = audio;
         audio = null;
@@ -163,6 +165,10 @@
       }
       known.clear();
       cooldown.clear();
+    }
+    /* 创建音频设备可能阻塞首个点击；空闲时预备，仍由用户手势恢复播放。 */
+    if (enabledState && typeof window.requestIdleCallback === "function") {
+      audioWarmup = window.requestIdleCallback(function () { audioWarmup = null; audioContext(); });
     }
     listen();
     return { evaluate: evaluate, enabled: function () { return enabledState; }, toggle: toggle, dispose: dispose };

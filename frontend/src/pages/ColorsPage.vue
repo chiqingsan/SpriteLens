@@ -5,6 +5,7 @@ import { useColors } from '../composables/useColors'
 import { matrixKey, type ColorAxis, type ColorCell, type ColorPet } from '../types/colors'
 import ColorCardFace from '../components/ColorCardFace.vue'
 import UiIcon from '../components/UiIcon.vue'
+import UiSegmented from '../components/UiSegmented.vue'
 
 type ColorTab = 'owned' | 'catalog'
 type CatalogStatusFilter = 'all' | 'owned' | 'unowned' | 'seasonal'
@@ -170,10 +171,10 @@ onMounted(() => { if (props.active) void resume(); else pause() })
   <div class="stack colors-page" data-vue-page :aria-busy="loading">
     <section class="panel content-panel full-panel color-page colors-workspace">
       <div class="panel-toolbar color-toolbar">
-        <div id="color-tab" class="segmented color-main-tabs" role="tablist" aria-label="色卡视图">
+        <UiSegmented id="color-tab" class="color-main-tabs" role="tablist" aria-label="色卡视图">
           <button type="button" role="tab" :aria-selected="activeTab === 'owned'" :class="{ active: activeTab === 'owned' }" @click="switchTab('owned')">我的色卡</button>
           <button type="button" role="tab" :aria-selected="activeTab === 'catalog'" :class="{ active: activeTab === 'catalog' }" @click="switchTab('catalog')">完整图鉴</button>
-        </div>
+        </UiSegmented>
         <div v-if="activeTab === 'catalog'" class="color-filters">
           <button id="color-filter-button" type="button" class="ghost-button color-filter-launch" :class="{ active: catalogFiltersOpen || catalogStatus !== 'all' || !!catalogBase || !!catalogMix }" :aria-expanded="catalogFiltersOpen" @click="catalogFiltersOpen = !catalogFiltersOpen">
             <span>图鉴筛选</span><small>{{ catalogFiltersOpen ? '收起' : catalogFilterSummary }}</small>
@@ -250,32 +251,6 @@ onMounted(() => { if (props.active) void resume(); else pause() })
         <div v-if="error && data" class="inline-state matrix-refresh-error" role="alert">色卡刷新失败：{{ error }}<button class="ghost-button small" @click="load">重试</button></div>
       </div>
 
-      <details v-if="activeTab === 'owned'" class="colors-special">
-        <summary><span>特殊记录</span><span class="special-counts"><span id="cl-seasonal-count">{{ data ? data.seasonal.length + ' 只赛季卡' : '' }}</span><span id="cl-unknown-count">{{ data ? data.unknown.length + ' 只未收录' : '' }}</span></span></summary>
-        <div class="special-records">
-          <section id="cl-seasonal" class="special-record-group">
-            <div class="special-record-heading"><h3>赛季卡</h3><span class="muted">{{ data ? data.seasonal.length + ' 只' : '' }}</span></div>
-            <div class="bl-chips">
-              <span v-for="pet in data?.seasonal || []" :key="pet.gid" class="color-owner" :data-mm="pet.gid">
-                <img v-if="pet.icon_url && !failed.has(failedKey(pet.gid))" :src="pet.icon_url" alt="" loading="eager" decoding="async" @error="failedIcon(pet.gid)">
-                <UiIcon :name="pet.gender === 2 ? 'gender-female' : 'gender-male'" />{{ pet.name }}
-              </span>
-            </div>
-            <div id="cl-seasonal-empty" class="empty-hint" v-show="!!data && !data.seasonal.length">暂无赛季卡</div>
-          </section>
-          <section id="cl-unknown" class="special-record-group">
-            <div class="special-record-heading"><h3>未收录编号</h3><span class="muted">{{ data ? data.unknown.length + ' 只' : '' }}</span></div>
-            <div class="bl-chips">
-              <span v-for="pet in data?.unknown || []" :key="pet.gid" class="color-owner" :data-mm="pet.gid">
-                <img v-if="pet.icon_url && !failed.has(failedKey(pet.gid))" :src="pet.icon_url" alt="" loading="eager" decoding="async" @error="failedIcon(pet.gid)">
-                <UiIcon :name="pet.gender === 2 ? 'gender-female' : 'gender-male'" />{{ pet.name }}
-                <span class="muted">{{ pet.card_id ? '#' + pet.card_id : '编号未解析' }}</span>
-              </span>
-            </div>
-            <div id="cl-unknown-empty" class="empty-hint" v-show="!!data && !data.unknown.length">全部色卡都已收录</div>
-          </section>
-        </div>
-      </details>
       </div>
       <aside class="colors-selection color-inspector" aria-label="色卡详情">
         <header class="inspector-header">
@@ -371,7 +346,7 @@ onMounted(() => { if (props.active) void resume(); else pause() })
 .matrix-empty { align-self: center; color: var(--muted-2); font-size: var(--fs-xs); opacity: .5; }
 
 .color-card { position: relative; display: block; width: min(100%, 126px); aspect-ratio: 280 / 153; margin: auto; overflow: hidden; border-radius: var(--radius-sm); background: var(--surface-2); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 12%, transparent); cursor: pointer; isolation: isolate; }
-.color-card-count { position: absolute; right: 4px; bottom: 4px; z-index: 3; padding: 1px 5px; border-radius: 999px; background: color-mix(in srgb, var(--teal-deep) 88%, transparent); color: var(--white); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.color-card-count { position: absolute; right: 4px; bottom: 4px; z-index: 3; padding: 1px 5px; border-radius: 999px; background: color-mix(in srgb, var(--teal-deep) 88%, transparent); color: var(--white); font-size: var(--fs-3xs); font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .color-inspector { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow-y: auto; border: 1px solid var(--line-soft); border-radius: var(--radius-lg); background: var(--panel); color: var(--ink); scrollbar-gutter: stable; }
 .inspector-header { display: flex; flex: none; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line-soft); }
@@ -408,23 +383,6 @@ onMounted(() => { if (props.active) void resume(); else pause() })
 .inline-state[role='alert'] { border-radius: var(--radius-md); background: var(--danger-soft); color: var(--danger-ink); }
 .matrix-refresh-error { margin-top: var(--space-2); border-radius: var(--radius-md); background: var(--danger-soft); color: var(--danger-ink); }
 
-.colors-special { flex: none; margin-top: var(--space-2); border: 1px solid var(--line-soft); border-radius: var(--radius-md); background: var(--surface-1); }
-.colors-special summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 34px; padding: 0 var(--space-3); color: var(--ink-soft); font-size: var(--fs-xs); font-weight: 500; cursor: pointer; list-style: none; }
-.colors-special summary::-webkit-details-marker { display: none; }
-.colors-special summary::after { content: '展开'; color: var(--muted-2); font-size: var(--fs-2xs); font-weight: 400; }
-.colors-special[open] summary::after { content: '收起'; }
-.special-counts { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-left: auto; color: var(--muted); font-size: var(--fs-3xs); font-weight: 400; }
-.special-records { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); padding: 0 var(--space-3) var(--space-3); }
-.special-record-group { min-width: 0; padding: var(--space-3); border: 1px solid var(--line-soft); border-radius: var(--radius-sm); background: var(--panel); }
-.special-record-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-2); }
-.special-record-heading h3 { margin: 0; font-size: var(--fs-xs); font-weight: 600; }
-.special-record-heading .muted { color: var(--muted); font-size: var(--fs-3xs); }
-.special-record-group .bl-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); min-height: 26px; }
-.color-owner { display: inline-flex; min-width: 0; align-items: center; gap: var(--space-1); padding: 2px var(--space-2) 2px 2px; border: 1px solid var(--line-soft); border-radius: 999px; background: var(--surface-1); color: var(--ink-soft); font-size: var(--fs-3xs); overflow-wrap: anywhere; }
-.color-owner img { width: 20px; height: 20px; flex: none; object-fit: contain; border-radius: 50%; background: var(--surface-2); }
-.color-owner .ui-icon { width: 12px; height: 12px; flex: none; color: var(--muted); }
-.color-owner .muted { color: var(--muted); }
-.empty-hint { color: var(--muted); font-size: var(--fs-2xs); }
 
 @media (max-width: 1360px) {
   .colors-split { grid-template-columns: minmax(0, 1fr) 312px; }
@@ -434,7 +392,6 @@ onMounted(() => { if (props.active) void resume(); else pause() })
   .color-filters { flex-basis: 200px; }
   .inspector-card { padding-block: var(--space-3); }
   .inspector-face { flex-basis: 140px; width: 140px; }
-  .special-records { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 760px) {
   .color-filters { flex-basis: 100%; }

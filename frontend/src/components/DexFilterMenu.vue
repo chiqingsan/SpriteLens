@@ -5,6 +5,10 @@ const props = defineProps<{ label: string; options: { value: string; label: stri
 const emit = defineEmits<{ 'update:modelValue': [value: string[]]; 'update:mode': [value: 'union' | 'intersection'] }>()
 const dialog = ref<HTMLDialogElement>()
 const headingId = useId()
+const iconFailed = ref(false)
+const selectedIcon = computed(() => !props.multiple && props.modelValue.length === 1
+  ? props.options.find(option => option.value === props.modelValue[0])?.iconUrl : undefined)
+watch(selectedIcon, () => { iconFailed.value = false })
 function choose(value: string) {
   const selected = !value ? [] : props.multiple
     ? props.modelValue.includes(value) ? props.modelValue.filter(entry => entry !== value) : [...props.modelValue, value]
@@ -20,10 +24,10 @@ watch(() => props.active, value => { if (!value) dialog.value?.close() })
 onBeforeUnmount(() => dialog.value?.close())
 </script>
 <template>
-  <button class="dex-filter-button" :class="{ active: modelValue.length }" aria-haspopup="dialog" @click="dialog?.showModal()"><small>{{ label }}</small><b>{{ selectionSummary }}</b><UiIcon name="chevron-down" /></button>
+  <button class="dex-filter-button" :class="{ active: modelValue.length }" :aria-label="`${label}：${selectionSummary}`" :title="`${label}：${selectionSummary}`" aria-haspopup="dialog" @click="dialog?.showModal()"><small>{{ label }}</small><b><img v-if="selectedIcon && !iconFailed" class="dex-filter-selected-icon" :src="selectedIcon" alt="" @error="iconFailed = true"><template v-else>{{ selectionSummary }}</template></b><UiIcon name="chevron-down" /></button>
   <dialog ref="dialog" class="dex-filter-dialog" :aria-labelledby="headingId" @click.self="dialog?.close()">
     <header><div class="dex-dialog-heading"><h3 :id="headingId">按{{ label }}筛选</h3><div v-if="multiple" class="dex-group-mode" aria-label="蛋组匹配方式"><button type="button" :aria-pressed="mode !== 'intersection'" aria-label="OR，满足任一蛋组" @click="emit('update:mode', 'union')">OR</button><button type="button" :aria-pressed="mode === 'intersection'" aria-label="AND，同时满足蛋组" @click="emit('update:mode', 'intersection')">AND</button></div></div><button class="ghost-button small" aria-label="关闭筛选" @click="dialog?.close()"><UiIcon name="x" /></button></header>
     <p>{{ multiple ? '可多选，选择后立即更新图鉴结果' : '选择后立即更新图鉴结果' }}</p>
-    <div class="dex-filter-options"><button v-for="option in options" :key="option.value" :aria-pressed="isSelected(option.value)" @click="choose(option.value)"><span class="dex-filter-option-label"><img v-if="option.iconUrl" :src="option.iconUrl" :alt="`${option.label}系别图标`" loading="lazy" decoding="async"><span>{{ option.label }}</span></span><UiIcon name="circle-check" :class="{ 'is-hidden': !isSelected(option.value) }" /></button></div>
+    <div class="dex-filter-options"><button v-for="option in options" :key="option.value" :aria-pressed="isSelected(option.value)" @click="choose(option.value)"><span class="dex-filter-option-label"><img v-if="option.iconUrl" :src="option.iconUrl" :alt="`${option.label}系别图标`" loading="lazy" decoding="async"><span>{{ option.label }}</span></span></button></div>
   </dialog>
 </template>

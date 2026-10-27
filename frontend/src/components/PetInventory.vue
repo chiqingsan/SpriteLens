@@ -6,6 +6,7 @@ import PetSlots from './PetSlots.vue'
 import PetBoxNavigation from './PetBoxNavigation.vue'
 import PetPageNavigation from './PetPageNavigation.vue'
 import UiIcon from './UiIcon.vue'
+import UiSegmented from './UiSegmented.vue'
 import PetDetailPanel from './PetDetailPanel.vue'
 const { model } = defineProps<{ model: PetsModel }>()
 const { view, data, busy, error, box, teams, pets, page, selected } = model
@@ -55,15 +56,16 @@ defineExpose({ setBox, reveal, closeDetail, openDetail: () => { if (selected.val
 
 <template>
   <Teleport to="#pet-view">
+    <UiSegmented aria-label="背包视图">
     <button v-for="item in ([['point', '游戏箱位'], ['card', '自定义排序']] as const)" :key="item[0]" :data-view="item[0]" :class="{ active: view === item[0] }" :aria-pressed="view === item[0]" @click="closeDetail(); emit('close'); model.setView(item[0]); emit('view', item[0])"><UiIcon name="layout-grid"></UiIcon>{{ item[1] }}</button>
+    </UiSegmented>
   </Teleport>
   <Teleport to="#pet-count-root"><span id="pet-count" class="count-badge" role="status">{{ data ? '命中 ' + (data?.shown || 0) + ' / ' + (data?.total || 0) + ' 只' : error ? '加载失败' : '加载中…' }}</span></Teleport>
   <PetBoxNavigation v-show="view === 'point'" :model="model" @select="setBox"></PetBoxNavigation>
   <PetPageNavigation v-show="view === 'card' && !!pets.length" :model="model" @select="setPage" @teams="openTeams"></PetPageNavigation>
   <div ref="wrap" class="table-wrap" :class="{ 'pet-empty-state': empty && (!busy || !data) }" :aria-busy="busy">
-    <div id="pet-grid" class="pet-grid" :class="{ 'point-grid game-box-grid': view === 'point' || view === 'card', 'box-fill-grid': (view === 'point' && !teams) || view === 'card' }" :aria-busy="busy">
-      <PetSlots v-if="view === 'point'" :slots="model.slots.value" :pets="model.byGid.value" :selected="selected" :teams="teams" :active-team="data?.backpack.active_team || 0" @select="select"></PetSlots>
-      <PetSlots v-if="view === 'card'" :slots="model.cardSlots.value" :pets="model.byGid.value" :selected="selected" :teams="false" :active-team="0" @select="select"></PetSlots>
+    <div id="pet-grid" class="pet-grid" :class="{ 'point-grid game-box-grid': view === 'point' || view === 'card', 'box-fill-grid': (view === 'point' && !teams) || view === 'card', 'pet-teams-view': view === 'point' && teams }" :aria-busy="busy">
+      <PetSlots :slots="view === 'point' ? model.slots.value : model.cardSlots.value" :pets="model.byGid.value" :selected="selected" :teams="view === 'point' && teams" :active-team="view === 'point' ? data?.backpack.active_team || 0 : 0" @select="select"></PetSlots>
     </div>
     <div id="pet-empty" class="empty-hint" role="status" :hidden="!empty && !error">
       <UiIcon :name="error ? 'search' : busy && !data ? 'clock' : 'layout-grid'" />

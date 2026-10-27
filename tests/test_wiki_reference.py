@@ -27,7 +27,7 @@ class WikiReferenceTests(unittest.TestCase):
                 "skill_stones": ["skill"], "blood_skills": [{"skill": "skill", "blood": "草", "level": 15}]}},
             "evolutions": {}}
         (directory / "wiki_reference.json").write_text(json.dumps(reference), encoding="utf-8")
-        (directory / "species.json").write_text(json.dumps({"100": {"name": "测试兽"}}), encoding="utf-8")
+        (directory / "species.json").write_text(json.dumps({"100": {"name": "测试兽", "handbook_no": "001"}}), encoding="utf-8")
         for name in ("skills", "natures", "types", "type_chart"):
             (directory / f"{name}.json").write_text("{}", encoding="utf-8")
         self.static = StaticData(directory)

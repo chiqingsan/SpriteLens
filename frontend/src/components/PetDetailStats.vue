@@ -24,22 +24,24 @@ const labelLayout = [
 <template>
   <section class="pet-detail-stats detail-block">
     <h3>当前六维属性</h3>
-    <svg v-if="pet.stats.length" class="detail-radar" viewBox="0 0 220 220" role="img" aria-label="六维种族值、天赋加成与性格方向">
-      <polygon v-for="radius in [13.2, 26.4, 39.6, 52.8, 66]" :key="radius" :points="ring(radius)" class="radar-ring" />
-      <line v-for="(_, index) in order" :key="index" x1="110" y1="110" :x2="point(index, 66).split(',')[0]" :y2="point(index, 66).split(',')[1]" class="radar-ring" />
-      <polygon :points="shape" class="radar-value" />
-      <template v-for="(row, index) in rows" :key="index">
-        <g :transform="`translate(${labelLayout[index]!.x} ${labelLayout[index]!.y})`" class="radar-label-group">
-          <svg v-if="row?.key === pet.nature_positive" :x="labelLayout[index]!.iconX" y="-8" width="16" height="16" viewBox="0 0 24 24" class="radar-nature-icon radar-nature-up" aria-hidden="true"><use href="/static/icons/sprite.svg#arrow-up" /></svg>
-          <svg v-if="row?.key === pet.nature_negative" :x="labelLayout[index]!.iconX" y="-8" width="16" height="16" viewBox="0 0 24 24" class="radar-nature-icon radar-nature-down" aria-hidden="true"><use href="/static/icons/sprite.svg#arrow-down" /></svg>
-          <text x="0" y="0" :text-anchor="labelLayout[index]!.anchor" dominant-baseline="central"><tspan class="radar-label">{{ row?.label }}</tspan></text>
-        </g>
-        <text :x="labelLayout[index]!.x" :y="labelLayout[index]!.valueY" :text-anchor="labelLayout[index]!.anchor">
-          <tspan class="radar-number">{{ row?.race ?? '—' }}</tspan>
-          <tspan v-if="row && row.talent_add !== 0" dx="4" class="radar-bonus" :class="{ highlighted: row.talent_add > 0 }">{{ row.talent_add > 0 ? '+' : '' }}{{ row.talent_add }}</tspan>
-        </text>
-      </template>
-    </svg>
-    <p v-else class="filter-note">暂无属性数据</p>
+    <div class="detail-stats-visual">
+      <svg v-if="pet.stats.length" class="detail-radar" viewBox="0 0 220 220" role="img" aria-label="六维种族值、天赋加成与性格方向">
+        <polygon v-for="radius in [13.2, 26.4, 39.6, 52.8, 66]" :key="radius" :points="ring(radius)" class="radar-ring" />
+        <line v-for="(_, index) in order" :key="index" x1="110" y1="110" :x2="point(index, 66).split(',')[0]" :y2="point(index, 66).split(',')[1]" class="radar-ring" />
+        <polygon :points="shape" class="radar-value" />
+        <template v-for="(row, index) in rows" :key="index">
+          <g :transform="`translate(${labelLayout[index]!.x} ${labelLayout[index]!.y})`" class="radar-label-group">
+            <svg v-if="row?.key === pet.nature_positive" :x="labelLayout[index]!.iconX" y="-8" width="16" height="16" viewBox="0 0 24 24" class="radar-nature-icon radar-nature-up" aria-hidden="true"><use href="/static/icons/sprite.svg#arrow-up" /></svg>
+            <svg v-if="row?.key === pet.nature_negative" :x="labelLayout[index]!.iconX" y="-8" width="16" height="16" viewBox="0 0 24 24" class="radar-nature-icon radar-nature-down" aria-hidden="true"><use href="/static/icons/sprite.svg#arrow-down" /></svg>
+            <text x="0" y="0" :text-anchor="labelLayout[index]!.anchor" dominant-baseline="central"><tspan class="radar-label">{{ row?.label }}</tspan></text>
+          </g>
+          <text :x="labelLayout[index]!.x" :y="labelLayout[index]!.valueY" :text-anchor="labelLayout[index]!.anchor">
+            <tspan class="radar-number">{{ row?.race ?? '—' }}</tspan>
+            <tspan v-if="row && row.talent_add !== 0" dx="4" class="radar-bonus" :class="{ highlighted: row.talent_add > 0 }">{{ row.talent_add > 0 ? '+' : '' }}{{ row.talent_add }}</tspan>
+          </text>
+        </template>
+      </svg>
+      <p v-else class="filter-note">暂无属性数据</p>
+    </div>
   </section>
 </template>

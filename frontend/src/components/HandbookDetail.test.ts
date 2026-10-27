@@ -4,7 +4,7 @@ import HandbookDetail from './HandbookDetail.vue'
 import type { HandbookSpecies } from '../types/handbook'
 
 const species = (patch: Partial<HandbookSpecies> = {}): HandbookSpecies => ({
-  key: '3001', name: '喵喵', display_name: '喵喵', dex_no: 1, handbook_no: '002', artwork_url: '', icon_url: '',
+  key: '3001', name: '喵喵', display_name: '喵喵', dex_no: 1, handbook_no: '002', artwork_url: '', shiny_artwork_url: '', icon_url: '',
   types: [6], egg_groups: ['动物组'], gender_ratio: [50, 50], height_range: [53, 75], weight_range: [3620, 4600],
   reference_ranges: { height: '0.53-0.75 m', weight: '3.62-4.60 kg' }, has_shiny: false,
   type_names: ['草'], type_colors: ['#83d256'], matchups: { weak: ['火'], resist: ['水'], immune: [] },

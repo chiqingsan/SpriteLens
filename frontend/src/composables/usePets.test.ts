@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { usePets } from './usePets'
-import { testPets } from '../petTestData'
+import { testPet, testPets } from '../petTestData'
 import { parsePets } from '../types/pets'
 import PetSlots from '../components/PetSlots.vue'
 
@@ -127,6 +127,21 @@ it('返回时重试失败请求，切号不复用前账号快照', async () => {
   api.mockResolvedValueOnce({ ...testPets(), uid: 202, version: 11 })
   await model.resume()
   expect(api).toHaveBeenCalledTimes(3); expect(model.data.value?.uid).toBe(202)
+})
+
+it('切换详情请求期间保留上一份详情，避免详情面板卸载', async () => {
+  const pending = deferred()
+  const api = vi.fn().mockResolvedValueOnce({ uid: 101, version: 10, gid: 1, pet: testPet(1) }).mockReturnValueOnce(pending.promise)
+  const model = usePets(api, () => ({ uid: 101, version: 10, generation: 1 }), () => ({}), vi.fn(), vi.fn())
+  model.activate(); model.accept(testPets(2)); model.selected.value = 1
+  await model.loadDetail(1)
+  model.accept({ ...testPets(2), version: 11 })
+  expect(model.detail.value?.gid).toBe(1)
+  model.selected.value = 2
+  const next = model.loadDetail(2)
+  expect(model.detail.value?.gid).toBe(1)
+  pending.resolve({ uid: 101, version: 11, gid: 2, pet: testPet(2) }); await next
+  expect(model.detail.value?.gid).toBe(2)
 })
 
 it('返回复用快照后，离页前取消的请求不能覆盖当前数据', async () => {

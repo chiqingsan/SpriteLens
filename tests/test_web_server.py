@@ -696,6 +696,28 @@ class HandbookPayloadTest(unittest.TestCase):
         self.assertEqual(payload["stage_options"], [1, 2])
         self.assertEqual(payload["egg_group_options"], ["动物组", "海洋组"])
 
+    def test_unnumbered_species_are_excluded_from_catalog_and_links(self):
+        original = self.static._species["100"]
+        self.static._species["999"] = replace(original, name="测试精灵", display_name="测试精灵",
+                                              handbook_no="", dex_no=0, type_names=("测试系",),
+                                              egg_groups=("测试组",), evolutions=(), chain_members=())
+        self.static._species["100"] = replace(original, evolutions=(999,), chain_members=(100, 999))
+        try:
+            payload = self._payload()
+            self.assertEqual(payload["total"], 4)
+            self.assertEqual(payload["shown"], 4)
+            self.assertNotIn("999", [row["key"] for row in payload["species"]])
+            self.assertNotIn("测试系", payload["type_options"])
+            self.assertNotIn("测试组", payload["egg_group_options"])
+            self.assertEqual(self._keys(search="测试精灵"), [])
+            row = next(row for row in payload["species"] if row["key"] == "100")
+            self.assertEqual(row["evolutions"], [])
+            self.assertEqual([member["key"] for member in row["chain_members"]], ["100"])
+            self.assertIsNotNone(self.static.species(999))
+        finally:
+            self.static._species["100"] = original
+            del self.static._species["999"]
+
     def test_duplicate_species_records_are_merged_to_complete_record(self):
         original = self.static._species["100"]
         self.static._species["099"] = replace(

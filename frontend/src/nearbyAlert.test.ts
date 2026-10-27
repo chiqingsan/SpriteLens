@@ -24,6 +24,28 @@ function snapshot(actors: unknown[], extra: Record<string, unknown> = {}) {
 }
 
 describe('附近精灵提醒音引擎', () => {
+  it('空闲时预备音频，用户手势恢复；关闭时取消尚未执行的预备任务', () => {
+    let idle: () => void = () => {}
+    const resume = vi.fn(() => Promise.resolve())
+    const close = vi.fn(() => Promise.resolve())
+    const createAudio = vi.fn(function (this: { state: string; resume: typeof resume; close: typeof close }) {
+      this.state = 'suspended'; this.resume = resume; this.close = close
+    })
+    const host = windowStub({ AudioContext: createAudio, requestIdleCallback: vi.fn((fn: () => void) => { idle = fn; return 7 }), cancelIdleCallback: vi.fn() })
+    const alert = loadAlert(host, { storage: null })
+    expect(createAudio).not.toHaveBeenCalled()
+    idle()
+    expect(createAudio).toHaveBeenCalledTimes(1)
+    const pointer = host.addEventListener.mock.calls.find(([name]) => name === 'pointerdown')![1] as () => void
+    pointer()
+    expect(resume).toHaveBeenCalledTimes(1)
+    alert.dispose()
+    expect(close).toHaveBeenCalledTimes(1)
+
+    const pending = loadAlert(host, { storage: null })
+    pending.dispose()
+    expect(host.cancelIdleCallback).toHaveBeenCalledWith(7)
+  })
   it('首次快照不响；新增单牌不响，新增双牌响一次', () => {
     const play = vi.fn()
     const alert = loadAlert(windowStub(), { storage: null, now: () => 0, play })

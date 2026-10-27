@@ -6,6 +6,7 @@ import PetBasicFilters from './PetBasicFilters.vue'
 import PetAdvancedFilters from './PetAdvancedFilters.vue'
 import PetShortcuts from './PetShortcuts.vue'
 import UiIcon from './UiIcon.vue'
+import UiSegmented from './UiSegmented.vue'
 import { ref } from 'vue'
 defineProps<{ basic: PetFilterModel; advanced: PetAdvancedModel; applied: Partial<PetConditions>; items: PetShortcut[]; busy: () => boolean; persist: (items: PetShortcut[]) => Promise<void>; reload: () => void; reset: () => void; notify: (message: string, bad: boolean) => void }>()
 const shortcuts = ref<InstanceType<typeof PetShortcuts>>()
@@ -13,7 +14,7 @@ defineExpose({ cancel: () => shortcuts.value?.cancel() })
 </script>
 <template>
   <Teleport to="#pet-filter-actions">
-    <div class="segmented filter-match-mode" aria-label="筛选匹配方式"><button v-for="mode in (['and', 'or'] as const)" :key="mode" :aria-pressed="basic.filters.pool_mode === mode" :class="{ active: basic.filters.pool_mode === mode }" :title="mode === 'and' ? '全符合' : '任一符合'" @click="basic.patch({ pool_mode: mode })">{{ mode.toUpperCase() }}</button></div>
+    <UiSegmented class="filter-match-mode" aria-label="筛选匹配方式"><button v-for="mode in (['and', 'or'] as const)" :key="mode" :aria-pressed="basic.filters.pool_mode === mode" :class="{ active: basic.filters.pool_mode === mode }" :title="mode === 'and' ? '全符合' : '任一符合'" @click="basic.patch({ pool_mode: mode })">{{ mode.toUpperCase() }}</button></UiSegmented>
     <button id="btn-reset-filters" class="ghost-button small" @click="reset"><UiIcon name="filter-off"></UiIcon>重置</button>
   </Teleport>
   <PetShortcuts ref="shortcuts" :basic="basic" :advanced="advanced" :applied="applied" :items="items" :busy="busy" :persist="persist" :reload="reload" :notify="notify"></PetShortcuts>

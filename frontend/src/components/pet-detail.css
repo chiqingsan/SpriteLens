@@ -3,6 +3,10 @@
 #page-pets .workspace.split { position: relative; }
 #page-pets .workspace.split > #pet-detail-root > .ui-inspector { container-type: inline-size; }
 #pet-detail .ui-inspector-body { display: flex; flex-direction: column; gap: var(--space-3); }
+#pet-detail .ui-inspector-actions { min-height: 32px; }
+#pet-detail .pet-detail-content { position: relative; display: flex; flex-direction: column; gap: var(--space-3); min-height: 0; }
+#pet-detail .pet-detail-refresh { position: absolute; top: var(--space-3); left: 50%; z-index: 2; transform: translateX(-50%); padding: var(--space-1) var(--space-3); border: 1px solid var(--line-soft); border-radius: 999px; background: color-mix(in srgb, var(--panel) 92%, transparent); color: var(--muted); font-size: var(--fs-3xs); line-height: 1.4; box-shadow: var(--shadow-1); pointer-events: none; white-space: nowrap; }
+#pet-detail .pet-detail-placeholder { min-height: 224px; display: grid; place-items: center; margin: 0; }
 #pet-detail .ui-inspector-body h3 { margin: 0 0 var(--space-2); color: var(--muted); font-size: var(--fs-2xs); font-weight: 600; line-height: 1.5; }
 #pet-detail .ui-inspector-body small { color: var(--muted); font-size: var(--fs-3xs); }
 .pet-detail-art { position: relative; height: 248px; flex: none; border: 1px solid color-mix(in srgb, var(--male-strong) 24%, var(--line-soft)); border-radius: var(--radius-lg); background: linear-gradient(158deg, color-mix(in srgb, var(--male) 92%, var(--panel)), color-mix(in srgb, var(--male) 36%, var(--panel))); overflow: hidden; }
@@ -37,7 +41,8 @@
 .detail-stats-position > .detail-block { padding: var(--space-2); }
 .detail-block { min-width: 0; padding: var(--space-3); border: 1px solid var(--line-soft); border-radius: var(--radius-md); background: var(--surface-1); }
 .detail-stats-position h3 { margin-bottom: var(--space-1); }
-.detail-radar { width: 100%; display: block; margin: 0; overflow: visible; }
+.detail-stats-visual { height: 224px; min-height: 224px; display: grid; place-items: center; }
+.detail-radar { width: 100%; height: 100%; display: block; margin: 0; overflow: visible; }
 .radar-ring { fill: none; stroke: var(--line); stroke-width: 1; }
 .radar-value { fill: color-mix(in srgb, var(--teal) 20%, transparent); stroke: var(--teal); stroke-width: 1.5; }
 .detail-radar text { fill: var(--ink-soft); font-size: 17px; }

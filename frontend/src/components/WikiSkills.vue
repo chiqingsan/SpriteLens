@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiSelect from './UiSelect.vue'
 import { computed, ref } from 'vue'
 import type { WikiSkill } from '../types/wikiReference'
 const { skills } = defineProps<{ skills: WikiSkill[] }>()
@@ -11,28 +12,8 @@ const filtered = computed(() => skills.filter(row => (!source.value || row.sourc
 <template>
   <div class="wiki-skill-filters">
     <input v-model="search" type="search" placeholder="搜索技能名称 / 效果" aria-label="搜索技能">
-    <select v-model="source" aria-label="技能来源">
-      <option value="">
-        全部来源
-      </option>
-      <option>
-        自学
-      </option>
-      <option>
-        技能石
-      </option>
-      <option>
-        血脉
-      </option>
-    </select>
-    <select v-model="type" aria-label="技能属性">
-      <option value="">
-        全部属性
-      </option>
-      <option v-for="name in types" :key="name">
-        {{ name }}
-      </option>
-    </select>
+    <UiSelect v-model="source" label="技能来源" :options="[{ value: '', label: '全部来源' }, ...['自学', '技能石', '血脉'].map(name => ({ value: name, label: name }))]" />
+    <UiSelect v-model="type" label="技能属性" :options="[{ value: '', label: '全部属性' }, ...types.map(name => ({ value: name, label: name }))]" />
     <span class="count-badge">
       {{ filtered.length }} / {{ skills.length }} 条
     </span>

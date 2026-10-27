@@ -5,6 +5,7 @@ import type { CollectionLine } from '../types/collectionLines'
 import PageShell from '../components/PageShell.vue'
 import PagePager from '../components/PagePager.vue'
 import UiIcon from '../components/UiIcon.vue'
+import UiSegmented from '../components/UiSegmented.vue'
 import CollectionParentCard from '../components/CollectionParentCard.vue'
 import './collection-lines.css'
 
@@ -117,8 +118,8 @@ defineExpose({ load, pause, resetAccount })
     <div class="collection-body">
     <section class="collection-list-panel" :aria-busy="loading">
       
-      <nav class="collection-tabs" aria-label="产线状态"><button v-for="tab in tabs" :key="tab" :class="{ active: status === tab }" :aria-pressed="status === tab" @click="status = tab">
-        {{ tab === 'all' ? '全部' : labels[tab] }} <span>{{ tab === 'all' ? data?.lines.length ?? '—' : data?.totals[tab] ?? '—' }}</span></button></nav>
+      <UiSegmented class="collection-tabs" role="navigation" aria-label="产线状态"><button v-for="tab in tabs" :key="tab" :class="{ active: status === tab }" :aria-pressed="status === tab" @click="status = tab">
+        {{ tab === 'all' ? '全部' : labels[tab] }} <span>{{ tab === 'all' ? data?.lines.length ?? '—' : data?.totals[tab] ?? '—' }}</span></button></UiSegmented>
       <div class="collection-list-caption" :class="{ 'has-error': error || saveError }" role="status">
         <span v-if="error" :title="error">更新失败{{ data ? '，保留上次结果' : '' }}：{{ error }}</span>
         <span v-else-if="saveError" :title="saveError">{{ saveError }}</span>
@@ -166,7 +167,7 @@ defineExpose({ load, pause, resetAccount })
         <div class="collection-side-body collection-filters">
           <section class="direct-filter"><h3>双牌目标</h3><div class="collection-goals"><button v-for="[key, label] in collectionGoals" :key="key" class="chip" :class="{ active: settings.goal === key }" :aria-pressed="settings.goal === key" @click="settings.goal = key; model.apply()"><span><img v-for="medal in goalMedals[key]" :key="medal" :src="`/static/medal-icons/${medal}.webp`" alt=""></span>{{ label }}</button></div><p class="collection-rule-note">按体重与声音标记统计，满身高不替代大块头；数值参考不等于已获奖牌。</p></section>
           <section class="collection-filter-section"><h3>蛋组</h3><div class="chip-group collection-group-options"><button class="chip" :class="{ active: !group }" :aria-pressed="!group" @click="group = ''">全部</button><button v-for="name in groups" :key="name" class="chip" :class="{ active: group === name }" :aria-pressed="group === name" @click="group = group === name ? '' : name">{{ name }}</button></div></section>
-          <section class="collection-filter-section"><h3>声音条件</h3><div class="segmented collection-sound" role="group" aria-label="声音条件"><button v-for="[value, label] in [['', '不限'], ['100', '+100 dB'], ['-100', '−100 dB']]" :key="value" :class="{ active: settings.sound === value }" :aria-pressed="settings.sound === value" @click="settings.sound = value; model.apply()">{{ label }}</button></div></section>
+          <section class="collection-filter-section"><h3>声音条件</h3><UiSegmented class="collection-sound" role="group" aria-label="声音条件"><button v-for="[value, label] in [['', '不限'], ['100', '+100 dB'], ['-100', '−100 dB']]" :key="value" :class="{ active: settings.sound === value }" :aria-pressed="settings.sound === value" @click="settings.sound = value; model.apply()">{{ label }}</button></UiSegmented></section>
           <section class="collection-filter-section"><h3>统计条件</h3><div class="collection-parent-options"><button v-for="[key, label, icon] in ([['full_weight', '仅满体重亲本', 'weight'], ['colorful', '仅炫彩亲本', 'palette'], ['ignore_missing_male', '忽略缺种公', 'gender-female']] as const)" :key="key" class="chip" :class="{ active: settings[key] }" :aria-pressed="settings[key]" @click="settings[key] = !settings[key]; model.apply()"><UiIcon :name="icon" />{{ label }}<UiIcon v-if="settings[key]" name="circle-check" /></button></div></section>
           <details class="collection-filter-section collection-rules"><summary>统计说明<UiIcon name="chevron-right" /></summary><p>本页收集同账号、同双标、同性格且蛋组相容的组合，统计全部已知性格。同性格是收集条件，不是生蛋前提。</p><p>体型、声音标记与背包使用同一规则；满身高不替代大块头，最低身高不替代小不点。数值参考不等于已获奖牌。</p><p>亲本配齐不代表已经配窝或子代必出双牌；观察记录可能含已移出个体，学院小窝另行验证。</p></details>
         </div>

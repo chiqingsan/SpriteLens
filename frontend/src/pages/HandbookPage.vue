@@ -7,16 +7,15 @@ import HandbookDetail from '../components/HandbookDetail.vue'
 import PageInspector from '../components/PageInspector.vue'
 import PageShell from '../components/PageShell.vue'
 import PagePager from '../components/PagePager.vue'
-import { useDexDisplay } from '../composables/useDexDisplay'
 import DexPortrait from '../components/DexPortrait.vue'
 import DexTypeBadge from '../components/DexTypeBadge.vue'
 import DexFilterMenu from '../components/DexFilterMenu.vue'
 import UiIcon from '../components/UiIcon.vue'
+import UiSegmented from '../components/UiSegmented.vue'
 import './catalog-wiki.css'
 
 const props = defineProps<{ api: ApiClient; active: boolean }>()
 const { filters, data, loading, error, load, pause, resume, resetAccount, clear } = useHandbook(props.api)
-const { view, density } = useDexDisplay()
 const page = ref(1), groups = ref<string[]>([])
 const groupMode = ref<'union' | 'intersection'>('union')
 const filtered = computed(() => (data.value?.species || []).filter(row => !groups.value.length
@@ -28,6 +27,7 @@ const typeOptions = computed(() => [{ value: '', label: '全部' }, ...(data.val
 const groupOptions = computed(() => [{ value: '', label: '全部' }, ...(data.value?.egg_group_options || []).map(value => ({ value, label: displayGroup(value) }))])
 const item = ref<HandbookSpecies>()
 function displayGroup(group: string) { return group === '未发现' ? '蛋组未知' : group }
+function cardGroups(groups: string[]) { return [...new Set(groups.length ? groups.map(group => ['未发现', '蛋组未知', '暂无蛋组', '无', '无法孵蛋'].includes(group) ? '无法孵蛋' : group) : ['无法孵蛋'])] }
 const detailLoading = ref(false), detailError = ref('')
 const detailTarget = ref<string>()
 let detailRequest: AbortController | undefined
@@ -130,18 +130,13 @@ defineExpose({ load, pause, resume, resetAccount, reveal, error })
   <PageShell class="catalog-dex" data-vue-page :busy="loading">
     <template #toolbar>
       <div class="dex-toolbar-heading">
-        <nav class="dex-view-switch" aria-label="图鉴分类"><button type="button" class="active" data-goto-page="handbook" aria-current="page">精灵图鉴</button><button type="button" data-goto-page="egg-dex">精灵蛋图鉴</button></nav>
+        <UiSegmented navigation class="dex-view-switch" role="navigation" aria-label="图鉴分类"><button type="button" class="active" data-goto-page="handbook" aria-current="page">精灵图鉴</button><button type="button" data-goto-page="egg-dex">精灵蛋图鉴</button></UiSegmented>
         <p id="hb-count" class="ui-page-meta">资料条目 {{ data?.total || 0 }} 只 · {{ filtered.length === data?.total ? '浏览完整资料库' : `找到 ${filtered.length} 个结果` }}</p>
       </div>
       <div class="dex-toolbar-actions">
         <input id="hb-search" v-model="filters.search" type="search" placeholder="搜索精灵名称、形态或编号" aria-label="搜索精灵图鉴">
         <DexFilterMenu label="属性" :options="typeOptions" :model-value="filters.type ? [filters.type] : []" :active="active" @update:model-value="filters.type = $event[0] || ''" />
         <DexFilterMenu v-model="groups" v-model:mode="groupMode" label="蛋组" :options="groupOptions" multiple :active="active" />
-        <label class="ui-density"><span class="sr-only">卡片密度</span><select v-model="density" aria-label="卡片密度"><option value="comfortable">舒适</option><option value="compact">紧凑</option></select></label>
-        <div class="ui-view-switch" role="group" aria-label="卡片视图">
-          <button type="button" :aria-pressed="view === 'grid'" title="网格视图" @click="view = 'grid'"><UiIcon name="layout-grid" /></button>
-          <button type="button" :aria-pressed="view === 'list'" title="列表视图" @click="view = 'list'"><UiIcon name="table" /></button>
-        </div>
       </div>
     </template>
     <div class="dex-browser-layout">
@@ -149,13 +144,12 @@ defineExpose({ load, pause, resume, resetAccount, reveal, error })
         <div v-if="loading && !data" class="empty-hint" role="status">正在加载图鉴…</div>
         <div v-if="error" class="dex-error" role="alert">图鉴加载失败：{{ error }}<button class="ghost-button small" @click="load">重试</button></div>
         <PagePager :page="page" :pages="pages" :page-size="pageSize" unit="只" label="精灵图鉴页码" @update:page="goPage" />
-        <div id="hb-grid" class="dex-browser-grid" :class="{ 'is-list': view === 'list', 'is-compact': density === 'compact' }">
+        <div id="hb-grid" class="dex-browser-grid">
           <button v-for="row in shown" :key="row.key" class="dex-browser-card" :class="{ selected: item?.key === row.key }" :aria-label="`查看${row.display_name || row.name}详情`" :aria-pressed="item?.key === row.key" @click="open(row, $event)">
             <span class="dex-card-number">No.{{ row.handbook_no || row.dex_no || '—' }} · {{ row.stage ? `第${row.stage}阶` : '阶段未知' }}</span>
             <DexPortrait :src="row.icon_url || row.artwork_url" :name="row.display_name || row.name" eager /><b>{{ row.display_name || row.name }}</b>
             <div class="dex-card-types"><DexTypeBadge v-for="(name, index) in row.type_names" :key="name" :name="name" :color="row.type_colors[index]" :icon-url="row.type_icons?.[name]" compact /></div>
-            <div class="dex-card-groups"><span v-for="group in row.egg_groups" :key="group" class="dex-tag">{{ displayGroup(group) }}</span><small v-if="!row.egg_groups.length">暂无蛋组</small></div>
-            <div class="dex-card-summary" aria-label="基础资料"><span><small>种族值</small><b>{{ row.stat_sum > 0 ? row.stat_sum : '—' }}</b></span><span><small>异色</small><b>{{ row.has_shiny ? '可用' : '无' }}</b></span></div>
+            <div class="dex-card-groups"><span v-for="group in cardGroups(row.egg_groups)" :key="group" class="dex-tag">{{ group }}</span></div>
           </button>
           <div v-if="data && !filtered.length" class="dex-empty"><b>没有找到匹配结果</b><span>试试其他名称，或清除筛选条件。</span><button class="ghost-button" @click="resetFilters">清除筛选</button></div>
         </div>

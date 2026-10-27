@@ -95,7 +95,7 @@ def _handbook_completeness(key: str, info) -> tuple[int, ...]:
 
 def _handbook_catalog(static: StaticData) -> tuple[dict[str, str], tuple[tuple[str, object], ...]]:
     """返回重复图鉴记录的别名映射，以及去重后的主记录。"""
-    items = static.species_items()
+    items = [(key, info) for key, info in static.species_items() if info.handbook_no or info.dex_no]
     canonical: dict[tuple, tuple[str, object]] = {}
     for key, info in items:
         identity = _handbook_identity(key, info)
@@ -158,7 +158,7 @@ def handbook_payload(
         return True
 
     aliases, catalog_items = _handbook_catalog(static)
-    members_by_id = {key: info for key, info in static.species_items()}
+    members_by_id = {key: info for key, info in static.species_items() if key in aliases}
     rows: list[dict] = []
     exact_rows: list[dict] = []
     type_names_seen: set[str] = set()
@@ -195,6 +195,7 @@ def handbook_payload(
                 "handbook_no": info.handbook_no,
                 "icon_url": species_icon_url(int(key)) if key.isdigit() else "",
                 "artwork_url": pet_images(int(key))["artwork_url"] if key.isdigit() else "",
+                "shiny_artwork_url": f"/static/pet-media/{key}-shiny-artwork.webp" if key.isdigit() and info.has_shiny else "",
                 "types": list(info.types),
                 "egg_groups": list(info.egg_groups),
                 "gender_ratio": list(info.gender_ratio),
@@ -214,12 +215,12 @@ def handbook_payload(
                 "evolutions": [
                     {"key": member_key, "name": evo.name}
                     for e in info.evolutions
-                    if (member_key := aliases.get(str(e), str(e)))
+                    if (member_key := aliases.get(str(e)))
                     and (evo := static.species(int(member_key))) is not None
                 ],
                 "chain_members": [{"key": member_key, "name": member.name, "icon_url": species_icon_url(int(member_key)), "stage": member.stage}
                                   for e in info.chain_members
-                                  if (member_key := aliases.get(str(e), str(e)))
+                                  if (member_key := aliases.get(str(e)))
                                   and (member := static.species(int(member_key))) is not None],
                 "egg": _handbook_egg(catalog, key),
                 "description": info.description,

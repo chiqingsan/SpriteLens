@@ -20,6 +20,7 @@ export interface HandbookSpecies {
   dex_no: number
   handbook_no: string
   artwork_url: string
+  shiny_artwork_url: string
   icon_url: string
   types: number[]
   egg_groups: string[]
@@ -85,7 +86,7 @@ function egg(value: unknown): value is HandbookEgg | null {
 function isSpecies(value: unknown): value is HandbookSpecies {
   if (!record(value)) return false
   return typeof value.key === 'string' && typeof value.name === 'string'
-    && ['display_name', 'handbook_no', 'icon_url', 'artwork_url', 'description'].every(key => typeof value[key] === 'string')
+    && ['display_name', 'handbook_no', 'icon_url', 'artwork_url', 'shiny_artwork_url', 'description'].every(key => typeof value[key] === 'string')
     && ['dex_no', 'stat_sum', 'quality', 'stage', 'max_energy'].every(
       key => Number.isSafeInteger(value[key]))
     && typeof value.has_shiny === 'boolean'

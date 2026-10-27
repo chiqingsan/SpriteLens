@@ -27,10 +27,7 @@ const visibleGroups = computed(() => groups.filter(group => props.matchups[group
     </header>
     <div class="dex-matchup-groups">
       <article v-for="group in visibleGroups" :key="group.key" class="dex-matchup-group" :class="`is-${group.tone}`">
-        <div class="dex-matchup-label">
-          <UiIcon :name="group.icon" aria-hidden="true" />
-          <span><b>{{ group.label }}</b><small>{{ group.note }}</small></span>
-        </div>
+        <div class="dex-matchup-label"><span><b>{{ group.label }}</b><UiIcon :name="group.icon" aria-hidden="true" /></span><small>{{ group.note }}</small></div>
         <div class="dex-matchup-types">
           <span v-for="name in props.matchups[group.key]" :key="name" class="dex-matchup-type">
             <img v-if="props.icons?.[name]" :src="props.icons[name]" :alt="`${name}系别`" loading="lazy" decoding="async">

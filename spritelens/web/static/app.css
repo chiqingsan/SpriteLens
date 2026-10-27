@@ -189,6 +189,9 @@ body, .app-shell, .sidebar, .main-shell, .topbar, .content-panel, .filter-rail,
   background: transparent;
 }
 
+.app-shell.rail-motion { transition: grid-template-columns var(--motion-base) var(--motion-ease), background-color var(--motion-base) var(--motion-ease), border-color var(--motion-base) var(--motion-ease), color var(--motion-base) var(--motion-ease); }
+.app-shell.rail-animating .nav-indicator { transition: none; }
+
 /* 侧栏：直接坐在环境光背景上 */
 .sidebar {
   color: var(--sidebar-text);
@@ -510,10 +513,6 @@ body, .app-shell, .sidebar, .main-shell, .topbar, .content-panel, .filter-rail,
 .page:not(.active):not(.page-cached) { display: none !important; }
 .page.page-cached { display: block; min-height: 0; visibility: hidden; pointer-events: none; }
 .page.page-cached.active { visibility: visible; pointer-events: auto; }
-/* 换页入场（由 app.js 在首次进入某页时短暂加 page-enter 类；缓存页切回不重播）。
-   只保留整页级淡入：单张卡片级 opacity/transform 动画会同时拉起几十个合成层，
-   低端 GPU/WebView2 下切页掉帧，而且只有真正渲染了卡片的行会动、空格行不动。 */
-.page.page-enter { animation: page-in var(--motion-base) var(--motion-ease) both; }
 
 .page .workspace.split { display: grid; grid-template-columns: 236px minmax(0, 1fr) 316px; gap: var(--space-4); align-items: start; }
 /* 背包右侧筛选与详情共用一列：宽屏时筛选常驻，详情以浮层抽屉叠在内容列右侧；窄屏交给 ui.css 的抽屉模式。 */
@@ -948,11 +947,6 @@ dialog[open] { animation: modal-in var(--motion-slow) var(--motion-spring) both;
 .feature-placeholder p { margin: 0; color: var(--muted); }
 
 /* ══════════════ 关键帧 ══════════════ */
-@keyframes page-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: none; }
-}
-
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modal-in {
   from { opacity: 0; transform: translateY(14px) scale(.97); }

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useHandbook } from './useHandbook'
 
 const species = {
-  key: '100', name: '火兽', display_name: '', dex_no: 1, handbook_no: '002', artwork_url: '', icon_url: '',
+  key: '100', name: '火兽', display_name: '', dex_no: 1, handbook_no: '002', artwork_url: '', shiny_artwork_url: '', icon_url: '',
   types: [1], egg_groups: ['动物组'], gender_ratio: [50, 50], height_range: [0, 0], weight_range: [0, 0],
   reference_ranges: { height: '0.4~0.8m', weight: '5~9kg' }, has_shiny: true,
   type_names: ['火'], type_colors: ['#e2764b'], matchups: { weak: ['水'], resist: ['草'], immune: [] },

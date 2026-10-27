@@ -3,6 +3,7 @@
 #page-pets { --pet-side-width: 360px; }
 .account-card { position: relative; margin-bottom: var(--space-4); padding: 2px; border: 1px solid var(--line-soft); border-radius: var(--radius-lg); background: var(--panel); box-shadow: var(--shadow-1); }
 .account-information { position: relative; }
+.sidebar:has(.account-information[open]) { z-index: 20; }
 .account-information > summary { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-3) var(--space-2); cursor: pointer; list-style: none; border-radius: var(--radius-md); }
 .account-information > summary::-webkit-details-marker { display: none; }
 .account-information > summary:hover { background: var(--surface-1); }
@@ -63,9 +64,11 @@
 .pet-toolbar .segmented, .pet-search input, .pet-view-settings > summary { height: var(--backpack-control); }
 .pet-toolbar .segmented { padding: 2px; }
 .pet-toolbar .segmented button { padding: 0 var(--space-4); font-size: var(--fs-sm); }
+#page-pets #pet-view .ui-sliding-segmented > button.active { background: transparent; box-shadow: none; }
 .pet-view-settings { margin-left: 0; }
 .pet-sort-root { flex: none; display: flex; align-items: center; }
-.pet-sort-root .pet-sort-field { margin-left: var(--space-3); }
+.pet-sort-root .pet-sort-field { display: inline-flex; align-items: center; height: var(--backpack-control); margin-left: var(--space-3); }
+.pet-sort-root .pet-sort-select { width: 96px; height: var(--backpack-control); }
 .pet-sort-root .pet-sort-direction { margin-left: var(--space-2); }
 .pet-view-settings > summary { display: flex; align-items: center; padding: 0 var(--space-4); white-space: nowrap; }
 #pet-count-root { flex: none; }
@@ -105,6 +108,7 @@
   grid-template-rows: repeat(5, minmax(126px, 1fr));
   grid-auto-rows: minmax(126px, auto);
 }
+#pet-grid.pet-teams-view { grid-template-rows: none; grid-auto-rows: max-content; }
 #pet-grid.box-fill-grid { height: 100%; min-height: 672px; align-content: stretch; }
 #pet-grid.box-fill-grid > .point-pet { height: 100%; grid-template-rows: 24px minmax(0, 1fr) 16px 22px; align-content: stretch; }
 #pet-grid.box-fill-grid .point-portrait-row { height: 100%; align-items: center; }
@@ -187,6 +191,9 @@
   #page-pets .workspace.split, #page-pets .workspace.split.detail-collapsed { height: 100%; min-height: 0; grid-template-columns: minmax(0, 1fr) var(--pet-side-width) !important; }
   #page-pets { overflow: hidden; }
   #page-pets .content-panel { height: 100%; }
+  #page-pets .workspace.split > #pet-detail-root { grid-column: 2; grid-row: 1; height: 100%; min-height: 0; display: none; }
+  #page-pets .workspace.split.has-detail > #pet-detail-root { display: flex; }
+  #page-pets .workspace.split > #pet-detail-root > .ui-inspector { flex: 1 1 auto; min-height: 0; box-sizing: border-box; }
   #page-pets .filter-rail, #page-pets .filter-rail.filters-open { display: flex; grid-column: 2; grid-row: 1; }
   /* 961–1360：详情与筛选共用右列，二选一；≤960px 才切换为模态抽屉。 */
   #page-pets .workspace.split.has-detail { grid-template-columns: minmax(0, 1fr) var(--pet-side-width) !important; }
@@ -232,11 +239,12 @@
    最小支持窗口下卡片内容宽约 124px，居中标记组宽 40px（16+4+20）左边缘约 42px；
    左簇 14px 性别 + 4px 间隙 + 18px 标记 = 36px，留约 5px 净空，不覆盖居中标记与性格胶囊。 */
 #pet-grid .point-top > .point-top-left { display: inline-flex; align-items: center; justify-content: flex-start; gap: 4px; min-width: 0; flex: none; }
-#pet-grid.box-fill-grid .point-portrait-row { grid-template-columns: 28px minmax(0, 1fr) 28px; }
-#pet-grid.box-fill-grid .point-groups, #pet-grid.box-fill-grid .point-medals { width: 28px; }
+#pet-grid.box-fill-grid .point-portrait-row { grid-template-columns: minmax(0, 1fr); }
+#pet-grid.box-fill-grid .point-groups { width: 3em; }
+#pet-grid.box-fill-grid .point-medals { width: 28px; }
 #pet-grid.box-fill-grid .point-avatar { max-width: 96px; }
 #pet-grid.box-fill-grid .point-name { font-size: var(--fs-xs); line-height: 16px; }
-#pet-grid.game-box-grid .point-egg-group { font-size: 12px; line-height: 20px; }
+#pet-grid.game-box-grid .point-egg-group { font-size: var(--fs-3xs); line-height: 20px; }
 /* 箱位填充模式：卡片高度随窗口收缩时，肖像行可能只有约 44px 高，
    左右两列（蛋组/奖牌）改为跟随行高等比收缩，避免固定 28px 奖牌压到名字行。 */
 #pet-grid.box-fill-grid .point-groups,

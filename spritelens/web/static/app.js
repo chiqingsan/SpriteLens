@@ -268,21 +268,6 @@
     document.querySelectorAll(".page").forEach(function (node) {
       node.classList.toggle("active", node.id === "page-" + name);
     });
-    // 换页入场：每个页面只在首次进入时播一次整页淡入，之后切回直接显示（不重播）。
-    // 不再给单张卡片加错峰动画——几十个卡片级 opacity/transform 动画会同时拉起几十个
-    // 合成层，低端 GPU/WebView2 下切页掉帧；且只有渲染了卡片的行会动，空格行不动。
-    var pageNode = $("page-" + name);
-    var enterTimer = pageNode.__enterTimer;
-    if (enterTimer) { window.clearTimeout(enterTimer); }
-    pageNode.classList.remove("page-enter");
-    if (!pageNode.dataset.entered) {
-      pageNode.dataset.entered = "1";
-      pageNode.classList.add("page-enter");
-      pageNode.__enterTimer = window.setTimeout(function () {
-        pageNode.classList.remove("page-enter");
-        pageNode.__enterTimer = null;
-      }, 260);
-    }
     document.querySelectorAll(".nav-item").forEach(function (node) {
       node.classList.toggle("active", node.dataset.page === name);
       if (node.dataset.page === name) { node.setAttribute("aria-current", "page"); }

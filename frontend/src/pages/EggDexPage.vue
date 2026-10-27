@@ -7,16 +7,15 @@ import EggDetail from '../components/EggDetail.vue'
 import PageInspector from '../components/PageInspector.vue'
 import PageShell from '../components/PageShell.vue'
 import PagePager from '../components/PagePager.vue'
-import { useDexDisplay } from '../composables/useDexDisplay'
 import DexPortrait from '../components/DexPortrait.vue'
 import DexTypeBadge from '../components/DexTypeBadge.vue'
 import DexFilterMenu from '../components/DexFilterMenu.vue'
 import UiIcon from '../components/UiIcon.vue'
+import UiSegmented from '../components/UiSegmented.vue'
 import './catalog-wiki.css'
 
 const props = defineProps<{ api: ApiClient; active: boolean }>()
 const { filters, data, loading, error, load, pause, resume, clear } = useEggDex(props.api)
-const { view, density } = useDexDisplay()
 const page = ref(1), groups = ref<string[]>([])
 const groupMode = ref<'union' | 'intersection'>('union')
 const sort = ref(''), groupCount = ref(''), sameRide = ref('')
@@ -151,7 +150,7 @@ defineExpose({ load, pause, resume, reveal, error })
   <PageShell class="catalog-dex" data-vue-page :busy="loading">
     <template #toolbar>
       <div class="dex-toolbar-heading">
-        <nav class="dex-view-switch" aria-label="图鉴分类"><button type="button" data-goto-page="handbook">精灵图鉴</button><button type="button" class="active" data-goto-page="egg-dex" aria-current="page">精灵蛋图鉴</button></nav>
+        <UiSegmented navigation class="dex-view-switch" role="navigation" aria-label="图鉴分类"><button type="button" data-goto-page="handbook">精灵图鉴</button><button type="button" class="active" data-goto-page="egg-dex" aria-current="page">精灵蛋图鉴</button></UiSegmented>
         <p id="ed-count" class="ui-page-meta">资料条目 {{ data?.total || 0 }} 种 · {{ filtered.length === data?.total ? '浏览完整资料库' : `找到 ${filtered.length} 个结果` }}</p>
       </div>
       <div class="dex-toolbar-actions">
@@ -159,11 +158,6 @@ defineExpose({ load, pause, resume, reveal, error })
         <DexFilterMenu label="蛋类型" :options="typeOptions" :model-value="filters.egg_type ? [filters.egg_type] : []" :active="active" @update:model-value="filters.egg_type = $event[0] || ''" />
         <DexFilterMenu v-model="groups" v-model:mode="groupMode" label="蛋组" :options="groupOptions" multiple :active="active" />
         <button ref="moreFiltersButton" class="dex-filter-button dex-more-filter-trigger" :class="{ active: moreFiltersActive }" type="button" aria-haspopup="dialog" :aria-expanded="moreFiltersOpen" @click="openMoreFilters"><small>更多筛选</small><b>{{ moreFiltersSummary }}</b><UiIcon name="adjustments" /></button>
-        <label class="ui-density"><span class="sr-only">卡片密度</span><select v-model="density" aria-label="卡片密度"><option value="comfortable">舒适</option><option value="compact">紧凑</option></select></label>
-        <div class="ui-view-switch" role="group" aria-label="卡片视图">
-          <button type="button" :aria-pressed="view === 'grid'" title="网格视图" @click="view = 'grid'"><UiIcon name="layout-grid" /></button>
-          <button type="button" :aria-pressed="view === 'list'" title="列表视图" @click="view = 'list'"><UiIcon name="table" /></button>
-        </div>
       </div>
     </template>
     <dialog ref="moreFilters" class="dex-filter-dialog dex-more-filter-dialog" aria-labelledby="ed-more-filters-title" @click.self="closeMoreFilters()" @close="moreFiltersOpen = false">
@@ -178,7 +172,7 @@ defineExpose({ load, pause, resume, reveal, error })
         <div v-if="loading && !data" class="empty-hint" role="status">正在加载蛋图鉴…</div>
         <div v-if="error" class="dex-error" role="alert">蛋图鉴加载失败：{{ error }}<button class="ghost-button small" @click="load">重试</button></div>
         <PagePager :page="page" :pages="pages" :page-size="pageSize" unit="枚" label="蛋蛋图鉴页码" @update:page="goPage" />
-        <div id="ed-grid" class="dex-browser-grid" :class="{ 'is-list': view === 'list', 'is-compact': density === 'compact' }">
+        <div id="ed-grid" class="dex-browser-grid">
           <button v-for="row in shown" :key="row.egg_conf_id" class="dex-browser-card egg" :class="{ selected: item?.egg_conf_id === row.egg_conf_id }" :aria-label="`查看${row.egg_name}详情`" :aria-pressed="item?.egg_conf_id === row.egg_conf_id" @click="open(row, $event)">
             <span class="dex-card-number">No.{{ row.handbook_no || '—' }} · {{ row.egg_type_name || '类型未知' }}</span><DexPortrait :src="row.egg_icon_url" :name="row.egg_name" eager /><b>{{ row.egg_name }}</b>
             <div class="dex-card-types"><DexTypeBadge v-for="(name, index) in (row.type_names || [])" :key="name" :name="name" :color="row.type_colors?.[index]" :icon-url="row.type_icons?.[name]" compact /></div>

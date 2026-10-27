@@ -2,6 +2,8 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import ColorsPage from './ColorsPage.vue'
 
+vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+
 const pet = (gid: string, cardId: string) => ({
   gid, name: `宠物${gid}`, level: 30, gender: 2,
   icon_url: `/static/pet-media/${gid}.webp`, card_id: cardId,
@@ -169,15 +171,15 @@ describe('色卡页面蛋神式矩阵布局', () => {
     await wrapper.find('#color-matrix [role="alert"] button').trigger('click')
     await flushPromises()
     expect(wrapper.find('#color-matrix [role="alert"]').exists()).toBe(false)
-    expect(wrapper.findAll('#cl-seasonal .color-owner')).toHaveLength(1)
-    expect(wrapper.find('#cl-unknown').text()).toContain('宠物1003')
+    expect(wrapper.find('.colors-special').exists()).toBe(false)
+    expect(wrapper.find('#color-matrix .matrix-card-cell').exists()).toBe(true)
 
     let settle!: (value: unknown) => void
     const pending = new Promise(resolve => { settle = resolve })
     const pendingWrapper = page(vi.fn().mockReturnValue(pending))
-    expect(pendingWrapper.find('#cl-seasonal-count').text()).toBe('')
+    expect(pendingWrapper.find('.colors-special').exists()).toBe(false)
     settle(payload)
     await flushPromises()
-    expect(pendingWrapper.find('#cl-seasonal-count').text()).toBe('1 只赛季卡')
+    expect(pendingWrapper.find('#color-matrix .matrix-card-cell').exists()).toBe(true)
   })
 })

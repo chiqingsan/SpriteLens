@@ -9,15 +9,10 @@ type RangeEntry = {
   high: string
   unit: string
   range: string
-  span: string
   reference: string
 }
 
 const props = defineProps<{ ranges: { height: string; weight: string }; areas?: string[]; egg?: boolean }>()
-
-function decimalPlaces(value: string) {
-  return value.includes('.') ? value.split('.')[1].length : 0
-}
 
 function formatValue(value: string) {
   return value.replace(/^-/, '−')
@@ -32,7 +27,6 @@ function parseRange(key: RangeKey, label: string, value: string): RangeEntry | n
   const match = value.trim().match(/^(-?[0-9]+(?:\.[0-9]+)?)\s*(?:-|–|—|~|至)\s*(-?[0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z]+)?$/)
   if (!match) return null
   const [, low, high, unit = ''] = match
-  const digits = Math.max(decimalPlaces(low), decimalPlaces(high))
   const lowNumber = Number(low)
   const highNumber = Number(high)
   const reference = key === 'height' || key === 'weight'
@@ -45,7 +39,6 @@ function parseRange(key: RangeKey, label: string, value: string): RangeEntry | n
     high: formatValue(high),
     unit,
     range: `${formatValue(low)}–${formatValue(high)}${unit ? ` ${unit}` : ''}`,
-    span: (highNumber - lowNumber).toFixed(digits),
     reference,
   }
 }
@@ -70,7 +63,6 @@ const hasContent = computed(() => entries.value.length > 0 || hasHabitat.value)
       <div class="mini-axis-heading">
         <b>{{ entry.label }} {{ entry.range }}</b>
         <span>参考范围</span>
-        <small>范围跨度 {{ entry.span }}{{ entry.unit ? ` ${entry.unit}` : '' }}</small>
       </div>
       <div class="mini-axis-scale">
         <span>{{ entry.low }}{{ entry.unit ? ` ${entry.unit}` : '' }}</span>

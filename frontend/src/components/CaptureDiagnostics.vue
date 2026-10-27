@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiSelect from './UiSelect.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import UiIcon from './UiIcon.vue'
 import { parseCaptureDiagnostics, parseIfaces } from '../types/captureDiagnostics'
@@ -166,7 +167,7 @@ defineExpose({ update })
     <template v-if="data">
       <div class="capture-setting-row capture-network-row">
         <div class="capture-setting-copy"><strong>抓包网卡</strong><span>下次启动采集时生效</span></div>
-        <div class="capture-network-controls"><div class="capture-select-row"><select v-model="selected" aria-label="抓包网卡" :disabled="busy" @change="run('select')"><option value="">默认路由网卡</option><option v-if="missingSelected" :value="selected">{{ selected }}（当前配置，尚未枚举）</option><option v-for="iface in ifaces" :key="iface.name" :value="iface.name">{{ iface.description || iface.name }}</option></select><button class="ghost-button small" :disabled="busy" @click="run('ifaces')">刷新</button></div><span class="capture-port-note">监听端口 {{ ports }}</span><span v-if="selected" class="capture-port-note capture-selected-name">{{ selected }}</span></div>
+        <div class="capture-network-controls"><div class="capture-select-row"><UiSelect v-model="selected" label="抓包网卡" :disabled="busy" :options="[{ value: '', label: '默认路由网卡' }, ...(missingSelected ? [{ value: selected, label: selected + '（当前配置，尚未枚举）' }] : []), ...ifaces.map(iface => ({ value: iface.name, label: iface.description || iface.name }))]" @change="run('select')" /><button class="ghost-button small" :disabled="busy" @click="run('ifaces')">刷新</button></div><span class="capture-port-note">监听端口 {{ ports }}</span><span v-if="selected" class="capture-port-note capture-selected-name">{{ selected }}</span></div>
       </div>
     </template>
     <div v-else class="capture-empty"><p role="status">{{ busy ? '正在加载采集设置…' : '尚无采集设置，请重试。' }}</p><button class="ghost-button small" :disabled="busy" @click="run('load')">重新加载</button></div>

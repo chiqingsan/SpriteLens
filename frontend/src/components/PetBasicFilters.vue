@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { PetFilterModel } from '../composables/usePetFilters'
 import DualRangeSlider from './DualRangeSlider.vue'
 import UiIcon from './UiIcon.vue'
+import UiSelect from './UiSelect.vue'
+import UiSegmented from './UiSegmented.vue'
 
 const { model } = defineProps<{ model: PetFilterModel }>()
 const { filters, options, fixed, selectedMedals } = model
 const specialitiesOpen = ref(false)
 const specialityDetails = ref<HTMLDetailsElement | null>(null)
+const sortOptions = computed(() => options.value.sorts.map(item => ({ value: item.key, label: item.label })))
 function value(event: Event) { return (event.target as HTMLInputElement).value }
 function setSortDirection(desc: boolean) { if (filters.desc !== desc) model.patch({ desc }) }
 function syncSpecialitiesOpen(event: Event) {
@@ -29,15 +32,13 @@ watch(() => model.active.value, active => {
     </label>
   </Teleport>
   <Teleport to="#pet-sort-root">
-    <label class="inline-field pet-sort-field" :hidden="fixed">排序
-      <select id="f-sort" v-model="filters.sort" :disabled="fixed" @change="model.changed()">
-        <option v-for="item in options.sorts" :key="item.key" :value="item.key">{{ item.label }}</option>
-      </select>
-    </label>
-    <div v-if="!fixed" class="segmented pet-sort-direction" role="group" aria-label="排序方向">
+    <span class="inline-field pet-sort-field" :hidden="fixed">排序
+      <UiSelect id="f-sort" v-model="filters.sort" class="pet-sort-select" label="排序" :options="sortOptions" :disabled="fixed" @change="model.changed()" />
+    </span>
+    <UiSegmented v-if="!fixed" class="pet-sort-direction" role="group" aria-label="排序方向">
       <button type="button" :class="{ active: !filters.desc }" :aria-pressed="!filters.desc" @click="setSortDirection(false)"><UiIcon name="arrow-up"></UiIcon>升</button>
       <button type="button" :class="{ active: filters.desc }" :aria-pressed="filters.desc" @click="setSortDirection(true)"><UiIcon name="arrow-down"></UiIcon>倒</button>
-    </div>
+    </UiSegmented>
   </Teleport>
   <section class="direct-filter" style="order: 0">
 <h3>异色与炫彩</h3><div class="filter-pair">

@@ -16,6 +16,7 @@
   var appShell = $("app");
   var railButton = $("btn-rail-toggle");
   var railTimer = 0;
+  var railFrame = 0;
 
   function readRail() {
     try { return localStorage.getItem(RAIL_KEY) === "1"; } catch (error) { return false; }
@@ -40,6 +41,7 @@
 
   function applyRail(collapsed, persist) {
     if (!appShell || !railButton) { return; }
+    if (persist) { appShell.classList.add("rail-motion", "rail-animating"); }
     appShell.classList.toggle("sidebar-rail", collapsed);
     syncRailTitles(collapsed);
     railButton.setAttribute("aria-pressed", String(collapsed));
@@ -50,8 +52,18 @@
     if (use) { use.setAttribute("href", SPRITE + "#" + (collapsed ? "layout-sidebar-left-expand" : "layout-sidebar-left-collapse")); }
     if (persist) { writeRail(collapsed); }
     window.clearTimeout(railTimer);
-    railTimer = window.setTimeout(function () { if (shell.syncNavIndicator) { shell.syncNavIndicator(); } }, 260);
-    window.requestAnimationFrame(function () { if (shell.syncNavIndicator) { shell.syncNavIndicator(); } });
+    window.cancelAnimationFrame(railFrame);
+    function syncFrame() {
+      if (shell.syncNavIndicator) { shell.syncNavIndicator(); }
+      railFrame = window.requestAnimationFrame(syncFrame);
+    }
+    if (persist) { railFrame = window.requestAnimationFrame(syncFrame); }
+    else if (shell.syncNavIndicator) { window.requestAnimationFrame(shell.syncNavIndicator); }
+    railTimer = window.setTimeout(function () {
+      window.cancelAnimationFrame(railFrame);
+      if (shell.syncNavIndicator) { shell.syncNavIndicator(); }
+      appShell.classList.remove("rail-animating");
+    }, 220);
   }
 
   if (railButton) {

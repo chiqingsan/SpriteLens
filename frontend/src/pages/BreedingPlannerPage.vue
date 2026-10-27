@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import UiSelect from '../components/UiSelect.vue'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import BreederCard from '../components/BreederCard.vue'
 import BreedingCanvas from '../components/BreedingCanvas.vue'
 import MedalIcon from '../components/MedalIcon.vue'
 import PageShell from '../components/PageShell.vue'
 import UiIcon from '../components/UiIcon.vue'
+import UiSegmented from '../components/UiSegmented.vue'
 import { useBreedingPlanner, type PlannerHost } from '../composables/useBreedingPlanner'
 import type { Goal, Placement } from '../types/breedingPlanner'
 import './breeder-library.css'
@@ -209,7 +211,7 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
   <PageShell class="planner-page" data-vue-page>
     <template #toolbar>
     <div class="planner-toolbar">
-      <div class="planner-tabs" role="group" aria-label="配窝模式"><button :class="{ active: mode === 'target' }" :aria-pressed="mode === 'target'" @click="model.changeMode('target')"><UiIcon name="egg" /><span>按目标配窝</span></button><button :class="{ active: mode === 'selected' }" :aria-pressed="mode === 'selected'" @click="model.changeMode('selected')"><UiIcon name="backpack" /><span>自选精灵</span></button></div>
+      <UiSegmented class="planner-tabs" role="group" aria-label="配窝模式"><button :class="{ active: mode === 'target' }" :aria-pressed="mode === 'target'" @click="model.changeMode('target')"><UiIcon name="egg" /><span>按目标配窝</span></button><button :class="{ active: mode === 'selected' }" :aria-pressed="mode === 'selected'" @click="model.changeMode('selected')"><UiIcon name="backpack" /><span>自选精灵</span></button></UiSegmented>
       <div class="planner-toolbar-actions">
         <button class="ghost-button" :disabled="!!busy || !context?.uid || !unsaved" :title="saveHint" @click="model.save"><span>保存草稿</span></button>
         <div class="planner-generate"><button class="planner-primary primary-button" :disabled="!model.canGenerate.value" :title="generationHint" @click="model.run('solve')"><UiIcon name="arrows-shuffle" /><span>{{ busy === 'solve' ? '正在规划' : plan ? '重新规划' : '生成方案' }}</span></button></div>
@@ -230,8 +232,8 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
          <div v-else class="planner-empty planner-start"><UiIcon name="egg" /><strong>{{ mode === 'target' ? '从培育目标开始规划' : '选择精灵，分析配窝方案' }}</strong><p>{{ mode === 'target' ? '在右侧添加目标蛋，按需设置奖牌与性格，再生成方案。' : '在右侧选择参与精灵，确认参与方式与小窝容量，再生成方案。' }}</p><small>① {{ mode === 'target' ? '添加目标' : '选择精灵' }}　→　② 确认条件　→　③ 生成方案</small></div>
         <section v-if="selectedPosition" class="planner-resident">
           <header><strong>{{ parentName(selected) }}</strong><span>{{ selectedParent?.gender === 1 ? '父本' : '母本' }} · {{ selectedParent?.nature || '性格未知' }}</span><button class="breeder-detail-link" @click="host.openPet(selected)">背包详情</button></header>
-          <div class="planner-actions"><button class="chip" :class="{ active: selectedPosition.lock }" :aria-pressed="!!selectedPosition.lock" @click="cycleLock">{{ { '': '未锁定', participation: '锁定参与', position: '锁定位置' }[selectedPosition.lock] }}</button><button class="ghost-button" :disabled="!!selectedPosition.lock" @click="showPicker('replace')">替换亲本</button><button class="ghost-button" :disabled="!!selectedPosition.lock" @click="removeParent">移出</button><select aria-label="交换到窝位" :value="''" :disabled="selectedPosition.lock === 'position'" @change="swap(($event.target as HTMLSelectElement).value)"><option value="">交换到另一窝位…</option><option v-for="pos in draft.placements.filter(p => p.gid !== selected && p.lock !== 'position')" :key="pos.gid" :value="pos.gid">{{ parentName(pos.gid) }} · {{ pos.kind === 'academy' ? '学院' : '普通' }}</option></select></div>
-           <div v-if="mode === 'target' && selectedParent?.gender === 2" class="planner-coordinate"><label>母本主目标<select aria-label="母本主目标" :value="selectedPosition.primary_goal_id" @change="updatePosition({ primary_goal_id: ($event.target as HTMLSelectElement).value })"><option value="">自动分配主目标</option><option v-for="goal in draft.goals" :key="goal.goal_id" :value="goal.goal_id">{{ eggName(goal.egg_key) }} {{ goal.size_mark }} {{ goal.voice_mark }}</option></select></label></div>
+          <div class="planner-actions"><button class="chip" :class="{ active: selectedPosition.lock }" :aria-pressed="!!selectedPosition.lock" @click="cycleLock">{{ { '': '未锁定', participation: '锁定参与', position: '锁定位置' }[selectedPosition.lock] }}</button><button class="ghost-button" :disabled="!!selectedPosition.lock" @click="showPicker('replace')">替换亲本</button><button class="ghost-button" :disabled="!!selectedPosition.lock" @click="removeParent">移出</button><UiSelect label="交换到窝位" :model-value="''" :disabled="selectedPosition.lock === 'position'" :options="[{ value: '', label: '交换到另一窝位…' }, ...draft.placements.filter(p => p.gid !== selected && p.lock !== 'position').map(pos => ({ value: pos.gid, label: parentName(pos.gid) + ' · ' + (pos.kind === 'academy' ? '学院' : '普通') }))]" @change="swap" /></div>
+           <div v-if="mode === 'target' && selectedParent?.gender === 2" class="planner-coordinate"><label>母本主目标<UiSelect label="母本主目标" :model-value="selectedPosition.primary_goal_id" :options="[{ value: '', label: '自动分配主目标' }, ...draft.goals.map(goal => ({ value: goal.goal_id, label: [eggName(goal.egg_key), goal.size_mark, goal.voice_mark].join(' ') }))]" @change="value => updatePosition({ primary_goal_id: value })" /></label></div>
         </section>
         <section v-if="plan || draft.placements.length" ref="outcomes" class="planner-outcomes" :class="{ 'is-stale': dirty[mode] }">
           <header><strong>产物与目标支持</strong><small>{{ dirty[mode] ? '下方为上次分析，等待重评' : '奖牌为规划支持，性格为模型参考' }}</small></header>
@@ -330,10 +332,10 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
               <section class="planner-goal-options" :class="{ 'is-editing': editingGoalIds.has(goal.goal_id) }" :aria-label="`${eggName(goal.egg_key)}附加条件`">
                 <button type="button" class="planner-goal-toggle" :aria-expanded="editingGoalIds.has(goal.goal_id)" @click="toggleGoalEditor(goal.goal_id)"><span class="planner-goal-toggle-label"><UiIcon :name="editingGoalIds.has(goal.goal_id) ? 'chevron-down' : 'chevron-right'" />附加条件</span><span class="planner-goal-action">{{ editingGoalIds.has(goal.goal_id) ? '保存' : '编辑' }}</span></button>
                 <div v-if="editingGoalIds.has(goal.goal_id)" class="planner-goal-fields">
-                  <label>体型奖牌<select v-model="goal.size_mark"><option value="">不限</option><option>大块头</option><option>小不点</option></select></label>
-                  <label>声音奖牌<select v-model="goal.voice_mark"><option value="">不限</option><option>婉转声</option><option>粗嗓门</option></select></label>
-                  <label>目标性格<select v-model.number="goal.nature_id"><option :value="0">不限</option><option v-for="n in context?.natures" :key="n.id" :value="n.id">{{ n.name }}</option></select></label>
-                  <label>优先级<select v-model.number="goal.priority"><option :value="0">普通</option><option :value="1">优先</option></select></label>
+                  <label>体型奖牌<UiSelect v-model="goal.size_mark" label="体型奖牌" :options="['不限', '大块头', '小不点'].map((name, i) => ({ value: i ? name : '', label: name }))" /></label>
+                  <label>声音奖牌<UiSelect v-model="goal.voice_mark" label="声音奖牌" :options="['不限', '婉转声', '粗嗓门'].map((name, i) => ({ value: i ? name : '', label: name }))" /></label>
+                  <label>目标性格<UiSelect v-model="goal.nature_id" label="目标性格" :options="[{ value: 0, label: '不限' }, ...(context?.natures || []).map(n => ({ value: n.id, label: n.name }))]" /></label>
+                  <label>优先级<UiSelect v-model="goal.priority" label="优先级" :options="[{ value: 0, label: '普通' }, { value: 1, label: '优先' }]" /></label>
                 </div>
               </section>
           </article>
@@ -341,7 +343,7 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
         <template v-else>
           <div class="planner-section-title"><strong>参与精灵</strong><span class="count-badge">{{ draft.selected.length }}</span></div>
           <button class="planner-add-pool ghost-button" :disabled="!context?.available || !!busy" @click="showPicker('pool')">{{ draft.selected.length ? '管理参与精灵' : '＋ 选择参与精灵' }}</button>
-          <label class="planner-participation">参与方式<select v-model="draft.participation"><option value="best">择优参与</option><option value="all">全部参与</option></select></label>
+          <label class="planner-participation">参与方式<UiSelect v-model="draft.participation" label="参与方式" :options="[{ value: 'best', label: '择优参与' }, { value: 'all', label: '全部参与' }]" /></label>
           <p class="planner-participation-help">{{ draft.participation === 'best' ? '从已选精灵中挑选配对，可保留空窝；未采用原因会列在结果中。' : '尝试让全部所选精灵入住；容量不足或不兼容时会在结果中说明。' }}</p>
           <p v-if="draft.participation === 'all' && draft.selected.length > draft.capacity + Number(draft.academy)" class="planner-warning planner-participation-help" role="status">已选 {{ draft.selected.length }} 只，超过 {{ draft.capacity + Number(draft.academy) }} 窝容量；请增加容量或减少选择。</p>
           <p v-if="plan" class="planner-participation-help">{{ dirty[mode] ? '待重新规划 · ' : '' }}当前布局采用 {{ selectedInPlan }} / {{ draft.selected.length }} 只所选精灵</p>
@@ -360,7 +362,7 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
     </aside>
     <dialog ref="picker" class="planner-picker" aria-labelledby="planner-picker-title" aria-modal="true" @click="($event.target === picker) && closePicker()">
       <header><strong id="planner-picker-title">{{ pickerKind === 'pool' ? '选择参与配窝的精灵' : pickerKind === 'replace' ? '替换当前亲本' : '添加亲本到布局' }}</strong><button class="ghost-button" aria-label="关闭选择精灵" @click="closePicker()"><UiIcon name="x" /></button></header>
-      <div class="planner-picker-filters"><input ref="pickerSearch" v-model="search" type="search" placeholder="名称、性格、蛋组或个体ID" aria-label="查找候选精灵" @input="page = 1"><select v-model="gender" aria-label="候选性别" @change="page = 1"><option value="">全部性别</option><option value="1">父本</option><option value="2">母本</option></select><select v-model="nature" aria-label="候选性格" @change="page = 1"><option value="">全部性格</option><option v-for="n in context?.natures" :key="n.id">{{ n.name }}</option></select><select v-model="group" aria-label="候选蛋组" @change="page = 1"><option value="">全部蛋组</option><option v-for="name in currentGroups" :key="name">{{ name }}</option></select><select v-model="medal" aria-label="候选奖牌" @change="page = 1"><option value="">全部奖牌</option><option v-for="name in ['大块头', '小不点', '婉转声', '粗嗓门']" :key="name">{{ name }}</option></select></div>
+      <div class="planner-picker-filters"><input ref="pickerSearch" v-model="search" type="search" placeholder="名称、性格、蛋组或个体ID" aria-label="查找候选精灵" @input="page = 1"><UiSelect v-model="gender" label="候选性别" :options="[{ value: '', label: '全部性别' }, { value: '1', label: '父本' }, { value: '2', label: '母本' }]" @change="page = 1" /><UiSelect v-model="nature" label="候选性格" :options="[{ value: '', label: '全部性格' }, ...(context?.natures || []).map(n => ({ value: n.name, label: n.name }))]" @change="page = 1" /><UiSelect v-model="group" label="候选蛋组" :options="[{ value: '', label: '全部蛋组' }, ...currentGroups.map(name => ({ value: name, label: name }))]" @change="page = 1" /><UiSelect v-model="medal" label="候选奖牌" :options="[{ value: '', label: '全部奖牌' }, ...['大块头', '小不点', '婉转声', '粗嗓门'].map(name => ({ value: name, label: name }))]" @change="page = 1" /></div>
       <div class="planner-picker-grid"><BreederCard v-for="parent in pickerRows" :key="parent.gid" :parent="parent" :selected="pickerKind === 'pool' && draft.selected.includes(parent.gid)" @select="choose(parent.gid)" @open="closePicker(); host.openPet($event)" /><div v-if="!pickerRows.length" class="planner-empty">当前观察记录中没有符合筛选的候选。</div></div>
       <footer><span>已选择 {{ draft.selected.length }} 只 · {{ filtered.length }} 个候选</span><div class="planner-actions"><button class="ghost-button" :disabled="page <= 1" @click="page--">上一页</button><span>{{ page }} / {{ Math.max(1, Math.ceil(filtered.length / 24)) }}</span><button class="ghost-button" :disabled="page * 24 >= filtered.length" @click="page++">下一页</button><button class="planner-primary" @click="closePicker()">完成</button></div></footer>
     </dialog>

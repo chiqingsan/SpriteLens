@@ -34,9 +34,11 @@ export function usePets(api: ApiClient, account: () => PetAccount, query: () => 
       : []),
   ])
   function commit(payload: ReturnType<typeof parsePets>, key = queryKey()) {
-    if (data.value && (data.value.uid !== payload.uid || data.value.version !== payload.version)) {
+    if (data.value && data.value.uid !== payload.uid) {
       invalidateDetail()
       detail.value = null
+      detailError.value = ''
+    } else if (data.value?.version !== payload.version) {
       detailError.value = ''
     }
     data.value = payload; error.value = ''; loadedQuery = key
@@ -88,7 +90,6 @@ export function usePets(api: ApiClient, account: () => PetAccount, query: () => 
     if (!snapshot || snapshot.uid !== owner.uid || !snapshot.pets.some(pet => pet.gid === gid)) return
     if (detail.value?.gid === gid && detail.value.version === snapshot.version && detail.value.uid === snapshot.uid) return
     invalidateDetail()
-    detail.value = null
     detailError.value = ''
     const ticket = detailSequence
     const snapshotVersion = snapshot.version
