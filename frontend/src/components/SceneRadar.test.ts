@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils'
 import { describe, it, expect } from 'vitest'
 import SceneRadar from './SceneRadar.vue'
 import { parseNearby } from '../types/nearby'
+import type { WorldMapEntry } from '../types/worldMap'
 const payload = { uid: '1', version: 1, observation_id: 1, phase: 'observing', complete: false, source: 'observed_partial', mapping_available: true, radar_radius_raw: 10000, scene_id: 1, updated_at: 1, unresolved_updates: 0, rejected_actors: 0, player_position: [0, 0, null], position_source: 'client_target', actors: [
   { actor_id: '9007199254740993', config_id: 1, base_id: null, name: '未知精灵', icon_url: '', type_names: [], level: null, height: null, weight: 0, voice: 0, updated_at: 1, marks: [{ label: '婉', name: '婉转声', source: 'reference' }], attention: 'marked', position: [-300, 400, null] },
   { actor_id: '2', config_id: 1, base_id: null, name: '缺位置精灵', icon_url: '', type_names: [], level: 1, height: 0, weight: 0, voice: null, updated_at: 1, marks: [], attention: 'normal', position: [null, 0, 0] },
@@ -29,6 +30,18 @@ describe('参考坐标雷达', () => {
     await wrapper.get('.radar-target').trigger('click')
     await wrapper.get('.radar-target').trigger('keydown.enter')
     expect(wrapper.emitted('select')).toEqual([['9007199254740993'], ['9007199254740993']])
+  })
+  it('调试坐标行仅在开关打开且有位置时出现', () => {
+    const debugPayload = (extra: Record<string, unknown>) => parseNearby({ ...payload, debug_coordinates: true, ...extra })
+    expect(mount(SceneRadar, { props: { data: snapshot() } }).find('.radar-debug').exists()).toBe(false)
+    // 只展示二维 x/y：高度 z 不参与地图校准，即使载荷带了也不显示。
+    const full = mount(SceneRadar, { props: { data: debugPayload({ player_position: [306000, 408000, 120] }) } })
+    expect(full.get('.radar-debug').text()).toBe('原始坐标 x=306000 y=408000')
+    expect(mount(SceneRadar, { props: { data: debugPayload({ player_position: null }) } }).find('.radar-debug').exists()).toBe(false)
+    // 悬浮雷达（compact）同样显示，方便在游戏内就地记录地标；关闭开关时不显示。
+    const compact = mount(SceneRadar, { props: { data: debugPayload({ player_position: [1, 2, 3] }), compact: true } })
+    expect(compact.get('.radar-debug').text()).toBe('原始坐标 x=1 y=2')
+    expect(mount(SceneRadar, { props: { data: snapshot(), compact: true } }).find('.radar-debug').exists()).toBe(false)
   })
   it('缺玩家位置时等待，不绘制假目标', () => {
     const wrapper = mount(SceneRadar, { props: { data: parseNearby({ ...payload, player_position: null }) } })
@@ -78,14 +91,14 @@ describe('参考坐标雷达', () => {
     const silent = mount(SceneRadar, { props: { data: snapshot(), compact: true } })
     expect(silent.findAll('.radar-target-label')).toHaveLength(0)
   })
-  it('绘制玩家中心点与短十字，不再绘制中心文字', () => {
+  it('玩家中心使用独立定位图标', () => {
     const wrapper = mount(SceneRadar, { props: { data: snapshot() } })
     const player = wrapper.get('.radar-player')
     expect(player.classes()).not.toContain('radar-point')
     expect(player.attributes('cx')).toBe('200')
     expect(player.attributes('cy')).toBe('200')
-    expect(player.attributes('r')).toBe('5')
-    expect(wrapper.find('.radar-player-cross').exists()).toBe(true)
+    expect(player.attributes('r')).toBe('8')
+    expect(wrapper.find('.radar-player-icon').exists()).toBe(true)
     expect(wrapper.find('.radar-center-label').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('位置参考')
   })
@@ -179,5 +192,58 @@ describe('参考坐标雷达', () => {
     expect(Number(background.attributes('height'))).toBeGreaterThan(10)
     expect(background.attributes('rx')).toBe('3')
     expect(wrapper.get('.radar-label').attributes('aria-hidden')).toBe('true')
+  })
+})
+
+describe('覆盖格网与渲染预算', () => {
+  const MAP: WorldMapEntry = {
+    name: '卡洛西亚大陆',
+    availability: 'supported',
+    image: { url: '/static/maps/10003.webp', width: 4096, height: 4096 },
+    projection: { origin_x: 306000, origin_y: 408000, side: 408000 },
+    calibration: { level: 'verified' },
+  }
+  const coverage = {
+    uid: '1', map_id: '10003', layer: 'visit', scope: 'session',
+    revision: 1, cell_size: 2000, cells: 2, rows: [[210, 160, 2]] as [number, number, number][],
+  }
+  const withCoverage = (extra: Record<string, unknown> = {}) => parseNearby({
+    ...payload, resource_id: '10003', coverage, ...extra,
+  })
+  it('覆盖格网只生成一份 path，fill/border/mask 复用', () => {
+    const wrapper = mount(SceneRadar, { props: { data: withCoverage(), map: MAP } })
+    const d = wrapper.get('.map-coverage-fill').attributes('d')
+    expect(d).toBeTruthy()
+    expect(wrapper.get('.map-coverage-border').attributes('d')).toBe(d)
+    expect(wrapper.get('.map-coverage mask path').attributes('d')).toBe(d)
+    wrapper.unmount()
+  })
+  it('visible=false 时不挂载覆盖层，恢复显示后才生成路径', async () => {
+    const wrapper = mount(SceneRadar, { props: { data: withCoverage(), map: MAP, visible: false } })
+    expect(wrapper.find('.map-coverage').exists()).toBe(false)
+    await wrapper.setProps({ visible: true })
+    expect(wrapper.get('.map-coverage-fill').attributes('d')).toBeTruthy()
+    wrapper.unmount()
+  })
+  it('uid/map_id 与当前快照不一致时拒绝绘制覆盖', () => {
+    const otherMap = mount(SceneRadar, { props: { data: withCoverage({ coverage: { ...coverage, map_id: '10018' } }), map: MAP } })
+    expect(otherMap.find('.map-coverage').exists()).toBe(false)
+    const otherAccount = mount(SceneRadar, { props: { data: withCoverage({ coverage: { ...coverage, uid: '2' } }), map: MAP } })
+    expect(otherAccount.find('.map-coverage').exists()).toBe(false)
+    otherMap.unmount(); otherAccount.unmount()
+  })
+  it('密集场景只渲染最近 160 个目标，选中项仍在且页脚说明', () => {
+    const dense = Array.from({ length: 200 }, (_, index) => actor(
+      String(500 + index), '精灵' + index, [index * 10, 0, 0],
+      index === 42 ? { attention: 'double', marks: [
+        { label: '大', name: '大块头', source: 'reference' },
+        { label: '婉', name: '婉转声', source: 'reference' },
+      ] } : {},
+    ))
+    const wrapper = mount(SceneRadar, { props: { data: snapshot(dense), selected: '699' } })
+    expect(wrapper.findAll('.radar-target')).toHaveLength(160)
+    expect(wrapper.findAll('.radar-target.selected')).toHaveLength(1)
+    expect(wrapper.text()).toContain('显示 160 / 200 个，优先选中和有标记的精灵')
+    wrapper.unmount()
   })
 })

@@ -34,7 +34,7 @@
     var baselineNext = false;
     var known = new Map();
     var cooldown = new Map();
-    var lastUid = null, lastObservation = null, lastCycle = "";
+    var lastUid = null, lastObservation = null, lastVersion = null, lastCycle = "";
     var audio = null, listening = false;
 
     function audioContext() {
@@ -103,29 +103,35 @@
       if (!payload || typeof payload !== "object" || Array.isArray(payload)) { return; }
       if (!Array.isArray(payload.actors)) { return; }
       if (typeof payload.uid !== "string" && typeof payload.uid !== "number") { return; }
-      if (typeof payload.observation_id !== "number" || !isFinite(payload.observation_id)) { return; }
-      var uid = String(payload.uid), observation = payload.observation_id;
+      if (typeof payload.observation_id !== "number" || !isFinite(payload.observation_id)
+          || typeof payload.version !== "number" || !isFinite(payload.version)) { return; }
+      var uid = String(payload.uid), observation = payload.observation_id, version = payload.version;
       /* 同一 uid 里更旧的观察是迟到的慢响应：忽略，避免旧周期把已知状态倒回去。 */
       if (uid === lastUid && lastObservation !== null && observation < lastObservation) { return; }
-      lastUid = uid; lastObservation = observation;
+      /* 同周期的旧版本同样不能改变已知实体或补发提示音。 */
+      if (uid === lastUid && observation === lastObservation && lastVersion !== null && version < lastVersion) { return; }
+      lastUid = uid; lastObservation = observation; lastVersion = version;
       var cycle = uid + ":" + observation;
       /* known 只描述当前观察周期；换周期后“仍在列表里”的双牌需要重新判断。 */
       if (cycle !== lastCycle) { lastCycle = cycle; known.clear(); }
       var timestamp = now();
       pruneCooldown(timestamp);
       var candidates = [];
+      var present = new Set();
       for (var index = 0; index < payload.actors.length; index++) {
         var actor = payload.actors[index];
         if (!actor || typeof actor !== "object") { continue; }
         if (typeof actor.actor_id !== "string") { continue; }
         var attention = actor.attention;
         if (attention !== "normal" && attention !== "marked" && attention !== "double") { continue; }
+        present.add(actor.actor_id);
         var key = attention === "double";
         var wasKey = known.get(actor.actor_id) === "double";
         known.set(actor.actor_id, attention);
         /* 只在“本次才变成双牌”时提醒：持续留在列表里的同一实体不能每份快照都响；单牌新出现不响，之后升为双牌再响。 */
         if (key && !wasKey && !cooldown.has(actor.actor_id)) { candidates.push(actor.actor_id); }
       }
+      known.forEach(function (_, id) { if (!present.has(id)) { known.delete(id); } });
       /* 开启后的第一份快照只建立基线，不把用户刚在列表里看到的双牌再补响一次。 */
       if (baselineNext) { baselineNext = false; return; }
       if (!enabledState || !candidates.length) { return; }

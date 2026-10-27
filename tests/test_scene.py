@@ -24,12 +24,14 @@ from spritelens.recording.recorder import StreamRecorder, read_recording
 from spritelens.recording.replay import ReplaySource
 from spritelens.services.capture_service import CaptureService
 from spritelens.services.monitor_service import MonitorService
+from spritelens.services.scene_coverage import DEFAULT_CELL_SIZE_RAW, SceneCoverage
+from spritelens.repositories.scene_coverage_store import SceneCoverageStore
 from spritelens.services.scene_repository import SceneRepository
-from spritelens.web.nearby import nearby_payload
+from spritelens.web.nearby import DEBUG_COORDINATES_ENV, nearby_payload
 from spritelens.web.server import LocalServer
 from tests._synth import SYNTH_KEY, make_ack_frame, make_data_frame, encode_frame
 from tests.test_account_selection import _Store, _PetRepository, _Repo
-from tests.test_web_server import _make_context, _http_get
+from tests.test_web_server import _make_context, _http_get, _http_post
 
 
 def field(no, raw=None, children=None):
@@ -57,6 +59,40 @@ def seed(repo, uid=101, session="s"):
 
 
 class SceneTests(unittest.TestCase):
+    def test_coverage_records_past_samples_but_not_future_targets_and_survives_battle(self):
+        repo = SceneRepository(); seed(repo)
+        point = lambda x, y: [field(1, x), field(2, y)]
+        segments = [field(12, children=[field(1, children=point(320000, 420000)), field(2, 900)]),
+                    field(12, children=[field(1, children=point(600000, 700000)), field(2, 1100)])]
+        repo.handle_packet(event(0x0133, [field(1, 1000), field(17, 1), field(2, children=point(650000, 750000)), *segments], direction="c2s"))
+        current = repo.snapshot()
+        self.assertEqual(current.position_source, "client_sample")
+        self.assertEqual(current.player_position[:2], (320000, 420000))
+        # 只记采样所在格：cell=2000 → gx=160、gy=210；请求时刻之后的分段与
+        # 计划目标 (650000, 750000) 都不入覆盖。
+        coverage = current.coverage
+        self.assertEqual((coverage.cell_size, coverage.cells, coverage.revision), (2000, 1, 1))
+        self.assertEqual(coverage.rows, ((210, 160, 1),))
+        repo.handle_packet(event(4886))
+        self.assertEqual(repo.snapshot().coverage, coverage)
+        self.assertIsNone(repo.snapshot().player_position)
+        self.assertFalse(repo.snapshot().actors)
+        seed(repo, uid=102)
+        self.assertIsNone(repo.snapshot().coverage)
+
+    def test_coverage_is_recorded_without_opening_map_and_returning_to_map_keeps_it(self):
+        repo = SceneRepository(); seed(repo)
+        repo.handle_packet(event(0x014A, [actor_node(7, x=320000, y=420000)]))
+        self.assertIsNone(repo.snapshot().coverage)
+        repo.handle_packet(event(0x0133, [field(1, 1000), field(8, 1), field(17, 1),
+            field(2, children=[field(1, 320000), field(2, 420000)])], direction="c2s"))
+        before = repo.snapshot().coverage
+        self.assertIsNotNone(before)
+        repo.handle_packet(event(0x0152, [field(2, 2), field(3, 3), field(4, 4)]))
+        self.assertIsNone(repo.snapshot().coverage)
+        repo.handle_packet(event(0x0152, [field(2, 1), field(3, 2), field(4, 3)]))
+        self.assertEqual(repo.snapshot().coverage, before)
+
     def test_midstream_rebuild_without_checkpoint_or_initial_scene(self):
         repo = SceneRepository()
         move = replace(event(0x0133, [field(17, 103), field(2, children=[field(1, 100), field(2, 200)])], direction="c2s"),
@@ -74,6 +110,157 @@ class SceneTests(unittest.TestCase):
         self.assertEqual([a.actor_id for a in repo.snapshot().actors], [7])
         repo.handle_packet(event(0x0414, [field(1, children=[field(2, children=[field(1, 7)])])]))
         self.assertFalse(repo.snapshot().actors)
+
+    def test_coverage_uses_configured_cell_size_and_ignores_npc_positions(self):
+        repo = SceneRepository(coverage_cell_raw=1000); seed(repo)
+        repo.handle_packet(event(0x014A, [actor_node(7, x=600000, y=700000)]))
+        self.assertIsNone(repo.snapshot().coverage)
+        repo.handle_packet(event(0x0133, [field(1, 1000), field(8, 1), field(17, 1),
+            field(2, children=[field(1, 320000), field(2, 420000)])], direction="c2s"))
+        coverage = repo.snapshot().coverage
+        self.assertEqual(coverage.cell_size, 1000)
+        self.assertEqual(coverage.cells, 1)
+        self.assertEqual(coverage.rows, ((420, 320, 1),))
+
+    def test_coverage_grid_merges_runs_and_floors_negative_coordinates(self):
+        coverage = SceneCoverage()
+        coverage.select_account(101)
+        coverage.record(1, None)
+        coverage.record(None, (0, 0))
+        self.assertIsNone(coverage.snapshot(1))
+        for point in ((0, 0), (1999, 0), (2000, 0), (-2001, -1), (4000, -1)):
+            coverage.record(1, point)
+        snapshot = coverage.snapshot(1)
+        self.assertEqual(snapshot.cell_size, DEFAULT_CELL_SIZE_RAW)
+        self.assertEqual(snapshot.cells, 4)
+        # gy=-1 的 gx=-2 与 gx=2 中间缺格，不能合并；gy=0 的 gx=0..1 连续合并。
+        self.assertEqual(snapshot.rows, ((-1, -2, 1), (-1, 2, 1), (0, 0, 2)))
+        self.assertEqual(snapshot.revision, 4)
+        coverage.select_account(102)
+        self.assertIsNone(coverage.snapshot(1))
+
+    def test_coverage_expands_to_observation_radius(self):
+        """覆盖记「采样点 + 观察半径」交集到的格：雷达看得到多远，就记多远。"""
+        coverage = SceneCoverage(cell_size=1000, radius_raw=500)
+        coverage.select_account(101)
+        self.assertTrue(coverage.record(1, (500, 500)))
+        snapshot = coverage.snapshot(1)
+        # 四个边界相切格都计入，四个斜角最近点距离约 707，不计。
+        self.assertEqual(snapshot.cells, 5)
+        self.assertEqual(snapshot.rows, ((-1, 0, 1), (0, -1, 3), (1, 0, 1)))
+        self.assertEqual(snapshot.revision, 1)
+        # 同一观察圆内的下一次采样没有新格：不重算、不推进版本。
+        self.assertFalse(coverage.record(1, (520, 500)))
+        self.assertEqual(coverage.snapshot(1).revision, 1)
+        # 半径 0 只记采样所在格（无配置或测试场景）。
+        single = SceneCoverage(cell_size=1000)
+        single.select_account(101)
+        single.record(1, (500, 500))
+        self.assertEqual((single.snapshot(1).cells, single.snapshot(1).rows), (1, ((0, 0, 1),)))
+
+    def test_coverage_circle_touches_grid_corner_with_negative_coordinates(self):
+        coverage = SceneCoverage(cell_size=1000, radius_raw=500)
+        coverage.select_account(101)
+        coverage.record(1, (-300, -400))
+        cells = {(y, x) for y, x, length in coverage.snapshot(1).rows for x in range(x, x + length)}
+        # 圆经过原点，四个围绕原点的格均包含该交点。
+        self.assertTrue({(-1, -1), (-1, 0), (0, -1), (0, 0)} <= cells)
+
+    def test_coverage_clips_map_bounds_and_rejects_unsupported_map(self):
+        coverage = SceneCoverage(cell_size=1000, radius_raw=500, map_bounds={1: (0, 0, 3000)})
+        coverage.select_account(101)
+        self.assertFalse(coverage.record(2, (100, 100)))
+        self.assertFalse(coverage.record(1, (-1, 100)))
+        self.assertTrue(coverage.record(1, (100, 100)))
+        self.assertEqual(coverage.snapshot(1).rows, ((0, 0, 1),))
+        self.assertTrue(coverage.record(1, (2900, 2900)))
+        self.assertEqual(coverage.snapshot(1).rows, ((0, 0, 1), (2, 2, 1)))
+
+    def test_coverage_radius_comes_from_repository_configuration(self):
+        """应用装配把雷达观察半径传给覆盖，避免看得见却只记一格。"""
+        repo = SceneRepository(coverage_cell_raw=1000, coverage_radius_raw=2000)
+        seed(repo)
+        repo.handle_packet(event(0x0133, [field(1, 1000), field(8, 1), field(17, 1),
+            field(2, children=[field(1, 320000), field(2, 420000)])], direction="c2s"))
+        coverage = repo.snapshot().coverage
+        self.assertGreater(coverage.cells, 1)
+        self.assertEqual(sum(run for _, _, run in coverage.rows), coverage.cells)
+
+    def test_coverage_clear_scopes_to_one_map_and_revision_restarts(self):
+        coverage = SceneCoverage()
+        coverage.select_account(101)
+        coverage.record(1, (0, 0))
+        coverage.record(2, (0, 0))
+        coverage.record(2, (2000, 0))
+        coverage.clear(1)
+        self.assertIsNone(coverage.snapshot(1))
+        self.assertEqual(coverage.snapshot(2).cells, 2)
+        # 清空后重新记录从 revision 1 开始，前端不会把新足迹当成旧足迹的延续。
+        coverage.record(1, (0, 0))
+        restarted = coverage.snapshot(1)
+        self.assertEqual((restarted.cells, restarted.revision), (1, 1))
+        # 支持清空全部地图，供将来整账号重置复用；当前路由只清当前地图。
+        coverage.clear()
+        self.assertIsNone(coverage.snapshot(1))
+        self.assertIsNone(coverage.snapshot(2))
+
+    def test_reset_coverage_clears_only_footprint_and_bumps_version(self):
+        repo = SceneRepository(); seed(repo)
+        repo.handle_packet(event(0x014A, [actor_node(7, x=320000, y=420000)]))
+        sample = [field(1, 1000), field(8, 1), field(17, 1),
+                  field(2, children=[field(1, 320000), field(2, 420000)])]
+        repo.handle_packet(event(0x0133, sample, direction="c2s"))
+        before = repo.snapshot()
+        self.assertIsNotNone(before.coverage)
+        self.assertFalse(repo.reset_coverage(before.uid, before.resource_id, before.observation_id + 1))
+        self.assertIsNotNone(repo.snapshot().coverage)
+        self.assertTrue(repo.reset_coverage(before.uid, before.resource_id, before.observation_id))
+        after = repo.snapshot()
+        self.assertIsNone(after.coverage)
+        self.assertEqual(after.actors, before.actors)
+        self.assertEqual(after.phase, before.phase)
+        self.assertGreater(after.version, before.version)
+        # 清零只是覆盖层：同一位置再次上报仍能重新记录足迹。
+        repo.handle_packet(event(0x0133, sample, direction="c2s"))
+        self.assertEqual(repo.snapshot().coverage.cells, 1)
+
+    def test_persisted_coverage_restored_while_new_recording_is_paused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "coverage.json"
+            store = SceneCoverageStore(path)
+            repo = SceneRepository(coverage_radius_raw=1000, coverage_store=store)
+            seed(repo)
+            repo.handle_packet(event(0x0133, [field(1, 1000), field(8, 1), field(17, 1),
+                field(2, children=[field(1, 320000), field(2, 420000)])], direction="c2s"))
+            before = repo.snapshot().coverage
+            store.close()
+            store = SceneCoverageStore(path)
+            restored = SceneRepository(coverage_enabled=False, coverage_store=store)
+            seed(restored)
+            snap = restored.snapshot()
+            self.assertEqual(snap.coverage.rows, before.rows)
+            self.assertTrue(snap.coverage_paused)
+            self.assertEqual(nearby_payload(snap)["coverage"]["scope"], "history")
+            restored.handle_packet(event(0x0133, [field(1, 1100), field(8, 1), field(17, 1),
+                field(2, children=[field(1, 500000), field(2, 600000)])], direction="c2s"))
+            self.assertEqual(restored.snapshot().coverage.rows, before.rows)
+            self.assertTrue(restored.reset_coverage(snap.uid, snap.resource_id, snap.observation_id))
+            store.close()
+            store = SceneCoverageStore(path)
+            restored = SceneRepository(coverage_enabled=False, coverage_store=store)
+            seed(restored)
+            self.assertIsNone(restored.snapshot().coverage)
+            store.close()
+
+    def test_scene_reentry_without_landing_point_does_not_write_footprint(self):
+        """换图/进场事件没带落点时，位置保持旧值，但旧坐标不能当成已记录区域。"""
+        repo = SceneRepository(); seed(repo)
+        repo.handle_packet(event(0x0133, [field(1, 1000), field(17, 1),
+            field(2, children=[field(1, 500000), field(2, 600000)])], direction="c2s"))
+        self.assertEqual(repo.snapshot().position_source, "client_target")
+        self.assertIsNone(repo.snapshot().coverage)
+        repo.handle_packet(event(0x0152, [field(2, 1), field(3, 2), field(4, 3)]))
+        self.assertIsNone(repo.snapshot().coverage)
 
     def test_server_motion_interpolates_and_interrupt_uses_confirmed_position(self):
         repo = SceneRepository(); seed(repo)
@@ -93,20 +280,20 @@ class SceneTests(unittest.TestCase):
         repo.handle_packet(event(0x0414, [field(1, children=[field(222, children=[field(1, 7), field(2, children=point(30, 80))])])]))
         self.assertEqual(repo.snapshot().actors[0].position, (30, 80, 0))
 
-    def test_radar_distance_removes_only_entities_beyond_delete_threshold(self):
+    def test_client_movement_target_does_not_discard_observed_entities(self):
         repo = SceneRepository(max_distance_raw=3000); seed(repo)
         repo.handle_packet(event(0x0133, [field(17, 1), field(2, children=[field(1, 0), field(2, 0)])], direction="c2s"))
         repo.handle_packet(event(0x014A, [actor_node(1, x=2000, y=0), actor_node(2, x=3001, y=0)]))
-        self.assertEqual(tuple(item.actor_id for item in repo.snapshot().actors), (1,))
+        self.assertEqual(tuple(item.actor_id for item in repo.snapshot().actors), (1, 2))
         repo.handle_packet(event(0x0133, [field(17, 1), field(2, children=[field(1, -1001), field(2, 0)])], direction="c2s"))
-        self.assertFalse(repo.snapshot().actors)
+        self.assertEqual(tuple(item.actor_id for item in repo.snapshot().actors), (1, 2))
 
-    def test_default_distance_threshold_covers_realistic_entity_ranges(self):
-        """真实流量里 85% 实体在 3,000 之外；默认阈值必须用 15,000 原始单位。"""
+    def test_default_distance_threshold_does_not_filter_against_client_target(self):
+        """客户端目标位置不是服务器确认位置，不能裁剪观察集合。"""
         repo = SceneRepository(); seed(repo)
         repo.handle_packet(event(0x0133, [field(17, 1), field(2, children=[field(1, 0), field(2, 0)])], direction="c2s"))
         repo.handle_packet(event(0x014A, [actor_node(1, x=10000, y=0), actor_node(2, x=15001, y=0)]))
-        self.assertEqual(tuple(item.actor_id for item in repo.snapshot().actors), (1,))
+        self.assertEqual(tuple(item.actor_id for item in repo.snapshot().actors), (1, 2))
 
     def test_snapshot_is_read_only_and_stable(self):
         """读接口不得推进插值：同一时刻重复 snapshot 的位置与版本一致。"""
@@ -126,6 +313,41 @@ class SceneTests(unittest.TestCase):
         repo = SceneRepository(); seed(repo)
         self.assertEqual(nearby_payload(repo.snapshot())["radar_radius_raw"], 10000)
         self.assertEqual(nearby_payload(repo.snapshot(), radar_radius_raw=1234)["radar_radius_raw"], 1234)
+
+    def test_nearby_payload_carries_grid_coverage(self):
+        repo = SceneRepository(); seed(repo)
+        self.assertIsNone(nearby_payload(repo.snapshot())["coverage"])
+        repo.handle_packet(event(0x0133, [field(1, 1000), field(8, 1), field(17, 1),
+            field(2, children=[field(1, 320000), field(2, 420000)])], direction="c2s"))
+        payload = nearby_payload(repo.snapshot())["coverage"]
+        self.assertIsInstance(payload.pop("updated_at"), float)
+        self.assertEqual(payload.pop("radius_raw"), 0)
+        self.assertEqual(payload, {
+            "uid": "101", "map_id": "2", "layer": "visit", "scope": "session",
+            "revision": 1, "cell_size": 2000, "cells": 1, "rows": [[210, 160, 1]],
+        })
+
+    def test_debug_coordinates_follow_environment_switch(self):
+        """调试坐标默认关闭；只有环境变量打开时才下发，供现场地标校准。"""
+        repo = SceneRepository(); seed(repo)
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop(DEBUG_COORDINATES_ENV, None)
+            self.assertFalse(nearby_payload(repo.snapshot())["debug_coordinates"])
+        for value in ("1", "true", "yes", "on", " ON "):
+            with patch.dict(os.environ, {DEBUG_COORDINATES_ENV: value}):
+                self.assertTrue(nearby_payload(repo.snapshot())["debug_coordinates"])
+        for value in ("0", "false", "", "maybe"):
+            with patch.dict(os.environ, {DEBUG_COORDINATES_ENV: value}):
+                self.assertFalse(nearby_payload(repo.snapshot())["debug_coordinates"])
+
+    def test_nearby_payload_exposes_scene_ids_as_strings(self):
+        """资源与实例编号按字符串下发：实例号是 64 位，前端不能依赖 JS 安全整数。"""
+        repo = SceneRepository()
+        self.assertIsNone(nearby_payload(repo.snapshot())["resource_id"])
+        replaced = replace(repo.snapshot(), resource_id=10003, instance_id=18446744073709551615)
+        payload = nearby_payload(replaced)
+        self.assertEqual(payload["resource_id"], "10003")
+        self.assertEqual(payload["instance_id"], "18446744073709551615")
 
     def test_exact_npc_catalog_mapping_and_observation_epoch(self):
         repo = SceneRepository(); seed(repo)
@@ -304,6 +526,37 @@ class SceneTests(unittest.TestCase):
                 self.assertEqual(state["nearby"]["version"], payload["version"])
             finally: server.stop(); ctx.close()
 
+    def test_http_coverage_reset_route(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ctx = _make_context(Path(tmp)); ctx.scene_repository = SceneRepository(); seed(ctx.scene_repository)
+            ctx.scene_repository.handle_packet(event(0x0133, [field(1, 1000), field(8, 1), field(17, 1),
+                field(2, children=[field(1, 320000), field(2, 420000)])], direction="c2s"))
+            server = LocalServer(ctx, port=0); server.start()
+            try:
+                base = f"http://127.0.0.1:{server.port}/api/nearby"
+                before = _http_get(base, server.token)[1]
+                self.assertIsNotNone(before["coverage"])
+                reset = base + "/coverage/reset"
+                self.assertEqual(_http_post(reset, "", {})[0], 401)
+                self.assertEqual(_http_post(reset, server.token, {})[0], 400)
+                self.assertEqual(_http_post(reset, server.token, {"uid": "999", "resource_id": before["resource_id"], "observation_id": before["observation_id"]})[0], 409)
+                self.assertIsNotNone(_http_get(base, server.token)[1]["coverage"])
+                code, body = _http_post(reset, server.token, {"uid": before["uid"], "resource_id": before["resource_id"], "observation_id": before["observation_id"]})
+                self.assertEqual((code, body), (200, {"ok": True}))
+                after = _http_get(base, server.token)[1]
+                self.assertIsNone(after["coverage"])
+                self.assertGreater(after["version"], before["version"])
+            finally: server.stop(); ctx.close()
+
+    def test_http_coverage_reset_requires_scene_repository(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ctx = _make_context(Path(tmp)); ctx.scene_repository = None
+            server = LocalServer(ctx, port=0); server.start()
+            try:
+                code, body = _http_post(f"http://127.0.0.1:{server.port}/api/nearby/coverage/reset", server.token, {})
+                self.assertEqual((code, body), (503, {"error": "当前实例未装配场景观察"}))
+            finally: server.stop(); ctx.close()
+
     def test_historical_selection_failure_preserves_scene(self):
         repo = SceneRepository(); seed(repo); repo.handle_packet(event(0x014A, [actor_node()]))
         events = []; profiles = ((101, "A", 1, ""), (202, "B", 1, ""))
@@ -326,7 +579,18 @@ class SceneTests(unittest.TestCase):
                 try:
                     repo = ctx.scene_repository
                     self.assertIsNotNone(repo)
-                    seed(repo); repo.handle_packet(event(0x014A, [actor_node()]))
+                    repo.handle_packet(event(0x0152, [field(2, 103), field(3, 10003), field(4, 3)], uid=101))
+                    repo.handle_packet(event(0x014A, [actor_node()]))
+                    # 大陆启用独立的 9000 原始单位估计覆盖。
+                    repo.handle_packet(event(0x0133, [field(1, 1000), field(8, 1), field(17, 1),
+                        field(2, children=[field(1, 320000), field(2, 420000)])], direction="c2s"))
+                    # 前一请求场景号不匹配不能写旧地图。
+                    self.assertIsNone(repo.snapshot().coverage)
+                    repo.handle_packet(event(0x0152, [field(2, 103), field(3, 10003), field(4, 3)]))
+                    repo.handle_packet(event(0x0133, [field(1, 1100), field(8, 1), field(17, 103),
+                        field(2, children=[field(1, 320000), field(2, 420000)])], direction="c2s"))
+                    self.assertGreater(repo.snapshot().coverage.cells, 50)
+                    self.assertFalse(repo.snapshot().coverage_paused)
                     ctx.monitor.close_session("s")
                     self.assertEqual(repo.snapshot().phase, "disconnected")
                     seed(repo); repo.handle_packet(event(0x014A, [actor_node()]))

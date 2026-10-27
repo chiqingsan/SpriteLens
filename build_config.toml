@@ -99,6 +99,8 @@ include_data_files = [
   "data/static/type_chart.json=data/static/type_chart.json",
   "data/static/types.json=data/static/types.json",
   "data/static/wiki_reference.json=data/static/wiki_reference.json",
+  # C13-02 起地图模式读取世界地图清单；底图本身随 spritelens/web/static 目录分发。
+  "data/static/world_maps.json=data/static/world_maps.json",
 
   # 仅图标是运行资源；resources 下的 wiki/source 候选素材不进入发布包。
   "resources/app.ico=resources/app.ico",

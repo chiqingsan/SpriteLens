@@ -25,6 +25,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `tools/import_assets.py` | 导入图鉴元数据 + 精灵图 + 系别图标 + 系别克制表 |
 | `tools/import_egg_data.py` | 导入蛋目录（蛋组/孵化时长/公母比/身高体重/进化链）到 data/static/eggs.json |
 | `tools/import_pet_details.py` | 补全静态数据：图鉴描述并入 species.json（+sum 重算修正）、补技能名、奖牌表、蛋/奖牌图标 |
+| `tools/import_world_maps.py` | 从解包资源导入两张世界地图底图与坐标 manifest：固定来源哈希/尺寸/原点边长，暂存校验后发布，失败保留旧产物 |
 | `tools/sync_catalog_resources.py` | 官方目录/镜像同步：保留有效值的 ID 合并、镜像校验、可重复导入并出报告（resource_sync_report.json） |
 | `tools/sync_pet_media.py` | 按官方 manifest 导入头像/立绘并写入媒体映射；稀有标记图标由 `rarity/` 资源单独维护（幂等，报告 pet_media_report.json） |
 | `tools/sync_ui_icons.py` | 按固定官方 Git 版本导入少量 Tabler SVG 图标并合成 sprite（开发期联网，运行期零网络） |
@@ -37,8 +38,8 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `spritelens/web/startup_cover.py` | 桌面启动唯一可见面板：静态图标与文案，首屏就绪才揭开；失败/20 秒超时原地重试，closing 释放资源 |
 | `spritelens/web/static/desktop-shell.js` / `desktop-shell.css` | 桌面顶栏、窗口操作与缩放边缘；浏览器模式隐藏 |
 | `data/schemas/` | 外挂 schema：`opcodes.json` + `messages/*.json`（字段级合并） |
-| `data/static/` | 静态映射：`species/natures/types/skills/type_chart/eggs/medals/specialities/color_cards.json` + 各 `_meta.json`；特性来源见 `_specialities_meta.json` |
-| `spritelens/web/static/` | 前端资源：`index.html`（分组导航骨架）/ `boot.js`（启动自恢复链）/ `app.css`（布局与组件 token）/ `themes.css`（三套主题色值）/ `app.js`（数据渲染）/ `ui.css` / `ui.js`（详情抽屉、键盘与焦点）/ `appearance.js`（主题与显示偏好）/ `icons.js` + `icons/`（本地 SVG sprite）/ `favicon.png` / `pet-media/`（官方原始头像与全身图）/ `type-icons/` `egg-icons/` `medal-icons/`（奖牌及标记图标）/ `rarity/` `color-cards/` |
+| `data/static/` | 静态映射：`species/natures/types/skills/type_chart/eggs/medals/specialities/color_cards.json` + 各 `_meta.json`；世界地图清单见 `world_maps.json`；特性来源见 `_specialities_meta.json` |
+| `spritelens/web/static/` | 前端资源：`index.html`（分组导航骨架）/ `boot.js`（启动自恢复链）/ `app.css`（布局与组件 token）/ `themes.css`（三套主题色值）/ `app.js`（数据渲染）/ `ui.css` / `ui.js`（详情抽屉、键盘与焦点）/ `appearance.js`（主题与显示偏好）/ `icons.js` + `icons/`（本地 SVG sprite）/ `favicon.png` / `pet-media/`（官方原始头像与全身图）/ `type-icons/` `egg-icons/` `medal-icons/`（奖牌及标记图标）/ `rarity/` `color-cards/` / `maps/`（世界地图底图，C13-01） |
 | `spritelens/web/account_avatar_cache.py` | 游戏名片头像 ID 映射、云端按需下载与用户数据目录缓存；失败由前端回退 Logo |
 | `data/recordings/` | 运行时录制产物（gitignore；本地回放样例不在版本库） |
 
@@ -197,6 +198,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `test_paths.py` | 打包态资源定位：源码/frozen/_MEIPASS 三分支、数据目录不受打包影响 |
 | `test_web_server.py` | REST/WS 鉴权、启动回收、请求串扰、采集输入/写失败与图鉴筛选 |
 | `test_build.py` | Nuitka 发布命令包含管理员权限开关 |
+| `test_world_maps.py` | C13-01 世界地图 manifest：图片尺寸/哈希/来源指纹、原点/边缘/留出点投影、负原点不钳制、坏源与改坐标失败、静态目录打包包含；C13-02 运行时清单载荷与 `/api/world-maps` 路由（200 子集、缺文件 503、no-store） |
 | `test_browser_open.py` | 设置页浏览器调试入口：鉴权、当前服务 URL 与浏览器打开失败 |
 | `test_environment.py` | 启动 quick 探测不调用慢 RSC 检查、Npcap 版本数字排序、PowerShell/Python 下载回退与安装器等待 |
 | `test_event_logger.py` | 异步落盘、关闭 flush、过载计数与关闭超时所有权 |
@@ -316,8 +318,11 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | 文件 | 职责 |
 | --- | --- |
 | `spritelens/domain/scene.py` | 场景 NPC 字段、原始坐标、未知值及离开 ID 的纯提取 |
-| `spritelens/services/scene_repository.py` | 账号/会话/场景归属、有限实体集合与一致观察快照；无持久化 |
-| `spritelens/web/nearby.py` | 只读附近观察载荷与鉴权路由，ID 字符串化，不导出会话地址 |
+| `spritelens/services/scene_repository.py` | 账号/会话/场景归属、有限实体集合与一致观察快照；`reset_coverage` 清空当前地图足迹并推进版本；无持久化 |
+| `spritelens/services/scene_coverage.py` | 本次运行的观察范围方格记录；人物位置采样及其雷达观察半径覆盖到的格（边长 2000 原始单位、上限 16384 格），行区间压缩，`clear(resource)` 可清指定地图或全部；战斗与换图保留记录、切账号隔离，不保存实体或 checkpoint |
+| `spritelens/web/nearby.py` | 只读附近观察载荷与鉴权路由，ID 字符串化，不导出会话地址；`POST /api/nearby/coverage/reset` 清除当前地图足迹（未装配场景观察时 503） |
+| `spritelens/repositories/scene_coverage_store.py` | 搜索覆盖历史的账号/地图隔离、异步原子保存与关闭等待；不保存实时实体 |
+| `tests/test_scene_coverage_store.py` | 搜索覆盖历史恢复、容量、归属与写入失败重试回归 |
 | `tests/test_scene.py` | 场景生命周期、契约、装配/停止和加密分段流录制回放回归 |
 | `docs/SCENE_OBSERVATIONS.md` | 当前字段证据、只读接口、失败分支与待验收范围 |
 
@@ -325,7 +330,12 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 
 | 文件 | 职责 |
 | --- | --- |
-| `frontend/src/pages/NearbyPage.vue`、`composables/useNearby.ts`、`types/nearby.ts` | 附近观察列表、搜索/排序、DTO校验、周期清空与请求失效 |
+| `frontend/src/pages/NearbyPage.vue`、`composables/useNearby.ts`、`types/nearby.ts` | 附近观察列表、搜索/排序、DTO校验、周期清空与请求失效；右侧面板在雷达与地图之间切换，共用同一选中与列表 |
+| `spritelens/web/world_maps.py` | 只读世界地图清单路由：校验 manifest 后下发投影/校准子集，缺文件或坏清单 503，统一 no-store |
+| `frontend/src/components/SceneMap.vue`、`SceneMap.test.ts` | 4096 底图相机（缩放/拖拽/全图/定位/跟随）、越界过滤、选中联动、标签错行与失败重试；2026-10-27 视觉重做：牛眼玩家锚点与常驻标签、分级标记与图例、图标控件列、默认 80% 街景比例 |
+| `frontend/src/domain/mapProjection.ts`、`frontend/src/types/worldMap.ts` | 原始坐标↔底图像素纯函数与逆变换；运行时清单严格解析、可用性判定与不可用原因 |
+| `frontend/src/components/MapCoverage.vue`、`frontend/src/domain/mapCoverage.ts` | 地图/雷达共用本次足迹格网；按行区间拼成单条路径，填充、外沿与外部遮罩三个节点复用同一份 `d` |
+| `frontend/src/composables/useWorldMaps.ts` | 按会话读取一次地图清单、失败显式重试、8 秒超时、损坏整块失效 |
 | `frontend/src/nearbyBridge.ts`、`spritelens/web/static/nearby-page.js` | Vue装配与既有REST/单一WS摘要转发；离页暂停、周期失效、超时与悬浮请求合并 |
 | `spritelens/web/static/nearby-alert.js` | 双牌重点精灵新出现提醒音（单牌只显示标记不发声）：按实体10分钟去重、默认开启并持久化；WebAudio合成双音，无外部音频资源 |
 | `tools/import_scene_catalog.py`、`data/static/scene_npc_pets.json` | 裁剪并记录来源哈希的NPC配置到物种映射；StaticData只读加载 |
@@ -344,3 +354,14 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 
 
 2026-10-24 悬浮雷达：自绘深色工具窗，标题拖动与本地关闭图标；底部固定35%–90%原生不透明度，按1%调整（默认85%）。保留置顶、不抢焦点与单一推送，正常/最小窗口/高倍缩放渲染及原生alpha验证见[附近精灵规格](NEARBY_OBSERVATIONS.md)。
+
+## C13 世界地图资源与坐标清单（2026-10-26）
+
+| 文件 | 职责 |
+| --- | --- |
+| `tools/import_world_maps.py` | 显式资源根导入两张 4096 世界地图与 desktop-data.json 参数；固定哈希/尺寸/原点边长，暂存校验后替换，失败保留旧产物 |
+| `data/static/world_maps.json` | 静态 manifest：`schema_version`/`coordinate_version`、来源哈希、图片尺寸与 URL、`origin_side_normalized` 投影、支持表与 `verified`/`candidate` 校准等级 |
+| `spritelens/web/static/maps/10003.webp`、`10018.webp` | 解包原图直接入库（未转码），经 `/static/maps/<id>.webp` 访问；10003 为 `supported`（8 个现场点校准后 `verified`），10018 为 `candidate` |
+| `tests/test_world_maps.py` | manifest 自洽、来源指纹、投影不变量与失败分支回归；运行时清单载荷与 `/api/world-maps` 路由（200/503、no-store） |
+
+C13-02 起地图模式在运行时读取清单：`spritelens/web/server.py` 在附近路由之后注册 `/api/world-maps`，`build_config.toml` 的 `include_data_files` 已带入 `data/static/world_maps.json`；前端只对 `availability=supported` 且 `calibration.level=verified` 的地图启用动态投影（当前仅 10003），投影公式与校准边界见 [实施计划](NEARBY_MAP_PLAN_2026-10-26.md) 与 ROADMAP C13。

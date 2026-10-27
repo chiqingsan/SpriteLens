@@ -3,10 +3,17 @@ import { computed, onUnmounted, ref, shallowRef } from 'vue'
 import SceneRadar from '../components/SceneRadar.vue'
 import MedalIcon from '../components/MedalIcon.vue'
 import UiIcon from '../components/UiIcon.vue'
+import { useWorldMaps } from '../composables/useWorldMaps'
+import { usableWorldMap } from '../types/worldMap'
 import { nearbyAttentionTone, parseNearby, parseNearbySummary, type NearbyActor, type NearbySnapshot, type NearbySummary } from '../types/nearby'
-const props = defineProps<{ channel: BroadcastChannel; host: { close: () => Promise<unknown>; setOpacity: (percent: number) => Promise<unknown> } }>()
+const props = defineProps<{ channel: BroadcastChannel; host: { close: () => Promise<unknown>; setOpacity: (percent: number) => Promise<unknown>; loadMaps?: () => Promise<unknown> } }>()
 const data = shallowRef<NearbySnapshot | null>(null), summary = shallowRef<NearbySummary | null>(null)
+const { catalog, error: mapsError, refresh: refreshMaps, stop: stopMaps } = useWorldMaps(props.host.loadMaps)
+const currentMap = computed(() => usableWorldMap(catalog.value, data.value?.resource_id ?? null))
+void refreshMaps()
+onUnmounted(stopMaps)
 const error = ref(''), stale = ref(false), staleMessage = ref(''), selected = ref(''), opacity = ref(85), settingsOpen = ref(false), linkLost = ref(false)
+const displayError = computed(() => error.value || mapsError.value)
 let pendingOpacity: number | null = null, applying = false, confirmedOpacity = 85
 const HEARTBEAT_TIMEOUT = 3000
 let lastMessageAt = Date.now()
@@ -89,9 +96,9 @@ onUnmounted(() => { window.removeEventListener('pagehide', leave); leave() })
 </script>
 <template>
   <main class="floating-radar">
-    <header class="floating-titlebar"><div class="floating-drag"><UiIcon name="eye"/><strong>附近雷达</strong><span>{{ data?.actors.length ?? 0 }} 只</span></div><div class="floating-legend" aria-label="雷达目标图例"><span><i class="floating-legend-dot" />普通</span><span><i class="floating-legend-dot is-marked" />单牌</span><span><i class="floating-legend-dot is-double" />双牌</span></div><button class="floating-settings" :aria-expanded="settingsOpen" aria-label="雷达设置" @click.stop="settingsOpen = !settingsOpen"><UiIcon name="settings"/></button><button class="floating-close" aria-label="关闭悬浮雷达" @click="close"><UiIcon name="x"/></button></header>
+    <header class="floating-titlebar"><div class="floating-drag"><UiIcon name="eye"/><strong>附近雷达</strong><span v-if="summary?.uid" :title="`当前观察账号 ${summary.uid}`">账号 {{ summary.uid.slice(-6) }}</span><span>{{ data?.actors.length ?? 0 }} 只</span></div><div class="floating-legend" aria-label="雷达目标图例"><span><i class="floating-legend-dot" />普通</span><span><i class="floating-legend-dot is-marked" />单牌</span><span><i class="floating-legend-dot is-double" />双牌</span></div><button class="floating-settings" :aria-expanded="settingsOpen" aria-label="雷达设置" @click.stop="settingsOpen = !settingsOpen"><UiIcon name="settings"/></button><button class="floating-close" aria-label="关闭悬浮雷达" @click="close"><UiIcon name="x"/></button></header>
     <div v-if="settingsOpen" class="floating-settings-panel" role="dialog" aria-label="雷达设置"><label for="radar-opacity">不透明度 <output for="radar-opacity">{{ opacity }}%</output></label><input id="radar-opacity" type="range" min="35" max="90" step="1" :value="opacity" @input="changeOpacity"></div>
-    <div class="floating-content"><p v-if="error || stale" class="floating-error" :class="{ 'is-stale': stale && !error }" :role="error ? 'alert' : 'status'">{{ error || staleMessage }}</p><div class="floating-attention-slot" aria-label="有标记精灵" @wheel="scrollAttention"><div class="floating-attention-list" :class="{ 'is-empty': !attentionActors.length }"><button v-for="actor in attentionActors" :key="actor.actor_id" class="floating-attention-chip" :class="[`attention-tone-${nearbyAttentionTone(actor.actor_id)}`, { selected: selected === actor.actor_id }]" :aria-pressed="selected === actor.actor_id" :aria-label="`${actor.name}，${actor.attention === 'double' ? '双牌' : '单牌'}`" @click="selectAttention(actor)"><span class="floating-attention-avatar"><img v-if="actor.icon_url && !failedImages.has(actor.icon_url)" :src="actor.icon_url" alt="" @error="imageFailed(actor.icon_url)"><UiIcon v-else name="eye"/></span><span class="floating-attention-medals"><MedalIcon v-for="mark in actor.marks" :key="mark.name" :name="mark.name" :source="mark.source"/></span></button></div></div><SceneRadar :data="data" :selected="selected" :radius="data?.radar_radius_raw" compact @select="selected = $event" /></div>
+    <div class="floating-content"><p v-if="displayError || stale" class="floating-error" :class="{ 'is-stale': stale && !displayError }" :role="displayError ? 'alert' : 'status'">{{ displayError || staleMessage }}</p><div class="floating-attention-slot" aria-label="有标记精灵" @wheel="scrollAttention"><div class="floating-attention-list" :class="{ 'is-empty': !attentionActors.length }"><button v-for="actor in attentionActors" :key="actor.actor_id" class="floating-attention-chip" :class="[`attention-tone-${nearbyAttentionTone(actor.actor_id)}`, { selected: selected === actor.actor_id }]" :aria-pressed="selected === actor.actor_id" :aria-label="`${actor.name}，${actor.attention === 'double' ? '双牌' : '单牌'}`" @click="selectAttention(actor)"><span class="floating-attention-avatar"><img v-if="actor.icon_url && !failedImages.has(actor.icon_url)" :src="actor.icon_url" alt="" @error="imageFailed(actor.icon_url)"><UiIcon v-else name="eye"/></span><span class="floating-attention-medals"><MedalIcon v-for="mark in actor.marks" :key="mark.name" :name="mark.name" :source="mark.source"/></span></button></div></div><SceneRadar :data="data" :map="currentMap" :selected="selected" :radius="data?.radar_radius_raw" compact @select="selected = $event" /></div>
   </main>
 </template>
 <style scoped>

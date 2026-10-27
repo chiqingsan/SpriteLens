@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import NearbyPage from './NearbyPage.vue'
+import SceneMap from '../components/SceneMap.vue'
 import type { NearbyActor, NearbyMark, NearbySnapshot } from '../types/nearby'
 import { flushPromises } from '@vue/test-utils'
 
@@ -29,6 +30,31 @@ describe('附近精灵更新布局稳定性', () => {
     vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(640)
   })
   afterEach(() => vi.restoreAllMocks())
+  it('范围待实测时提示搜索覆盖已暂停，附近精灵仍显示', async () => {
+    const load = vi.fn().mockResolvedValue({ ...snapshot(1, [actor('1', 1)]), coverage_paused: true })
+    const wrapper = mount(NearbyPage, { props: { host: { load } } })
+    ;(wrapper.vm as unknown as { update(value: unknown): void }).update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    expect(wrapper.get('.nearby-count-note').text()).toBe('记录已暂停')
+    expect(wrapper.get('.nearby-count-note').attributes('title')).toContain('服务器下发范围尚待实测')
+    expect(wrapper.find('.nearby-card').exists()).toBe(true)
+    wrapper.unmount()
+  })
+  it('版本不变时后台写入失败与恢复也更新状态提示', async () => {
+    const load = vi.fn().mockResolvedValue({ ...snapshot(1, [actor('1', 1)]), coverage_paused: true })
+    const wrapper = mount(NearbyPage, { props: { host: { load } } })
+    const page = wrapper.vm as unknown as { update(value: unknown): void }
+    page.update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    page.update({ uid: '1', version: 1, observation_id: 1, phase: 'observing', coverage_error: '磁盘不可写' })
+    await nextTick()
+    expect(wrapper.get('.nearby-count-note').text()).toBe('搜索记录异常')
+    expect(wrapper.get('.nearby-count-note').attributes('title')).toContain('磁盘不可写')
+    page.update({ uid: '1', version: 1, observation_id: 1, phase: 'observing', coverage_error: null })
+    await nextTick()
+    expect(wrapper.get('.nearby-count-note').text()).toBe('记录已暂停')
+    wrapper.unmount()
+  })
   it('后台慢请求和实体增删不切换刷新按钮或重置滚动位置', async () => {
     let resolve: (value: unknown) => void = () => {}
     const load = vi.fn().mockResolvedValueOnce(snapshot(1, [actor('1', 1), actor('2', 2)]))
@@ -51,6 +77,25 @@ describe('附近精灵更新布局稳定性', () => {
     expect(wrapper.get('.nearby-toolbar button').element).toBe(element)
     expect(button.text()).toBe('刷新')
     expect(viewport.scrollTop).toBe(120)
+    wrapper.unmount()
+  })
+
+  it('手动刷新期间使用原生禁用态但保持按钮文案与位置', async () => {
+    let resolve: (value: unknown) => void = () => {}
+    const load = vi.fn().mockResolvedValueOnce(snapshot(1, [actor('1', 1)])).mockImplementationOnce(() => new Promise(r => { resolve = r }))
+    const wrapper = mount(NearbyPage, { props: { host: { load } } })
+    const page = wrapper.vm as unknown as { update(value: unknown): void }
+    page.update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    const button = wrapper.get('.nearby-refresh')
+    const pending = button.trigger('click')
+    await nextTick()
+    expect(button.attributes('disabled')).toBeDefined()
+    expect(button.text()).toBe('刷新')
+    resolve(snapshot(2, [actor('1', 2)]))
+    await pending
+    await flushPromises()
+    expect(button.attributes('disabled')).toBeUndefined()
     wrapper.unmount()
   })
 
@@ -115,10 +160,45 @@ describe('附近精灵更新布局稳定性', () => {
     const wrapper = mount(NearbyPage, { props: { host: { load, openFloating: vi.fn() } } })
     ;(wrapper.vm as unknown as { update(value: unknown): void }).update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
     await flushPromises()
-    expect(wrapper.get('.nearby-error').text()).toContain('网络断开')
+    expect(wrapper.get('.nearby-count-note').text()).toContain('读取失败，请刷新重试')
     expect(wrapper.find('.nearby-empty').exists()).toBe(true)
     expect(wrapper.findAll('.nearby-card')).toHaveLength(0)
-    expect(wrapper.get('.nearby-count-note').text()).toBe('')
+    expect(wrapper.get('.nearby-count-note').text()).toBe('读取失败，请刷新重试')
+    wrapper.unmount()
+  })
+
+  it('无数据且读取失败时给出可重试的错误空态，重试复用刷新入口', async () => {
+    const load = vi.fn().mockRejectedValue(new Error('网络断开'))
+    const wrapper = mount(NearbyPage, { props: { host: { load, openFloating: vi.fn() } } })
+    ;(wrapper.vm as unknown as { update(value: unknown): void }).update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    expect(wrapper.get('.nearby-empty h3').text()).toBe('附近数据读取失败')
+    expect(wrapper.get('.nearby-empty').text()).toContain('网络断开')
+    expect(wrapper.get('.nearby-empty').attributes('aria-live')).toBe('assertive')
+    expect(wrapper.find('.nearby-empty .nearby-retry').exists()).toBe(true)
+    await wrapper.get('.nearby-retry').trigger('click')
+    await flushPromises()
+    expect(load).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('.nearby-count-note').text()).toBe('读取失败，请刷新重试')
+    wrapper.unmount()
+  })
+
+  it('观察周期推进时列表行保持同一批 DOM 节点，不整表重挂', async () => {
+    const load = vi.fn()
+      .mockResolvedValueOnce(snapshot(1, [actor('1', 1), actor('2', 2)]))
+      .mockResolvedValueOnce({ ...snapshot(2, [actor('1', 1), actor('2', 2)]), observation_id: 2 })
+    const wrapper = mount(NearbyPage, { props: { host: { load, openFloating: vi.fn() } } })
+    const page = wrapper.vm as unknown as { update(value: unknown): void }
+    page.update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    await nextTick()
+    const cards = wrapper.findAll('.nearby-card').map(card => card.element)
+    expect(cards).toHaveLength(2)
+    // 同账号同场景内摘要只能带版本推进，周期编号变化不应改变行 key。
+    page.update({ uid: '1', version: 2, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    await nextTick()
+    expect(wrapper.findAll('.nearby-card').map(card => card.element)).toEqual(cards)
     wrapper.unmount()
   })
   it('有牌优先按双牌满、双牌、单牌满、单牌排序，同级保持最近观察', async () => {
@@ -202,7 +282,204 @@ describe('附近精灵提醒音开关', () => {
     const host = { load: vi.fn().mockResolvedValue(snapshot(1, [])) }
     const wrapper = mount(NearbyPage, { props: { host } })
     expect(wrapper.find('.nearby-alert').exists()).toBe(false)
-    expect(wrapper.findAll('.nearby-toolbar button').map(item => item.text())).toEqual(['刷新', '悬浮雷达'])
+    expect(wrapper.findAll('.nearby-toolbar > button').map(item => item.text())).toEqual(['刷新', '悬浮雷达'])
+    wrapper.unmount()
+  })
+})
+
+const MAP_CATALOG = {
+  schema_version: 1,
+  coordinate_version: 1,
+  maps: {
+    '10003': {
+      name: '卡洛西亚大陆', availability: 'supported',
+      image: { url: '/static/maps/10003.webp', width: 4096, height: 4096 },
+      projection: { origin_x: 306000, origin_y: 408000, side: 408000 },
+      calibration: { level: 'verified' },
+    },
+    '10018': {
+      name: '魔法学院', availability: 'candidate',
+      image: { url: '/static/maps/10018.webp', width: 4096, height: 4096 },
+      projection: { origin_x: -886161, origin_y: -891000, side: 180000 },
+      calibration: { level: 'candidate' },
+    },
+  },
+}
+
+function mappedSnapshot(version: number, resourceId: string, actors: NearbyActor[] = [actor('1', version)]) {
+  return { ...snapshot(version, actors), resource_id: resourceId, instance_id: '42' }
+}
+
+function coverageSnapshot(version: number, cells = 3) {
+  const coverage = {
+    uid: '1', map_id: '10003', layer: 'visit' as const, scope: 'session' as const,
+    revision: 1, cell_size: 2000, cells, rows: [[210, 160, cells]] as [number, number, number][],
+  }
+  return { ...mappedSnapshot(version, '10003'), coverage }
+}
+
+describe('附近精灵地图模式', () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('nearby-list-pane') ? 680 : 220
+    })
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(640)
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it('可用地图自动显示，未知场景回退雷达，切回可用场景恢复地图', async () => {
+    const load = vi.fn().mockResolvedValueOnce(mappedSnapshot(1, '10003'))
+      .mockResolvedValueOnce({ ...mappedSnapshot(2, '10018'), observation_id: 2 })
+      .mockResolvedValueOnce({ ...mappedSnapshot(3, '10003'), observation_id: 3 })
+    const wrapper = mount(NearbyPage, { props: { host: { load, loadMaps: vi.fn().mockResolvedValue(MAP_CATALOG) } } })
+    const page = wrapper.vm as unknown as { update(value: unknown): void }
+    page.update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    expect(wrapper.find('.scene-map').exists()).toBe(true)
+    expect(wrapper.find('.scene-radar').exists()).toBe(false)
+    page.update({ uid: '1', version: 2, observation_id: 2, phase: 'observing' })
+    await flushPromises()
+    expect(wrapper.find('.scene-map').exists()).toBe(false)
+    expect(wrapper.find('.scene-radar').exists()).toBe(true)
+    page.update({ uid: '1', version: 3, observation_id: 3, phase: 'observing' })
+    await flushPromises()
+    expect(wrapper.find('.scene-map').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('地图清单失败时显示雷达并可重试', async () => {
+    const loadMaps = vi.fn().mockRejectedValueOnce(new Error('失败')).mockResolvedValue(MAP_CATALOG)
+    const wrapper = mount(NearbyPage, { props: { host: { load: vi.fn().mockResolvedValue(mappedSnapshot(1, '10003')), loadMaps } } })
+    ;(wrapper.vm as unknown as { update(value: unknown): void }).update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    expect(wrapper.find('.scene-radar').exists()).toBe(true)
+    await wrapper.findAll('button').find(button => button.text().includes('重试地图清单'))!.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.scene-map').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('停止采集时保留历史覆盖但清除精灵和人物位置', async () => {
+    const load = vi.fn().mockResolvedValueOnce(coverageSnapshot(1)).mockResolvedValueOnce({
+      ...snapshot(2, []), phase: 'stopped', observation_id: 2, resource_id: null, instance_id: null,
+      player_position: null, coverage: null,
+    })
+    const wrapper = mount(NearbyPage, { props: { host: { load, loadMaps: vi.fn().mockResolvedValue(MAP_CATALOG) } } })
+    const page = wrapper.vm as unknown as { update(value: unknown): void }
+    page.update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    page.update({ uid: '1', version: 2, observation_id: 2, phase: 'stopped' })
+    await flushPromises()
+    const mapData = wrapper.getComponent(SceneMap).props('data')
+    expect(mapData?.coverage?.cells).toBe(3)
+    expect(mapData?.actors).toEqual([])
+    expect(mapData?.player_position).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('页头显示当前观察账号，切号后更新为新账号', async () => {
+    const load = vi.fn()
+      .mockResolvedValueOnce(snapshot(1, [actor('1', 1)]))
+      .mockResolvedValueOnce({ ...snapshot(1, [actor('2', 2)]), uid: '123456789012345' })
+    const wrapper = mount(NearbyPage, { props: { host: { load } } })
+    const page = wrapper.vm as unknown as { update(value: unknown): void }
+    page.update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    expect(wrapper.get('.nearby-account').text()).toBe('账号 1')
+    expect(wrapper.get('.nearby-account').attributes('title')).toContain('当前观察账号 1')
+    page.update({ uid: '123456789012345', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    expect(wrapper.get('.nearby-account').text()).toMatch(/^账号 …\d{9}$/)
+    expect(wrapper.get('.nearby-account').attributes('title')).toContain('123456789012345')
+    wrapper.unmount()
+  })
+
+  it('壳层没有清除接口时不渲染清除足迹按钮，有接口但无足迹时禁用', async () => {
+    const plain = mount(NearbyPage, { props: { host: { load: vi.fn().mockResolvedValue(coverageSnapshot(1)) } } })
+    ;(plain.vm as unknown as { update(value: unknown): void }).update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    expect(plain.find('.nearby-clear-coverage').exists()).toBe(false)
+    plain.unmount()
+
+    const empty = mount(NearbyPage, { props: { host: { load: vi.fn().mockResolvedValue(mappedSnapshot(1, '10003')), resetCoverage: vi.fn() } } })
+    ;(empty.vm as unknown as { update(value: unknown): void }).update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    const button = empty.get('.nearby-clear-coverage')
+    expect(button.text()).toBe('清除足迹')
+    expect(button.attributes('disabled')).toBeDefined()
+    empty.unmount()
+  })
+
+  it('清除足迹后刷新快照确认服务端已清空', async () => {
+    const resetCoverage = vi.fn().mockResolvedValue({ ok: true })
+    const load = vi.fn()
+      .mockResolvedValueOnce(coverageSnapshot(1))
+      .mockResolvedValueOnce({ ...mappedSnapshot(2, '10003'), coverage: null })
+    const wrapper = mount(NearbyPage, {
+      props: { host: { load, loadMaps: vi.fn().mockResolvedValue(MAP_CATALOG), resetCoverage } },
+    })
+    ;(wrapper.vm as unknown as { update(value: unknown): void }).update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    expect(wrapper.get('.nearby-count-note').text()).not.toContain('清除足迹失败')
+    expect(wrapper.find('.scene-map').exists()).toBe(true)
+    const button = wrapper.get('.nearby-clear-coverage')
+    expect(button.attributes('disabled')).toBeUndefined()
+    await button.trigger('click')
+    await flushPromises()
+    expect(resetCoverage).toHaveBeenCalledTimes(1)
+    expect(resetCoverage).toHaveBeenCalledWith({ uid: '1', resource_id: '10003', observation_id: 1 })
+    expect(load).toHaveBeenCalledTimes(2)
+    expect(wrapper.find('.map-coverage').exists()).toBe(false)
+    expect(wrapper.get('.nearby-clear-coverage').attributes('disabled')).toBeDefined()
+    expect(wrapper.findAll('.nearby-card')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  it('清除失败时重新读取并给出重试提示', async () => {
+    const resetCoverage = vi.fn().mockRejectedValue(new Error('服务不可用'))
+    const load = vi.fn().mockResolvedValue(coverageSnapshot(1))
+    const wrapper = mount(NearbyPage, {
+      props: { host: { load, loadMaps: vi.fn().mockResolvedValue(MAP_CATALOG), resetCoverage } },
+    })
+    ;(wrapper.vm as unknown as { update(value: unknown): void }).update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    const button = wrapper.get('.nearby-clear-coverage')
+    await button.trigger('click')
+    await flushPromises()
+    expect(resetCoverage).toHaveBeenCalledTimes(1)
+    expect(load).toHaveBeenCalledTimes(2)
+    expect(wrapper.find('.scene-map').exists()).toBe(true)
+    expect(button.attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('.nearby-count-note').text()).toBe('清除足迹失败，请重试')
+    expect(wrapper.get('.nearby-count-note').attributes('title')).toContain('服务不可用')
+    wrapper.unmount()
+  })
+
+  it('清除期间切号后旧请求失败不能恢复旧账号数据', async () => {
+    let rejectReset: (error: Error) => void = () => {}
+    const resetCoverage = vi.fn(() => new Promise((_, reject) => { rejectReset = reject }))
+    const load = vi.fn().mockResolvedValueOnce(coverageSnapshot(1))
+      .mockResolvedValueOnce({ ...mappedSnapshot(1, '10003'), uid: '2', actors: [actor('2', 1)] })
+    const wrapper = mount(NearbyPage, { props: { host: { load, loadMaps: vi.fn().mockResolvedValue(MAP_CATALOG), resetCoverage } } })
+    const page = wrapper.vm as unknown as { update(value: unknown): void }
+    page.update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    await wrapper.get('.nearby-clear-coverage').trigger('click')
+    page.update({ uid: '2', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    rejectReset(new Error('超时'))
+    await flushPromises()
+    expect(wrapper.get('.nearby-account').text()).toBe('账号 2')
+    expect(wrapper.get('.nearby-card').attributes('id')).toBe('nearby-actor-2')
+    expect(load).toHaveBeenCalledTimes(2)
     wrapper.unmount()
   })
 })

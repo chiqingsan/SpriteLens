@@ -226,7 +226,7 @@ class CaptureRoutesMixin:
             "cached_identity": pets["cached_identity"],
             "stats": pets["stats"],
             "account_epoch": self._account_epoch,
-            "nearby": {"uid": str(nearby.uid), "version": nearby.version, "observation_id": nearby.observation_id, "phase": nearby.phase} if nearby is not None else None,
+            "nearby": {"uid": str(nearby.uid), "version": nearby.version, "observation_id": nearby.observation_id, "phase": nearby.phase, "coverage_error": nearby.coverage_error} if nearby is not None else None,
             "capture": self._capture_payload(capture),
             # 环境探测在启动路径上异步进行（RSC 检查约 1.8s）；
             # 探测完成后 report 变化 → 此载荷变化 → WS 推送 → 横幅自动刷新

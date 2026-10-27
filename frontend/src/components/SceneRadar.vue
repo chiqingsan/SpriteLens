@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useId } from 'vue'
+import UiIcon from './UiIcon.vue'
+import MapCoverage from './MapCoverage.vue'
+import type { WorldMapEntry } from '../types/worldMap'
 import { nearbyAttentionTone, type NearbyAttention, type NearbyActor, type NearbySnapshot } from '../types/nearby'
-const props = withDefaults(defineProps<{ data: NearbySnapshot | null; selected?: string; compact?: boolean; radius?: number; note?: string }>(), {
+const props = withDefaults(defineProps<{ data: NearbySnapshot | null; map?: WorldMapEntry | null; selected?: string; compact?: boolean; radius?: number; note?: string; visible?: boolean }>(), {
   radius: 10000,
   note: '',
+  visible: true,
 })
 const emit = defineEmits<{ select: [id: string] }>()
+const mapClipId = `radar-map-${useId()}`
 
 /** 固定 400×400 参考坐标系：圆心 200、外环屏显半径 180；所有文字标签都必须留在 viewBox 内。 */
 const VIEW_SIZE = 400
@@ -17,6 +22,11 @@ const LABEL_MARGIN = 4
 const LABEL_LIMIT = 6
 const LABEL_FONT_SIZE = 9
 const SELECTED_FONT_SIZE = 10
+/**
+ * 密集场景渲染预算：雷达最多为 MAX_RENDERED_TARGETS 个目标建可交互节点（每点 3~4 个 SVG 节点）。
+ * 只裁渲染不改数据：左侧列表仍展示完整实体，超限说明见页脚。
+ */
+const MAX_RENDERED_TARGETS = 160
 
 interface RadarRow {
   actor: NearbyActor
@@ -99,7 +109,42 @@ function placeLabel(point: { x: number; y: number }, text: string, fontSize: num
     rect: { x: chipX, y: chipTop, width, height },
   }
 }
+/** 覆盖归属校验：只画当前账号、当前地图的足迹；切号/切图残留的旧包不画，也不报错。 */
+const visibleCoverage = computed(() => {
+  const data = props.data
+  const coverage = data?.coverage
+  if (!data || !coverage || coverage.uid !== data.uid) return null
+  return data.resource_id === null || coverage.map_id === data.resource_id ? coverage : null
+})
+/**
+ * 渲染预算：选中项优先，其次非普通关注，再按距玩家距离由近到远，取前 MAX_RENDERED_TARGETS 个；
+ * 返回保持 actors 原始顺序，避免推送时节点顺序跳动。只裁渲染，不改数据。
+ */
+function budgetRows(rows: RadarRow[], selectedId?: string) {
+  if (rows.length <= MAX_RENDERED_TARGETS) return rows
+  const keep = new Set<string>()
+  const selected = rows.find(row => row.actor.actor_id === selectedId)
+  if (selected) keep.add(selected.actor.actor_id)
+  const ranked = [...rows].sort((a, b) => (a.kind === 'normal' ? 1 : 0) - (b.kind === 'normal' ? 1 : 0)
+    || a.distance - b.distance || a.actor.actor_id.localeCompare(b.actor.actor_id))
+  for (const row of ranked) {
+    if (keep.size >= MAX_RENDERED_TARGETS) break
+    keep.add(row.actor.actor_id)
+  }
+  return rows.filter(row => keep.has(row.actor.actor_id))
+}
 const range = computed(() => Number.isFinite(props.radius) && props.radius > 0 ? props.radius : 10000)
+const mapBackground = computed(() => {
+  const map = props.map, position = props.data?.player_position
+  if (!map || position?.[0] == null || position[1] == null) return null
+  const scale = OUTER_RADIUS / range.value
+  return {
+    x: CENTER + (map.projection.origin_x - position[0]) * scale,
+    y: CENTER + (map.projection.origin_y - position[1]) * scale,
+    width: map.projection.side * scale,
+    height: map.projection.side * scale,
+  }
+})
 /** 三环刻度：外环 = 半径、中环 = 半径/2、内环 = 半径/5；放在右下方避开十字轴与中心标签。 */
 const scale = computed(() => [
   { key: 'outer', radius: OUTER_RADIUS, value: range.value },
@@ -137,8 +182,9 @@ const projection = computed(() => {
   })
   // 只绘制本次观察半径内的目标，半径之外的目标既不显示点位也不显示标签。
   const visibleRows = rows.filter(row => row.distance <= range.value)
-  const byDistance = [...visibleRows].sort((a, b) => a.distance - b.distance || a.actor.actor_id.localeCompare(b.actor.actor_id))
-  const selectedRow = visibleRows.find(row => row.actor.actor_id === props.selected) ?? null
+  const renderedRows = budgetRows(visibleRows, props.selected)
+  const byDistance = [...renderedRows].sort((a, b) => a.distance - b.distance || a.actor.actor_id.localeCompare(b.actor.actor_id))
+  const selectedRow = renderedRows.find(row => row.actor.actor_id === props.selected) ?? null
   const labels: LabelPlacement[] = []
   const occupied: Box[] = []
   function addLabel(row: RadarRow, text: string, fontSize: number, selected = false) {
@@ -162,7 +208,16 @@ const projection = computed(() => {
       addLabel(anchorRow, group.length > 1 ? `${anchorRow.label} ×${group.length}` : anchorRow.label, LABEL_FONT_SIZE)
     }
   }
-  return { range: range.value, rows: visibleRows, labels }
+  return { range: range.value, rows: renderedRows, labels, total: visibleRows.length }
+})
+// 调试坐标：仅当后端按环境变量打开时显示原始 x/y，供现场地标校准；不参与雷达投影。
+// 只显示二维 x/y：校准用不到高度 z，少一行文案也能让窄窗圆盘保留可见高度。
+const debugPosition = computed(() => {
+  const data = props.data
+  if (!data?.debug_coordinates || !Array.isArray(data.player_position)) return ''
+  const [x, y] = data.player_position
+  if (typeof x !== 'number' || typeof y !== 'number') return ''
+  return `原始坐标 x=${x} y=${y}`
 })
 </script>
 <template>
@@ -171,36 +226,47 @@ const projection = computed(() => {
     <div v-if="!compact && projection" class="radar-legend" aria-label="雷达目标图例"><span><i class="radar-legend-dot" />普通</span><span><i class="radar-legend-dot is-marked" />单牌</span><span><i class="radar-legend-dot is-double" />双牌</span></div>
     <div class="radar-body">
       <svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMid meet" class="scene-radar-scope" role="group" aria-label="参考坐标雷达">
+        <defs><clipPath :id="mapClipId"><rect width="400" height="400" /></clipPath></defs>
+        <g v-if="map && mapBackground" :clip-path="`url(#${mapClipId})`" class="radar-map">
+          <image :href="map.image.url" :x="mapBackground.x" :y="mapBackground.y" :width="mapBackground.width" :height="mapBackground.height" preserveAspectRatio="none" />
+          <g v-if="visible" :transform="`translate(${mapBackground.x},${mapBackground.y}) scale(${mapBackground.width / map.image.width},${mapBackground.height / map.image.height})`"><MapCoverage :coverage="visibleCoverage" :map="map" /></g>
+        </g>
         <circle v-for="radius in RING_RADII" :key="radius" cx="200" cy="200" :r="radius" class="radar-ring" />
         <path d="M20 200H380M200 20V380" class="radar-axis" />
         <g v-if="!compact" class="radar-scale" aria-hidden="true"><text v-for="tick in scale" :key="tick.key" class="radar-scale-label" :x="tick.x" :y="tick.y" text-anchor="middle">{{ tick.text }}</text></g>
         <g v-if="projection">
-          <g class="radar-center"><path class="radar-player-cross" d="M194 200H206M200 194V206" /><circle cx="200" cy="200" r="5" class="radar-player" /></g>
           <g v-for="row in projection.rows" :key="row.actor.actor_id" class="radar-target" :class="[`is-${row.kind}`, `attention-tone-${row.attentionTone}`, { selected: selected === row.actor.actor_id }]" :transform="`translate(${row.x},${row.y})`" tabindex="0" role="button" :aria-label="`${row.actor.name}${row.kind === 'double' ? '，双牌' : row.kind === 'marked' ? '，单牌' : ''}`" @click="emit('select', row.actor.actor_id)" @keydown.enter="emit('select', row.actor.actor_id)" @keydown.space.prevent="emit('select', row.actor.actor_id)">
             <title>{{ row.actor.name }} · {{ row.kind === 'double' ? '双牌' : row.kind === 'marked' ? '单牌' : '普通' }} · Lv.{{ row.actor.level ?? '未知' }}</title><circle r="12" class="radar-hit"/><circle v-if="row.kind !== 'normal'" r="10" class="radar-attention-ring" /><circle :r="row.kind === 'double' ? 7 : row.kind === 'marked' ? 6 : 5" class="radar-point" />
           </g>
           <g v-for="label in projection.labels" :key="`label-${label.id}`" class="radar-label" :class="{ selected: label.selected }" aria-hidden="true">
             <rect class="radar-label-bg" :x="label.rect.x" :y="label.rect.y" :width="label.rect.width" :height="label.rect.height" rx="3" /><text class="radar-target-label" :x="label.x" :y="label.y" :text-anchor="label.anchor">{{ label.text }}</text>
           </g>
+          <g class="radar-center"><circle cx="200" cy="200" r="8" class="radar-player" /><UiIcon name="current-location" x="193" y="193" width="14" height="14" class="radar-player-icon" /><text v-if="!compact" x="200" y="220" text-anchor="middle" class="radar-self-label">{{ data?.position_source === 'client_target' ? '你的移动目标' : '你的位置' }}</text></g>
         </g>
         <text v-else x="200" y="200" text-anchor="middle">等待玩家位置</text>
       </svg>
     </div>
+    <p v-if="compact && debugPosition" class="radar-debug is-compact">{{ debugPosition }}</p>
     <template v-if="!compact">
       <p v-if="note" class="radar-note">{{ note }}</p>
-      <p v-if="projection">外环 {{ projection.range.toLocaleString('zh-CN') }} 单位 · 已定位 {{ projection.rows.length }} / {{ data?.actors.length ?? 0 }} · 原始坐标，未校准米制</p>
+      <p v-if="debugPosition" class="radar-debug">{{ debugPosition }}</p>
+      <p v-if="projection">外环 {{ projection.range.toLocaleString('zh-CN') }} 单位 · 已定位 {{ projection.total }} / {{ data?.actors.length ?? 0 }} · 原始坐标，未校准米制<template v-if="projection.total > projection.rows.length"> · 显示 {{ projection.rows.length }} / {{ projection.total }} 个，优先选中和有标记的精灵</template></p>
     </template>
   </section>
 </template>
 <style scoped>
 /* 块级容器：填满父面板，父面板固定高度时由内部 flex 分配空间，避免圆盘被裁掉。 */
-.scene-radar { display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; max-width: 100%; padding: var(--space-3); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.scene-radar { display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; max-width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-sm); }
 .scene-radar > header, .scene-radar > .radar-legend, .scene-radar > p { flex: none; }
 .scene-radar .radar-note { margin-bottom: var(--space-1); }
-.scene-radar header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-3); min-width: 0; }
+.scene-radar .radar-debug { color: var(--ink); font-variant-numeric: tabular-nums; }
+.scene-radar header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-width: 0; min-height: 44px; padding: 8px var(--space-3); border-bottom: 1px solid var(--line-soft); }
+.scene-radar header span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scene-radar header span, .scene-radar p { min-width: 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.6; overflow-wrap: anywhere; }
 /* svg 外层吃掉剩余高度并居中；svg 自身撑满容器，viewBox 等比缩放保证圆盘完整可见。 */
-.radar-body { flex: 1 1 0; min-height: 0; min-width: 0; display: grid; place-items: center; margin: var(--space-2) 0; }
+.radar-body { flex: 1 1 0; min-height: 0; min-width: 0; display: grid; place-items: center; }
+.radar-map { pointer-events: none; }
+.radar-map image { opacity: .9; }
 .scene-radar-scope { display: block; width: 100%; height: 100%; max-width: 100%; max-height: 100%; aspect-ratio: 1; background: var(--surface-1); border-radius: var(--radius-sm); }
 .radar-ring, .radar-axis { fill: none; stroke: var(--line); stroke-width: 1; }
 .radar-ring { stroke-dasharray: 2 4; }
@@ -213,12 +279,14 @@ const projection = computed(() => {
 .scene-radar { --radar-label-bg: var(--panel); }
 .radar-label-bg { fill: var(--radar-label-bg); fill-opacity: .86; }
 .radar-label.selected .radar-label-bg { fill-opacity: .96; }
-.radar-legend { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-3); color: var(--muted); font-size: var(--fs-2xs); }
+.radar-legend { display: flex; flex-wrap: wrap; gap: var(--space-3); margin: 8px var(--space-3); color: var(--muted); font-size: var(--fs-2xs); }
 .radar-legend span { display: inline-flex; align-items: center; gap: var(--space-1); }
 .radar-legend-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--teal); }
 .radar-legend-dot.is-marked { background: var(--amber); }
 .radar-legend-dot.is-double { width: 11px; height: 11px; background: var(--danger); border: 1px solid var(--danger-ink); }
-.radar-player { fill: var(--ink); stroke: var(--panel); stroke-width: 2; }
+.radar-player { fill: var(--teal-deep); stroke: var(--panel); stroke-width: 3; }
+.radar-player-icon { color: var(--panel); width: 14px; height: 14px; }
+.scene-radar .radar-self-label { fill: var(--panel); font-size: 11px; font-weight: 700; paint-order: stroke; stroke: var(--teal-deep); stroke-width: 4; stroke-linejoin: round; }
 .radar-target { cursor: pointer; outline: none; }
 .radar-label { pointer-events: none; }
 .radar-hit { fill: transparent; }
@@ -233,7 +301,7 @@ const projection = computed(() => {
 .radar-target.is-double .radar-point { fill: var(--danger); stroke: var(--panel); stroke-width: 2.5; }
 .radar-target.selected .radar-hit, .radar-target:focus-visible .radar-hit { fill: var(--accent); stroke: var(--teal-dark); stroke-width: 2; }
 .radar-label.selected .radar-target-label { font-size: 10px; fill: var(--teal-deep); }
-.scene-radar > p { padding-top: var(--space-3); border-top: 1px solid var(--line-soft); }
+.scene-radar > p { margin: 0; padding: 8px var(--space-3); border-top: 1px solid var(--line-soft); }
 .scene-radar.is-overlay { flex: 1; min-height: 0; padding: 0; border: 0; background: transparent; --radar-label-bg: var(--radar-overlay-bg); }
 .is-overlay header { display: none; }
 .is-overlay .radar-legend { flex: none; margin: 0 0 var(--space-2); justify-content: center; }
@@ -249,4 +317,6 @@ const projection = computed(() => {
 .scene-radar.is-overlay .radar-legend-dot.is-double { background: var(--danger); border-color: var(--danger); }
 .is-overlay .radar-player { fill: var(--radar-overlay-ink); stroke: var(--radar-overlay-bg); }
 .is-overlay .radar-player-cross { stroke: var(--radar-overlay-ink); }
+/* 悬浮雷达紧凑窗只在调试图标开启时多显示一行原始坐标，供游戏内就地记录地标。 */
+.is-overlay .radar-debug { margin-top: var(--space-1); text-align: center; color: var(--radar-overlay-ink); }
 </style>

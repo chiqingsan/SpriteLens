@@ -33,7 +33,7 @@ function waitForStyles() {
 async function start() {
   try {
     await waitForStyles();
-    const { mountFloatingRadar } = await import('/static/vue/radar-entry.js');
+    const { mountFloatingRadar, createApiClient } = await import('/static/vue/radar-entry.js');
     /* 入口加载后才注入 Vue 样式链接，等它们就绪再挂载，避免未样式化的布局闪烁。 */
     await waitForStyles();
     if (started) { return; }
@@ -41,6 +41,7 @@ async function start() {
     clearTimeout(startTimeout);
     const ready = window.pywebview?.api ? Promise.resolve() : new Promise(resolve => window.addEventListener('pywebviewready', resolve, { once: true }));
     mountFloatingRadar(root, channel, {
+      loadMaps: () => createApiClient(token)('/api/world-maps'),
       close: async () => { await ready; return window.pywebview.api.close_radar(); },
       setOpacity: async percent => { await ready; return window.pywebview.api.set_radar_opacity(percent); }
     });

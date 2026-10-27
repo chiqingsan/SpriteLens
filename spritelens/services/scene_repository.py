@@ -11,13 +11,17 @@ from spritelens.domain.identity import PlayerIdentity, extract_identity
 from spritelens.domain.scene import SceneActor, actor, children, integer, nodes, position, removed_ids
 from spritelens.events import PacketEvent
 from spritelens.services.account_tracker import AccountTracker
+from spritelens.services.scene_coverage import DEFAULT_CELL_SIZE_RAW, CoverageSnapshot, SceneCoverage
 from spritelens.repositories.scene_checkpoint_store import SceneCheckpoint, SceneCheckpointStore
+from spritelens.repositories.scene_coverage_store import SceneCoverageStore
 
 MAX_ACTORS = 4096
 # 删除阈值与雷达半径都用「原始坐标单位」；真实流量实测玩家↔实体距离
 # p50≈7,990、p99≈8,994、max≈14,455，旧值 3,000 会删掉 85% 的实体。
 DEFAULT_MAX_DISTANCE_RAW = 15000
 RADAR_DELETE_DISTANCE = DEFAULT_MAX_DISTANCE_RAW  # 兼容旧引用；实例以构造参数为准
+# 雷达显示半径（原始坐标单位），不代表服务器下发半径。
+DEFAULT_RADAR_RADIUS_RAW = 10000
 RESUMED_STALE = "resumed_stale"
 
 
@@ -37,6 +41,9 @@ class SceneSnapshot:
     actors: tuple[SceneActor, ...]
     unresolved_updates: int
     rejected_actors: int
+    coverage: CoverageSnapshot | None = None
+    coverage_paused: bool = False
+    coverage_error: str | None = None
 
 
 class SceneRepository:
@@ -45,9 +52,18 @@ class SceneRepository:
         *,
         checkpoint_store: SceneCheckpointStore | None = None,
         max_distance_raw: int = DEFAULT_MAX_DISTANCE_RAW,
+        coverage_cell_raw: int = DEFAULT_CELL_SIZE_RAW,
+        coverage_radius_raw: int = 0,
+        coverage_enabled: bool = True,
+        coverage_store: SceneCoverageStore | None = None,
+        coverage_map_bounds: dict[int, tuple[int, int, int]] | None = None,
     ) -> None:
         self._lock = threading.Lock()
         self._account = AccountTracker()
+        # 用户选择实测前暂停覆盖，雷达显示半径不作为覆盖依据。
+        self._coverage_enabled = coverage_enabled
+        self._coverage_store = coverage_store
+        self._coverage = SceneCoverage(cell_size=coverage_cell_raw, radius_raw=coverage_radius_raw, enabled=coverage_enabled, store=coverage_store, map_bounds=coverage_map_bounds)
         self._checkpoint_store = checkpoint_store
         # 距离阈值只影响内存过筛，不是协议事实；由 config.json 调整，
         # 默认值来自真实流量回放（见模块常量注释）。
@@ -65,6 +81,7 @@ class SceneRepository:
         self._instance: int | None = None
         self._position: tuple[int | None, int | None, int | None] | None = None
         self._position_source: str | None = None
+        self._last_position_sample = 0
         self._battle_id: int | None = None
         self._updated_at: float | None = None
         self._actors: dict[int, SceneActor] = {}
@@ -81,6 +98,7 @@ class SceneRepository:
             self._account = AccountTracker()
             if uid:
                 self._account.select_loaded(uid)
+                self._coverage.select_account(uid)
             self._retired_sessions.clear()
             self._clear(phase)
 
@@ -99,6 +117,7 @@ class SceneRepository:
             return False
         self._account = AccountTracker()
         self._account.note_loaded(uid)
+        self._coverage.select_account(uid)
         self._phase = RESUMED_STALE
         self._session = checkpoint.flow_id
         self._scene = checkpoint.scene_id
@@ -150,12 +169,30 @@ class SceneRepository:
         with self._lock:
             self._advance_motion(time.time() if now is None else now)
 
+    def reset_coverage(self, uid: int, resource_id: int, observation_id: int) -> bool:
+        """清空当前地图的已探索足迹。
+
+        只动覆盖格，不清实体、位置与观察周期；推进版本让在途的旧载荷
+        因版本落后被前端丢弃，避免重置后又被晚到的响应画回旧足迹。
+        """
+        with self._lock:
+            if (self._account.display_uid != uid or self._resource != resource_id
+                    or self._observation_id != observation_id):
+                return False
+            self._coverage.clear(self._resource)
+            self._version += 1
+        if self._coverage_store is not None:
+            self._coverage_store.flush()
+        return True
+
     def snapshot(self) -> SceneSnapshot:
         """只读快照：不推进插值、不改版本，重复读取结果一致。"""
         with self._lock:
             return SceneSnapshot(self._account.display_uid, self._version, self._observation_id, self._phase, self._session,
                 self._scene, self._resource, self._instance, self._position, self._updated_at, self._position_source,
-                tuple(self._actors.values()), self._unresolved, self._rejected)
+                tuple(self._actors.values()), self._unresolved, self._rejected, self._coverage.snapshot(self._resource),
+                not self._coverage_enabled, self._coverage.error or self._coverage.unavailable_reason(self._resource)
+                or (self._coverage_store.error if self._coverage_store else None))
 
     def _add(self, node: dict, event: PacketEvent) -> None:
         value, invalid = actor(node, event)
@@ -164,7 +201,7 @@ class SceneRepository:
         if value is None:
             return
         self._motions.pop(value.actor_id, None)
-        if self._is_beyond_radar_delete_distance(value):
+        if self._has_confirmed_position() and self._is_beyond_radar_delete_distance(value):
             self._actors.pop(value.actor_id, None)
             return
         if value.actor_id not in self._actors and len(self._actors) >= MAX_ACTORS:
@@ -183,7 +220,13 @@ class SceneRepository:
             return False
         return hypot(actor_x - player_x, actor_y - player_y) > self._max_distance_raw
 
+    def _has_confirmed_position(self) -> bool:
+        """客户端移动目标只用于展示参考，不能据此否定已观察到的实体。"""
+        return self._position_source in ("teleport", "scene_entry")
+
     def _prune_distant_actors(self) -> None:
+        if not self._has_confirmed_position():
+            return
         for actor_id, value in tuple(self._actors.items()):
             if self._is_beyond_radar_delete_distance(value):
                 del self._actors[actor_id]
@@ -247,6 +290,7 @@ class SceneRepository:
             if identity is not None:
                 previous_uid = self._account.display_uid
                 switched = self._account.observe(identity)
+                self._coverage.select_account(identity.uid)
                 if switched or self._session != event.session_id:
                     previous = self._session
                     if switched or (previous and previous != event.session_id):
@@ -270,6 +314,29 @@ class SceneRepository:
                     self._scene = scene
                     self._position = position(children(fs, 2))
                     self._position_source = "client_target" if self._position is not None else None
+                    # 只接纳请求时刻以前的历史分段；计划目标仍只作参考。
+                    request_time = integer(fs, 1)
+                    for segment in nodes(fs, 12):
+                        content = segment.get("children", [])
+                        if not isinstance(content, list):
+                            continue
+                        sample_time = integer(content, 2)
+                        sample = position(children(content, 1))
+                        if (request_time is not None and sample_time is not None
+                                and self._last_position_sample < sample_time <= request_time
+                                and sample is not None and sample[0] is not None and sample[1] is not None):
+                            self._last_position_sample = sample_time
+                            self._position, self._position_source = sample, "client_sample"
+                            if self._phase == "observing":
+                                self._coverage.record(self._resource, sample)
+                    if (integer(fs, 8) == 1 and request_time is not None
+                            and request_time >= self._last_position_sample):
+                        stopped = position(children(fs, 2))
+                        if stopped is not None and stopped[0] is not None and stopped[1] is not None:
+                            self._last_position_sample = request_time
+                            self._position, self._position_source = stopped, "client_stop"
+                            if self._phase == "observing":
+                                self._coverage.record(self._resource, stopped)
                     self._prune_distant_actors()
                     self._updated_at = event.ts
                     self._version += 1
@@ -292,9 +359,21 @@ class SceneRepository:
                     self._clear("observing")
                     self._session = event.session_id
                 self._scene, self._resource, self._instance = scene, resource, instance
+                landing = None
                 if event.opcode == 0x015C:
                     self._position = position(children(children(fs, 14), 1))
                     self._position_source = "teleport" if self._position is not None else None
+                    landing = self._position
+                else:
+                    base = children(children(children(fs, 11), 12), 1)
+                    entry_position = position(children(children(base, 8), 1))
+                    if entry_position is not None:
+                        self._position, self._position_source = entry_position, "scene_entry"
+                        landing = entry_position
+                # 只有本次事件自带落点才写足迹：0x0152 缺落点时位置保持旧值，
+                # 用残留的客户端目标坐标会把未确认的位置当成已记录区域。
+                if landing is not None:
+                    self._coverage.record(self._resource, landing)
             elif event.opcode in (4886, 4908, 4909):
                 if event.opcode == 4908 and self._battle_id is not None:
                     if integer(children(fs, 1), 19) != self._battle_id:
@@ -304,6 +383,7 @@ class SceneRepository:
                         return
                 if event.opcode == 4886:
                     self._clear_checkpoint_locked(self._account.display_uid, self._session)
+                self._last_position_sample = 0
                 self._actors.clear()
                 self._motions.clear()
                 self._observation_id += 1

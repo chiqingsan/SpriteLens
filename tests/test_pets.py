@@ -236,6 +236,21 @@ class PetRepositoryTest(unittest.TestCase):
         self._feed(repo, 0, b"x", 1)
         self.assertEqual(repo.snapshot(), ())
 
+    def test_limit_applies_per_repository_and_existing_pets_can_update(self):
+        repo = PetRepository()
+        repo.handle_packet(_named_event("s2c", [
+            _named_pet_node(gid, 20508, b"Cat", 5) for gid in range(1, 10000)
+        ]))
+        self.assertEqual(len(repo.snapshot()), 9999)
+        self._feed(repo, 10000, b"New", 5)
+        self._feed(repo, 1, b"Updated", 6)
+        self.assertEqual(len(repo.snapshot()), 9999)
+        self.assertEqual(repo.snapshot()[0].name, "Updated")
+
+        other = PetRepository()
+        self._feed(other, 10000, b"Other", 5)
+        self.assertEqual(len(other.snapshot()), 1)
+
 
 class PipelineIntegrationTest(unittest.TestCase):
     """端到端：合成 GCP 流 → 管线 → schema 命中 → 形状提取 → 仓库聚合。"""

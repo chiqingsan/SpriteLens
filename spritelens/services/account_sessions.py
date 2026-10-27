@@ -16,6 +16,7 @@ from spritelens.services.egg_repository import EggBoxRepository
 from spritelens.services.home_repository import HomeRepository
 from spritelens.services.scene_repository import DEFAULT_MAX_DISTANCE_RAW, SceneRepository
 from spritelens.repositories.scene_checkpoint_store import SceneCheckpointStore
+from spritelens.repositories.scene_coverage_store import SceneCoverageStore
 
 logger = get_logger("account_sessions")
 
@@ -62,6 +63,10 @@ class AccountSessions:
         pet_store: PetStore, egg_store: EggStore, home_store: HomeStore,
         scene_checkpoint_store: SceneCheckpointStore | None = None,
         scene_max_distance_raw: int = DEFAULT_MAX_DISTANCE_RAW,
+        scene_coverage_radius_raw: int = 0,
+        scene_coverage_enabled: bool = True,
+        scene_coverage_store: SceneCoverageStore | None = None,
+        scene_coverage_map_bounds: dict[int, tuple[int, int, int]] | None = None,
         selection_explicit: bool = False,
     ) -> None:
         self.lock = threading.RLock()
@@ -76,6 +81,10 @@ class AccountSessions:
         self._home_store = home_store
         self._scene_checkpoint_store = scene_checkpoint_store
         self._scene_max_distance_raw = max(1, int(scene_max_distance_raw))
+        self._scene_coverage_radius_raw = max(0, int(scene_coverage_radius_raw))
+        self._scene_coverage_enabled = scene_coverage_enabled
+        self._scene_coverage_store = scene_coverage_store
+        self._scene_coverage_map_bounds = scene_coverage_map_bounds
 
     def view(self, domain: str) -> SelectedRepository:
         return SelectedRepository(self, domain)
@@ -85,6 +94,10 @@ class AccountSessions:
                                    HomeRepository(self._home_store), SceneRepository(
                                        checkpoint_store=self._scene_checkpoint_store,
                                        max_distance_raw=self._scene_max_distance_raw,
+                                       coverage_radius_raw=self._scene_coverage_radius_raw,
+                                       coverage_enabled=self._scene_coverage_enabled,
+                                       coverage_store=self._scene_coverage_store,
+                                       coverage_map_bounds=self._scene_coverage_map_bounds,
                                    ))
 
     def handle_packet(self, event: PacketEvent) -> None:

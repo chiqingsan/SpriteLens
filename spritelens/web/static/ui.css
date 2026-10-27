@@ -268,14 +268,23 @@ button:not(.nav-item):has(> .ui-icon) { display: inline-flex; align-items: cente
 }
 @media (max-width: 760px) {
   :root:has(#page-pets.active) { --sidebar: 64px; }
+  :root:has(#page-nearby.active) { --sidebar: 64px; }
   body:has(#page-pets.active) .sidebar { padding: 12px 6px 8px; }
+  body:has(#page-nearby.active) .sidebar { padding: 12px 6px 8px; }
   body:has(#page-pets.active) .brand { justify-content: center; padding: 0 0 12px; }
+  body:has(#page-nearby.active) .brand { justify-content: center; padding: 0 0 12px; }
   body:has(#page-pets.active) .brand-copy, body:has(#page-pets.active) .nav-group-title { display: none; }
+  body:has(#page-nearby.active) .brand-copy, body:has(#page-nearby.active) .nav-group-title { display: none; }
   body:has(#page-pets.active) .sidebar-foot { display: block; }
+  body:has(#page-nearby.active) .sidebar-foot { display: block; }
   body:has(#page-pets.active) .nav-item { justify-content: center; padding: 0; gap: 0; font-size: 0; }
+  body:has(#page-nearby.active) .nav-item { justify-content: center; padding: 0; gap: 0; font-size: 0; }
   body:has(#page-pets.active) .sidebar-settings { justify-content: center; padding: 0; gap: 0; font-size: 0; }
+  body:has(#page-nearby.active) .sidebar-settings { justify-content: center; padding: 0; gap: 0; font-size: 0; }
   body:has(#page-pets.active) .sidebar-settings > .ui-icon:not(.nav-icon) { display: none; }
+  body:has(#page-nearby.active) .sidebar-settings > .ui-icon:not(.nav-icon) { display: none; }
   #page-pets { padding: 8px; }
+  #page-nearby { padding: 8px; }
   .pet-toolbar { padding: 8px; }
 }
 

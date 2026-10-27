@@ -47,6 +47,7 @@ from spritelens.web.pet_media_cache import PetMediaCache
 from spritelens.web.account_avatar_cache import AccountAvatarCache
 from spritelens.web.background import RUN_BLOCKING
 from spritelens.web.nearby import register_nearby_routes
+from spritelens.web.world_maps import register_world_map_routes
 from spritelens.web.routes_capture import CaptureRoutesMixin
 from spritelens.web.routes_accounts import AccountRoutesMixin
 from spritelens.web.collection_lines import register_collection_routes
@@ -342,6 +343,7 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         register_nearby_routes(
             app, self._context.scene_repository, self._context.static_data, self._context.settings
         )
+        register_world_map_routes(app)
         register_collection_routes(app, self._context)
         register_breeder_routes(app, self._context)
         register_planner_routes(app, self._context)
@@ -466,14 +468,17 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
 
     @web.middleware
     async def _no_cache_middleware(self, request: web.Request, handler):
-        """本地单机应用：静态资源禁用缓存。
+        """本地单机应用：每次都要重新校验，但不禁止条件请求。
 
-        WebView2 与浏览器的内存/磁盘缓存会让改前端后刷新不生效（实测遇到），
-        本地加载代价可忽略，直接 no-store 换掉这类玄学问题。
+        页面与 API 用 no-store；静态资源用 no-cache：浏览器仍会重新校验，
+        改前端后刷新照旧生效（WebView2/浏览器缓存曾让改动静默失效），
+        但底图等大文件未变化时可命中 304，不必每次重传数 MB。
         """
         response = await handler(request)
-        if request.path == "/" or request.path.startswith("/static"):
+        if request.path == "/":
             response.headers["Cache-Control"] = "no-store"
+        elif request.path.startswith("/static"):
+            response.headers["Cache-Control"] = "no-cache"
         return response
 
     # -- 数据 API ------------------------------------------------------

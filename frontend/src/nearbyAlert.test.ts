@@ -49,6 +49,17 @@ describe('附近精灵提醒音引擎', () => {
     alert.evaluate(snapshot([actor('1', 'normal'), actor('2', 'normal')]))
     expect(play).not.toHaveBeenCalled()
   })
+  it('同周期实体消失后超过冷却时间重新出现时再次提醒', () => {
+    let clock = 0
+    const play = vi.fn()
+    const alert = loadAlert(windowStub(), { storage: null, now: () => clock, play })
+    alert.evaluate(snapshot([actor('7', 'double')]))
+    alert.evaluate(snapshot([], { version: 11 }))
+    clock = 600001
+    alert.evaluate(snapshot([actor('7', 'double')], { version: 12 }))
+    expect(play).toHaveBeenCalledTimes(2)
+    alert.dispose()
+  })
   it('同一实体十分钟内跨周期或短暂消失重现不重复响，冷却后重现再响', () => {
     const play = vi.fn()
     let clock = 0
@@ -111,6 +122,13 @@ describe('附近精灵提醒音引擎', () => {
     alert.evaluate(snapshot([actor('9', 'double')], { observation_id: 6 }))
     expect(play).toHaveBeenCalledTimes(1)
   })
+  it('同一观察周期的旧版本不会倒退并触发提醒', () => {
+    const play = vi.fn()
+    const alert = loadAlert(windowStub(), { storage: null, now: () => 0, play })
+    alert.evaluate(snapshot([actor('9', 'normal')], { version: 12 }))
+    alert.evaluate(snapshot([actor('9', 'double')], { version: 11 }))
+    expect(play).not.toHaveBeenCalled()
+  })
   it('dispose 移除手势监听且之后调用不抛错', () => {
     const windowHost = windowStub()
     const alert = loadAlert(windowHost, { storage: null, now: () => 0, play: vi.fn() })
@@ -130,7 +148,11 @@ describe('提醒音与附近壳层供数', () => {
   function audioWindow(storageValue: string | null) {
     const windowHost: Record<string, any> = {
       addEventListener: vi.fn(), removeEventListener: vi.fn(),
-      setTimeout, clearTimeout, setInterval, clearInterval,
+      /* 延迟到调用时再取全局实现，才能被 setupBridge 里的假定时器接管。 */
+      setTimeout: (fn: () => void, ms: number) => setTimeout(fn, ms),
+      clearTimeout: (id: number) => clearTimeout(id),
+      setInterval: (fn: () => void, ms: number) => setInterval(fn, ms),
+      clearInterval: (id: number) => clearInterval(id),
       localStorage: { getItem: vi.fn(() => storageValue), setItem: vi.fn() },
       __toneStarts: 0
     }
@@ -168,24 +190,30 @@ describe('提醒音与附近壳层供数', () => {
   }
   afterEach(() => { bridge?.unmount(); vi.useRealTimers() })
 
-  it('页面未挂载时按摘要变化取快照，双牌响、单牌不响', async () => {
+  it('页面未挂载时按摘要变化取快照，双牌响、单牌不响；推送密集时合并供数', async () => {
     const request = vi.fn()
       .mockResolvedValueOnce(snapshot([actor('7', 'double')]))
       .mockResolvedValueOnce(snapshot([actor('7', 'double'), actor('8', 'marked')], { version: 12 }))
       .mockResolvedValueOnce(snapshot([actor('7', 'double'), actor('8', 'marked'), actor('9', 'double')], { version: 13 }))
     const windowHost = audioWindow(null)
     setupBridge(windowHost, request)
+    /* 首份快照立即取，作为提醒基线。 */
     bridge.update(summary)
     expect(request).toHaveBeenCalledTimes(1)
     await flushPromises()
     expect(windowHost.__toneStarts).toBe(2)
+    /* 2 秒内的多次推送合并为一次尾随读取，不按推送次数放大请求。 */
     bridge.update({ ...summary, version: 12 })
-    expect(request).toHaveBeenCalledTimes(2)
+    expect(request).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(2000)
     await flushPromises()
+    expect(request).toHaveBeenCalledTimes(2)
     expect(windowHost.__toneStarts).toBe(2)
     bridge.update({ ...summary, version: 13 })
-    expect(request).toHaveBeenCalledTimes(3)
+    expect(request).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(2000)
     await flushPromises()
+    expect(request).toHaveBeenCalledTimes(3)
     expect(windowHost.__toneStarts).toBe(4)
     expect(messages.some(message => message.kind === 'snapshot')).toBe(false)
   })

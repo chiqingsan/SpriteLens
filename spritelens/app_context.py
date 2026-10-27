@@ -9,6 +9,7 @@ Web 界面入口（`spritelens.web.run.run_web`）调用本模块完成一次性
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from typing import cast
 
 from spritelens.capture.key_store import KeyStore
@@ -45,6 +46,7 @@ from spritelens.services.retention import apply_storage_retention, eventlog_roll
 from spritelens.services.game_capture_automation import GameCaptureAutomation
 from spritelens.services.monitor_service import MonitorService
 from spritelens.repositories.scene_checkpoint_store import SceneCheckpointStore
+from spritelens.repositories.scene_coverage_store import SceneCoverageStore
 from spritelens.services.pet_repository import PetRepository
 from spritelens.view_models import CaptureViewModel, PetViewModel
 
@@ -79,6 +81,7 @@ class AppContext:
     key_store: KeyStore | None = None  # 会话文件 writer 的生命周期归组合根持有
     scene_repository: SceneRepository | None = None
     scene_checkpoint_store: SceneCheckpointStore | None = None
+    scene_coverage_store: SceneCoverageStore | None = None
     _capture_stopped: bool = False
 
     def close(self) -> None:
@@ -114,6 +117,8 @@ class AppContext:
             _try("事件日志", self.event_log.close)
         if self.scene_checkpoint_store is not None:
             _try("附近场景基线", self.scene_checkpoint_store.close)
+        if self.scene_coverage_store is not None:
+            _try("搜索覆盖记录", self.scene_coverage_store.close)
         if self.key_store is not None:
             _try("密钥存储", self.key_store.close)
         store_failures: list[tuple[str, BaseException]] = []
@@ -195,6 +200,8 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
     _created(key_store.close)
     scene_checkpoint_store = SceneCheckpointStore(scene_checkpoint_path())
     _created(scene_checkpoint_store.close)
+    scene_coverage_store = SceneCoverageStore(data_root() / "scene_coverage.json")
+    _created(scene_coverage_store.close)
     # 桌面链路由下面的业务监听器消费事件，不保留事件历史（2000 条常驻无消费方）。
     monitor = MonitorService(
         catalog=load_catalog(),
@@ -278,14 +285,33 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
     scene_max_distance_raw = settings.get_int(
         "nearby.max_distance_raw", DEFAULT_MAX_DISTANCE_RAW, lo=1000, hi=200000
     )
+    # 90m 是历史真实日志的估计值，不是服务器保证的 AOI 半径。
+    coverage_radius_raw = 9000
+    coverage_map_bounds: dict[int, tuple[int, int, int]] = {}
+    manifest_path = static_dir() / "world_maps.json"
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("coordinate_version") == 1:
+            for map_id, entry in manifest.get("maps", {}).items():
+                projection = entry.get("projection", {})
+                if (map_id.isdigit() and entry.get("availability") == "supported"
+                        and entry.get("calibration", {}).get("level") == "verified"
+                        and all(type(projection.get(k)) is int for k in ("origin_x", "origin_y", "side"))
+                        and projection["side"] > 0):
+                    coverage_map_bounds[int(map_id)] = (projection["origin_x"], projection["origin_y"], projection["side"])
     scene_repository = SceneRepository(
-        checkpoint_store=scene_checkpoint_store, max_distance_raw=scene_max_distance_raw
+        checkpoint_store=scene_checkpoint_store, max_distance_raw=scene_max_distance_raw,
+        coverage_radius_raw=coverage_radius_raw, coverage_map_bounds=coverage_map_bounds,
+        coverage_store=scene_coverage_store,
     )
     account_sessions = AccountSessions(
         AccountRepositories(pet_repository, egg_box, home_repo, scene_repository),
         uid=display_uid, pet_store=pet_store, egg_store=egg_store, home_store=home_store,
         scene_checkpoint_store=scene_checkpoint_store,
         scene_max_distance_raw=scene_max_distance_raw,
+        scene_coverage_radius_raw=coverage_radius_raw,
+        scene_coverage_map_bounds=coverage_map_bounds,
+        scene_coverage_store=scene_coverage_store,
         selection_explicit=selection_explicit,
     )
     monitor.add_packet_listener(account_sessions.handle_packet)
@@ -338,6 +364,7 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
         home_repo=home_repo,
         account_selection=account_selection,
         scene_repository=scene_repository,
+        scene_coverage_store=scene_coverage_store,
         game_automation=game_automation,
         database=database,
         key_store=key_store,

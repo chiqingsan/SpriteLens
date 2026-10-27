@@ -250,6 +250,25 @@ class PetStoreTest(unittest.TestCase):
 
 
 class PetRepositoryPersistenceTest(unittest.TestCase):
+    def test_more_than_2000_pets_persist_per_account(self):
+        db = Database(":memory:")
+        store = PetStore(db)
+        self.addCleanup(db.close)
+        self.addCleanup(store.close)
+        first = PetRepository(store)
+        first.handle_packet(identity_event())
+        first.handle_packet(pet_event([(gid, "Cat", 5) for gid in range(1, 2002)]))
+        second = PetRepository(store)
+        second.handle_packet(identity_event(uid=OTHER_UID))
+        second.handle_packet(pet_event([(1, "Other", 6)]))
+        store.flush()
+
+        restored_first = PetRepository(store)
+        restored_second = PetRepository(store)
+        self.assertEqual(restored_first.load_persisted(UID), 2001)
+        self.assertEqual(restored_second.load_persisted(OTHER_UID), 1)
+        self.assertEqual(restored_second.snapshot()[0].name, "Other")
+
     def setUp(self):
         self.tmp_path = _make_tmp(self)
         self.db_path = self.tmp_path / "repo.sqlite"

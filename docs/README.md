@@ -9,6 +9,10 @@
 
 [附近精灵列表](NEARBY_OBSERVATIONS.md) — C03 操作入口、解包适配来源、请求归属与观察版边界。
 
+[野生精灵搜索覆盖记录规格](NEARBY_EXPLORATION_SPEC.md) — 用户确认的网格覆盖目标、任意相交规则、可信采样、历史和验收边界；半径及刷新策略尚待确认。
+
+[附近精灵地图与本地观察区域计划](NEARBY_MAP_PLAN_2026-10-26.md) — DeepSeek 交接：底图/投影资源证据、可信位置采样、本次足迹和历史观察区域；用户选择工具本地记录，非游戏解锁状态。C13-01 已交付并完成 10003 现场校准，C13-02 地图模式已实现待真实游戏验收；后续切片与证据见 ROADMAP 的 C13。
+
 [DeepSeek 交接文档](HANDOFF_DEEPSEEK_2026-10-24.md) — 2026-10-24 数据库数据恢复事故记录、恢复后验证结果、伙伴标记实现与遗留事项。
 
 [内存与性能修复交接](reviews/MEMORY_PERFORMANCE_HANDOFF_2026-10-24.md) — 进程内存采样、事件缓存隔离对照、PERF01–PERF07 修复方向与验收边界；持续状态见 ROADMAP，本报告不表示修复已完成。
@@ -47,6 +51,7 @@
 - [reviews/MEMORY_PERFORMANCE_PAGE_RESIDENCY_2026-10-26.md](reviews/MEMORY_PERFORMANCE_PAGE_RESIDENCY_2026-10-26.md) — PERF03 页面驻留分摊测量：11 页 10 轮导航平台化、单页隔离归因上界与释放上限实验；本轮只交付测量与决策，不实施离页释放
 - [reviews/MEMORY_PERFORMANCE_DECODE_AUDIT_2026-10-26.md](reviews/MEMORY_PERFORMANCE_DECODE_AUDIT_2026-10-26.md) — PERF06 解码分配复测与消费者审计：峰值等于单个大包解码树（22.7 MiB），结束态 1.5 MiB，结论保持协议表示不变
 - [reviews/MEMORY_PERFORMANCE_RADAR_ACCEPTANCE_2026-10-26.md](reviews/MEMORY_PERFORMANCE_RADAR_ACCEPTANCE_2026-10-26.md) — PERF02 原生雷达窗口验收：真实 WebView2/pywebview 双窗口下消息语义、失效清空、断链心跳与宿主 API 契约通过；真实游戏流量与整机内存对比未覆盖
+- [reviews/2026-10-27-nearby-performance-review.md](reviews/2026-10-27-nearby-performance-review.md) — 附近精灵性能与补全审查：12 实体链路健康，500 实体每拍约 1 个 120–150 ms 长任务、覆盖层 6 份 path 与整面 mask、密集场景无节点预算；附 P0/P1/P2 最小改法与验收断言，第十节补记第二至五轮方格覆盖、渲染预算、手动清除足迹与按雷达半径外扩观察范围的实施实测，真实 WebView2/游戏流量未验证
 
 当前规格、历史 review 与方向（按需查阅）：
 

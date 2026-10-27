@@ -22,7 +22,7 @@ from spritelens.repositories.pet_store import PetStore
 from spritelens.services.account_tracker import AccountTracker
 from spritelens.events import PacketEvent
 
-MAX_PETS = 2000
+MAX_PETS = 9999
 
 
 @dataclass(frozen=True)

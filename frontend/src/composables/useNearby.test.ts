@@ -1,6 +1,6 @@
 import { flushPromises } from '@vue/test-utils'
 import { describe, it, expect, vi } from 'vitest'
-import { useNearby } from './useNearby'
+import { AUTO_LOAD_INTERVAL_MS, useNearby } from './useNearby'
 import { parseNearby } from '../types/nearby'
 
 const summary = { uid: '101', version: 1, observation_id: 1, phase: 'observing' }
@@ -62,8 +62,11 @@ describe('附近精灵请求归属', () => {
     const load = vi.fn().mockResolvedValueOnce(snapshot).mockImplementationOnce(() => new Promise(r => { resolve = r })).mockResolvedValueOnce({ ...snapshot, uid: '202', version: 3, observation_id: 2, actors: [] })
     const model = useNearby({ load }); model.update(summary); await flushPromises()
     expect(model.data.value?.actors).toHaveLength(1)
-    model.update({ ...summary, version: 2 })
+    // 旧账号的手动刷新还在途：节流不会推迟它，切号必须立刻取消并清空。
+    void model.load()
+    const previousSignal = load.mock.calls[1]![0] as AbortSignal
     model.update({ ...summary, uid: '202', version: 3, observation_id: 2 })
+    expect(previousSignal.aborted).toBe(true)
     expect(model.data.value).toBeNull(); await flushPromises()
     resolve({ ...snapshot, version: 2 }); await flushPromises()
     expect(model.data.value?.uid).toBe('202'); expect(model.data.value?.actors).toEqual([])
@@ -115,6 +118,84 @@ describe('附近精灵请求归属', () => {
     expect(load).toHaveBeenCalledTimes(2)
     await flushPromises()
     expect(model.data.value?.version).toBe(3)
+  })
+
+  it('版本推进触发的后台同步不切换 loading，只原位更新已提交的数据', async () => {
+    let resolve: (value: unknown) => void = () => {}
+    const load = vi.fn().mockResolvedValueOnce(snapshot).mockImplementationOnce(() => new Promise(r => { resolve = r }))
+    const model = useNearby({ load }); model.update(summary); await flushPromises()
+    model.update({ ...summary, version: 2 }); await flushPromises()
+    expect(model.loading.value).toBe(false)
+    expect(model.data.value?.version).toBe(1)
+    resolve({ ...snapshot, version: 2 }); await flushPromises()
+    expect(model.data.value?.version).toBe(2)
+    expect(model.loading.value).toBe(false)
+    model.pause()
+  })
+  it('自动同步按最小间隔合并，窗口内多次推进只补发一次最新', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const load = vi.fn().mockResolvedValueOnce(snapshot)
+        .mockResolvedValueOnce({ ...snapshot, version: 2 })
+        .mockResolvedValueOnce({ ...snapshot, version: 5 })
+      const model = useNearby({ load })
+      model.update(summary)
+      expect(model.loading.value).toBe(true)
+      await flushPromises()
+      expect(model.data.value?.version).toBe(1)
+      // 距上次自动读取足够久：领先的版本推进立即读一次。
+      model.update({ ...summary, version: 2 }); await flushPromises()
+      expect(load).toHaveBeenCalledTimes(2)
+      expect(model.data.value?.version).toBe(2)
+      model.update({ ...summary, version: 3 })
+      model.update({ ...summary, version: 4 })
+      model.update({ ...summary, version: 5 })
+      expect(load).toHaveBeenCalledTimes(2)
+      vi.advanceTimersByTime(AUTO_LOAD_INTERVAL_MS)
+      await flushPromises()
+      expect(load).toHaveBeenCalledTimes(3)
+      expect(model.data.value?.version).toBe(5)
+      expect(model.loading.value).toBe(false)
+      model.pause()
+    } finally { vi.useRealTimers() }
+  })
+  it('暂停后不再排程后台同步，恢复时立即补一次积压的读取', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const load = vi.fn().mockResolvedValueOnce(snapshot)
+        .mockResolvedValueOnce({ ...snapshot, version: 2 })
+        .mockResolvedValueOnce({ ...snapshot, version: 3 })
+      const model = useNearby({ load })
+      model.update(summary); await flushPromises()
+      model.update({ ...summary, version: 2 }); await flushPromises()
+      expect(load).toHaveBeenCalledTimes(2)
+      model.update({ ...summary, version: 3 })
+      model.pause()
+      vi.advanceTimersByTime(AUTO_LOAD_INTERVAL_MS * 2)
+      await flushPromises()
+      expect(load).toHaveBeenCalledTimes(2)
+      model.resume(); await flushPromises()
+      expect(load).toHaveBeenCalledTimes(3)
+      expect(model.data.value?.version).toBe(3)
+      expect(model.loading.value).toBe(false)
+      model.pause()
+    } finally { vi.useRealTimers() }
+  })
+  it('同周期失败只标记稍早结果，不会自动重试', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const load = vi.fn().mockResolvedValueOnce(snapshot).mockRejectedValueOnce(Error('读取失败'))
+      const model = useNearby({ load })
+      model.update(summary); await flushPromises()
+      model.update({ ...summary, version: 2 }); await flushPromises()
+      expect(model.error.value).toBe('读取失败')
+      expect(model.stale.value).toBe(true)
+      expect(model.data.value?.version).toBe(1)
+      vi.advanceTimersByTime(AUTO_LOAD_INTERVAL_MS * 4)
+      await flushPromises()
+      expect(load).toHaveBeenCalledTimes(2)
+      model.pause()
+    } finally { vi.useRealTimers() }
   })
   it('切号状态短暂缺少附近观察时清空旧账号数据', async () => {
     const load = vi.fn().mockResolvedValue(snapshot)

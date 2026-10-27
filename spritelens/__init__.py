@@ -4,7 +4,7 @@
 protocol 协议层为模式无关纯函数，功能层只消费统一的 PacketEvent。
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 APP_NAME = "SpriteLens"
 APP_DISPLAY_NAME = "小洛探探"

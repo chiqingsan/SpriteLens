@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "coordinate_version": 1,
+  "dataset": "roco_resources",
+  "generated_by": "tools/import_world_maps.py",
+  "source": {
+    "config": {
+      "path": "runtime_assets/desktop-data.json",
+      "sha256": "3cd8ae8277a5dedd1e50377a87664f4246b484197996f86ef74e2705cfae8797"
+    },
+    "maps": {
+      "10003": {
+        "path": "decompiled/asar/ui/assets/maps/10003.webp",
+        "sha256": "3aaaca531a50e6fcee6763c696a1f58c824d464dbc790a20970d5052a7e88c7c",
+        "bytes": 1263992
+      },
+      "10018": {
+        "path": "decompiled/asar/ui/assets/maps/10018.webp",
+        "sha256": "44851431840cc83988de4eaf5d9c0c0da62d9c13abb44b7081fc9c922b89b96b",
+        "bytes": 1786848
+      }
+    }
+  },
+  "maps": {
+    "10003": {
+      "name": "卡洛西亚大陆",
+      "availability": "supported",
+      "image": {
+        "asset": "maps/10003.webp",
+        "url": "/static/maps/10003.webp",
+        "format": "webp",
+        "width": 4096,
+        "height": 4096,
+        "bytes": 1263992,
+        "sha256": "3aaaca531a50e6fcee6763c696a1f58c824d464dbc790a20970d5052a7e88c7c"
+      },
+      "coordinate_system": {
+        "raw_unit": "game_world",
+        "image_pixel_origin": "top_left"
+      },
+      "projection": {
+        "kind": "origin_side_normalized",
+        "origin_x": 306000,
+        "origin_y": 408000,
+        "side": 408000
+      },
+      "calibration": {
+        "level": "verified",
+        "basis": "field_screenshot_match",
+        "field_points": 8,
+        "orientation": "verified_north_up",
+        "max_error_px": 4.54,
+        "mean_error_px": 2.82,
+        "checked_at": "2026-10-26",
+        "method": "游戏内地图截图与入库底图多尺度互相关匹配，锚点取玩家徽标中心"
+      },
+      "notes": "解包原图直接入库，未转码、未裁切；原点与边长来自 desktop-data.json，已用 8 个游戏内坐标点与地图截图比对，单位像素误差不超过 8，朝向已确认北向上。"
+    },
+    "10018": {
+      "name": "魔法学院",
+      "availability": "candidate",
+      "image": {
+        "asset": "maps/10018.webp",
+        "url": "/static/maps/10018.webp",
+        "format": "webp",
+        "width": 4096,
+        "height": 4096,
+        "bytes": 1786848,
+        "sha256": "44851431840cc83988de4eaf5d9c0c0da62d9c13abb44b7081fc9c922b89b96b"
+      },
+      "coordinate_system": {
+        "raw_unit": "game_world",
+        "image_pixel_origin": "top_left"
+      },
+      "projection": {
+        "kind": "origin_side_normalized",
+        "origin_x": -886161,
+        "origin_y": -891000,
+        "side": 180000
+      },
+      "calibration": {
+        "level": "candidate",
+        "basis": "static_import",
+        "field_points": 0,
+        "orientation": "unverified"
+      },
+      "notes": "解包原图直接入库，未转码、未裁切；原点与边长来自 desktop-data.json，朝向和坐标误差未做游戏现场地标校准。"
+    }
+  }
+}

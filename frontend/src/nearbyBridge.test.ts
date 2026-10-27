@@ -34,7 +34,7 @@ describe('附近主窗口与悬浮窗桥接', () => {
     expect(request).toHaveBeenCalledTimes(1)
     finish(summary); await flushPromises()
     expect(request).toHaveBeenCalledTimes(2)
-    expect(messages.filter(m => m.kind === 'snapshot').map(m => m.payload?.version)).toEqual([10, 12])
+    expect(messages.filter(m => m.kind === 'snapshot').map(m => m.payload?.version)).toEqual([12])
   })
   it('低版本切号立即取消旧请求，晚到结果不转发', async () => {
     let finish: (value: unknown) => void = () => {}

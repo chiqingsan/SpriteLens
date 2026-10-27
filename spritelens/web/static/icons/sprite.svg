@@ -207,4 +207,34 @@
   <path d="M9 17v1a3 3 0 0 0 6 0v-1" />
   <path d="M3 3l18 18" />
 </symbol>
+<symbol id="zoom-in" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="10" cy="10" r="7" />
+  <path d="M7 10h6" />
+  <path d="M10 7v6" />
+  <path d="M21 21l-6 -6" />
+</symbol>
+<symbol id="zoom-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="10" cy="10" r="7" />
+  <path d="M7 10h6" />
+  <path d="M21 21l-6 -6" />
+</symbol>
+<symbol id="arrows-maximize" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M16 4l4 0l0 4" />
+  <path d="M4 8l0 -4l4 0" />
+  <path d="M4 16l0 4l4 0" />
+  <path d="M20 16l0 4l-4 0" />
+</symbol>
+<symbol id="current-location" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="8" />
+  <circle cx="12" cy="12" r="3" />
+  <path d="M12 2v3" />
+  <path d="M12 19v3" />
+  <path d="M2 12h3" />
+  <path d="M19 12h3" />
+</symbol>
+<symbol id="route" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="6" cy="19" r="2" />
+  <circle cx="18" cy="5" r="2" />
+  <path d="M8 19h8.5a3.5 3.5 0 0 0 0 -7h-9a3.5 3.5 0 0 1 0 -7h6.5" />
+</symbol>
 </svg>

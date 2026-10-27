@@ -22,7 +22,7 @@ ENTRY_LOADERS = {
     "src/main.ts": "entry.js",
     "src/radar.ts": "radar-entry.js",
 }
-RADAR_EXPORTS = ("mountFloatingRadar",)
+RADAR_EXPORTS = ("mountFloatingRadar", "createApiClient")
 
 
 def _entry_css(manifest: dict, source: str) -> list[str]:
