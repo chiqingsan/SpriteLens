@@ -192,10 +192,12 @@
   gap: var(--space-1);
   min-width: 0;
   padding: var(--space-3);
-  border: 1px solid var(--line-soft);
+  /* 卡片是白底落在暖白画布上，--line-soft 几乎看不出边界，描边加深到墨 24% 并加一层极浅阴影 */
+  border: 1px solid color-mix(in srgb, var(--ink) 24%, transparent);
   border-radius: var(--radius-md);
   background: var(--panel);
   color: var(--ink);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 5%, transparent);
   text-align: center;
   cursor: pointer;
   transition:
@@ -205,7 +207,7 @@
 }
 
 .collection-card:hover {
-  border-color: color-mix(in srgb, var(--teal) 34%, var(--line-soft));
+  border-color: color-mix(in srgb, var(--teal) 42%, var(--ink));
   box-shadow: var(--shadow-1);
 }
 
