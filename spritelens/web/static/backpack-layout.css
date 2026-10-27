@@ -1,5 +1,5 @@
 /* 定稿布局：应用壳与背包样式，复用主题 token；不改变业务卡片配色。 */
-:root { --backpack-control: 34px; --pet-search-width: clamp(220px, 18vw, 280px); }
+:root { --backpack-control: 34px; --pet-search-width: clamp(220px, 18vw, 280px); --pet-card-min: 136px; }
 #page-pets { --pet-side-width: 340px; }
 .account-card { position: relative; margin-bottom: var(--space-4); padding: 2px; border: 1px solid var(--line-soft); border-radius: var(--radius-lg); background: var(--panel); box-shadow: var(--shadow-1); }
 .account-information { position: relative; }
@@ -83,14 +83,29 @@
 .box-number { display: block; width: 42px; padding: 0; }
 .box-scroll { flex: none; width: 24px; height: var(--backpack-control); background: transparent; padding: 0; }
 .box-total { flex: none; font-size: var(--fs-xs); color: var(--muted); padding-left: var(--space-2); white-space: nowrap; }
-#page-pets .table-wrap { overflow: auto; }
+#page-pets .table-wrap {
+  overflow: auto;
+  scrollbar-width: auto;
+  scrollbar-gutter: stable both-edges;
+}
+#page-pets .table-wrap::-webkit-scrollbar { display: block; width: 10px; height: 10px; }
+#page-pets .table-wrap::-webkit-scrollbar-track { background: var(--surface-2); border-radius: 999px; }
+#page-pets .table-wrap::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
 #page-pets .table-wrap.pet-empty-state { display: grid; place-items: center; min-height: 260px; }
 #page-pets .table-wrap.pet-empty-state #pet-grid { display: none; }
 #page-pets .table-wrap.pet-empty-state #pet-empty:not([hidden]) { display: grid; justify-items: center; align-content: center; gap: var(--space-3); width: 100%; min-height: 100%; padding: var(--space-7) var(--space-5); box-sizing: border-box; }
 #page-pets .table-wrap.pet-empty-state #pet-empty > .ui-icon { width: 32px; height: 32px; color: var(--teal); }
 #page-pets .table-wrap.pet-empty-state #pet-empty-copy { max-width: 460px; margin: 0; line-height: 1.6; }
-#pet-grid.game-box-grid { width: 100%; max-width: none; min-width: 0; grid-template-columns: repeat(6, minmax(0, 1fr)); }
-#pet-grid.box-fill-grid { height: 100%; min-height: 672px; grid-template-rows: repeat(5, minmax(0, 1fr)); grid-auto-rows: auto; align-content: stretch; }
+#pet-grid.game-box-grid,
+#pet-grid.box-fill-grid {
+  width: 100%;
+  max-width: none;
+  min-width: calc(6 * var(--pet-card-min, 136px) + 5 * var(--space-2));
+  grid-template-columns: repeat(6, minmax(var(--pet-card-min, 136px), 164px));
+  grid-template-rows: repeat(5, minmax(126px, 1fr));
+  grid-auto-rows: minmax(126px, auto);
+}
+#pet-grid.box-fill-grid { height: 100%; min-height: 672px; align-content: stretch; }
 #pet-grid.box-fill-grid > .point-pet { height: 100%; grid-template-rows: 24px minmax(0, 1fr) 16px 22px; align-content: stretch; }
 #pet-grid.box-fill-grid .point-portrait-row { height: 100%; align-items: center; }
 #pet-grid.box-fill-grid .point-groups, #pet-grid.box-fill-grid .point-medals { align-self: start; }
@@ -187,10 +202,8 @@
   #page-pets .workspace.split.has-detail > #pet-detail-root > .ui-inspector { height: 100%; min-height: 0; border-radius: var(--radius-lg); border: 1px solid var(--line-soft); box-shadow: var(--shadow-1); }
   #page-pets .workspace.has-detail .content-panel { grid-row: 1; height: 100%; min-height: 0; }
   #page-pets .workspace.has-detail .filter-rail { display: flex; }
-  #page-pets .workspace.has-detail #pet-grid.game-box-grid,
-  #page-pets .workspace.has-detail #pet-grid.box-fill-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
   #page-pets .workspace.has-detail #pet-grid.box-fill-grid > .point-pet { grid-template-rows: 22px minmax(0, 1fr) 14px 20px; }
-  /* 详情打开时内容列变窄：工具行允许换行，卡片切紧凑排版。 */
+  /* 详情打开时内容列变窄：工具行允许换行，网格保持 6×5，最小宽度由内部横向滚动承载。 */
   #page-pets .workspace.has-detail .pet-toolbar { flex-wrap: wrap; }
   #page-pets .workspace.has-detail .pet-search-results { order: 0; justify-content: flex-start; flex-basis: 100%; width: 100%; }
   #page-pets .workspace.has-detail .pet-tools { flex: 1 1 auto; }
@@ -301,35 +314,4 @@
   #pet-grid.game-box-grid .point-metrics > span + span { border-left-color: color-mix(in srgb, var(--line) 85%, transparent); }
   #pet-grid.game-box-grid .point-name { font-size: 13px; line-height: 16px; }
   #pet-grid.game-box-grid .point-egg-group { font-size: 11px; line-height: 16px; }
-}
-
-/* 窄窗列数：≤760 时 6 列卡宽不足 100px，数值/名字会被裁切。
-   让箱位网格退化为自适应卡片网格（保持箱位顺序、可纵向滚动），
-   640 时 3 列，保证卡片内容完整。 */
-@media (max-width: 760px) {
-  #pet-grid.box-fill-grid {
-    height: auto;
-    min-height: 0;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    grid-template-rows: none;
-    grid-auto-rows: 152px;
-    align-content: start;
-  }
-  #pet-grid.box-fill-grid > .point-pet { height: 100%; }
-}
-@media (max-width: 640px) {
-  #pet-grid.box-fill-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-
-/* 640 窗口：内容宽约 576，6 列卡宽仅 ~89px。优先保住立绘、名称和三列数值，
-   两侧蛋组/奖牌与顶部居中标记让位，避免元素互相遮挡。 */
-@media (max-width: 640px) {
-  #pet-grid.box-fill-grid .point-groups,
-  #pet-grid.box-fill-grid .point-medals { display: none; }
-  #pet-grid.box-fill-grid .point-portrait-row { grid-template-columns: minmax(0, 1fr); }
-  #pet-grid.game-box-grid .point-markers { display: none; }
-  #pet-grid.game-box-grid .point-name { font-size: 12px; line-height: 15px; }
-  #pet-grid.game-box-grid .point-nature { max-width: 32px; padding: 0 3px; }
-  #pet-grid.game-box-grid .point-metrics b { font-size: 10px; line-height: 14px; }
-  #pet-grid.game-box-grid .point-metrics small { font-size: 9px; line-height: 12px; }
 }
