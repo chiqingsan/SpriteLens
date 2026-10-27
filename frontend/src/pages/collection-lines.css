@@ -428,7 +428,7 @@
 .collection-group-options .chip {
   min-height: 26px;
   padding: 0 var(--space-2);
-  border: 1px solid var(--hairline-strong);
+  border: 1px solid var(--field-line);
   border-radius: var(--radius-sm);
   background: var(--panel);
   color: var(--ink-soft);
@@ -436,7 +436,7 @@
   font-weight: 500;
 }
 
-.collection-group-options .chip:hover { border-color: color-mix(in srgb, var(--ink) 26%, transparent); background: var(--surface-1); color: var(--ink); }
+.collection-group-options .chip:hover { border-color: var(--field-line-hover); background: var(--surface-1); color: var(--ink); }
 
 .collection-group-options .chip.active {
   border-color: color-mix(in srgb, var(--teal) 55%, var(--hairline-strong));
@@ -458,7 +458,7 @@
   gap: var(--space-2);
   min-height: 34px;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--hairline-strong);
+  border: 1px solid var(--field-line);
   border-radius: var(--radius-sm);
   background: var(--panel);
   color: var(--ink-soft);
@@ -467,7 +467,7 @@
   text-align: left;
 }
 
-.collection-parent-options .chip:hover { border-color: color-mix(in srgb, var(--ink) 26%, transparent); background: var(--surface-1); color: var(--ink); }
+.collection-parent-options .chip:hover { border-color: var(--field-line-hover); background: var(--surface-1); color: var(--ink); }
 .collection-parent-options .ui-icon { width: 15px; height: 15px; }
 
 .collection-parent-options .chip.active {

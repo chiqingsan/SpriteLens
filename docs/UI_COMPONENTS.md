@@ -23,7 +23,7 @@
 | 间距 | `--space-0` 2 / `-1` 4 / `-2` 6 / `-3` 8 / `-4` 10 / `-5` 12 / `-6` 16 / `-7` 20 / `-8` 24（禁止 3/5/7/9 等散值） |
 | 圆角 | `--radius-sm` 8 / `--radius-md` 10 / `--radius-lg` 16 / `--radius-xl` 20；胶囊写 999px、正圆 50% |
 | 阴影 | `--shadow-1` 静置 / `--shadow-2` 悬停 / `--shadow-3`（=`--shadow-pop`）浮层 / `--shadow-canvas` 工作画布；全部为「低透明叠层小偏移 + inset 高光」，不使用单层重投影 |
-| 描边 | `--hairline`（墨色 9%，卡片/输入框/分隔线）/ `--hairline-strong`（15%，悬停/强调）替代实色 `--line` 作为视觉边界 |
+| 描边 | `--hairline`（墨色 9%，卡片/分隔线）/ `--hairline-strong`（15%，悬停/强调）替代实色 `--line` 作为视觉边界；`--field-line`（26%）/ `--field-line-hover`（34%）专给**需要看清边界的输入控件**（搜索框、筛选 chip）——白底上 15% 只有 1.35:1 对比，看起来像没描边 |
 | 输入 | `--field-bg`（内凹底色，= surface-1）/ `--field-inset`（内凹阴影），输入框统一使用，聚焦叠加 3px 焦点光环 |
 | 动效 | `--motion-fast` 120ms / `--motion-base` 200ms / `--motion-slow` 300ms / `--motion-ease`（出）/ `--motion-spring`（弹性）/ `--motion-lift` |
 | 颜色 | 表面 `--bg/[--canvas]/--panel/--surface-1..4`；描边 `--line/--line-soft/--hairline*`；文字 `--ink/--ink-soft/--muted/--muted-2`；主色 `--teal/--teal-dark/--teal-soft/--teal-bright`；语义 `--amber*/--danger*/--ok`；焦点 `--focus-ring/--focus-halo`；环境光 `--ambient-1/2` |

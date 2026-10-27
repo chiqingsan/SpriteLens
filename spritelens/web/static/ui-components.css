@@ -126,14 +126,14 @@
 .ui-search {
   position: relative; display: flex; align-items: center; gap: var(--space-2);
   height: 34px; min-width: 0; padding: 0 var(--space-2) 0 var(--space-4);
-  border: 1px solid var(--hairline-strong); border-radius: var(--radius-md);
+  border: 1px solid var(--field-line); border-radius: var(--radius-md);
   background: var(--field-bg); color: var(--muted-2);
   transition: border-color var(--motion-fast) var(--motion-ease),
               box-shadow var(--motion-fast) var(--motion-ease),
               background-color var(--motion-fast) var(--motion-ease),
               color var(--motion-fast) var(--motion-ease);
 }
-.ui-search:hover { border-color: color-mix(in srgb, var(--ink) 22%, transparent); }
+.ui-search:hover { border-color: var(--field-line-hover); }
 .ui-search:focus-within {
   background: var(--panel); color: var(--teal-dark);
   border-color: color-mix(in srgb, var(--teal) 62%, var(--hairline));
