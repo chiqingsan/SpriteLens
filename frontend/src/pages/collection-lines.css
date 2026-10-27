@@ -200,10 +200,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 产线卡网格：>=1361 五列，1201–1360 四列，窄屏自适应 */
+/* 产线卡网格：列数跟随列表面板的实际宽度，而不是窗口宽度。
+   侧栏常驻时面板只有窗口的一小半，按窗口写死 5/4 列会让 1024 窗口只剩 88px 一列，
+   组名和精灵名全被截成两三个字。minmax(176px) 保证「蛋组 / 蛋组」与最长的
+   「鸭吉吉（蓬松的样子）」这类名字都能放得下。 */
 .collection-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(172px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
   gap: var(--space-3);
   align-content: start;
   align-items: start;
@@ -217,8 +220,8 @@
 
 .collection-card {
   display: grid;
-  grid-template-rows: 18px 64px 20px minmax(28px, auto) 24px;
-  gap: 2px;
+  grid-template-rows: 18px 70px 20px minmax(24px, auto) 24px;
+  gap: var(--space-1);
   min-width: 0;
   padding: var(--space-3);
   border: 1px solid var(--line-soft);
@@ -246,9 +249,11 @@
 
 .collection-card:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 
-.collection-card-topline { display: flex; align-items: start; justify-content: space-between; gap: var(--space-1); min-width: 0; }
+.collection-card-topline { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; }
 
 .collection-card-groups {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   color: var(--muted);
   font-size: var(--fs-3xs);
@@ -258,37 +263,66 @@
   white-space: nowrap;
 }
 
+/* 状态不再用灰底胶囊：198/200 张卡都是「未收集」，胶囊既占掉组名的位置，
+   又在整屏里堆成一片灰块。改成小圆点 + 彩色文字，位置固定，扫视时同样一眼可辨。 */
 .collection-status {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   flex: none;
   min-height: 18px;
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
   color: var(--muted);
   font-size: var(--fs-3xs);
   line-height: 18px;
   white-space: nowrap;
 }
 
-.collection-status .ui-icon { width: 12px; height: 12px; }
-.collection-status.collected { background: var(--teal-soft); color: var(--teal-dark); }
-.collection-status.missingMale,
-.collection-status.unknown { background: var(--amber-soft); color: var(--amber-ink); }
-.collection-status.missing { background: var(--surface-2); color: var(--muted); }
+.collection-status::before {
+  content: "";
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: .72;
+}
 
+.collection-status .ui-icon { width: 12px; height: 12px; }
+.collection-status:has(.ui-icon)::before { display: none; }
+.collection-status.collected { color: var(--teal-dark); }
+.collection-status.missingMale,
+.collection-status.unknown { color: var(--amber-ink); }
+.collection-status.missing { color: var(--muted); }
+
+/* 立绘放进一块浅色画框里：卡片因此有「顶部信息 / 立绘 / 文字 / 计数」四段节奏，
+   不再是白底上一张散图。 */
 .collection-card-portrait {
+  position: relative;
   display: grid;
   place-items: center;
   width: 100%;
-  height: 64px;
+  height: 70px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-2) 70%, var(--panel));
   color: var(--muted);
   font-size: var(--fs-xl);
 }
 
-.collection-card-portrait img { width: 60px; height: 60px; object-fit: contain; }
+.collection-card-portrait img { width: 64px; height: 64px; object-fit: contain; }
+
+/* 图鉴编号从名字行挪到立绘右下角：名字行因此拿满整卡宽度，
+   长名字（「鸭吉吉（蓬松的样子）」这类 10–12 字）不再被编号挤掉半截。 */
+.collection-card-dex {
+  position: absolute;
+  right: 6px;
+  bottom: 2px;
+  color: var(--muted-2);
+  font-size: var(--fs-3xs);
+  font-weight: 400;
+  line-height: 15px;
+  font-variant-numeric: tabular-nums;
+  opacity: .8;
+}
 
 .collection-card-name {
   display: flex;
@@ -301,7 +335,6 @@
 }
 
 .collection-card-name > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.collection-card-name small { flex: none; color: var(--muted); font-size: var(--fs-3xs); font-weight: 400; }
 
 .collection-natures {
   display: flex;
@@ -313,6 +346,7 @@
 }
 
 .collection-natures > span,
+.collection-natures-more,
 .collection-nature-label {
   padding: 0 var(--space-1);
   border: 1px solid var(--egg-tag-nature-line);
@@ -324,6 +358,9 @@
 }
 
 .collection-natures > small { color: var(--muted); font-size: var(--fs-3xs); }
+
+/* 卡面最多展示 3 个性格，其余折叠成 +N，避免性格多的产线把卡片撑成两层高 */
+.collection-natures-more { border-style: dashed; color: var(--muted); }
 
 .collection-card-counts {
   display: grid;
@@ -641,16 +678,11 @@
 
 .collection-backdrop { position: fixed; inset: 0; z-index: 110; background: var(--overlay); }
 
-@media (min-width: 1361px) {
-  .collection-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-}
-
 @media (max-width: 1360px) and (min-width: 961px) {
   .collection-toolbar { flex-wrap: nowrap; gap: var(--space-3); }
   .collection-overview { flex: 0 1 auto; }
   .collection-controls { flex: 1 1 auto; justify-content: flex-end; }
   .collection-search { flex: 1 1 140px; width: auto; min-width: 120px; }
-  .collection-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 @media (max-width: 960px) {
