@@ -38,12 +38,16 @@
 .planner-page small { color: var(--muted); font-size: var(--fs-xs); line-height: 1.5; }
 
 /* ── 工具栏 ─────────────────────────────────────────────────────────────── */
+/* 工具行要能收缩：sc 只给一部分宽度时（下面还有两个面板），
+   flex:none 会按 max-content 顶出横向滚动；状态区加进来后内容更宽，必须可换行。 */
 .planner-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  flex: none;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  flex: 1 1 auto;
   min-width: 0;
+  max-width: 100%;
   min-height: 52px;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--line-soft);
@@ -54,7 +58,9 @@
 /* 配窝模式：surface-2 容器 + 白色激活药丸，替代旧版实底深绿 */
 .planner-tabs {
   display: flex;
-  flex: 0 1 400px;
+  /* 按内容宽度收缩（两个等长页签），不走 400px 基准：固定基准会白占 167px，
+     把右侧状态区顶到第二行，白白多出一行工具行高度。 */
+  flex: 0 0 auto;
   gap: 2px;
   min-width: 0;
   padding: 2px;
@@ -97,10 +103,9 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   gap: var(--space-2);
   min-width: 0;
-  margin-left: auto;
 }
 
 .planner-generate { display: flex; align-items: center; gap: var(--space-2); }
@@ -196,42 +201,87 @@
 
 .planner-page .planner-main { flex: 1; }
 
-.planner-status {
+/* ── 工具行右侧的配窝状态区 ──────────────────────────────────────────── */
+/* 原来「历史观察背包 / 可参与 / 状态文案 / 目标就绪」占页面顶部一整行，
+   「入住亲本 / 有配对母本 / 目标进度 / 查看产物」又占画布上方一整条摘要带，
+   两条带子说的是同一件事，压掉约 50px 还把视线分成三段。现在合并进工具行右侧的空白区：
+   徽标回答「现在什么状态」，四个两行小指标回答「数据是多少」。 */
+.planner-state {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-3);
-  flex: none;
-  min-height: 22px;
-  padding: 0 var(--space-1);
-  color: var(--muted);
-  font-size: var(--fs-3xs);
-  line-height: 1.5;
+  flex: 0 1 auto;
+  min-width: 0;
+  /* 靠右落在工具行末尾：左边是模式页签与三个动作，右边是状态，中间留白 */
+  margin-left: auto;
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--line-soft);
 }
 
-.planner-status-account {
+.planner-state-badge {
   display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-3);
-  flex: 1;
+  gap: var(--space-1);
+  flex: none;
+  height: 26px;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: var(--fs-3xs);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.planner-state-badge > .ui-icon { width: 14px; height: 14px; }
+
+.planner-state-badge.is-ready { border-color: color-mix(in srgb, var(--teal) 38%, transparent); background: var(--teal-soft); color: var(--teal-dark); }
+.planner-state-badge.is-warning { border-color: color-mix(in srgb, var(--amber) 42%, transparent); background: var(--amber-soft); color: var(--amber-ink); }
+.planner-state-badge.is-danger { border-color: color-mix(in srgb, var(--danger) 42%, transparent); background: var(--danger-soft); color: var(--danger-ink); }
+.planner-state-badge.is-busy { border-color: color-mix(in srgb, var(--teal) 26%, transparent); background: var(--surface-2); color: var(--teal-dark); }
+.planner-state-badge.is-idle { border-color: var(--line-soft); background: var(--surface-2); color: var(--muted); }
+
+button.planner-state-badge { cursor: pointer; }
+button.planner-state-badge:hover:not(:disabled) { border-color: color-mix(in srgb, var(--amber) 62%, transparent); }
+button.planner-state-badge:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+.planner-state-metrics {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
   min-width: 0;
 }
 
-.planner-status-eligible { color: var(--ink-soft); font-weight: 500; white-space: nowrap; }
-.planner-status-progress { flex: none; color: var(--ink-soft); font-weight: 500; font-variant-numeric: tabular-nums; }
+.planner-state-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  line-height: 1.15;
+}
 
-.planner-status-action {
+.planner-state-metric small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.planner-state-metric strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.planner-state-metric strong i { margin: 0 1px; color: var(--muted); font-size: 11px; font-style: normal; font-weight: 500; }
+.planner-state-metric strong.is-idle { color: var(--muted); font-weight: 500; }
+
+.planner-state-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--amber-ink);
+  color: var(--teal-dark);
   font-size: var(--fs-3xs);
   font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-.planner-status-action:hover { text-decoration: underline; text-underline-offset: 2px; }
+.planner-state-link > .ui-icon { width: 12px; height: 12px; }
+.planner-state-link:hover { text-decoration: underline; text-underline-offset: 2px; }
 
 .planner-scroll {
   flex: 1;
@@ -314,29 +364,6 @@
   font-weight: 600;
 }
 
-/* 摘要从「带框浅底卡片 + 三组两行」压成一条内联统计带，只用一条下划线分隔 */
-.planner-summary {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-4);
-  margin-bottom: var(--space-3);
-  padding: 0 0 var(--space-2);
-  border: 0;
-  border-bottom: 1px solid var(--line-soft);
-  background: none;
-  transition: border-color var(--motion-fast) var(--motion-ease);
-}
-
-.planner-summary > div { display: flex; flex-direction: row; align-items: baseline; gap: var(--space-2); min-width: 0; }
-.planner-summary small { color: var(--muted); font-size: var(--fs-3xs); line-height: 1.3; }
-.planner-summary strong { overflow: hidden; color: var(--ink); font-size: var(--fs-sm); font-weight: 600; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
-.planner-summary .breeder-detail-link { margin-left: auto; padding: 0; font-size: var(--fs-2xs); }
-.planner-summary .breeder-detail-link .ui-icon { width: 12px; height: 12px; }
-
-.planner-summary.is-stale { border-bottom-color: color-mix(in srgb, var(--amber) 45%, var(--line-soft)); }
-.planner-summary.is-stale strong { color: var(--amber-ink); }
-
 /* ── 画布视图 ───────────────────────────────────────────────────────────── */
 /* 画布区去掉「盒中盒」：原来面板里再套一层浅底描边盒，四周还各吃 10px 内边距 */
 .planner-canvas-view {
@@ -370,36 +397,6 @@
 .planner-canvas text { font-family: var(--font-ui); }
 .planner-grid-line { stroke: var(--line-soft); stroke-width: 0.5; opacity: 0.7; }
 
-/* 父本连线：正交折线 + 圆角，走格线，交叉成十字而不是斜穿成一团 X；细线 + 端点定位点，
-   只保留 1.6px 主线，压在立绘上也不糊。 */
-.planner-canvas-links { pointer-events: none; }
-.planner-edge {
-  fill: none;
-  stroke: var(--teal);
-  stroke-width: 1.1;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  opacity: 0.12;
-  transition:
-    opacity var(--motion-base) var(--motion-ease),
-    stroke-width var(--motion-base) var(--motion-ease);
-}
-.planner-edge.dim { opacity: 0.04; }
-.planner-edge.active { stroke-width: 2.2; opacity: 0.95; }
-.planner-edge.interference { stroke: var(--amber-ink); stroke-dasharray: 5 4; opacity: 0.55; }
-.planner-edge-nodes circle { fill: var(--teal); opacity: 0.2; transition: opacity var(--motion-base) var(--motion-ease); }
-.planner-edge-nodes.dim circle { opacity: 0.06; }
-.planner-edge-nodes.active circle { opacity: 1; }
-.planner-edge-nodes.interference circle { fill: var(--amber-ink); }
-/* 配对对象用虚线环标出，选中窝自己仍是实线描边，两者不混 */
-.planner-partner-ring rect {
-  fill: none;
-  stroke: var(--teal);
-  stroke-width: 2;
-  stroke-dasharray: 6 4;
-  opacity: 0.75;
-}
-
 .planner-canvas-outside {
   grid-area: warning;
   margin: 0;
@@ -430,6 +427,16 @@
 .planner-nest.related > rect { fill: var(--teal-soft); stroke: var(--teal); stroke-width: 3; }
 .planner-nest.unrelated { opacity: 0.3; }
 .planner-nest.academy > rect { fill: color-mix(in srgb, var(--teal-soft) 70%, var(--panel)); stroke: var(--teal); }
+/* 画布不再画连线，配对关系靠「选中即描边」表达：选中某个窝后，与它配对的窝位
+   换成青色虚线描边。用虚线而不是再加一圈实线，是因为实线描边已经承载性别色（蓝/粉）
+   与选中态（深青双线），再加实线在雄性窝位上和性别描边几乎分不出来；
+   虚线在缩放、彩色与灰度下都能一眼认出「这些是可以配的」。
+   选中窝自己由 .planner-nest.selected 与 .planner-selected-outline 负责，不会走到这里。 */
+.planner-nest.is-partner > rect {
+  stroke: var(--teal);
+  stroke-width: 3;
+  stroke-dasharray: 6 3.5;
+}
 .planner-nest.match-iterative > rect { fill: var(--amber-soft); stroke: var(--amber-ink); stroke-dasharray: 5 3; }
 .planner-nest.dragging { cursor: grabbing; }
 .planner-nest.drop-target > rect { stroke: var(--teal-dark); stroke-dasharray: 6 3; stroke-width: 4; }
@@ -459,7 +466,9 @@
 .planner-nest.selected .planner-nest-name,
 .planner-nest:focus-visible .planner-nest-name { opacity: 1; }
 
-.planner-selected-outline rect { fill: none; stroke: var(--teal-dark); stroke-width: 2.5; pointer-events: none; }
+/* 选中：外框深青 + 内侧再画一圈细线，和「配对窝单圈青色描边」在形状上区分开，
+   不靠红/绿这种额外色相，避免与性别底色、干扰琥珀色打架。 */
+.planner-selected-outline rect { fill: none; stroke: var(--teal-dark); stroke-width: 1.6; opacity: 0.75; pointer-events: none; }
 .planner-drop-preview rect { fill: none; stroke-width: 3; stroke-dasharray: 8 5; }
 .planner-drop-preview.is-valid rect,
 .planner-drop-preview.is-swap rect { stroke: var(--teal-dark); }
@@ -481,10 +490,6 @@
   font-size: var(--fs-3xs);
   line-height: 1.5;
 }
-
-.planner-canvas-legend { display: inline-flex; align-items: center; gap: var(--space-1); margin-left: var(--space-2); color: var(--muted); }
-.planner-legend-swatch { display: inline-block; width: 16px; height: 0; margin: 0 var(--space-1); border-top: 2px solid var(--teal); border-radius: 2px; opacity: 0.8; }
-.planner-legend-swatch.is-interference { border-top-style: dashed; border-top-color: var(--amber-ink); }
 
 .planner-warning { color: var(--amber-ink); font-weight: 500; }
 
@@ -1475,6 +1480,21 @@ dialog.planner-picker {
   .planner-sidebar { max-height: 680px; }
 }
 
+/* 工具行放不下「页签 + 三个动作 + 状态区」时，状态区整行落到第二排：
+   与其把指标一个个藏起来（信息缺口比多一行更难受），不如让它独占一行重新铺开。
+   1240px 是实测临界点（页面可用宽度 1000px 时全量状态区正好一行）。 */
+@media (max-width: 1240px) {
+  .planner-state {
+    flex: 1 1 100%;
+    justify-content: space-between;
+    margin-left: 0;
+    padding: var(--space-2) 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--line-soft);
+  }
+  .planner-state-metrics { flex: 1 1 auto; justify-content: space-between; gap: var(--space-4); }
+}
+
 @media (max-width: 840px) {
   /* 工具栏是 .ui-page-toolbar 的 flex 子项，原本 flex:none 会按 max-content 撑到 578px，
      在 640px 窄窗把页面顶出 128px 横向滚动；窄窗改为可增长+可收缩并占满一行。 */
@@ -1485,7 +1505,12 @@ dialog.planner-picker {
   .planner-scroll { padding: var(--space-3); }
   .planner-layout-heading { flex-wrap: wrap; align-items: center; }
   .planner-layout-heading > div:first-child { flex: 1 1 100%; }
-  .planner-summary .breeder-detail-link { margin-left: 0; }
+  /* 状态区（沿用 1240px 的独占行样式）在窄窗收紧间距，并收起两个次要指标：
+     一排放不下四个两行指标，硬塞会挤得标签互相贴住，信息也更难扫。 */
+  .planner-state { gap: var(--space-2); }
+  .planner-state-metrics { gap: var(--space-3); }
+  .planner-state-metric:nth-child(3),
+  .planner-state-metric:nth-child(4) { display: none; }
 }
 
 @media (max-width: 700px) {

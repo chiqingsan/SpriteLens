@@ -30,66 +30,38 @@ function viewBox(wrapper: ReturnType<typeof canvas>) { return (wrapper.get('svg'
 const nests = (wrapper: ReturnType<typeof canvas>) => wrapper.findAll('g.planner-nest')
 
 describe('小窝布局草图', () => {
-  it('按方案渲染父本连线，标出干扰连边并淡化无配对窝位', () => {
+  it('画布不再画父本连线，只按方案标记无配对窝位', () => {
     const wrapper = canvas()
-    const lines = wrapper.findAll('path.planner-edge')
-    expect(lines).toHaveLength(2)
-    expect(lines.filter(line => line.classes('interference'))).toHaveLength(1)
+    expect(wrapper.findAll('path.planner-edge')).toHaveLength(0)
+    expect(wrapper.find('.planner-canvas-links').exists()).toBe(false)
+    expect(wrapper.find('.planner-canvas-legend').exists()).toBe(false)
     expect(nests(wrapper)[0]!.classes()).not.toContain('unrelated')
     expect(nests(wrapper)[3]!.classes()).toContain('unrelated')
   })
-  it('父本连线端点点在窝位边框上，相邻窝位之间也不缩成一小段', () => {
-    const wrapper = canvas()
-    const centers = positions.map(position => [position.x * 32 + 32, position.y * 32 + 32])
-    const circles = wrapper.findAll('.planner-edge-nodes circle')
-    expect(circles).toHaveLength(4)
-    for (const circle of circles) {
-      const point = [Number(circle.attributes('cx')), Number(circle.attributes('cy'))]
-      const nearest = Math.min(...centers.map(([x, y]) => Math.hypot(x! - point[0]!, y! - point[1]!)))
-      // 端点留在 64×64 方框的边框附近（相邻窝位之间还要留出可视线长），不压在窝位中心
-      expect(nearest).toBeGreaterThan(5)
-      expect(nearest).toBeLessThanOrEqual(33)
-    }
-    expect(wrapper.findAll('path.planner-edge.active')).toHaveLength(0)
-    expect(canvas({ selected: '3' }).findAll('path.planner-edge.active')).toHaveLength(1)
-  })
-  it('跨排的父本连线画成外鼓弧线，不从窝位中心直穿', () => {
-    const numbers = (canvas({ positions: [nest('1', 0, 0), nest('3', 4, 4)] }).get('path.planner-edge').attributes('d') ?? '')
-      .match(/-?[\d.]+/g)!.map(Number)
-    const [x0, y0, cx, cy, x1, y1] = numbers as number[]
-    const chord = Math.hypot(x1! - x0!, y1! - y0!)
-    const bow = Math.abs((cx! - x0!) * (y1! - y0!) - (cy! - y0!) * (x1! - x0!)) / chord
-    // 控制点离弦足够远，弧线才不会看起来像根直杠
-    expect(bow).toBeGreaterThan(5)
-    expect(chord).toBeGreaterThan(60)
-    expect(Math.hypot(x0! - 32, y0! - 32)).toBeGreaterThan(30)
-  })
-  it('聚焦窝位时用虚线环标出它的配对对象', async () => {
-    const wrapper = canvas()
-    expect(wrapper.findAll('.planner-partner-ring')).toHaveLength(0)
-    await nests(wrapper)[0]!.trigger('pointerenter')
+  it('选中窝位后，可与它配对的窝位加上配对描边', () => {
+    expect(canvas({ selected: '4' }).findAll('.planner-nest.is-partner')).toHaveLength(0)
     // 父本 1 与母本 2、3 配对
-    expect(wrapper.findAll('.planner-partner-ring')).toHaveLength(2)
-    await nests(wrapper)[0]!.trigger('pointerleave')
-    expect(wrapper.findAll('.planner-partner-ring')).toHaveLength(0)
+    const wrapper = canvas({ selected: '1' })
+    expect(wrapper.findAll('.planner-nest.is-partner')).toHaveLength(2)
+    expect(nests(wrapper)[1]!.classes()).toContain('is-partner')
+    expect(nests(wrapper)[2]!.classes()).toContain('is-partner')
+    expect(nests(wrapper)[0]!.classes()).not.toContain('is-partner')
+    // 从配对另一端反查也成立：母本 2 只与父本 1 配对
+    const reverse = canvas({ selected: '2' })
+    expect(reverse.findAll('.planner-nest.is-partner')).toHaveLength(1)
+    expect(nests(reverse)[0]!.classes()).toContain('is-partner')
   })
-  it('悬停窝位时只点亮它的配对连线，离开后回到淡骨架', async () => {
+  it('配对描边只由选中触发，悬停不点亮', async () => {
     const wrapper = canvas()
     await nests(wrapper)[0]!.trigger('pointerenter')
-    expect(wrapper.findAll('path.planner-edge.active')).toHaveLength(2)
-    expect(wrapper.findAll('path.planner-edge.dim')).toHaveLength(0)
-    await nests(wrapper)[0]!.trigger('pointerleave')
-    expect(wrapper.findAll('path.planner-edge.active')).toHaveLength(0)
-    // 没有配对的窝：悬停时其余连线全部淡出
-    await nests(wrapper)[3]!.trigger('pointerenter')
-    expect(wrapper.findAll('path.planner-edge.active')).toHaveLength(0)
-    expect(wrapper.findAll('path.planner-edge.dim')).toHaveLength(2)
+    expect(wrapper.findAll('.planner-nest.is-partner')).toHaveLength(0)
   })
   it('说明区报告窝数与连线数，待重评和未生成方案时给出对应说明', () => {
     const caption = canvas().get('.planner-canvas-caption').text()
     expect(caption).toContain('共 4 个小窝（普通 4／学院 0）')
-    expect(caption).toContain('2 条父本连线')
-    expect(caption).toContain('1 条为干扰连边')
+    expect(caption).toContain('2 组配对')
+    expect(caption).toContain('1 组存在迭代或目标干扰')
+    expect(caption).toContain('选中窝位后')
     expect(canvas({ pending: true }).get('.planner-canvas-caption').text()).toContain('正在重新评估')
     expect(canvas({ plan: null }).get('.planner-canvas-caption').text()).toContain('拖动窝位可移到空位')
   })
@@ -144,21 +116,20 @@ describe('小窝布局草图', () => {
     expect(viewBox(legacy)[2]).toBeGreaterThan(640)
     expect(legacy.get('.planner-canvas-outside').text()).toContain('超出 20×20')
   })
-  it('待重评时隐藏旧连线，选中亲本后只强调相关连线', () => {
-    const pending = canvas({ pending: true })
-    expect(pending.findAll('path.planner-edge')).toHaveLength(0)
-    expect(pending.find('.planner-canvas-legend').exists()).toBe(false)
-    expect(canvas({ selected: '3' }).findAll('path.planner-edge.dim')).toHaveLength(1)
+  it('待重评时不用旧方案描配对边', () => {
+    const pending = canvas({ pending: true, selected: '1' })
+    expect(pending.findAll('.planner-nest.is-partner')).toHaveLength(0)
+    expect(canvas({ selected: '1' }).findAll('.planner-nest.is-partner')).toHaveLength(2)
   })
-  it('选中框和配对连线位于窝位之上，避免被相邻窝位覆盖', () => {
+  it('选中框位于窝位之上，并内缩成第二道细线以便和配对描边区分', () => {
     const wrapper = canvas({ selected: '3' })
     const children = Array.from(wrapper.get('svg').element.children)
     const nestIndex = Math.max(...children.map((child, index) => child.classList.contains('planner-nest') ? index : -1))
-    const linkIndex = children.findIndex(child => child.classList.contains('planner-canvas-links'))
     const selectedIndex = children.findIndex(child => child.classList.contains('planner-selected-outline'))
-    expect(linkIndex).toBeGreaterThan(nestIndex)
-    expect(selectedIndex).toBeGreaterThan(linkIndex)
-    expect(wrapper.get('.planner-selected-outline rect').attributes()).toMatchObject({ x: '-32', y: '-32', width: '64', height: '64', rx: '8' })
+    expect(selectedIndex).toBeGreaterThan(nestIndex)
+    // 窝位自身的描边已经承载性别色与选中色，选中框内缩 7 单位画第二道细线，
+    // 和「配对窝位用青色虚线框」形成两种可分辨的信号。
+    expect(wrapper.get('.planner-selected-outline rect').attributes()).toMatchObject({ x: '-25', y: '-25', width: '50', height: '50', rx: '6' })
   })
   it('学院窝与锁定窝位用文字角标表达，不靠颜色', () => {
     const badges = canvas({ positions: [nest('1', 0, 0, 'academy'), nest('2', 2, 0, 'normal', 'position')] }).findAll('g.planner-nest-badge')

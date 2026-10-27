@@ -76,6 +76,20 @@ const parentName = (gid: string) => parents.value.get(gid)?.name || `个体 ${gi
 const outcomeEdges = (gid: string) => plan.value?.edges.filter(edge => edge.female === gid) || []
 const percent = (value: number | null | undefined) => value === null || value === undefined ? '未知' : `${Math.round(value * 100)}%`
 const statusName: Record<string, string> = { ready: '规划参考就绪', partial: '部分支持', no_plan: '暂未形成有效配对', invalid: '存在布局冲突' }
+// 配窝状态全部收在工具行右侧的状态区：徽标说「现在是什么状态」，四个小指标说「数据是什么」，
+// 不再用页面顶部一行说明 + 画布上方一条摘要带重复表达同一件事。
+const stateLabel = computed(() => {
+  if (busy.value) return { loading: '正在读取资料', evaluate: '正在重评布局', saving: '正在保存', solve: '正在规划配窝' }[busy.value] || '处理中'
+  return statusName[plan.value?.status || result.value?.status || ''] || '尚未生成方案'
+})
+const stateTone = computed(() => {
+  if (busy.value) return 'is-busy'
+  const status = plan.value?.status || result.value?.status || ''
+  if (!status) return 'is-idle'
+  return status === 'ready' ? 'is-ready' : status === 'invalid' ? 'is-danger' : 'is-warning'
+})
+const stateIcon = computed(() => busy.value ? 'clock' : (plan.value?.status || result.value?.status) === 'ready' ? 'circle-check' : plan.value?.status || result.value?.status ? 'alert-circle' : 'info-circle')
+const stateTitle = computed(() => [`${context.value?.source === 'history' ? '历史观察背包' : '当前账号已观察背包'} · ${context.value?.pet_count ?? '—'} 只`, '传说精灵、迪莫、通行证精灵、活动精灵等不可生蛋精灵不会计入可参与配窝数量'].join(' · '))
 const kindName: Record<string, string> = { exact: '合格组合', iterative: '迭代参考', unknown: '资料待补' }
 const currentGroups = computed(() => [...new Set(context.value?.parents.flatMap(p => p.groups) || [])].sort())
 const filtered = computed(() => context.value?.parents.filter(p => {
@@ -216,9 +230,20 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
         <div class="planner-generate"><button class="planner-primary primary-button" :disabled="!model.canGenerate.value" :title="generationHint" @click="model.run('solve')"><UiIcon name="arrows-shuffle" /><span>{{ busy === 'solve' ? '正在规划' : plan ? '重新规划' : '生成方案' }}</span></button></div>
         <button class="ghost-button" :disabled="!!busy || (!draft.placements.length && !draft.goals.length && !draft.approved.length)" title="清除方案：清空画布上的窝位；按目标配窝时同时清空培育目标" @click="model.clearPlan"><UiIcon name="trash" /><span>清除方案</span></button>
       </div>
+      <div class="planner-state" role="status" aria-label="配窝状态">
+        <button v-if="dirty[mode] && !busy" type="button" class="planner-state-badge is-warning" :disabled="!!busy" title="布局或目标已改动，点击按当前条件重新评估" @click="model.run('evaluate')"><UiIcon name="alert-circle" />待重新评估</button>
+        <span v-else class="planner-state-badge" :class="stateTone" :title="stateTitle"><UiIcon :name="stateIcon" />{{ stateLabel }}</span>
+        <span class="planner-state-metrics">
+          <span class="planner-state-metric" :title="stateTitle"><small>可参与</small><strong>{{ context?.available ? context.parents.length : '—' }}<i>只</i></strong></span>
+          <span class="planner-state-metric" :title="mode === 'target' ? '已就绪目标 / 已添加目标' : '当前方案里的父本—母本配对数'"><small>{{ mode === 'target' ? '目标就绪' : '配对组' }}</small><strong v-if="plan">{{ mode === 'target' ? `${plan.goals.filter(g => g.ready).length} / ${draft.goals.length}` : plan.edges.length }}<i v-if="mode !== 'target'">组</i></strong><strong v-else class="is-idle">待评估</strong></span>
+          <span class="planner-state-metric" title="画布上已入住的父本 / 母本数量"><small>入住</small><strong>{{ placementCounts.males }}<i>父</i> / {{ placementCounts.females }}<i>母</i></strong></span>
+          <span class="planner-state-metric" title="方案里有合格父本的母本数量"><small>有配对母本</small><strong>{{ plan ? plan.metrics.effective_mothers ?? 0 : '—' }}<i>只</i></strong></span>
+        </span>
+        <button v-if="plan" type="button" class="planner-state-link" title="跳到下方的产物与目标支持" @click="outcomes?.scrollIntoView({ block: 'start', behavior: 'smooth' })">{{ dirty[mode] ? '上次结果' : '查看产物' }}<UiIcon name="chevron-down" /></button>
+      </div>
     </div>
     </template>
-    <div class="planner-status" role="status"><span class="planner-status-account"><span>{{ context?.source === 'history' ? '历史观察背包' : '当前账号已观察背包' }} · {{ context?.pet_count ?? '—' }} 只</span><span class="planner-status-eligible" title="传说精灵、迪莫、通行证精灵、活动精灵等不可生蛋精灵不会计入此数量">可参与配窝 {{ context?.available ? context.parents.length : '—' }} 只</span></span><span v-if="busy">{{ { loading: '正在读取资料', evaluate: '正在重评布局', saving: '正在保存', solve: '正在选择亲本与摆位' }[busy] }}</span><button v-else-if="dirty[mode]" class="planner-status-action planner-warning" :disabled="!!busy" @click="model.run('evaluate')">待重新评估 · 点击重评</button><span v-else>{{ statusName[plan?.status || result?.status || ''] || '尚未生成方案' }}</span><span v-if="plan" class="planner-status-progress">{{ mode === 'target' ? `目标就绪 ${plan.goals.filter(g => g.ready).length} / ${draft.goals.length}` : `${plan.edges.length} 组配对` }}</span></div>
+
     <div class="planner-body">
     <div class="planner-primary-column">
     <div v-if="error" class="planner-notice is-error" role="alert"><UiIcon name="alert-circle" />{{ error }}<button class="breeder-detail-link" :disabled="!!busy" @click="errorAction === 'save' ? model.save() : model.refresh()">{{ errorAction === 'save' ? '重试保存' : '刷新资料' }}</button></div>
@@ -226,7 +251,6 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
     <main class="planner-main panel">
       <div class="planner-scroll">
          <div class="planner-layout-heading"><div><strong>小窝布局</strong><small>{{ mode === 'target' ? '按培育条件选择亲本与窝位' : '分析所选精灵的配对关系与产物' }}</small></div><div v-if="draft.placements.length" class="planner-actions"><button class="ghost-button" :disabled="!!busy || !model.canUndo.value" title="撤销上一次窝位调整" @click="model.undo()">撤销</button><button class="ghost-button" :disabled="!!busy || !model.canRedo.value" title="重做被撤销的窝位调整" @click="model.undo(true)">重做</button><button v-if="model.canRestore.value" class="ghost-button" :disabled="!!busy" @click="model.restorePlan">恢复方案</button><button class="ghost-button" :disabled="!!busy" @click="model.run('evaluate')">重评布局</button><button class="ghost-button" :disabled="!context?.available || !!busy || mode === 'target' && !draft.goals.length" @click="showPicker('add')">补充布局亲本</button></div></div>
-         <div v-if="plan || draft.placements.length" class="planner-summary" :class="{ 'is-stale': dirty[mode] }" aria-label="当前方案摘要"><div><small>当前入住亲本</small><strong>{{ placementCounts.males }} 父 / {{ placementCounts.females }} 母</strong></div><div><small>有配对的母本</small><strong>{{ plan ? `${plan.metrics.effective_mothers ?? 0} 只` : '待评估' }}</strong></div><div><small>{{ mode === 'target' ? '目标进度' : '配对关系' }}</small><strong>{{ plan ? mode === 'target' ? `${plan.goals.filter(g => g.ready).length} / ${draft.goals.length} 就绪` : `${plan.edges.length} 组` : mode === 'target' ? `${draft.goals.length} 项待评估` : '待评估' }}</strong></div><button v-if="plan" class="breeder-detail-link" @click="outcomes?.scrollIntoView({ block: 'start', behavior: 'smooth' })">{{ dirty[mode] ? '上次结果 · 待更新' : '查看产物详情 ↓' }}</button></div>
          <BreedingCanvas v-if="draft.placements.length" :positions="draft.placements" :parents="parents" :plan="plan" :selected="selected" :pending="dirty[mode] || busy === 'evaluate'" @select="selected = $event" @move="moveNest" @locate="host.openPet" />
          <div v-else class="planner-empty planner-start"><UiIcon name="egg" /><strong>{{ mode === 'target' ? '从培育目标开始规划' : '选择精灵，分析配窝方案' }}</strong><p>{{ mode === 'target' ? '在右侧添加目标蛋，按需设置奖牌与性格，再生成方案。' : '在右侧选择参与精灵，确认参与方式与小窝容量，再生成方案。' }}</p><small>① {{ mode === 'target' ? '添加目标' : '选择精灵' }}　→　② 确认条件　→　③ 生成方案</small></div>
         <section v-if="selectedPosition" class="planner-resident">
