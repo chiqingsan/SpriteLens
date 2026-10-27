@@ -1,6 +1,6 @@
 /* 定稿布局：应用壳与背包样式，复用主题 token；不改变业务卡片配色。 */
 :root { --backpack-control: 34px; --pet-search-width: clamp(220px, 18vw, 280px); --pet-card-min: 136px; }
-#page-pets { --pet-side-width: 340px; }
+#page-pets { --pet-side-width: 360px; }
 .account-card { position: relative; margin-bottom: var(--space-4); padding: 2px; border: 1px solid var(--line-soft); border-radius: var(--radius-lg); background: var(--panel); box-shadow: var(--shadow-1); }
 .account-information { position: relative; }
 .account-information > summary { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-3) var(--space-2); cursor: pointer; list-style: none; border-radius: var(--radius-md); }
@@ -188,20 +188,15 @@
   #page-pets { overflow: hidden; }
   #page-pets .content-panel { height: 100%; }
   #page-pets .filter-rail, #page-pets .filter-rail.filters-open { display: flex; grid-column: 2; grid-row: 1; }
-  /* 961–1360：详情与筛选共用右列，与 ui.css 的窄屏抽屉规则一致（由于宽度不足，二选一）。 */
-  #page-pets .workspace.split.has-detail { grid-template-columns: minmax(0, 1fr) auto !important; }
+  /* 961–1360：详情与筛选共用右列，二选一；≤960px 才切换为模态抽屉。 */
+  #page-pets .workspace.split.has-detail { grid-template-columns: minmax(0, 1fr) var(--pet-side-width) !important; }
   #page-pets .workspace.has-detail .filter-rail { display: none; }
   #page-pets .workspace.split > #pet-detail-root > .ui-inspector { grid-column: 2; grid-row: 1; height: 100%; }
   #page-pets .workspace:has(.filters-open):not(.has-detail) .content-panel { grid-row: 1; }
   #btn-pet-filters, #btn-close-pet-filters { display: none; }
 }
 @media (min-width: 1361px) {
-  /* 宽屏时筛选栏与详情并列：内容列收窄，详情作为第三列常驻。 */
-  #page-pets .workspace.split.has-detail { grid-template-columns: minmax(0, 1fr) var(--pet-side-width) auto !important; grid-template-rows: 100%; height: 100%; min-height: 0; }
-  #page-pets .workspace.split.has-detail > #pet-detail-root { grid-column: 3; grid-row: 1; display: flex; position: static; min-height: 0; }
-  #page-pets .workspace.split.has-detail > #pet-detail-root > .ui-inspector { height: 100%; min-height: 0; border-radius: var(--radius-lg); border: 1px solid var(--line-soft); box-shadow: var(--shadow-1); }
-  #page-pets .workspace.has-detail .content-panel { grid-row: 1; height: 100%; min-height: 0; }
-  #page-pets .workspace.has-detail .filter-rail { display: flex; }
+  /* 宽屏详情也与筛选栏共用右侧区域，打开详情后由筛选切换为详情。 */
   #page-pets .workspace.has-detail #pet-grid.box-fill-grid > .point-pet { grid-template-rows: 22px minmax(0, 1fr) 14px 20px; }
   /* 详情打开时内容列变窄：工具行允许换行，网格保持 6×5，最小宽度由内部横向滚动承载。 */
   #page-pets .workspace.has-detail .pet-toolbar { flex-wrap: wrap; }

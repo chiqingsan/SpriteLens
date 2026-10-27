@@ -5,6 +5,7 @@ const { pet } = defineProps<{ pet: Pet }>()
 const failed = reactive<Record<number, boolean>>({})
 const root = ref<HTMLElement | null>(null)
 let drag: { pointerId: number; startX: number; startScrollLeft: number; container: HTMLElement } | null = null
+let positionFrame = 0
 function pointerDown(event: PointerEvent) {
   const container = event.currentTarget as HTMLElement
   if (event.pointerType !== 'mouse' || event.button !== 0 || container.scrollWidth <= container.clientWidth) return
@@ -37,6 +38,8 @@ const paths = computed(() => {
   return result
 })
 function keepCurrentVisible() {
+  const page = root.value?.closest<HTMLElement>('.page')
+  if (page && !page.classList.contains('active')) return
   root.value?.querySelectorAll<HTMLElement>('.detail-evolution-path').forEach(container => {
     container.classList.toggle('is-scrollable', container.scrollWidth > container.clientWidth)
     const current = container.querySelector<HTMLElement>('figure.current')
@@ -55,10 +58,14 @@ function keepCurrentVisible() {
     }
   })
 }
+function requestPositionSync() {
+  if (positionFrame) return
+  positionFrame = window.requestAnimationFrame(() => { positionFrame = 0; keepCurrentVisible() })
+}
 function syncCurrentPosition() { void nextTick(keepCurrentVisible) }
 watch([() => pet.base_conf_id, paths], syncCurrentPosition)
-onMounted(() => { keepCurrentVisible(); window.addEventListener('resize', keepCurrentVisible) })
-onBeforeUnmount(() => window.removeEventListener('resize', keepCurrentVisible))
+onMounted(() => { keepCurrentVisible(); window.addEventListener('resize', requestPositionSync) })
+onBeforeUnmount(() => { window.removeEventListener('resize', requestPositionSync); if (positionFrame) window.cancelAnimationFrame(positionFrame) })
 </script>
 <template>
   <section ref="root" class="detail-evolution"><h3>进化关系</h3><p v-if="!paths.length" class="filter-note">暂无进化资料</p><div v-for="(path, index) in paths" :key="index" class="detail-evolution-path" tabindex="0" aria-label="精灵进化关系，可按住鼠标拖动横向滚动" @pointerdown="pointerDown" @pointermove="pointerMove" @pointerup="pointerEnd" @pointercancel="pointerEnd" @lostpointercapture="pointerEnd"><template v-for="(node, step) in path" :key="node.id"><span v-if="step" class="evolution-arrow" aria-label="进化为">→</span><figure :class="{ current: node.id === pet.base_conf_id }"><span class="evolution-avatar"><img v-if="node.portrait_url && !failed[node.id]" :src="node.portrait_url" alt="" draggable="false" @error="failed[node.id] = true"><span v-else>{{ node.name.slice(0, 1) }}</span></span><figcaption>No.{{ node.dex_no || '—' }} {{ node.name }}<small v-if="node.id === pet.base_conf_id">当前</small></figcaption></figure></template></div></section>

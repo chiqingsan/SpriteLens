@@ -28,6 +28,12 @@
 [data-window-maximized="true"] .window-maximize-icon { display: none; }
 [data-window-maximized="true"] .window-restore-icon { display: block; }
 .desktop-window .app-shell { margin-top: var(--window-titlebar); height: calc(100% - var(--window-titlebar)); }
+/* 窗口连续缩放期间暂停页面动画与过渡，避免它们和 WebView2 的原生重排争用绘制帧。 */
+body.window-resizing .page.active,
+body.window-resizing .page.active * {
+  animation-play-state: paused !important;
+  transition: none !important;
+}
 .window-resize { display: none; position: fixed; z-index: 1001; }
 .desktop-window:not([data-window-maximized="true"]) .window-resize { display: block; }
 .window-resize-left { inset: var(--window-resize) auto var(--window-resize) 0; width: var(--window-resize); cursor: ew-resize; }

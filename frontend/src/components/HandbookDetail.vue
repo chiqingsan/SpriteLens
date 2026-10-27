@@ -13,6 +13,7 @@ const emit = defineEmits<{ navigate: [key: string | number]; filterGroup: [group
 const familyRoot = ref<HTMLElement | null>(null)
 let familyDrag: { pointerId: number; startX: number; startScrollLeft: number; moved: boolean; container: HTMLElement } | null = null
 let suppressFamilyClick = false
+let familyFrame = 0
 const dexText = computed(() => item.handbook_no || item.dex_no || '—')
 const displayName = computed(() => item.display_name || item.name)
 const stage = computed(() => ({ 1: 'I阶', 2: 'II阶', 3: 'III阶', 4: '最终形态' })[item.stage] || '阶段未知')
@@ -50,6 +51,8 @@ function familySelect(key: string | number, event: MouseEvent) {
   emit('navigate', key)
 }
 function keepFamilyCurrentVisible() {
+  const page = familyRoot.value?.closest<HTMLElement>('.page')
+  if (page && !page.classList.contains('active')) return
   const container = familyRoot.value?.querySelector<HTMLElement>('.mini-family-members')
   if (!container) return
   container.classList.toggle('is-scrollable', container.scrollWidth > container.clientWidth)
@@ -60,10 +63,14 @@ function keepFamilyCurrentVisible() {
   if (bounds.left < viewport.left) container.scrollLeft -= viewport.left - bounds.left
   else if (bounds.right > viewport.right) container.scrollLeft += bounds.right - viewport.right
 }
+function requestFamilySync() {
+  if (familyFrame) return
+  familyFrame = window.requestAnimationFrame(() => { familyFrame = 0; keepFamilyCurrentVisible() })
+}
 function syncFamilyScroll() { void nextTick(keepFamilyCurrentVisible) }
 watch([() => item.key, chain], syncFamilyScroll)
-onMounted(() => { keepFamilyCurrentVisible(); window.addEventListener('resize', keepFamilyCurrentVisible) })
-onBeforeUnmount(() => window.removeEventListener('resize', keepFamilyCurrentVisible))
+onMounted(() => { keepFamilyCurrentVisible(); window.addEventListener('resize', requestFamilySync) })
+onBeforeUnmount(() => { window.removeEventListener('resize', requestFamilySync); if (familyFrame) window.cancelAnimationFrame(familyFrame) })
 </script>
 <template>
   <div class="dex-mini">

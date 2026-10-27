@@ -189,6 +189,7 @@
   /* ---------- 侧栏选中滑块：pills 在导航项之间滑动 ---------- */
   var navIndicator = null;
   var navIndicatorFirst = true;
+  var navIndicatorFrame = 0;
 
   function ensureNavIndicator() {
     if (navIndicator) { return navIndicator; }
@@ -225,6 +226,14 @@
       navIndicatorFirst = false;
     }
     pill.setAttribute("data-ready", "1");
+  }
+
+  function requestNavIndicatorSync() {
+    if (navIndicatorFrame) { return; }
+    navIndicatorFrame = window.requestAnimationFrame(function () {
+      navIndicatorFrame = 0;
+      syncNavIndicator();
+    });
   }
 
   function switchPage(name, revealGid) {
@@ -302,7 +311,7 @@
     node.addEventListener("click", function () { switchPage(node.dataset.page); });
   });
 
-  window.addEventListener("resize", syncNavIndicator);
+  window.addEventListener("resize", requestNavIndicatorSync);
   var navScrollBox = document.querySelector("#main-nav");
   if (navScrollBox) { navScrollBox.addEventListener("scroll", syncNavIndicator, { passive: true }); }
 

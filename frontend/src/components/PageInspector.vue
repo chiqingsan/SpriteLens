@@ -10,7 +10,8 @@ const props = withDefaults(defineProps<{
   defaultWidth?: number
   minWidth?: number
   maxWidth?: number
-}>(), { modal: false, storageKey: '', defaultWidth: 360, minWidth: 280, maxWidth: 560 })
+  resizable?: boolean
+}>(), { modal: false, storageKey: '', defaultWidth: 360, minWidth: 280, maxWidth: 560, resizable: true })
 
 const emit = defineEmits<{ (e: 'close'): void }>()
 
@@ -37,7 +38,7 @@ let startX = 0
 let startWidth = 0
 
 function startResize(event: PointerEvent) {
-  if (props.modal || event.button !== 0) return
+  if (props.modal || !props.resizable || event.button !== 0) return
   event.preventDefault()
   resizing.value = true
   startX = event.clientX
@@ -82,13 +83,13 @@ defineExpose({ el, body, focusClose: () => closeButton.value?.focus({ preventScr
     ref="el"
     class="ui-inspector"
     :class="{ 'is-modal': modal, 'is-resizing': resizing }"
-    :style="modal ? undefined : { width: `${width}px` }"
+    :style="modal || !resizable ? undefined : { width: `${width}px` }"
     :role="modal ? 'dialog' : 'region'"
     :aria-modal="modal || undefined"
     :aria-label="title"
   >
     <span
-      v-if="!modal"
+      v-if="!modal && resizable"
       class="ui-inspector-handle"
       role="separator"
       aria-orientation="vertical"

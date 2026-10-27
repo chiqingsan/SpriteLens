@@ -15,7 +15,7 @@ const detailedPet = computed(() => {
 const place = computed(() => pet.value?.location ?? null)
 const showing = computed(() => props.open && props.enabled && !!pet.value)
 const inspector = ref<InstanceType<typeof PageInspector> | null>(null)
-const narrow = window.matchMedia('(max-width: 1360px)'), modal = ref(narrow.matches)
+const narrow = window.matchMedia('(max-width: 960px)'), modal = ref(narrow.matches)
 const workspace = () => document.querySelector<HTMLElement>('#page-pets .workspace.split')!
 let inert: HTMLElement[] = []
 function sync() {
@@ -69,6 +69,7 @@ onUnmounted(() => { inert.forEach(node => { node.inert = false }); workspace().c
       :modal="modal"
       storage-key="pets"
       :default-width="360"
+      :resizable="false"
       :aria-busy="model.detailBusy.value || undefined"
       @close="close()"
     >

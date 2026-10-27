@@ -7,6 +7,15 @@
   var api;
   var pendingResize;
   var resizing = false;
+  var resizeFrame = 0;
+
+  function scheduleResize() {
+    if (resizeFrame) { return; }
+    resizeFrame = window.requestAnimationFrame(function () {
+      resizeFrame = 0;
+      void flushResize();
+    });
+  }
 
   async function flushResize() {
     if (resizing || !pendingResize) { return; }
@@ -21,7 +30,7 @@
       console.error("窗口缩放失败", error);
     } finally {
       resizing = false;
-      flushResize();
+      scheduleResize();
     }
   }
 
@@ -61,6 +70,7 @@
         if (event.button !== 0) { return; }
         event.preventDefault();
         start = { x: event.screenX, y: event.screenY, width: window.innerWidth, height: window.innerHeight };
+        document.body.classList.add("window-resizing");
         edge.setPointerCapture(event.pointerId);
       });
       edge.addEventListener("pointermove", function (event) {
@@ -73,10 +83,12 @@
           width: Math.round(start.width + ([1, 4, 7].includes(direction) ? -dx : [2, 5, 8].includes(direction) ? dx : 0)),
           height: Math.round(start.height + ([3, 4, 5].includes(direction) ? -dy : [6, 7, 8].includes(direction) ? dy : 0))
         };
-        flushResize();
+        scheduleResize();
       });
       edge.addEventListener("lostpointercapture", function () {
         start = null;
+        document.body.classList.remove("window-resizing");
+        scheduleResize();
       });
     });
   }
