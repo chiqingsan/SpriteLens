@@ -1371,11 +1371,14 @@
 .eggbox-favorite-error { margin: 0; }
 
 @media (max-width: 1360px) {
-  .eggbox-body { grid-template-columns: minmax(0, 1fr) 340px; }
+  .eggbox-body { grid-template-columns: minmax(0, 1fr) minmax(0, 340px); }
 }
 @media (max-width: 1100px) {
-  .eggbox-body { grid-template-columns: minmax(0, 1fr) 320px; }
+  .eggbox-body { grid-template-columns: minmax(0, 1fr) minmax(0, 320px); }
 }
+/* 详情栏自身带 inline width（PageInspector 可拖动调宽，默认 360px），
+   窄窗下必须让它服从网格轨道，否则会顶出页面产生横向滚动。 */
+.eggbox-body > .ui-inspector { max-width: 100%; }
 @media (max-width: 960px) {
   .eggbox-page { display: flex; height: auto; min-height: 100%; }
   .eggbox-body { display: block; }

@@ -1451,7 +1451,9 @@ dialog.planner-picker {
 }
 
 @media (max-width: 840px) {
-  .planner-toolbar { flex-wrap: wrap; }
+  /* 工具栏是 .ui-page-toolbar 的 flex 子项，原本 flex:none 会按 max-content 撑到 578px，
+     在 640px 窄窗把页面顶出 128px 横向滚动；窄窗改为可增长+可收缩并占满一行。 */
+  .planner-toolbar { flex: 1 1 auto; width: 100%; max-width: 100%; flex-wrap: wrap; }
   .planner-tabs { flex-basis: 100%; }
   .planner-toolbar-actions { width: 100%; margin-left: 0; justify-content: space-between; flex-wrap: wrap; }
   .planner-generate { margin-left: auto; }

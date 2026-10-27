@@ -108,6 +108,8 @@
 
 .collection-pager {
   flex: 1 1 auto;
+  /* flex 子项的 min-width:auto 会让页码条按 min-content 撑到 318px，在 640 窄窗顶出页面 2px */
+  min-width: 0;
   justify-content: flex-end;
   min-height: 30px;
   padding: 0;
@@ -660,8 +662,10 @@
   .collection-grid { grid-template-columns: repeat(auto-fill, minmax(164px, 1fr)); }
   .collection-toolbar { flex-wrap: wrap; }
   .collection-overview { flex: 1 1 100%; }
-  .collection-controls { flex: 1; }
-  .collection-search { flex: 1; width: auto; }
+  .collection-controls { flex: 1; flex-wrap: wrap; }
+  /* 搜索框与页码条同时 flex:1 时，页码条按 max-content 抢走空间，把「筛选条件」挤成竖排两行 */
+  .collection-search { flex: 1 1 160px; width: auto; min-width: 0; }
+  .collection-controls .ghost-button { flex: none; white-space: nowrap; }
   .collection-side.mobile-filters { grid-row: 1; max-height: 320px; }
   .collection-page.filters-expanded .collection-body { grid-template-rows: auto minmax(0, 1fr); }
   .collection-side.showing-detail {
@@ -672,6 +676,11 @@
     border-radius: 0;
     box-shadow: var(--shadow-pop);
   }
+}
+
+@media (max-width: 700px) {
+  /* 窄窗把页码条移到独立一行，避免与搜索/筛选挤在同一行 */
+  .collection-pager { flex: 0 0 100%; }
 }
 
 @media (max-width: 560px) {
