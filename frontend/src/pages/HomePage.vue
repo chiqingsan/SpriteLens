@@ -246,8 +246,10 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
                 </div>
                 <div class="home-sprite-body">
                   <div class="home-sprite-title">
+                    <strong class="home-sprite-name" :title="resident.name">{{ resident.name }}</strong>
+                  </div>
+                  <div class="home-sprite-sub">
                     <span class="home-sprite-tags">
-                      <strong :title="resident.name">{{ resident.name }}</strong>
                       <span v-if="resident.nature_name" class="home-nature-chip">{{ resident.nature_name }}</span>
                       <span v-if="portraitMedals(resident).length" class="home-sprite-medals">
                         <img v-for="mark in portraitMedals(resident)" :key="mark.name" class="home-medal-icon"

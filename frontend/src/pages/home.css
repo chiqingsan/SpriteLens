@@ -332,26 +332,14 @@
   padding: 8px 11px 10px;
 }
 
+/* 名称独占一行，性格/奖牌与等级/性别落在第二行两端 */
 .home-sprite-title {
   display: flex;
   align-items: center;
-  flex-wrap: nowrap;
-  gap: 5px;
   min-width: 0;
-  white-space: nowrap;
 }
 
-/* 左簇（名称/性格/奖牌）可压缩；右簇（等级/性别）不参与收缩，永远贴在行尾 */
-.home-sprite-tags {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.home-sprite-tags > strong {
+.home-sprite-name {
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -362,7 +350,25 @@
   color: var(--ink);
 }
 
-.home-sprite-title .home-nature-chip {
+.home-sprite-sub {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* 左簇（性格/奖牌）可压缩；右簇（等级/性别）不参与收缩，永远贴在行尾 */
+.home-sprite-tags {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.home-sprite-sub .home-nature-chip {
   flex: 0 1 auto;
   min-width: 0;
   height: 18px;
