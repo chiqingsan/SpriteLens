@@ -63,7 +63,7 @@ describe('附近精灵更新布局稳定性', () => {
     const page = wrapper.vm as unknown as { update(value: unknown): void }
     page.update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
     await flushPromises()
-    const button = wrapper.get('.nearby-toolbar button')
+    const button = wrapper.get('.nearby-toolbar .nearby-refresh')
     const element = button.element
     const viewport = wrapper.get('.nearby-list-pane').element
     viewport.scrollTop = 120
@@ -74,7 +74,7 @@ describe('附近精灵更新布局稳定性', () => {
     expect(button.attributes('aria-busy')).toBe('false')
     resolve(snapshot(2, [actor('2', 3), actor('3', 4)]))
     await flushPromises()
-    expect(wrapper.get('.nearby-toolbar button').element).toBe(element)
+    expect(wrapper.get('.nearby-toolbar .nearby-refresh').element).toBe(element)
     expect(button.text()).toBe('刷新')
     expect(viewport.scrollTop).toBe(120)
     wrapper.unmount()
