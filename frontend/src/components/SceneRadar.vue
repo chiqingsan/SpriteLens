@@ -56,12 +56,10 @@ function labelFor(name: string, actorId: string, compact: boolean) {
   const maxLength = compact ? 4 : 8
   return value.length > maxLength ? `${value.slice(0, maxLength)}…` : value
 }
-/** 刻度值：>=1000 折算成 k 并去掉尾零，<1000 保留原始数值。 */
-function formatScaleValue(value: number) {
-  const rounded = Math.max(1, Math.round(value))
-  if (rounded < 1000) return String(rounded)
-  const scaled = Math.round(rounded / 100) / 10
-  return `${Number.isInteger(scaled) ? scaled : scaled.toFixed(1)}k`
+/** 原始坐标 → 米：1 原始单位 ≈ 1 cm（大陆现场校准，见 docs/NEARBY_MAP_PLAN_2026-10-26.md §米制比例尺）。 */
+function formatMeters(raw: number) {
+  const meters = raw / 100
+  return `${meters >= 10 ? Math.round(meters) : Math.round(meters * 10) / 10} m`
 }
 /** 粗估文本宽度：CJK 记满字号，其余字符约 0.56 字号，用于标签占位与越界判断。 */
 function estimateTextWidth(text: string, fontSize: number) {
@@ -152,7 +150,7 @@ const scale = computed(() => [
   { key: 'inner', radius: 60, value: range.value / 5 },
 ].map(tick => ({
   ...tick,
-  text: formatScaleValue(tick.value),
+  text: formatMeters(tick.value),
   x: CENTER + tick.radius * Math.SQRT1_2,
   y: CENTER + tick.radius * Math.SQRT1_2 + 4,
 })))
@@ -250,7 +248,7 @@ const debugPosition = computed(() => {
     <template v-if="!compact">
       <p v-if="note" class="radar-note">{{ note }}</p>
       <p v-if="debugPosition" class="radar-debug">{{ debugPosition }}</p>
-      <p v-if="projection">外环 {{ projection.range.toLocaleString('zh-CN') }} 单位 · 已定位 {{ projection.total }} / {{ data?.actors.length ?? 0 }} · 原始坐标，未校准米制<template v-if="projection.total > projection.rows.length"> · 显示 {{ projection.rows.length }} / {{ projection.total }} 个，优先选中和有标记的精灵</template></p>
+      <p v-if="projection" class="radar-footnote"><span>外环 {{ projection.range.toLocaleString('zh-CN') }} 单位 ≈ {{ formatMeters(projection.range) }}</span><span> · </span><span>已定位 {{ projection.total }} / {{ data?.actors.length ?? 0 }}</span><span> · </span><span>按 1 单位 ≈ 1 cm 折算</span><span>（大陆现场校准，平面距离）</span><template v-if="projection.total > projection.rows.length"><span> · </span><span>显示 {{ projection.rows.length }} / {{ projection.total }} 个，优先选中和有标记的精灵</span></template></p>
     </template>
   </section>
 </template>
@@ -258,6 +256,8 @@ const debugPosition = computed(() => {
 /* 块级容器：填满父面板，父面板固定高度时由内部 flex 分配空间，避免圆盘被裁掉。 */
 .scene-radar { display: flex; flex-direction: column; height: 100%; min-height: 0; min-width: 0; max-width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-sm); }
 .scene-radar > header, .scene-radar > .radar-legend, .scene-radar > p { flex: none; }
+/* 页脚按语义片段整体换行，避免「1 cm」「19 / 20」这类数值被拆到两行。 */
+.scene-radar .radar-footnote > span { white-space: nowrap; }
 .scene-radar .radar-note { margin-bottom: var(--space-1); }
 .scene-radar .radar-debug { color: var(--ink); font-variant-numeric: tabular-nums; }
 .scene-radar header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-width: 0; min-height: 44px; padding: 8px var(--space-3); border-bottom: 1px solid var(--line-soft); }

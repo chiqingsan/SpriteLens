@@ -279,8 +279,9 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
         if restored_eggs:
             logger.info("已载入历史蛋仓 %d 枚（来自本地库）", restored_eggs)
 
-    # 场景观察的距离参数：都是「原始坐标单位」，米制尚未校准（见
-    # docs/NEARBY_OBSERVATIONS.md）。默认值来自真实流量回放，可用
+    # 场景观察的距离参数：都是「原始坐标单位」，后端只存原始值、不做米制换算。
+    # 前端按 1 原始单位 ≈ 1 cm 折算显示米制（大陆现场校准，平面距离；见
+    # docs/NEARBY_MAP_PLAN_2026-10-26.md §米制比例尺）。默认值来自真实流量回放，可用
     # config.json 的 nearby.* 调整，改完重启生效。
     scene_max_distance_raw = settings.get_int(
         "nearby.max_distance_raw", DEFAULT_MAX_DISTANCE_RAW, lo=1000, hi=200000

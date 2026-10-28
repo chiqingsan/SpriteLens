@@ -102,13 +102,13 @@ describe('参考坐标雷达', () => {
     expect(wrapper.find('.radar-center-label').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('位置参考')
   })
-  it('三环刻度按半径显示为 2k / 5k / 10k 并随半径缩放', () => {
+  it('三环刻度按 1 单位 ≈ 1 cm 折算为米制并随半径缩放', () => {
     const wrapper = mount(SceneRadar, { props: { data: snapshot() } })
-    expect(wrapper.findAll('.radar-scale-label').map(node => node.text())).toEqual(['10k', '5k', '2k'])
+    expect(wrapper.findAll('.radar-scale-label').map(node => node.text())).toEqual(['100 m', '50 m', '20 m'])
     const small = mount(SceneRadar, { props: { data: snapshot(), radius: 2000 } })
-    expect(small.findAll('.radar-scale-label').map(node => node.text())).toEqual(['2k', '1k', '400'])
+    expect(small.findAll('.radar-scale-label').map(node => node.text())).toEqual(['20 m', '10 m', '4 m'])
     const fallback = mount(SceneRadar, { props: { data: snapshot(), radius: 0 } })
-    expect(fallback.findAll('.radar-scale-label').map(node => node.text())).toEqual(['10k', '5k', '2k'])
+    expect(fallback.findAll('.radar-scale-label').map(node => node.text())).toEqual(['100 m', '50 m', '20 m'])
   })
   it('默认只标注最近 6 个目标，选中目标即使更远也始终显示标签', () => {
     const spread = [
