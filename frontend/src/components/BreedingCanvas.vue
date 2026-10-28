@@ -55,6 +55,17 @@ const edgeCount = computed(() => props.plan?.edges?.length || 0)
 const interferenceCount = computed(() => (props.plan?.edges || []).filter(edge => (props.plan?.mothers || [])
   .some(mother => mother.gid === edge.female && mother.references.some(reference => reference.interference.includes(edge.male)))).length)
 const connected = computed(() => new Set((props.plan?.edges || []).flatMap(edge => [edge.male, edge.female])))
+// SVG 没有 z-index，谁后画谁在上面。选中的窝最后绘制，它自己的加粗描边、学院角标
+// 和下方名称才能压住相邻窝位；否则相邻窝的色块会把选中窝的下半截和名称切掉。
+// 编号仍按方案顺序，只有绘制顺序变了。
+const nestRows = computed(() => {
+  const rows = props.positions.map((position, index) => ({ position, index }))
+  const at = rows.findIndex(row => row.position.gid === props.selected)
+  if (at < 0 || at === rows.length - 1) return rows
+  const [picked] = rows.splice(at, 1)
+  rows.push(picked)
+  return rows
+})
 const shortName = (gid: string) => {
   const name = props.parents.get(gid)?.name || '记录缺失'
   return name.length > 5 ? `${name.slice(0, 5)}…` : name
@@ -132,7 +143,7 @@ function key(event: KeyboardEvent, gid: string) {
       <svg :viewBox="`${boardBounds.x} ${boardBounds.y} ${boardBounds.size} ${boardBounds.size}`" preserveAspectRatio="xMidYMid meet" aria-label="小窝布局草图">
         <defs><pattern id="planner-grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" class="planner-grid-line" fill="none" /></pattern></defs>
         <rect class="planner-board-grid" :x="boardBounds.x" :y="boardBounds.y" :width="boardBounds.size" :height="boardBounds.size" fill="url(#planner-grid)" />
-        <g v-for="(position, index) in positions" :key="position.gid" class="planner-nest" :class="[{ selected: selected === position.gid, 'is-partner': pairMates.has(position.gid), academy: position.kind === 'academy', dragging: drag?.gid === position.gid, 'drop-target': dropState?.targetGid === position.gid, unrelated: !!plan && !connected.has(position.gid) }, `gender-${parents.get(position.gid)?.gender}`]"
+        <g v-for="{ position, index } in nestRows" :key="position.gid" class="planner-nest" :class="[{ selected: selected === position.gid, 'is-partner': pairMates.has(position.gid), academy: position.kind === 'academy', dragging: drag?.gid === position.gid, 'drop-target': dropState?.targetGid === position.gid, unrelated: !!plan && !connected.has(position.gid) }, `gender-${parents.get(position.gid)?.gender}`]"
           :transform="`translate(${(drag?.gid === position.gid ? drag.cellX : position.x) * 32 + 32},${(drag?.gid === position.gid ? drag.cellY : position.y) * 32 + 32})`" :data-gid="position.gid" tabindex="0" role="button" :aria-label="`${index + 1}号，${parents.get(position.gid)?.name || '当前记录未找到'}，${parents.get(position.gid)?.gender === 1 ? '父本' : '母本'}${position.lock ? '，已锁定' : ''}，Enter 选择，也可拖动到空位或与另一窝交换位置`"
           @focus="emit('select', position.gid)" @pointerdown="pointerDown($event, position.gid)" @pointermove="pointerMove" @pointerup="pointerUp" @pointercancel="drag = null" @keydown="key($event, position.gid)">
           <rect x="-32" y="-32" width="64" height="64" rx="8" />

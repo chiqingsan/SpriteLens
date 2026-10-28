@@ -230,40 +230,27 @@ button.planner-state-badge:focus-visible { outline: 2px solid var(--teal); outli
 .planner-state-metrics {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
   min-width: 0;
 }
 
+/* 一个指标读作「标签 数值」一行、同一基线对齐。
+   原来标签压在数值上方排两行：在 36px 工具行里和左侧状态胶囊对不齐（胶囊居中于两行之间），
+   四个宽度不一的数值又各占一块地盘，整条读起来发飘。 */
 .planner-state-metric {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-  line-height: 1.15;
-}
-
-.planner-state-metric small { color: var(--muted); font-size: 11px; white-space: nowrap; }
-.planner-state-metric strong { color: var(--ink); font-size: var(--fs-sm); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.planner-state-metric strong i { margin: 0 1px; color: var(--muted); font-size: 11px; font-style: normal; font-weight: 500; }
-.planner-state-metric strong.is-idle { color: var(--muted); font-weight: 500; }
-
-.planner-state-link {
   display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  flex: none;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--teal-dark);
-  font-size: var(--fs-3xs);
-  font-weight: 500;
+  align-items: baseline;
+  gap: var(--space-1);
+  min-width: 0;
+  line-height: 1;
   white-space: nowrap;
-  cursor: pointer;
 }
 
-.planner-state-link > .ui-icon { width: 12px; height: 12px; }
-.planner-state-link:hover { text-decoration: underline; text-underline-offset: 2px; }
+.planner-state-metric small { color: var(--muted); font-size: var(--fs-3xs); font-weight: 400; }
+.planner-state-metric strong { color: var(--ink); font-size: var(--fs-3xs); font-weight: 600; font-variant-numeric: tabular-nums; }
+.planner-state-metric strong i { margin-left: 1px; color: var(--muted); font-size: 11px; font-style: normal; font-weight: 500; }
+.planner-state-metric strong.is-idle { color: var(--muted); font-weight: 500; }
 
 .planner-scroll {
   flex: 1;
@@ -956,18 +943,19 @@ button.planner-state-badge:focus-visible { outline: 2px solid var(--teal); outli
 /* 容量卡 */
 .planner-capacity { margin-bottom: var(--space-3); border: 1px solid var(--line-soft); border-radius: var(--radius-md); background: var(--surface-1); overflow: hidden; }
 
-/* 容量卡：去掉左侧 40×40 装饰方块（纯装饰，占掉 360px 侧栏里 50px 宽度），数字与步进器直接占满整行 */
+/* 容量卡：去掉左侧 40×40 装饰方块（纯装饰，占掉 360px 侧栏里 50px 宽度）。
+   一行排开：步进器在左、普通小窝标签紧随其后，学院绿窝靠行尾；放不下时学院绿窝整块换行。 */
 .planner-capacity-main {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
   align-items: center;
-  row-gap: var(--space-2);
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
   padding: var(--space-2) var(--space-4) var(--space-2) var(--space-3);
 }
 
 .planner-capacity-art { display: none; }
 
-.planner-capacity-nests { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; }
+.planner-capacity-nests { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .planner-capacity-label { color: var(--ink); font-size: var(--fs-2xs); font-weight: 600; white-space: nowrap; }
 
 .planner-stepper { display: inline-flex; align-items: stretch; flex: none; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); }
@@ -1005,9 +993,8 @@ button.planner-state-badge:focus-visible { outline: 2px solid var(--teal); outli
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  grid-column: 1 / -1;
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--line-soft);
+  flex: none;
+  margin-left: auto;
   cursor: pointer;
 }
 
@@ -1041,7 +1028,6 @@ button.planner-state-badge:focus-visible { outline: 2px solid var(--teal); outli
 .planner-capacity-academy input:checked + .planner-check::after { opacity: 1; }
 .planner-capacity-academy input:focus-visible + .planner-check { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
-.planner-capacity-academy .planner-capacity-label { margin-right: auto; }
 .planner-capacity-cap { display: grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 50%; background: color-mix(in srgb, var(--teal-soft) 75%, var(--panel)); color: var(--teal-dark); }
 .planner-capacity-cap .ui-icon { width: 13px; height: 13px; }
 
@@ -1423,7 +1409,8 @@ dialog.planner-picker {
     border-left: 0;
     border-top: 1px solid var(--line-soft);
   }
-  .planner-state-metrics { flex: 1 1 auto; justify-content: space-between; gap: var(--space-4); }
+  /* 状态徽标靠左、四个指标靠右：整行只在两端有内容，中间留白，比把四个指标均摊到满行更稳 */
+  .planner-state-metrics { flex: 0 1 auto; gap: var(--space-4); }
 }
 
 @media (max-width: 840px) {

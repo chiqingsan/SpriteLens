@@ -21,7 +21,6 @@ const editingGoalIds = ref(new Set<string>())
 const expandedOutcomeIds = ref(new Set<string>())
 const iterationPage = ref(1), unusedPage = ref(1)
 const selectedPage = ref(1)
-const outcomes = ref<HTMLElement | null>(null)
 // 生成按钮的禁用原因只做 title 提示：工具条里任何出现/消失的内联文案都会让按钮与相邻操作跳动。
 const generationHint = computed(() => {
   if (!context.value?.uid || !context.value.available) return '请先采集当前账号的背包资料'
@@ -264,11 +263,10 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
         <span v-else class="planner-state-badge" :class="stateTone" :title="stateTitle"><UiIcon :name="stateIcon" />{{ stateLabel }}</span>
         <span class="planner-state-metrics">
           <span class="planner-state-metric" :title="stateTitle"><small>可参与</small><strong>{{ context?.available ? context.parents.length : '—' }}<i v-if="context?.available">只</i></strong></span>
-          <span class="planner-state-metric" :title="mode === 'target' ? '已就绪目标 / 已添加目标' : '当前方案里的父本—母本配对数'"><small>{{ mode === 'target' ? '目标就绪' : '配对组' }}</small><strong v-if="plan">{{ mode === 'target' ? `${plan.goals.filter(g => g.ready).length} / ${draft.goals.length}` : plan.edges.length }}<i v-if="mode !== 'target'">组</i></strong><strong v-else class="is-idle">待评估</strong></span>
-          <span class="planner-state-metric" title="画布上已入住的父本 / 母本数量"><small>入住</small><strong>{{ placementCounts.males }}<i>父</i> / {{ placementCounts.females }}<i>母</i></strong></span>
-          <span class="planner-state-metric" title="方案里有合格父本的母本数量"><small>有配对母本</small><strong>{{ plan ? plan.metrics.effective_mothers ?? 0 : '—' }}<i v-if="plan">只</i></strong></span>
+          <span class="planner-state-metric" :title="mode === 'target' ? '已就绪目标 / 已添加目标' : '当前方案里的父本—母本配对数'"><small>{{ mode === 'target' ? '目标就绪' : '配对组' }}</small><strong v-if="plan">{{ mode === 'target' ? `${plan.goals.filter(g => g.ready).length}/${draft.goals.length}` : plan.edges.length }}<i v-if="mode !== 'target'">组</i></strong><strong v-else class="is-idle">待评估</strong></span>
+          <span class="planner-state-metric" title="画布上已入住的父本 / 母本数量"><small>入住</small><strong>{{ placementCounts.males }}<i>父</i>/{{ placementCounts.females }}<i>母</i></strong></span>
+          <span class="planner-state-metric" title="方案里有合格父本的母本数量"><small>配对母本</small><strong>{{ plan ? plan.metrics.effective_mothers ?? 0 : '—' }}<i v-if="plan">只</i></strong></span>
         </span>
-        <button v-if="plan" type="button" class="planner-state-link" title="跳到下方的产物与目标支持" @click="outcomes?.scrollIntoView({ block: 'start', behavior: 'smooth' })">{{ dirty[mode] ? '上次结果' : '查看产物' }}<UiIcon name="chevron-down" /></button>
       </div>
     </div>
     </template>
@@ -287,7 +285,7 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
           <div class="planner-actions"><button class="chip" :class="{ active: selectedPosition.lock }" :aria-pressed="!!selectedPosition.lock" @click="cycleLock">{{ { '': '未锁定', participation: '锁定参与', position: '锁定位置' }[selectedPosition.lock] }}</button><button class="ghost-button" :disabled="!!selectedPosition.lock" @click="showPicker('replace')">替换亲本</button><button class="ghost-button" :disabled="!!selectedPosition.lock" @click="removeParent">移出</button><UiSelect size="xs" :options="swapOptions" :model-value="''" label="交换到窝位" placeholder="交换到另一窝位" :disabled="selectedPosition.lock === 'position'" @change="swap(String($event ?? ''))" /></div>
            <div v-if="mode === 'target' && selectedParent?.gender === 2" class="planner-coordinate"><label>母本主目标<UiSelect size="sm" :options="primaryGoalOptions" :model-value="selectedPosition.primary_goal_id" label="母本主目标" @change="updatePosition({ primary_goal_id: String($event ?? '') })" /></label></div>
         </section>
-        <section v-if="plan || draft.placements.length" ref="outcomes" class="planner-outcomes" :class="{ 'is-stale': dirty[mode] }">
+        <section v-if="plan || draft.placements.length" class="planner-outcomes" :class="{ 'is-stale': dirty[mode] }">
           <header><strong>产物与目标支持</strong><small>{{ dirty[mode] ? '下方为上次分析，等待重评' : '奖牌为规划支持，性格为模型参考' }}</small></header>
            <div v-if="!plan" class="planner-empty">
             <UiIcon name="egg" />
@@ -352,12 +350,12 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
           <div class="planner-capacity-main">
             <span class="planner-capacity-art" aria-hidden="true"><UiIcon name="home" /></span>
             <div class="planner-capacity-nests">
-              <span id="planner-nest-count-label" class="planner-capacity-label">普通小窝</span>
               <span class="planner-stepper" role="group" aria-labelledby="planner-nest-count-label">
                 <button type="button" :disabled="draft.capacity <= 0" aria-label="减少普通小窝" @click="draft.capacity = Math.max(0, draft.capacity - 1)">−</button>
                 <output class="planner-stepper-value" aria-live="polite">{{ draft.capacity }}</output>
                 <button type="button" :disabled="draft.capacity >= 10" aria-label="增加普通小窝" @click="draft.capacity = Math.min(10, draft.capacity + 1)">+</button>
               </span>
+              <span id="planner-nest-count-label" class="planner-capacity-label">普通小窝</span>
             </div>
             <label class="planner-capacity-academy">
               <input v-model="draft.academy" type="checkbox">

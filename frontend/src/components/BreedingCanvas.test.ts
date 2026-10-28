@@ -28,6 +28,7 @@ function canvas(options: { plan?: Plan | null; pending?: boolean; positions?: Pl
 
 function viewBox(wrapper: ReturnType<typeof canvas>) { return (wrapper.get('svg').attributes('viewBox') ?? '').split(' ').map(Number) }
 const nests = (wrapper: ReturnType<typeof canvas>) => wrapper.findAll('g.planner-nest')
+const nestOf = (wrapper: ReturnType<typeof canvas>, gid: string) => wrapper.get(`g.planner-nest[data-gid="${gid}"]`)
 
 describe('小窝布局草图', () => {
   it('画布不再画父本连线，只按方案标记无配对窝位', () => {
@@ -43,18 +44,26 @@ describe('小窝布局草图', () => {
     // 父本 1 与母本 2、3 配对
     const wrapper = canvas({ selected: '1' })
     expect(wrapper.findAll('.planner-nest.is-partner')).toHaveLength(2)
-    expect(nests(wrapper)[1]!.classes()).toContain('is-partner')
-    expect(nests(wrapper)[2]!.classes()).toContain('is-partner')
-    expect(nests(wrapper)[0]!.classes()).not.toContain('is-partner')
+    expect(nestOf(wrapper, '2').classes()).toContain('is-partner')
+    expect(nestOf(wrapper, '3').classes()).toContain('is-partner')
+    expect(nestOf(wrapper, '1').classes()).not.toContain('is-partner')
     // 从配对另一端反查也成立：母本 2 只与父本 1 配对
     const reverse = canvas({ selected: '2' })
     expect(reverse.findAll('.planner-nest.is-partner')).toHaveLength(1)
-    expect(nests(reverse)[0]!.classes()).toContain('is-partner')
+    expect(nestOf(reverse, '1').classes()).toContain('is-partner')
   })
   it('配对描边只由选中触发，悬停不点亮', async () => {
     const wrapper = canvas()
     await nests(wrapper)[0]!.trigger('pointerenter')
     expect(wrapper.findAll('.planner-nest.is-partner')).toHaveLength(0)
+  })
+  it('选中的窝位最后绘制，名称与角标不会被相邻窝位盖住', () => {
+    const gids = (wrapper: ReturnType<typeof canvas>) => nests(wrapper).map(item => item.attributes('data-gid'))
+    // SVG 没有层级，后画者在上：选中的窝必须挪到末尾，它的名称与角标才会压住邻窝
+    expect(gids(canvas({ selected: '2' }))).toEqual(['1', '3', '4', '2'])
+    // 编号仍按草稿顺序，不随绘制顺序变化
+    expect(nestOf(canvas({ selected: '2' }), '2').get('text.planner-nest-number').text()).toBe('2')
+    expect(gids(canvas())).toEqual(['1', '2', '3', '4'])
   })
   it('说明区报告窝数与连线数，待重评和未生成方案时给出对应说明', () => {
     const caption = canvas().get('.planner-canvas-caption').text()
