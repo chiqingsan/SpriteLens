@@ -34,7 +34,7 @@ watch(() => model.active.value, active => {
       placeholder="搜索名字 / 编号 / 图鉴 ID" @update:model-value="model.search($event)" />
   </Teleport>
   <Teleport to="#pet-sort-root">
-    <label class="inline-field pet-sort-field" :hidden="fixed">排序
+    <label class="inline-field pet-sort-field" :hidden="fixed"><span class="pet-sort-label">排序</span>
       <UiSelect id="f-sort" size="sm" class="pet-sort-picker" :options="sortOptions" :model-value="filters.sort" :disabled="fixed" label="排序" @change="setSort" />
     </label>
     <div v-if="!fixed" class="segmented pet-sort-direction" role="group" aria-label="排序方向">

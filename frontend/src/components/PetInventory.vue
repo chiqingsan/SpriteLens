@@ -60,7 +60,7 @@ defineExpose({ setBox, reveal, closeDetail, openDetail: () => { if (selected.val
     <button v-for="item in ([['point', '游戏箱位'], ['card', '自定义排序']] as const)" :key="item[0]" :data-view="item[0]" :class="{ active: view === item[0] }" :aria-pressed="view === item[0]" @click="closeDetail(); emit('close'); model.setView(item[0]); emit('view', item[0])"><UiIcon name="layout-grid"></UiIcon>{{ item[1] }}</button>
     </UiSegmented>
   </Teleport>
-  <Teleport to="#pet-count-root"><span id="pet-count" class="count-badge" role="status">{{ data ? '命中 ' + (data?.shown || 0) + ' / ' + (data?.total || 0) + ' 只' : error ? '加载失败' : '加载中…' }}</span></Teleport>
+  <Teleport to="#pet-count-root"><span id="pet-count" class="count-badge" role="status"><template v-if="data"><span class="pet-count-words">命中 </span>{{ data?.shown || 0 }} / {{ data?.total || 0 }}<span class="pet-count-words"> 只</span></template><template v-else>{{ error ? '加载失败' : '加载中…' }}</template></span></Teleport>
   <PetBoxNavigation v-show="view === 'point'" :model="model" @select="setBox"></PetBoxNavigation>
   <PetPageNavigation v-show="view === 'card' && !!pets.length" :model="model" @select="setPage" @teams="openTeams"></PetPageNavigation>
   <div ref="wrap" class="table-wrap" :class="{ 'pet-empty-state': empty && (!busy || !data) }" :aria-busy="busy">
