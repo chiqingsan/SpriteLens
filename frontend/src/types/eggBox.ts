@@ -19,12 +19,19 @@ export interface EggBoxAnnotations {
 }
 export interface EggBoxTags { nature: string; weight: string | null; voice: string | null; medals: string[]; nest: string }
 export interface EggBoxSaveAnnotations extends EggBoxAnnotations { uid: number; instance_id: number }
+export interface EggParent { instance_id: number; name: string; base_id: number; icon_url: string }
+export interface EggPickupOrigin {
+  actor_id: string; nest_guid: string; nest_kind: 'ordinary' | 'academy'; nest_config_id: number
+  mother: EggParent | null; fathers: EggParent[]; observed_at: number; pairing_stale: boolean
+  mother_nature_id: number
+}
 
 export interface EggBoxEntry {
   instance_id: number
   egg_conf_id: number
   egg_name: string
   species_name: string
+  dex_no: number
   chain_names: string[]
   description: string
   description_source: string
@@ -46,6 +53,12 @@ export interface EggBoxEntry {
   height_cm: number
   weight_g: number
   home_egg: boolean
+  pickup: EggPickupOrigin | null
+  category: number
+  from_player_name: string
+  from_pet_name: string
+  from_player_uin: number
+  from_pet_gid: number
   annotations: EggBoxAnnotations
   tags: EggBoxTags
   measurement_ranges: EggBoxMeasurementRanges
@@ -112,9 +125,11 @@ function isSource(value: unknown): value is EggBox['source'] {
 
 function isEntry(value: unknown): value is EggBoxEntry {
   if (!record(value)) return false
-  return ['instance_id', 'egg_conf_id', 'quantity', 'obtained_at', 'special_egg_conf_id', 'height_cm', 'weight_g']
+  return ['instance_id', 'egg_conf_id', 'quantity', 'obtained_at', 'special_egg_conf_id', 'height_cm', 'weight_g',
+    'category', 'from_player_uin', 'from_pet_gid', 'dex_no']
     .every(key => safeInteger(value[key]))
-    && ['egg_name', 'species_name', 'description', 'description_source', 'icon_url', 'fallback_icon_url', 'egg_type_name', 'hatch_label']
+    && ['egg_name', 'species_name', 'description', 'description_source', 'icon_url', 'fallback_icon_url', 'egg_type_name', 'hatch_label',
+      'from_player_name', 'from_pet_name']
       .every(key => string(value[key]))
     && strings(value.chain_names)
     && typeof value.egg_kind === 'string' && ['regular', 'special', 'shiny', 'colorful', 'mystery', 'unknown'].includes(value.egg_kind)
@@ -123,9 +138,23 @@ function isEntry(value: unknown): value is EggBoxEntry {
       .every(key => typeof value[key] === 'boolean')
     && typeof value.favorite === 'boolean'
     && typeof value.home_egg === 'boolean' && isAnnotations(value.annotations)
+    && (value.pickup === null || isPickup(value.pickup))
     && isTags(value.tags)
     && finite(value.hatch_progress) && value.hatch_progress >= 0 && value.hatch_progress <= 1
     && isRanges(value.measurement_ranges)
+}
+
+function isParent(value: unknown): value is EggParent {
+  return record(value) && safeInteger(value.instance_id) && value.instance_id > 0
+    && string(value.name) && safeInteger(value.base_id) && string(value.icon_url)
+}
+
+function isPickup(value: unknown): value is EggPickupOrigin {
+  return record(value) && string(value.actor_id) && string(value.nest_guid)
+    && (value.nest_kind === 'ordinary' || value.nest_kind === 'academy')
+    && safeInteger(value.nest_config_id) && safeInteger(value.mother_nature_id)
+    && finite(value.observed_at) && typeof value.pairing_stale === 'boolean'
+    && (value.mother === null || isParent(value.mother)) && Array.isArray(value.fathers) && value.fathers.every(isParent)
 }
 
 function isEggBox(value: unknown): value is EggBox {

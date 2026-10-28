@@ -18,6 +18,8 @@ from spritelens.domain.identity import extract_identity
 from spritelens.logs import get_logger
 from spritelens.services.account_tracker import AccountTracker
 from spritelens.events import PacketEvent
+from spritelens.services.egg_pickup import EggPickupTracker
+from spritelens.services.home_repository import HomeRepoSnapshot
 
 logger = get_logger("egg_repository")
 
@@ -50,6 +52,13 @@ class EggBoxRepository:
         self._historical_ids: set[int] = set()
         self._source = "unknown"
         self._slots_source = "unknown"
+        self._pickups = EggPickupTracker()
+
+    def observe_pickup(self, event: PacketEvent, home: HomeRepoSnapshot, natures: dict[int, int]) -> None:
+        self._pickups.observe(event, home, natures)
+
+    def clear_pickups(self, session_id: str | None = None) -> None:
+        self._pickups.clear(session_id)
 
     def handle_packet(self, event: PacketEvent) -> None:
         # 身份跟踪无条件进行：账号切换要把内存蛋仓/孵化槽一起作废，
@@ -59,6 +68,7 @@ class EggBoxRepository:
             with self._lock:
                 switched = self._account.observe(identity)
                 if switched:
+                    self._pickups.clear()
                     logger.info("账号切换 → 清空蛋仓快照（uid %s）", identity.uid)
                     self._eggs.clear()
                     self._hatch_slots.clear()
@@ -86,13 +96,19 @@ class EggBoxRepository:
         eggs = extract_eggs(event)
         if not eggs:
             return
-        if event.opcode == OP_HOME_EGG_PICKUP:
+        pickup = self._pickups.take(event)
+        if pickup is not None and len(eggs) == 1 and eggs[0].quantity == 1:
+            eggs = [replace(eggs[0], pickup=pickup, home_egg=True)]
+        reward_fields = {node["no"]: node.get("raw") for node in event.decoded or []}
+        if event.opcode == OP_HOME_EGG_PICKUP and reward_fields.get(2) == 13 and reward_fields.get(3) == 223:
             eggs = [replace(egg, home_egg=True) for egg in eggs]
         with self._lock:
             for egg in eggs:
                 if egg.instance_id <= 0 or len(self._eggs) >= MAX_EGGS and egg.instance_id not in self._eggs:
                     continue
                 previous = self._eggs.get(egg.instance_id)
+                if previous is not None and previous.pickup is not None:
+                    egg = replace(egg, pickup=previous.pickup)
                 if previous is not None and previous.home_egg and not egg.home_egg:
                     egg = replace(egg, home_egg=True)
                 self._eggs[egg.instance_id] = egg
@@ -100,6 +116,7 @@ class EggBoxRepository:
             self._source = "mixed" if self._historical_ids else "observed"
             self._version += 1
             uid = self._account.uid
+            eggs = [self._eggs[egg.instance_id] for egg in eggs if egg.instance_id in self._eggs]
         if self._store is not None and uid > 0:
             self._store.put(uid, eggs)
 
@@ -206,6 +223,7 @@ class EggBoxRepository:
             self._version += 1
 
     def clear(self) -> None:
+        self._pickups.clear()
         with self._lock:
             self._eggs.clear()
             self._hatch_slots.clear()

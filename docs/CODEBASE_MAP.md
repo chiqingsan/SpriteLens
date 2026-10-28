@@ -30,7 +30,8 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `tools/sync_pet_media.py` | 按官方 manifest 导入头像/立绘并写入媒体映射；稀有标记图标由 `rarity/` 资源单独维护（幂等，报告 pet_media_report.json） |
 | `tools/sync_ui_icons.py` | 按固定官方 Git 版本导入少量 Tabler SVG 图标并合成 sprite（开发期联网，运行期零网络） |
 | `tools/analyze_recording.py` | 录制文件离线分析（帧分类/opcode 分布/宠物形状） |
-| `tools/run_web_demo.py` | 带合成数据的界面实例（浏览器打开，视觉验收用） |
+| `tools/backfill_egg_origins.py` | 回放事件日志补录历史收蛋来源：默认只读预览，`--apply` 写库前检查应用是否已退出 |
+| `tools/run_web_demo.py` | 带合成数据的界面实例（浏览器打开，视觉验收用；含一条收蛋来源链路数据） |
 | `tools/make_icon.py` | 生成 `resources/app.ico` 多尺寸图标与 favicon（PIL，产物入库） |
 | `resources/app.ico` | 应用图标（窗口/任务栏用，打包时随包分发） |
 | `resources/icon_source.png` | 已确认的好奇版头像源图，供 `tools/make_icon.py` 派生 ICO 与 favicon |
@@ -117,6 +118,10 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `services/account_sessions.py` | M01：连接身份路由、每账号业务仓库、稳定展示视图与选择所有权 |
 | `services/pet_repository.py` | 宠物聚合、身份/切号、彩名学习与入库；consistent_snapshot 单次取齐宠物/箱位/位置/uid/version，声音只保留抓取值 |
 | `services/egg_repository.py` | 蛋仓聚合；EggBoxSnapshot 一次取齐条目/槽/uid/version/历史来源，恢复 IO 竞争拒绝提交 |
+| `services/egg_pickup.py` | 同账号、同连接的收蛋请求与奖励关联；保存收取前小窝、关联母本和候选父本快照 |
+| `tests/test_egg_pickup.py` | 收蛋归属、并行歧义、刷新/重启与写失败重试、学院窝性格回归 |
+| `services/egg_origin_backfill.py` | 事件日志回放：跨分片按 ts 归并，复用家园快照与收蛋关联规则产出历史收取来源；只读、不写库 |
+| `tests/test_egg_origin_backfill.py` | 日志行解析与坏行跳过、跨分片归并、回放关联、未匹配奖励计数、pickup 只合并不覆盖 |
 | `services/home_repository.py` | 家园聚合（快照覆盖 + 切号清空 + 增量帧版本提示） |
 | `services/event_logger.py` | PacketEvent JSONL 异步落盘（有界队列 + worker 批量写，按天分片，复盘用） |
 | `recording/recorder.py` | StreamChunk jsonl 录制/读回 |
@@ -179,6 +184,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `test_static_data.py` | base_conf_id 与 conf_id 的区分、坏表不影响其它数据 |
 | `test_eggs.py` | 蛋目录关联索引与蛋组/类型/孵化时长/搜索筛选 |
 | `test_egg_box.py` | 蛋仓：形状搜索提取/拒收、聚合去重、SQLite roundtrip、写-behind 落盘、跨账号隔离与载荷联查 |
+| `test_egg_origin_backfill.py` | 历史补录：事件日志解析/坏行跳过、跨分片按 ts 归并、回放关联母本与候选父本、未匹配奖励与 pickup 只合并不覆盖 |
 | `test_home.py` | 家园：居民/家具/窝提取、聚合与增量计数 |
 | `test_desktop_shell.py` | DPI/工作区适配、保存的宽高比例与多屏位置恢复 |
 | `test_app_icons.py` | 窗口大小图标消息、64 位句柄与图标加载失败回归 |

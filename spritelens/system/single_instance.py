@@ -27,6 +27,7 @@ ERROR_ALREADY_EXISTS = 183
 WAIT_OBJECT_0 = 0
 EVENT_MODIFY_STATE = 0x0002
 SW_RESTORE = 9
+SYNCHRONIZE = 0x00100000
 
 # 仅在 Windows 上加载内核库；其他平台下面各函数走降级分支
 _kernel32 = ctypes.WinDLL("kernel32", use_last_error=True) if sys.platform == "win32" else None
@@ -47,6 +48,8 @@ if _kernel32 is not None:
     _kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
     _kernel32.CloseHandle.restype = wintypes.BOOL
     _kernel32.GetCurrentProcessId.restype = wintypes.DWORD
+    _kernel32.OpenMutexW.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.LPCWSTR]
+    _kernel32.OpenMutexW.restype = wintypes.HANDLE
 
 if _user32 is not None:
     _user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
@@ -54,6 +57,24 @@ if _user32 is not None:
     _user32.SetForegroundWindow.restype = wintypes.BOOL
     _user32.BringWindowToTop.argtypes = [wintypes.HWND]
     _user32.BringWindowToTop.restype = wintypes.BOOL
+
+
+def instance_running(mutex_name: str = MUTEX_NAME) -> bool:
+    """只读探测：是否已有进程持有实例互斥锁（不创建锁、不唤醒窗口）。
+
+    用 OpenMutexW 打开已有命名互斥锁；进程退出时内核释放句柄、互斥对象
+    随之消失，所以「能打开」就等于「仍有实例在运行」。维护脚本写库前用它
+    判断应用是否已退出，避免和在线应用抢写同一份蛋仓。
+
+    非 Windows 平台无单实例限制，恒返回 False，由调用方自行兜底。
+    """
+    if _kernel32 is None:
+        return False
+    handle = _kernel32.OpenMutexW(SYNCHRONIZE, False, mutex_name)
+    if not handle:
+        return False
+    _kernel32.CloseHandle(handle)
+    return True
 
 
 class SingleInstanceGuard:
@@ -155,4 +176,5 @@ __all__ = [
     "UI_ACTIVATION_EVENT_NAME",
     "UI_MUTEX_NAME",
     "SingleInstanceGuard",
+    "instance_running",
 ]

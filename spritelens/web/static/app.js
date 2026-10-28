@@ -699,6 +699,8 @@
       var root = $(rootId);
       if (!root) { return; }
       root.addEventListener("click", function (event) {
+        var toInstance = event.target.closest("[data-reveal-pet]");
+        if (toInstance) { petFilters.reset(); switchPage("pets", String(toInstance.dataset.revealPet)); return; }
         var toPage = event.target.closest("[data-goto-page]");
         if (toPage) { switchPage(String(toPage.dataset.gotoPage), toPage.dataset.catalogId); return; }
         var toPets = event.target.closest("[data-goto-pets]");

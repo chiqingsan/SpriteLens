@@ -91,6 +91,11 @@
   min-width: 0;
 }
 
+.eggbox-sort-select {
+  flex: none;
+  width: 100px;
+}
+
 .eggbox-sort {
   flex: none;
   min-width: 0;
@@ -1219,6 +1224,18 @@
   margin: auto;
   padding: var(--space-6);
 }
+
+.eggbox-origin-meta dd {
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  text-align: right;
+  line-height: 1.6;
+}
+
+.eggbox-parent-list { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); }
+.eggbox-parent-link { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: right; }
+.eggbox-parent-link .ui-icon { width: 14px; height: 14px; vertical-align: middle; }
 
 /* ── 容器查询：列表面板变窄时收拢工具栏 ── */
 @container (max-width: 560px) {

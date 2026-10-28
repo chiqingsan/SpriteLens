@@ -34,6 +34,7 @@ class HomeRepoSnapshot:
     version: int
     pending_deltas: int
     source: str = "unknown"
+    session_id: str | None = None
 
 
 class HomeRepository:
@@ -210,7 +211,8 @@ class HomeRepository:
             )
             source = ("stale" if self._delta_count else "observed") if observed else "history" if self._snapshot else "unknown"
             return HomeRepoSnapshot(
-                self._snapshot, self._account.display_uid, self._version, self._delta_count, source
+                self._snapshot, self._account.display_uid, self._version, self._delta_count, source,
+                self._active_session if observed else None,
             )
 
     def version(self) -> int:

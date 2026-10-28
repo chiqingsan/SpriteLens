@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from spritelens.domain.egg_box import EggBoxEntry, extract_eggs, extract_hatch_slots
 from spritelens.domain.eggs import EggCatalog
@@ -107,6 +108,8 @@ class ExtractEggsTests(unittest.TestCase):
         self.assertEqual(egg.pet_conf_id, 3001001)
         self.assertEqual(egg.hatch_seconds, 43200)
         self.assertEqual(egg.category, 6)
+        self.assertEqual((egg.from_player_name, egg.from_pet_name, egg.from_player_uin, egg.from_pet_gid),
+                         ("", "", 0, 0))
         self.assertFalse(egg.hatching)
         self.assertEqual(egg.hatch_progress, 0.0)
 
@@ -166,6 +169,54 @@ class HatchSlotTests(unittest.TestCase):
         self.assertIsNone(extract_hatch_slots(event))
 
 class EggBoxRepositoryTests(unittest.TestCase):
+    def test_origin_fields_survive_failed_flush_and_restart(self) -> None:
+        row = _egg_row()
+        row["children"][-1]["children"].extend([
+            _field(13, "测试来源玩家".encode("utf-8")), _field(14, "来源精灵昵称"),
+            _field(15, 4294967295), _field(16, 4294967294),
+        ])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "db.sqlite"
+            db = Database(path)
+            store = EggStore(db, flush_interval=60.0)
+            try:
+                repo = EggBoxRepository(store=store)
+                repo.handle_packet(_identity_event(101))
+                pickup_event = _event(row, opcode=0x0243)
+                pickup_event.decoded.extend([_field(2, 13), _field(3, 223)])
+                repo.handle_packet(pickup_event)
+                with patch.object(db, "execute_batches", side_effect=sqlite3.OperationalError("synthetic failure")):
+                    with self.assertRaises(sqlite3.OperationalError):
+                        store.flush()
+                self.assertEqual(store.pending_count, 1)
+            finally:
+                store.close()
+                db.close()
+            db = Database(path)
+            store = EggStore(db)
+            try:
+                repo = EggBoxRepository(store=store)
+                repo.load_account(101)
+                payload = egg_box_payload(repo, None)
+                got = payload["eggs"][0]
+                self.assertTrue(got["historical"])
+                self.assertTrue(got["home_egg"])
+                self.assertEqual(got["category"], 6)
+                self.assertEqual(got["from_player_name"], "测试来源玩家")
+                self.assertEqual(got["from_pet_name"], "来源精灵昵称")
+                self.assertEqual(got["from_player_uin"], 4294967295)
+                self.assertEqual(got["from_pet_gid"], 4294967294)
+                repo.load_account(202)
+                self.assertEqual(egg_box_payload(repo, None)["eggs"], [])
+                # 旧明细未保存来源字段时仍可读取，不把缺失值补成别的账号或精灵。
+                db.execute("UPDATE eggs SET detail_json = ? WHERE uid = 101", ('{"category":6}',))
+                legacy = store.load(101)[0]
+                self.assertEqual((legacy.from_player_name, legacy.from_pet_name,
+                                  legacy.from_player_uin, legacy.from_pet_gid), ("", "", 0, 0))
+            finally:
+                store.close()
+                db.close()
+
     def test_annotation_and_favorite_changes_invalidate_page_version(self) -> None:
         store = Mock()
         repo = EggBoxRepository(store=store)
@@ -492,6 +543,7 @@ class EggBoxPayloadTests(unittest.TestCase):
             directory = Path(tmp)
             (directory / "eggs.json").write_text(json.dumps({"eggs": [{
                 "egg_key": "synthetic", "egg_conf_id": 4001001, "base_id": 4001,
+                "dex_no": 77,
                 "name": "测试精灵", "egg_name": "测试精灵蛋", "egg_item_id": 108001,
                 "egg_group_names": ["动物组"], "height_low": 10, "height_high": 20,
                 "chain_members": [4001, 4002, 4003],
@@ -515,6 +567,7 @@ class EggBoxPayloadTests(unittest.TestCase):
 
             row = egg_box_payload(repo, catalog, static=Static())["eggs"][0]
             self.assertEqual(row["species_name"], "测试精灵")
+            self.assertEqual(row["dex_no"], 77)
             self.assertEqual(row["chain_names"], ["测试精灵", "罗隐"])
             self.assertEqual(row["egg_kind"], "shiny")
             self.assertEqual(row["icon_url"], "/static/egg-icons/108001.webp")
@@ -549,9 +602,11 @@ class EggBoxPayloadTests(unittest.TestCase):
             self.assertEqual([row["annotations"]["voice_db"] for row in voice_rows], [-20, None, 20, None])
             # 随机配置本身不等于特殊蛋；未知新配置保持未知，不借普通蛋范围。
             random_info = catalog.inventory_egg(310049, 0, 1)
+            self.assertEqual(random_info.dex_no, 0)
             from spritelens.domain.egg_box import egg_kind
             self.assertEqual(egg_kind(replace(egg, appearance_type=0), random_info.precious_type, 0, True), "mystery")
             unknown = catalog.inventory_egg(999999, 9999999)
+            self.assertEqual(unknown.dex_no, 0)
             self.assertEqual(unknown.height_high, 0)
             self.assertEqual(egg_kind(egg, unknown.precious_type, 0, False), "unknown")
 

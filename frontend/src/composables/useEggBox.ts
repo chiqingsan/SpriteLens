@@ -30,7 +30,7 @@ export function useEggBox(host: EggBoxHost) {
   const loading = ref(false)
   const error = ref('')
   const selectedId = ref<number | null>(null)
-  const filters = reactive({ search: '', category: 'all', ascending: false })
+  const filters = reactive({ search: '', category: 'all', sort: 'time', ascending: false })
   const favoriteOrder = shallowRef(new Set<number>())
   const annotationStates = reactive(new Map<string, AnnotationSaveState>())
   let generation = 0
@@ -127,6 +127,7 @@ export function useEggBox(host: EggBoxHost) {
 
   const visibleEggs = computed(() => {
     const keyword = filters.search.trim().toLocaleLowerCase()
+    const weightRanks: Record<string, number> = { '满重': 2, '大块头': 1, '小不点': -1, '底重': -2 }
     return [...(data.value?.eggs || [])]
       .filter(egg => {
         if (filters.category !== 'all' && egg.egg_kind !== filters.category) return false
@@ -138,11 +139,29 @@ export function useEggBox(host: EggBoxHost) {
         const byFavorite = Number(favoriteOrder.value.has(b.instance_id))
           - Number(favoriteOrder.value.has(a.instance_id))
         if (byFavorite) return byFavorite
+        if (filters.sort === 'large' || filters.sort === 'small') {
+          const aRank = weightRanks[a.tags.weight || ''] ?? (a.tags.medals.includes('大块头') ? 1 : a.tags.medals.includes('小不点') ? -1 : 0)
+          const bRank = weightRanks[b.tags.weight || ''] ?? (b.tags.medals.includes('大块头') ? 1 : b.tags.medals.includes('小不点') ? -1 : 0)
+          const byWeight = (filters.sort === 'large' ? -1 : 1) * (aRank - bRank)
+          if (byWeight) return byWeight
+        } else if (filters.sort === 'academy') {
+          const byNest = Number(b.tags.nest === '学院绿窝') - Number(a.tags.nest === '学院绿窝')
+          if (byNest) return byNest
+        } else if (filters.sort === 'dex') {
+          const byDex = Number(a.dex_no === 0) - Number(b.dex_no === 0) || a.dex_no - b.dex_no
+          if (byDex) return byDex
+        }
         const byTime = a.obtained_at - b.obtained_at
         const byId = a.instance_id - b.instance_id
         return (filters.ascending ? 1 : -1) * (byTime || byId)
       })
   })
+
+  function applyFavoriteOrder() {
+    favoriteOrder.value = new Set(data.value?.eggs.filter(egg => egg.favorite).map(egg => egg.instance_id))
+  }
+
+  watch(() => [filters.sort, filters.ascending], applyFavoriteOrder, { flush: 'sync' })
 
   const selected = computed(() => visibleEggs.value.find(egg => egg.instance_id === selectedId.value) || null)
 
@@ -157,8 +176,10 @@ export function useEggBox(host: EggBoxHost) {
     try {
       const next = parseEggBox(await host.load())
       if (current !== generation) return
-      favoriteOrder.value = new Set(next.eggs.filter(egg => egg.favorite).map(egg => egg.instance_id))
+      const firstLoad = data.value?.uid !== next.uid
       data.value = next
+      // 同页后台同步只更新收藏状态；位置留到用户重排或返回页面时再应用。
+      if (firstLoad) applyFavoriteOrder()
       refreshNeeded = false
       for (const [key, state] of annotationStates) {
         if (state.running || state.pending || state.error || state.uid !== next.uid) continue
@@ -180,6 +201,7 @@ export function useEggBox(host: EggBoxHost) {
 
   async function resume(version: number) {
     if (!data.value || data.value.version < version || error.value || refreshNeeded) await load()
+    applyFavoriteOrder()
   }
 
   function invalidate() {

@@ -17,6 +17,7 @@ import argparse
 import json
 import random
 import sys
+from dataclasses import replace
 import tempfile
 import time
 import webbrowser
@@ -27,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from spritelens.app_context import AppContext
 from spritelens.capture.key_store import KeyStore
 from spritelens.domain.color_cards import ColorCatalog
-from spritelens.domain.egg_box import EggBoxEntry
+from spritelens.domain.egg_box import EggBoxEntry, EggParent, EggPickupOrigin
 from spritelens.domain.eggs import EggCatalog
 from spritelens.domain.identity import PlayerIdentity
 from spritelens.domain.pets import Pet, PetAttribute, PetSkill
@@ -294,6 +295,42 @@ def build_demo_context(tmp: Path, count: int, scenario: str = "normal") -> AppCo
             hatch_updated_at=0, start_hatch_time=int(_time.time()) - 3600 if hatching else 0,
             category=6, special_egg_conf_id=0, appearance_type=0, extension_type=0,
         )
+    # 收蛋来源（关联母本 / 候选父本）：详情面板「其他信息」验收需要真实链路数据。
+    # 极限场景用静态数据里最长的精灵名 + 3 个候选父本，检查窄面板下的换行与对齐。
+    mother_name = "暮风隐者（枯叶的样子）" if scenario == "extreme" else "鸭吉吉"
+    father_names = (("鸭吉吉", "鸭吉吉", "暮风隐者（枯叶的样子）") if scenario == "extreme"
+                    else ("鸭吉吉", "鸭吉吉"))
+    egg_box._eggs[9000] = replace(
+        egg_box._eggs[9000],
+        home_egg=True,
+        pickup=EggPickupOrigin(
+            actor_id=9520629190547736777,
+            nest_guid="10779410497212480486",
+            nest_kind="ordinary",
+            nest_config_id=1001071,
+            mother=EggParent(17369, mother_name, 10001),
+            fathers=tuple(
+                EggParent(8000 + index, name, 10002) for index, name in enumerate(father_names)
+            ),
+            observed_at=float(int(_time.time()) - 600),
+            pairing_stale=True,
+            mother_nature_id=3,
+        ),
+    )
+    egg_box._eggs[9001] = replace(
+        egg_box._eggs[9001],
+        home_egg=True,
+        pickup=EggPickupOrigin(
+            actor_id=9520629190547736778,
+            nest_guid="17689559667267208566",
+            nest_kind="academy",
+            nest_config_id=1001072,
+            mother=None,
+            fathers=(),
+            observed_at=float(int(_time.time()) - 3600),
+            pairing_stale=False,
+        ),
+    )
     egg_box._version += 1
     egg_box._source = "observed"
     egg_box._slots_source = "observed"

@@ -106,6 +106,7 @@ class AccountSessions:
             if identity is not None:
                 previous = self._sessions.get(event.session_id)
                 if previous is not None and previous != identity.uid:
+                    self._accounts[previous].eggs.clear_pickups(event.session_id)
                     self._accounts[previous].scene.session_closed(event.session_id)
                     self._accounts[previous].home.session_closed(event.session_id)
                 self._sessions[event.session_id] = identity.uid
@@ -124,6 +125,12 @@ class AccountSessions:
             # 采集重新开始会清场景；只在本连接已确认身份时恢复观察归属。
             scene_event = event if identity is not None else replace(
                 event, resumed_identity=self._identities[event.session_id])
+            natures = {}
+            if event.direction == "c2s" and event.opcode == 0x0137:
+                pets = repos.pets.consistent_snapshot()
+                if pets.uid == uid:
+                    natures = {pet.gid: pet.nature for pet in pets.pets}
+            repos.eggs.observe_pickup(event, repos.home.consistent_snapshot(), natures)
             for repo, packet in ((repos.pets, event), (repos.eggs, event),
                                  (repos.home, event), (repos.scene, scene_event)):
                 try:
@@ -137,6 +144,7 @@ class AccountSessions:
             uid = self._sessions.pop(session_id, None)
             self._identities.pop(session_id, None)
             if uid is not None:
+                self._accounts[uid].eggs.clear_pickups(session_id)
                 self._accounts[uid].scene.session_closed(session_id)
                 self._accounts[uid].home.session_closed(session_id)
 
@@ -165,5 +173,6 @@ class AccountSessions:
             if self.selected not in accounts:
                 accounts.append(self.selected)
             for repos in accounts:
+                repos.eggs.clear_pickups()
                 uid = repos.pets.consistent_snapshot().uid
                 repos.scene.reset(phase, uid=uid)

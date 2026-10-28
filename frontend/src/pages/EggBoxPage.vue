@@ -9,6 +9,7 @@ import PageInspector from '../components/PageInspector.vue'
 import PageShell from '../components/PageShell.vue'
 import UiIcon from '../components/UiIcon.vue'
 import UiSearch from '../components/UiSearch.vue'
+import UiSelect from '../components/UiSelect.vue'
 import type { EggBoxAnnotations, EggBoxEntry } from '../types/eggBox'
 import './egg-box.css'
 
@@ -64,10 +65,10 @@ watch(model.visibleEggs, async (eggs, previousEggs) => {
   const orderChanged = eggs.length !== previousEggs.length
     || eggs.some((egg, index) => egg.instance_id !== previousEggs[index]?.instance_id)
   if (!orderChanged) return
-  if (listViewport.value) listViewport.value.scrollTop = 0
   await nextTick()
   syncColumnCount()
   rowVirtualizer.value.measure()
+  rowVirtualizer.value.scrollToOffset(0)
 })
 
 function syncColumnCount() {
@@ -237,13 +238,18 @@ defineExpose({
         </div>
         <div class="eggbox-list-controls">
           <button type="button" class="ghost-button small" data-goto-page="egg-dex" title="到蛋图鉴查蛋的孵化与蛋组信息">蛋图鉴</button>
+          <UiSelect :model-value="model.filters.sort" class="eggbox-sort-select" size="sm" label="蛋仓排序"
+            @change="model.filters.sort = String($event)"
+            :options="[{ value: 'time', label: '时间' }, { value: 'large', label: '大块头' },
+              { value: 'small', label: '小不点' }, { value: 'academy', label: '学院窝' },
+              { value: 'dex', label: '图鉴 ID' }]" />
           <button type="button" class="eggbox-sort" :class="model.filters.ascending ? 'eggbox-sort--ascending' : 'eggbox-sort--descending'"
             :aria-pressed="!model.filters.ascending"
-            :aria-label="`当前按获得时间${model.filters.ascending ? '升序' : '倒序'}排列，点击切换为${model.filters.ascending ? '倒序' : '升序'}`"
-            :title="`当前：${model.filters.ascending ? '升序' : '倒序'}，点击切换`"
+            :aria-label="`获得时间${model.filters.ascending ? '升序' : '倒序'}，点击切换为${model.filters.ascending ? '倒序' : '升序'}`"
+            :title="`获得时间${model.filters.ascending ? '升序' : '倒序'}（同档内），点击切换`"
             @click="model.filters.ascending = !model.filters.ascending">
             <UiIcon :name="model.filters.ascending ? 'arrow-up' : 'arrow-down'" />
-            <span>{{ model.filters.ascending ? '升序' : '倒序' }}</span>
+            <span>{{ model.filters.ascending ? '时间升序' : '时间倒序' }}</span>
           </button>
           <UiSearch v-model="model.filters.search" class="eggbox-search" compact label="搜索蛋" placeholder="搜索蛋名 / 精灵 / 进化链 / 编号" />
         </div>

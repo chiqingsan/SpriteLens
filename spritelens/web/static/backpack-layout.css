@@ -55,14 +55,11 @@
 .capture-summary { align-items: center; }
 #btn-toggle { min-width: 132px; height: 34px; }
 
-/* 面板宽度只有窗口的一部分（右侧常驻筛选栏），961px 以上也可能放不下整条工具栏，
-   固定 nowrap 会让命中文案与计数徽标伸到筛选栏底下被裁切，因此统一允许换行。 */
-#page-pets .pet-toolbar { flex-wrap: wrap; gap: var(--space-3); padding: var(--space-3); }
-#page-pets .pet-search-results { display: flex; flex: 1 1 auto; align-items: center; justify-content: flex-end; gap: var(--space-3); width: auto; margin-left: auto; flex-wrap: nowrap; order: 5; }
+#page-pets .pet-toolbar { flex-wrap: nowrap; gap: var(--space-3); padding: var(--space-3); }
+#page-pets .pet-search-results { display: flex; flex: 1 1 auto; align-items: center; justify-content: flex-end; gap: var(--space-3); width: auto; min-width: 0; margin-left: auto; flex-wrap: nowrap; order: 5; }
 #page-pets .pet-toolbar > #pet-view, #page-pets .pet-toolbar > #btn-pet-filters, #page-pets .pet-toolbar > .pet-view-settings, #page-pets .pet-toolbar > .pet-sort-root { flex: none; }
 .pet-toolbar .pet-tools { display: flex; flex: 1 1 var(--pet-search-width); width: auto; min-width: 0; border: 0; padding: 0; background: transparent; justify-content: flex-end; }
-/* flex-basis 给一个偏低的名义宽度：宽窗口能一行放下，窄面板才换行；实际宽度由剩余空间撑到 15em。 */
-.pet-toolbar .pet-search { flex: 1 1 12em; width: auto; max-width: 15em; min-width: 9em; order: 1; }
+.pet-toolbar .pet-search { flex: 1 1 auto; width: auto; max-width: 15em; min-width: 4em; order: 1; }
 .pet-toolbar:has(#pet-view [data-view="card"].active) .pet-tools { width: auto; min-width: 0; flex-wrap: nowrap; gap: var(--space-3); }
 .pet-toolbar .segmented, .pet-toolbar .pet-search, .pet-view-settings > summary { height: var(--backpack-control); }
 .pet-toolbar .segmented { padding: 2px; }
@@ -207,9 +204,6 @@
 }
 @media (max-width: 960px) {
   #page-pets .workspace.split, #page-pets .workspace.split.detail-collapsed { grid-template-columns: minmax(0, 1fr) !important; }
-  #page-pets .pet-toolbar { flex-wrap: wrap; }
-  #page-pets .pet-search-results { order: 0; justify-content: flex-start; flex-basis: 100%; }
-  .pet-search-results { width: 100%; }
   .pet-toolbar .segmented button { padding: 0 var(--space-2); }
   #page-pets .filter-rail { gap: 0; }
   #pet-grid.box-fill-grid { min-height: 672px; }

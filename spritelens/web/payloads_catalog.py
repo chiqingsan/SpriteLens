@@ -5,7 +5,6 @@ payloads.py 保留兼容重导出。本模块不依赖 aiohttp 与 pywebview。
 """
 
 from __future__ import annotations
-
 from dataclasses import replace
 from math import trunc
 
@@ -26,6 +25,31 @@ from spritelens.services.home_repository import HomeRepoSnapshot
 def species_icon_url(base_conf_id: int) -> str:
     """精灵头像 URL；缺图时前端回退首字头像。"""
     return pet_images(base_conf_id)["portrait_url"]
+
+
+def _egg_parent_payload(parent) -> dict:
+    """亲代关联条目：补官方头像，供蛋仓详情卡片展示（缺图时前端回退首字）。"""
+    return {
+        "instance_id": parent.instance_id,
+        "name": parent.name,
+        "base_id": parent.base_id,
+        "icon_url": species_icon_url(parent.base_id) if parent.base_id > 0 else "",
+    }
+
+
+def _egg_pickup_payload(pickup) -> dict:
+    """收蛋现场关联快照；actor_id 转字符串避免前端精度丢失。"""
+    return {
+        "actor_id": str(pickup.actor_id),
+        "nest_guid": pickup.nest_guid,
+        "nest_kind": pickup.nest_kind,
+        "nest_config_id": pickup.nest_config_id,
+        "observed_at": pickup.observed_at,
+        "pairing_stale": pickup.pairing_stale,
+        "mother_nature_id": pickup.mother_nature_id,
+        "mother": _egg_parent_payload(pickup.mother) if pickup.mother is not None else None,
+        "fathers": [_egg_parent_payload(father) for father in pickup.fathers],
+    }
 
 
 def _handbook_haystacks(key: str, info, chain_names: tuple[str, ...] = ()) -> tuple[str, ...]:
@@ -569,6 +593,8 @@ def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_o
     for egg in entries:
         annotation = annotations.get(egg.instance_id, {})
         nature_id = int(annotation.get("nature_id", 0))
+        if not nature_id and egg.pickup and egg.pickup.nest_kind == "academy":
+            nature_id = egg.pickup.mother_nature_id
         nest_override = str(annotation.get("nest_override", ""))
         note = str(annotation.get("note", ""))
         voice_tag = str(annotation.get("voice_tag", ""))
@@ -614,7 +640,8 @@ def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_o
             medals.append(voice_tag)
         nature_label = nature_names.get(nature_id, str(nature_id)) if nature_id else ""
         nest_label = {"normal": "普通窝", "green": "学院绿窝"}.get(
-            nest_override or ("normal" if egg.home_egg else ""), ""
+            nest_override or ("green" if egg.pickup and egg.pickup.nest_kind == "academy"
+                              else "normal" if egg.home_egg else ""), ""
         )
         rows.append(
             {
@@ -622,6 +649,7 @@ def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_o
                 "egg_conf_id": egg.egg_conf_id,
                 "egg_name": info.egg_name if info else f"蛋 #{egg.egg_conf_id}",
                 "species_name": info.species_name if info else "",
+                "dex_no": info.dex_no if info else 0,
                 "chain_names": chain_names,
                 "description": info.description if info else "",
                 "description_source": info.description_source if info else "",
@@ -645,10 +673,15 @@ def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_o
                 "in_slot": in_slot,
                 "hatch_progress": round(egg.hatch_progress, 4),
                 "category": egg.category,
+                "from_player_name": egg.from_player_name,
+                "from_pet_name": egg.from_pet_name,
+                "from_player_uin": egg.from_player_uin,
+                "from_pet_gid": egg.from_pet_gid,
                 "special_egg_conf_id": egg.special_egg_conf_id,
                 "height_cm": egg.height_cm,
                 "weight_g": egg.weight_g,
                 "home_egg": egg.home_egg,
+                "pickup": _egg_pickup_payload(egg.pickup) if egg.pickup else None,
                 "annotations": {"nature_id": nature_id, "nest_override": nest_override,
                                 "note": note, "voice_tag": voice_tag, "voice_db": voice_db},
                 "tags": {"nature": nature_label, "weight": weight_label, "voice": voice_label,
