@@ -73,7 +73,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `__main__.py` | `python -m spritelens` 入口（转发到 `main:main`） |
 | `paths.py` | 数据目录解析（SPRITELENS_DATA_ROOT 可覆盖）+ 打包态资源根（frozen/_MEIPASS） |
 | `main.py` | CLI：--smoke-test / --list-ifaces / --replay / --diagnose-net / --web-browser / 界面启动 |
-| `app_context.py` | **装配根**：管线/库/VM/清理的一次性组装（autostart 在此触发） |
+| `app_context.py` | **装配根**：管线/库/VM/清理的一次性组装（autostart 在此触发）；蛋目录优先读用户数据目录里的快照版本，缺失时退回随包 `data/static/` |
 | `events.py` | 中立叶子模块：`PacketEvent` 事件类型（无 IO 无依赖；protocol/domain/services 共用，避免层间反向引用） |
 | `protocol/frames.py` | GCP 21B 大端头切帧、假 magic 同步、FrameStream |
 | `protocol/crypto.py` | AES-128-CBC 固定 IV 解密/加密、ACK 密钥提取 |
@@ -119,6 +119,8 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `services/account_sessions.py` | M01：连接身份路由、每账号业务仓库、稳定展示视图与选择所有权 |
 | `services/pet_repository.py` | 宠物聚合、身份/切号、彩名学习与入库；consistent_snapshot 单次取齐宠物/箱位/位置/uid/version，声音只保留抓取值 |
 | `services/egg_repository.py` | 蛋仓聚合；EggBoxSnapshot 一次取齐条目/槽/uid/version/历史来源，恢复 IO 竞争拒绝提交 |
+| `services/catalog_update.py` | 目录增量更新的扩展点（游戏增量更新层 2）：CatalogStore 版本快照 + 原子指针 + 回滚，CatalogSource 协议（默认禁用、不联网），CatalogUpdater 编排 check→fetch→校验→安装，失败保留旧版本 |
+| `tests/test_catalog_update.py` | 快照切换与回滚、sha256/结构校验失败时保留旧版本、更新源不可用不落半成品、未配置更新源时状态为 disabled |
 | `services/egg_pickup.py` | 同账号、同连接的收蛋请求与奖励关联；保存收取前小窝、关联母本和候选父本快照 |
 | `tests/test_egg_pickup.py` | 收蛋归属、并行歧义、刷新/重启与写失败重试、学院窝性格回归 |
 | `services/egg_origin_backfill.py` | 事件日志回放：跨分片按 ts 归并，复用家园快照与收蛋关联规则产出历史收取来源；只读、不写库 |
@@ -136,6 +138,8 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `web/routes_capture.py` | 采集域路由与载荷（/api/capture*、/api/state、capture/state 载荷；阶段1.4 自 server.py 拆出） |
 | `web/routes_accounts.py` | `/api/accounts` 与 `/api/accounts/select`：账号列表、切换查看与结果 |
 | `web/server_helpers.py` | HTTP query 解析助手（路由模块共用） |
+| `web/egg_icon_cache.py` | 蛋图标按需补图：安装包优先，缺图时按道具 ID 从素材站下载一次并缓存到用户数据目录；404 负缓存、失败静默降级占位 |
+| `tests/test_egg_icon_cache.py` | 补图只请求一次、安装包优先、非法名不发请求、404 负缓存、异常来源不落盘 |
 | `web/run.py` | 界面入口：pywebview 窗口（系统 WebView2）+ 单实例唤醒 + 降级提示；支持按需打开后台采集的远程界面 |
 | `web/background_run.py` | 按需后台模式：游戏进程存在期间启动采集、托盘打开主界面、游戏退出后清理 |
 | `web/close_coordinator.py` | 桌面关闭握手：等待页面保存确认、采集停止与缓存 flush；失败保留窗口或显式放弃 |

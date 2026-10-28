@@ -38,6 +38,7 @@ from spritelens.repositories.settings import DEFAULT_CAPTURE_PORT, SettingsRepos
 from spritelens.services.egg_repository import EggBoxRepository
 from spritelens.services.account_selection_service import AccountSelectionService
 from spritelens.services.account_sessions import AccountRepositories, AccountSessions
+from spritelens.services.catalog_update import CatalogStore
 from spritelens.services.home_repository import HomeRepository
 from spritelens.services.scene_repository import DEFAULT_MAX_DISTANCE_RAW, SceneRepository
 from spritelens.services.event_logger import PART_BYTES as EVENTLOG_PART_BYTES
@@ -192,7 +193,9 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
     game_automation = GameCaptureAutomation(settings)
     load_library(schema_dir())
     static_data = load_static_data(static_dir())
-    egg_catalog = EggCatalog(static_dir())
+    # 目录快照（游戏增量更新时由用户数据目录里的版本覆盖随包目录）；
+    # 没有快照或快照损坏时 resolve() 退回随包目录，页面不会因此变空
+    egg_catalog = EggCatalog(CatalogStore(data_root() / "egg-catalog").resolve(static_dir()))
     color_catalog = ColorCatalog(static_dir())
 
     # 启动按各自 flow 恢复密钥；不能将最后一把密钥套给其他游戏连接

@@ -532,9 +532,17 @@ class EggBoxPayloadTests(unittest.TestCase):
             row = payload["eggs"][0]
             self.assertEqual(row["egg_name"], "喵喵蛋")
             self.assertEqual(row["icon_url"], "/static/egg-icons/107001.webp")
-            self.assertEqual(row["fallback_icon_url"], "")
+            self.assertEqual(row["fallback_icon_url"], "/static/egg-icons/_fallback.webp")
             self.assertEqual(row["egg_kind"], "regular")
             self.assertEqual(payload["total_quantity"], 1)
+
+    def test_payload_labels_unresolved_egg_neutrally(self) -> None:
+        """目录里解不出这枚蛋时给中性文案，不把内部配置号当名字摆在卡片上。"""
+        repo = EggBoxRepository()
+        repo.handle_packet(_event(_egg_row(9)))
+        row = egg_box_payload(repo, EggCatalog(None))["eggs"][0]
+        self.assertEqual(row["egg_name"], "精灵蛋 · 数据待补")
+        self.assertEqual(row["fallback_icon_url"], "/static/egg-icons/_fallback.webp")
 
     def test_inventory_variant_uses_exact_ranges_and_item_texture(self) -> None:
         import json
