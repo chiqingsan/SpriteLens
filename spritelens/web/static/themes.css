@@ -71,6 +71,16 @@
   --on-amber: #3a2800;
   --amber-progress: rgba(116, 83, 13, .16);
 
+  /* ── 炫彩：游戏内固有外观（变异类型第 4 位），独立于单牌/双牌的关注色 ── */
+  --colorful: #8b5cf6;
+  --colorful-bright: #a78bfa;
+  --colorful-soft: #f1eafe;
+  --colorful-line: #d8c8f8;
+  --colorful-ink: #4c2a86;
+  /* 炫彩星标渐变与光晕：取自游戏内彩虹星素材，三主题共用，不随主题改色相。 */
+  --colorful-gradient: linear-gradient(135deg, #f2c94c 0%, #7ed3a0 34%, #5fb4f2 66%, #b57cf0 100%);
+  --colorful-glow: rgba(168, 118, 240, .58);
+
   /* ── 危险：只留给真正破坏性操作 ── */
   --danger: #dd5663;
   --danger-soft: #fce9ec;
@@ -142,6 +152,11 @@
   --on-accent: #5b3527;
   --ambient-1: rgba(214, 160, 122, .20);
   --ambient-2: rgba(240, 205, 175, .28);
+  --colorful: #a259d0;
+  --colorful-bright: #bd7de3;
+  --colorful-soft: #f4e9fa;
+  --colorful-line: #e0cdee;
+  --colorful-ink: #5b2c73;
   --deep-1: #482e24;
   --deep-2: #32211c;
   --deep-text: #f3e7de;
@@ -188,6 +203,11 @@
   --on-accent: #23485f;
   --ambient-1: rgba(122, 170, 205, .20);
   --ambient-2: rgba(168, 205, 228, .30);
+  --colorful: #7c6ae0;
+  --colorful-bright: #9a8bf2;
+  --colorful-soft: #ece9fb;
+  --colorful-line: #d3cdf5;
+  --colorful-ink: #3f3389;
   --deep-1: #223d4f;
   --deep-2: #182c3a;
   --deep-text: #e4f0f8;

@@ -55,28 +55,27 @@ class AccountAvatarCache:
         if icon_id not in self._sources:
             return None
 
-        async with self._downloads:
+        task = self._inflight.get(icon_id)
+        if task is None:
+            await self._downloads.acquire()
             local = self._local_asset(icon_id)
-            if local is not None:
-                return local
             now = time.monotonic()
-            if self._misses.get(icon_id, 0) > now or self._network_retry_after > now:
-                return None
             task = self._inflight.get(icon_id)
+            if local is not None or self._misses.get(icon_id, 0) > now or self._network_retry_after > now:
+                self._downloads.release()
+                return local
             if task is None:
                 task = asyncio.create_task(self._download_and_remember(icon_id))
                 self._inflight[icon_id] = task
                 task.add_done_callback(
                     lambda completed, key=icon_id: self._clear_inflight(key, completed)
                 )
-            cached, retry_after = await asyncio.shield(task)
-        if cached is not None:
-            return cached
-        retry_at = time.monotonic() + retry_after
-        self._misses[icon_id] = retry_at
-        if retry_after == _NETWORK_COOLDOWN:
-            self._network_retry_after = retry_at
-        return None
+                # 下载线程结束前，即使请求取消也要保留并发许可。
+                task.add_done_callback(lambda _: self._downloads.release())
+            else:
+                self._downloads.release()
+        cached, _ = await asyncio.shield(task)
+        return cached
 
     async def close(self) -> None:
         """停止接收新请求，并等待已启动的下载线程完成。"""
@@ -108,7 +107,14 @@ class AccountAvatarCache:
         return path if path.is_file() else None
 
     async def _download_and_remember(self, icon_id: str) -> tuple[Path | None, float]:
-        return await asyncio.to_thread(self._download, icon_id)
+        result = await asyncio.to_thread(self._download, icon_id)
+        cached, retry_after = result
+        if cached is None:
+            retry_at = time.monotonic() + retry_after
+            self._misses[icon_id] = retry_at
+            if retry_after == _NETWORK_COOLDOWN:
+                self._network_retry_after = retry_at
+        return result
 
     def _download(self, icon_id: str) -> tuple[Path | None, float]:
         url = self._sources[icon_id]

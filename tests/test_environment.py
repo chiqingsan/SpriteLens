@@ -39,6 +39,74 @@ class CheckNpcapTest(unittest.TestCase):
         self.assertEqual(calls, [], "quick 模式不得调用 RSC 探测")
 
 
+class RscScopeTest(unittest.TestCase):
+    """RSC 只判定抓包网卡：虚拟网卡开启 RSC 不能判整个环境异常。"""
+
+    _PAYLOAD = (
+        '{"default_route":"WLAN","adapters":['
+        '{"Name":"vEthernet (Default Switch)","InterfaceAlias":"vEthernet (Default Switch)","IPv4Enabled":true},'
+        '{"Name":"以太网","InterfaceAlias":"以太网","IPv4Enabled":false},'
+        '{"Name":"WLAN","InterfaceAlias":"WLAN","IPv4Enabled":false}]}'
+    )
+
+    def probe(self, iface: str = ""):
+        with mock.patch.object(environment, "_run_powershell", return_value=self._PAYLOAD):
+            return environment._check_rsc(iface)
+
+    def test_default_route_adapter_is_used_when_no_selection(self):
+        # Hyper-V 虚拟网卡 RSC 开启，但默认路由走 WLAN —— 不得误报
+        self.assertEqual(self.probe(), (False, "WLAN"))
+
+    def test_explicit_selection_overrides_default_route(self):
+        self.assertEqual(self.probe("以太网"), (False, "以太网"))
+
+    def test_selected_adapter_with_rsc_enabled_is_reported(self):
+        self.assertEqual(self.probe("vEthernet (Default Switch)"), (True, "vEthernet (Default Switch)"))
+
+    def test_unknown_adapter_does_not_inherit_other_adapters_state(self):
+        # 回环等网卡没有 RSC 设置项：返回空名，不能谎报"RSC 已关闭"
+        self.assertEqual(self.probe("Loopback Pseudo-Interface 1"), (False, ""))
+
+    def test_unparseable_output_reports_no_adapter(self):
+        with mock.patch.object(environment, "_run_powershell", return_value="not json"):
+            self.assertEqual(environment._check_rsc(), (False, ""))
+
+    def test_probe_requests_utf8_output_for_chinese_adapter_names(self):
+        with mock.patch.object(environment, "_run_powershell", return_value=self._PAYLOAD) as run:
+            environment._check_rsc()
+        self.assertIn("OutputEncoding", run.call_args.args[0])
+
+    def test_check_npcap_passes_selected_iface_to_real_probe(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = Path(tmp) / "wpcap.dll"
+            fake.write_bytes(b"MZ")
+            with mock.patch.object(environment, "_check_rsc", return_value=(False, "以太网")) as probe:
+                report = check_npcap(search_paths=(str(fake),), iface="以太网")
+        probe.assert_called_once_with("以太网")
+        self.assertTrue(report.installed)
+        self.assertFalse(report.rsc_enabled)
+        self.assertIn("以太网", report.message)
+        self.assertIn("正常", report.message)
+
+    def test_check_npcap_explains_when_probe_cannot_locate_adapter(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = Path(tmp) / "wpcap.dll"
+            fake.write_bytes(b"MZ")
+            report = check_npcap(search_paths=(str(fake),), check_rsc=lambda: (False, ""))
+        self.assertTrue(report.installed)
+        self.assertFalse(report.rsc_enabled)
+        # 无法判定时不能宣称"环境正常"，也不能说成 RSC 已关闭
+        self.assertIn("未能读取抓包网卡的 RSC 状态", report.message)
+        self.assertNotIn("抓包环境正常", report.message)
+
+    def test_ok_report_carries_checked_adapter(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = Path(tmp) / "wpcap.dll"
+            fake.write_bytes(b"MZ")
+            report = check_npcap(search_paths=(str(fake),), check_rsc=lambda: (False, "WLAN"))
+        self.assertEqual(report.rsc_adapter, "WLAN")
+
+
 class ParseDistPageTest(unittest.TestCase):
     def test_latest_version_selected(self):
         # 1.79 > 1.9.2（逐段数值比较，不是字符串比较）

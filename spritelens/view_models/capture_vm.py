@@ -157,7 +157,9 @@ class CaptureViewModel:
         self._resolver = resolver or resolve_latest_installer
         self._downloader = downloader or download_installer
         self._launcher = launcher or launch_installer
-        self._environment_probe = environment_probe or check_npcap
+        # RSC 只对实际抓包的网卡有意义（默认路由或用户显式选择），
+        # 探测时读取当前选择，切网卡后无需重建 VM。
+        self._environment_probe = environment_probe or (lambda: check_npcap(iface=self._iface))
         if probe_environment:
             threading.Thread(
                 target=self._probe_environment,
@@ -195,6 +197,7 @@ class CaptureViewModel:
         """选择网卡；显式命令保存失败必须可见（D03，set_checked）。
 
         运行态已切到新网卡但配置未保存时抛 OSError，HTTP 层转可读错误。
+        RSC 判定绑定抓包网卡，切换后需点「重新检测环境」更新结论。
         """
         self._iface = name
         self._service.set_iface(name or None)

@@ -3,6 +3,7 @@
   "use strict";
   /* 隐藏页供数的最小间隔：提醒默认开启时，每条推送都全量读取会打满本地服务。 */
   var SHELL_MIN_INTERVAL_MS = 2000;
+  var RADAR_MIN_INTERVAL_MS = 500;
   window.SpriteLensNearby = { create: function (request, token) {
     /* 旧构建/测试没有提醒模块时优雅降级：附近页与雷达照常工作，只是没有声音。 */
     var alertApi = window.SpriteLensNearbyAlert ? window.SpriteLensNearbyAlert.create() : null;
@@ -57,7 +58,7 @@
     function feedSoon() {
       if (feedController) { feedQueued = true; return; }
       if (feedTimer) { return; }
-      var wait = SHELL_MIN_INTERVAL_MS - (Date.now() - feedLast);
+      var wait = (floating ? RADAR_MIN_INTERVAL_MS : SHELL_MIN_INTERVAL_MS) - (Date.now() - feedLast);
       if (wait <= 0) { feedNow(); return; }
       feedTimer = window.setTimeout(function () { feedTimer = null; feedNow(); }, wait);
     }
@@ -104,7 +105,7 @@
       if (event.data.kind === "subscribe") {
         floating = true;
         hadSnapshot = false;
-        if (summary) { channel.postMessage({ kind: "summary", summary: summary }); loadFloating(); }
+        if (summary) { clearFeedTimer(); channel.postMessage({ kind: "summary", summary: summary }); loadFloating(); }
         else { channel.postMessage({ kind: "error", message: "当前没有可用的附近观察数据" }); }
       } else if (event.data.kind === "unsubscribe") {
         stopFloating();
@@ -172,6 +173,7 @@
     }
     function update(next) {
         var changed = next && (!summary || next.uid !== summary.uid || next.observation_id !== summary.observation_id || next.version !== summary.version || next.phase !== summary.phase);
+        var cycleChanged = next && (!summary || next.uid !== summary.uid || next.observation_id !== summary.observation_id);
         if (!next || (summary && (next.uid !== summary.uid || next.observation_id !== summary.observation_id))) {
           hadSnapshot = false; cancelFeed();
         }
@@ -181,7 +183,9 @@
         if (mounted) { mounted.update(next); }
         /* 页面不可见（切页或从未打开）时按最小间隔合并供数：提醒音默认开启，
            不能每条 500ms 推送都全量读一次快照；首份快照与失败重试仍立即执行。 */
-        if (changed && (!mounted || !active) && feedNeeded()) { feedSoon(); }
+        if (changed && (!mounted || !active) && feedNeeded()) {
+          if (cycleChanged) { feedNow(); } else { feedSoon(); }
+        }
     }
     return { enter: enter, leave: leave,
       /* 推送连接断开/恢复由壳通知；断线期间不假装数据仍然新鲜。 */

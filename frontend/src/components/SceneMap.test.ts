@@ -72,6 +72,24 @@ describe('场景地图', () => {
     wrapper.unmount()
   })
 
+  it('炫彩点位额外套虚线环并有图例，与奖牌关注级别并存', async () => {
+    const data = snapshot({
+      actors: [{ ...snapshot().actors[0]!, mutation: 8, colorful: true, attention: 'double' }],
+    })
+    const wrapper = mount(SceneMap, { props: { data, map: MAP } })
+    await ready(wrapper)
+    const marker = wrapper.get('.scene-map-marker')
+    expect(marker.classes()).toContain('colorful')
+    expect(marker.classes()).toContain('is-double')
+    expect(marker.get('.scene-map-marker-ring').exists()).toBe(true)
+    expect(marker.get('.scene-map-marker-colorful-ring').exists()).toBe(true)
+    expect(marker.get('.scene-map-marker-colorful-badge').attributes('src')).toBe('/static/rarity/colorful-fit.webp')
+    expect(marker.attributes('aria-label')).toContain('炫彩')
+    // 炫彩只做样式，图例仍只说明普通/单牌/双牌。
+    expect(wrapper.get('.scene-map-legend').text()).not.toContain('炫彩')
+    wrapper.unmount()
+  })
+
   it('选中目标的标签优先出现，普通精灵不铺标签', async () => {
     const data = snapshot({
       actors: [
@@ -185,7 +203,7 @@ describe('场景地图', () => {
     const wrapper = mount(SceneMap, { props: { data: snapshot({ coverage: { ...COVERAGE, radius_raw: 9000 } }), map: MAP } })
     await ready(wrapper)
     const legend = wrapper.get('.scene-map-legend')
-    expect(legend.text()).toContain('记录范围 · 3 格')
+    expect(legend.text()).toContain('记录范围 3 格')
     expect(legend.text()).toContain('估计半径 约 90 米')
     expect(legend.text()).toContain('未记录')
     expect(legend.text()).not.toContain('已扫描')

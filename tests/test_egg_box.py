@@ -643,6 +643,81 @@ class EggBoxPayloadTests(unittest.TestCase):
             self.assertEqual(unknown.height_high, 0)
             self.assertEqual(egg_kind(egg, unknown.precious_type, 0, False), "unknown")
 
+    def test_voice_prediction_from_parents(self) -> None:
+        """声音遗传：母本与候选父本取平均向下取整；一致时自动打声音标签。"""
+        from dataclasses import replace
+        from spritelens.domain.egg_box import EggParent, EggPickupOrigin
+
+        def entry(mother: EggParent | None, fathers: tuple[EggParent, ...]) -> EggBoxEntry:
+            return EggBoxEntry(
+                instance_id=5897, egg_conf_id=3001001, pet_conf_id=3001, quantity=1,
+                obtained_at=1793163709, bag_type=8, height_cm=0, weight_g=0,
+                hatch_seconds=0, hatched_seconds=0, hatch_updated_at=0,
+                start_hatch_time=0, category=0, special_egg_conf_id=0,
+                appearance_type=0, extension_type=0, home_egg=True,
+                pickup=EggPickupOrigin(
+                    actor_id=1, nest_guid="90001", nest_kind="ordinary", nest_config_id=1001071,
+                    mother=mother, fathers=fathers, observed_at=1.0, pairing_stale=False,
+                ),
+            )
+
+        def payload(egg: EggBoxEntry, voices: dict[int, int]) -> dict:
+            repo = SimpleNamespace(consistent_snapshot=lambda: SimpleNamespace(
+                entries=(egg,), slots=frozenset(), slots_source="unknown", historical_ids=frozenset(),
+                source="observed", uid=101, version=1))
+            return egg_box_payload(repo, None, pet_voices=voices)["eggs"][0]
+
+        mother = EggParent(17369, "鸭吉吉", 3452)
+        father = EggParent(89190, "鸭吉吉", 3012)
+        # 96 与 100 同为婉转声；-100 与 -100 同时命中粗嗓门与底分；向下取整而非四舍五入
+        row = payload(entry(mother, (father,)), {17369: 96, 89190: 100})
+        self.assertEqual(row["voice_prediction"]["voice_db"], 98)
+        self.assertEqual(row["voice_prediction"]["tags"], ["婉转声"])
+        self.assertEqual(row["tags"]["medals"], ["婉转声"])
+        self.assertIsNone(row["tags"]["voice"])
+        row = payload(entry(mother, (father,)), {17369: -100, 89190: -100})
+        self.assertEqual(row["voice_prediction"]["tags"], ["粗嗓门", "底分"])
+        self.assertEqual(row["tags"]["voice"], "底分")
+        self.assertEqual(row["tags"]["medals"], ["粗嗓门"])
+        row = payload(entry(mother, (father,)), {17369: -1, 89190: 0})
+        self.assertEqual(row["voice_prediction"]["voice_db"], -1)
+        self.assertEqual(row["voice_prediction"]["tags"], [])
+        self.assertIsNone(row["tags"]["voice"])
+        self.assertEqual(row["tags"]["medals"], [])
+        # 多候选父本声音不同：只给区间，不臆测单值
+        row = payload(entry(mother, (father, EggParent(89191, "鸭吉吉", 3012))), {17369: 100, 89190: 100, 89191: -100})
+        self.assertFalse(row["voice_prediction"]["unanimous"])
+        self.assertIsNone(row["voice_prediction"]["voice_db"])
+        self.assertEqual(row["voice_prediction"]["tags"], [])
+        self.assertEqual(row["voice_prediction"]["range"], [0, 100])
+        self.assertEqual(row["tags"]["medals"], [])
+        # 真实组合：母本 70 + 父本 -95 / -27 → -13 / 21，两个结果都无标签
+        row = payload(entry(EggParent(24192, "鸭吉吉", 3452), (father, EggParent(24218, "鸭吉吉", 3012))),
+                      {24192: 70, 89190: -95, 24218: -27})
+        self.assertIsNone(row["voice_prediction"]["voice_db"])
+        self.assertEqual(row["voice_prediction"]["range"], [-13, 21])
+        self.assertEqual(row["voice_prediction"]["tags"], [])
+        self.assertEqual(row["tags"]["medals"], [])
+        # 声音不同但都达到婉转声：给区间，仍自动打标签
+        row = payload(entry(EggParent(24192, "鸭吉吉", 3452), (father, EggParent(24218, "鸭吉吉", 3012))),
+                      {24192: 96, 89190: 98, 24218: 100})
+        self.assertIsNone(row["voice_prediction"]["voice_db"])
+        self.assertEqual(row["voice_prediction"]["range"], [97, 98])
+        self.assertEqual(row["voice_prediction"]["tags"], ["婉转声"])
+        self.assertEqual(row["tags"]["medals"], ["婉转声"])
+        # 手工标签优先；缺母本/缺声音时不给推算
+        repo = SimpleNamespace(consistent_snapshot=lambda: SimpleNamespace(
+            entries=(entry(mother, (father,)),), slots=frozenset(), slots_source="unknown",
+            historical_ids=frozenset(), source="observed", uid=101, version=1))
+        annotated_row = egg_box_payload(repo, None, pet_voices={17369: 96, 89190: 100},
+                                        annotations={5897: {"voice_tag": "满分"}})["eggs"][0]
+        self.assertIsNotNone(annotated_row["voice_prediction"])
+        self.assertEqual(annotated_row["tags"]["voice"], "满分")
+        self.assertEqual(annotated_row["tags"]["medals"], [])
+        self.assertIsNone(payload(entry(None, (father,)), {17369: 96, 89190: 100})["voice_prediction"])
+        self.assertIsNone(payload(entry(mother, ()), {17369: 96})["voice_prediction"])
+        self.assertIsNone(payload(entry(mother, (father,)), {})["voice_prediction"])
+
     def test_kind_uses_precious_enum_and_mutation_bits(self) -> None:
         from dataclasses import replace
         from spritelens.domain.egg_box import egg_kind

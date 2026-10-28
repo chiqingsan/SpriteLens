@@ -254,6 +254,10 @@ def build_demo_context(tmp: Path, count: int, scenario: str = "normal") -> AppCo
                 for k, sid in enumerate((7050210 + i * 10, 7050190, 7050270, 200107))
             ),
         )
+    # 亲代关联演示：让 9000 号蛋的预测声音命中「婉转声」，便于查看自动标签
+    for gid, voice in ((1000, 100), (1001, 96), (1002, 98)):
+        if gid in repository._pets:
+            repository._pets[gid] = replace(repository._pets[gid], voice=voice)
     # 留出空箱、筛选空格与一组位置未知个体，验证真实箱模式。
     gids = list(repository._pets)
     boxes = {}
@@ -295,11 +299,17 @@ def build_demo_context(tmp: Path, count: int, scenario: str = "normal") -> AppCo
             hatch_updated_at=0, start_hatch_time=int(_time.time()) - 3600 if hatching else 0,
             category=6, special_egg_conf_id=0, appearance_type=0, extension_type=0,
         )
-    # 收蛋来源（关联母本 / 候选父本）：详情面板「其他信息」验收需要真实链路数据。
-    # 极限场景用静态数据里最长的精灵名 + 3 个候选父本，检查窄面板下的换行与对齐。
-    mother_name = "暮风隐者（枯叶的样子）" if scenario == "extreme" else "鸭吉吉"
-    father_names = (("鸭吉吉", "鸭吉吉", "暮风隐者（枯叶的样子）") if scenario == "extreme"
-                    else ("鸭吉吉", "鸭吉吉"))
+    # 收蛋来源（关联母本 / 候选父本）：详情面板「亲代关联」验收需要真实链路数据。
+    # 亲代优先指向合成仓库里真实存在的精灵，点击卡片才能定位到对应精灵；
+    # 极限场景选最长名称的母本 + 3 个候选父本，检查窄面板下的换行与对齐。
+    def _demo_parent(gid: int) -> EggParent:
+        pet = repository._pets.get(gid)
+        if pet is None:
+            return EggParent(gid, "鸭吉吉", 10001)
+        return EggParent(pet.gid, pet.name, pet.base_conf_id)
+
+    mother_gid = 5012 if scenario == "extreme" else 1001
+    father_gids = (5001, 5016, 5019) if scenario == "extreme" else (1000, 1002)
     egg_box._eggs[9000] = replace(
         egg_box._eggs[9000],
         home_egg=True,
@@ -308,10 +318,8 @@ def build_demo_context(tmp: Path, count: int, scenario: str = "normal") -> AppCo
             nest_guid="10779410497212480486",
             nest_kind="ordinary",
             nest_config_id=1001071,
-            mother=EggParent(17369, mother_name, 10001),
-            fathers=tuple(
-                EggParent(8000 + index, name, 10002) for index, name in enumerate(father_names)
-            ),
+            mother=_demo_parent(mother_gid),
+            fathers=tuple(_demo_parent(gid) for gid in father_gids),
             observed_at=float(int(_time.time()) - 600),
             pairing_stale=True,
             mother_nature_id=3,

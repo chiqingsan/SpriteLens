@@ -117,5 +117,34 @@ class EggCatalogTests(unittest.TestCase):
         self.assertEqual((row["gender_male"], row["gender_female"]), (0, 0))
 
 
+class EggInventoryCuratedKindTests(unittest.TestCase):
+    """活动珍贵蛋（151xxx / 名称含「炫彩」）在蛋囊里没有 mutation 字段，靠目录 kind 判炫彩。"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.static = Path(__file__).resolve().parents[1] / "data" / "static"
+        cls.catalog = EggCatalog(cls.static)
+
+    def test_activity_rare_eggs_keep_colorful_kind(self) -> None:
+        # 大量出没 / 重逢契约的珍贵精灵蛋：孵化必得炫彩外观
+        for item_id in (151031, 151032, 151033, 151039, 151040, 151043, 151054):
+            self.assertEqual(self.catalog.inventory_egg(item_id, 0).precious_type, 6, item_id)
+        # 官方命名带「炫彩」的道具同理
+        for item_id in (310050, 310053, 600001, 600005):
+            self.assertEqual(self.catalog.inventory_egg(item_id, 0).precious_type, 6, item_id)
+        # 普通蛋与异色蛋不被连带
+        self.assertEqual(self.catalog.inventory_egg(107010, 3014001).precious_type, 0)
+        self.assertEqual(self.catalog.inventory_egg(150106, 3121007).precious_type, 2)
+
+    def test_colorful_items_follow_curated_rule(self) -> None:
+        """重导数据时只允许 151xxx 与名称含炫彩的蛋道具被判炫彩；规则见 tools/import_egg_inventory.py。"""
+        items = json.loads((self.static / "egg_inventory.json").read_text(encoding="utf-8"))["items"]
+        colorful = [key for key, item in items.items() if item.get("kind") == "colorful"]
+        self.assertTrue(colorful)
+        for key in colorful:
+            curated = (key.isdigit() and 151_000 <= int(key) < 152_000) or "炫彩" in (items[key].get("name") or "")
+            self.assertTrue(curated, f"道具 {key} 不是活动珍贵蛋，却被标成炫彩")
+
+
 if __name__ == "__main__":
     unittest.main()

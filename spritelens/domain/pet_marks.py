@@ -22,6 +22,24 @@ def voice_mark(voice: int) -> tuple[str, str] | None:
     return None
 
 
+def egg_voice(mother_voice: int, father_voice: int) -> int:
+    """蛋的声音遗传：父母本声音取平均并向下取整（实测规则）。"""
+    return (mother_voice + father_voice) // 2
+
+
+def voice_tags(voice: int) -> tuple[str, ...]:
+    """声音值可打上的参考标签：婉转声/粗嗓门，满值再带满分/底分。"""
+    tags: list[str] = []
+    sound = voice_mark(voice)
+    if sound is not None:
+        tags.append(sound[1])
+    if voice == 100:
+        tags.append("满分")
+    elif voice == -100:
+        tags.append("底分")
+    return tuple(tags)
+
+
 def pet_marks(pet, weight_range) -> list[dict]:
     # 明确佩戴相应奖牌时优先采用；其它情况用竞品已核验的参考规则。
     worn = {1001: ("大", "大块头"), 1002: ("小", "小不点"),
@@ -60,4 +78,4 @@ def observation_marks(weight: int | None, voice: int | None, weight_range) -> li
     return marks
 
 
-__all__ = ["observation_marks", "pet_marks", "size_mark", "voice_mark"]
+__all__ = ["egg_voice", "observation_marks", "pet_marks", "size_mark", "voice_mark", "voice_tags"]

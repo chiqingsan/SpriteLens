@@ -9,6 +9,16 @@ import shutil
 from pathlib import Path
 
 
+def is_colorful_item(item_id: str, item: dict) -> bool:
+    """活动珍贵蛋的炫彩只能按道具事实判定。
+
+    蛋仓分页（0x1344）不下发 mutation/precious 字段，1.5 活动的「大量出没 / 重逢契约」
+    珍贵精灵蛋（151xxx 道具）与官方命名带「炫彩」的道具孵化必得炫彩外观；wiki 派生数据
+    当时只映射了异色，这里补一层显式规则，避免重导后退回「特殊蛋」。
+    """
+    return (item_id.isdigit() and 151_000 <= int(item_id) < 152_000) or "炫彩" in str(item.get("name") or "")
+
+
 def build(game: Path, pets_file: Path, catalog_file: Path, icons: Path, reference: Path, output: Path,
           wiki_items: Path | None = None, wiki_icons: Path | None = None) -> None:
     sources = [game / f"{name}.json" for name in ("PET_EGG_CONF", "BAG_ITEM_CONF", "PET_RANDOM_EGG_CONF")]
@@ -76,6 +86,9 @@ def build(game: Path, pets_file: Path, catalog_file: Path, icons: Path, referenc
             copied[:] = [record for record in copied if record["item_id"] != int(key)]
             copied.append({"item_id": int(key), "source_kind": "wiki", "sha256": hashlib.sha256(image.read_bytes()).hexdigest()})
             item["icon_item_id"] = int(key)
+    for key, item in result["items"].items():
+        if is_colorful_item(key, item):
+            item["kind"] = "colorful"
     (output / "egg_inventory.json").write_text(json.dumps(result, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
     report = {
         "source": "Roco-Kingdom-World-Data/Bin/BinDataCompressed",

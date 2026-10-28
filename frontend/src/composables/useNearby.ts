@@ -2,7 +2,7 @@ import { ref, shallowRef } from 'vue'
 import { parseNearby, parseNearbySummary, type NearbySummary, type NearbySnapshot } from '../types/nearby'
 
 /** 后台自动同步的最小间隔：短时间内多次版本推进合并成一次读取，避免按钮与骨架跟着每条推送闪动。 */
-export const AUTO_LOAD_INTERVAL_MS = 800
+export const AUTO_LOAD_INTERVAL_MS = 500
 
 export interface NearbyAlertHost {
   enabled(): boolean

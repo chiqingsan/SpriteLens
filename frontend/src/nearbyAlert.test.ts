@@ -24,6 +24,16 @@ function snapshot(actors: unknown[], extra: Record<string, unknown> = {}) {
 }
 
 describe('附近精灵提醒音引擎', () => {
+  it('战前接续的未确认双牌不触发提醒', () => {
+    const play = vi.fn()
+    const alert = loadAlert(windowStub(), { storage: null, now: () => 0, play })
+    alert.evaluate(snapshot([]))
+    alert.evaluate(snapshot([{ ...actor('7', 'double'), stale: true }], { observation_id: 2 }))
+    expect(play).not.toHaveBeenCalled()
+    alert.evaluate(snapshot([actor('7', 'double')], { observation_id: 2, version: 11 }))
+    expect(play).not.toHaveBeenCalled()
+    alert.dispose()
+  })
   it('空闲时预备音频，用户手势恢复；关闭时取消尚未执行的预备任务', () => {
     let idle: () => void = () => {}
     const resume = vi.fn(() => Promise.resolve())

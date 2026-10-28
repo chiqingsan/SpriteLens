@@ -761,11 +761,14 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         ctx = self._context
         view = ctx.egg_box.consistent_snapshot() if ctx.egg_box is not None else None
         uid = view.uid if view is not None else 0
+        pets = ctx.pet_repository.consistent_snapshot().pets if ctx.pet_repository is not None else ()
         return egg_box_payload(
             view, ctx.egg_catalog,
             static=ctx.static_data,
             annotations=ctx.egg_box.annotations(uid) if ctx.egg_box is not None else {},
             nature_options=tuple((key, info.name) for key, info in ctx.static_data.nature_items()) if ctx.static_data else (),
+            # 亲代声音推算蛋的声音：需要 gid → voice，宠物快照里取
+            pet_voices={pet.gid: pet.voice for pet in pets},
         )
 
     async def _api_home(self, request: web.Request) -> web.Response:

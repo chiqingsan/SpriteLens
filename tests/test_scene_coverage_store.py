@@ -11,6 +11,31 @@ from spritelens.services.scene_coverage import SceneCoverage
 
 
 class CoverageStoreTest(unittest.TestCase):
+    def test_incremental_rows_match_cells_after_load_clear_and_account_switch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = SceneCoverageStore(Path(tmp) / "coverage.json")
+            coverage = SceneCoverage(radius_raw=2500, store=store)
+            coverage.select_account(1)
+            for point in ((-4000, -1000), (0, 0), (4000, 0), (0, 4000)):
+                coverage.record(10003, point)
+                rows = coverage.snapshot(10003).rows
+                decoded = {(gy, gx) for gy, start, length in rows for gx in range(start, start + length)}
+                self.assertEqual(decoded, coverage._cells[10003])
+            store.flush()
+            expected = coverage.snapshot(10003).rows
+            coverage.select_account(2)
+            coverage.record(10003, (100000, 100000))
+            coverage.select_account(1)
+            self.assertEqual(coverage.snapshot(10003).rows, expected)
+            coverage.record(10003, (8000, 0))
+            rows = coverage.snapshot(10003).rows
+            self.assertEqual({(gy, gx) for gy, start, length in rows for gx in range(start, start + length)}, coverage._cells[10003])
+            coverage.clear(10003)
+            coverage.record(10003, (20000, 20000))
+            rows = coverage.snapshot(10003).rows
+            self.assertEqual({(gy, gx) for gy, start, length in rows for gx in range(start, start + length)}, coverage._cells[10003])
+            store.close()
+
     def test_restart_isolates_accounts_maps_and_clear(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "coverage.json"

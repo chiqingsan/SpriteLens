@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import type { EggBoxAnnotations, EggBoxEntry, EggBoxRange, EggNest, EggBoxVoiceTag } from '../types/eggBox'
 import EggBoxArtwork from './EggBoxArtwork.vue'
-import UiIcon from './UiIcon.vue'
+import EggBoxParents from './EggBoxParents.vue'
 
 const props = defineProps<{
   egg: EggBoxEntry
@@ -117,6 +117,8 @@ function updateNote(event: Event) {
     <a v-if="egg.description_source" :href="egg.description_source" target="_blank" rel="noreferrer">来源：洛克王国世界 WIKI</a>
   </aside>
 
+  <EggBoxParents v-if="egg.pickup" :pickup="egg.pickup" :prediction="egg.voice_prediction" />
+
   <section class="eggbox-detail-section">
     <div class="eggbox-section-heading"><h3>数据对比</h3></div>
     <div class="eggbox-measurements">
@@ -206,17 +208,8 @@ function updateNote(event: Event) {
         <template v-if="egg.pickup">
           <div><dt>收取时间</dt><dd>{{ date(egg.pickup.observed_at) }}</dd></div>
           <div><dt>收取小窝</dt><dd>{{ egg.pickup.nest_kind === 'academy' ? '学院绿窝' : '普通窝' }}</dd></div>
-          <div v-if="egg.pickup.mother"><dt>关联母本</dt><dd>
-            <button type="button" class="text-button eggbox-parent-link" :data-reveal-pet="egg.pickup.mother.instance_id"
-              :title="`查看精灵 #${egg.pickup.mother.instance_id}`">{{ egg.pickup.mother.name || '精灵' }} #{{ egg.pickup.mother.instance_id }}<UiIcon name="chevron-right" /></button>
-          </dd></div>
-          <div v-if="egg.pickup.fathers.length"><dt>候选父本</dt><dd class="eggbox-parent-list">
-            <button v-for="father in egg.pickup.fathers" :key="father.instance_id" type="button" class="text-button eggbox-parent-link"
-              :data-reveal-pet="father.instance_id" :title="`查看精灵 #${father.instance_id}`">{{ father.name || '精灵' }} #{{ father.instance_id }}<UiIcon name="chevron-right" /></button>
-          </dd></div>
         </template>
       </dl>
-      <small v-if="egg.pickup?.mother || egg.pickup?.fathers.length" class="filter-note">按收取前观察的小窝与配对关联，候选父本不代表实际父本。<template v-if="egg.pickup.pairing_stale">配对快照有待同步，仅供参考。</template></small>
       <small v-if="egg.home_egg && !egg.pickup" class="filter-note">这枚蛋未记录收取时的关联。后续收蛋前，请在采集开启后离开家园并重新进入，以取得现场小窝和配对数据。</small>
     </div>
   </section>

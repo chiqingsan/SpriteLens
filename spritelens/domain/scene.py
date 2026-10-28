@@ -21,6 +21,8 @@ class SceneActor:
     glass_value: int | None
     updated_at: float
     source_opcode: int
+    stale: bool = False
+    pet_base_id: int | None = None
 
 
 def nodes(fields: list[dict], no: int) -> list[dict]:
@@ -68,7 +70,7 @@ def actor(node: dict, event: PacketEvent) -> tuple[SceneActor | None, bool]:
     return SceneActor(actor_id, integer(config, 1), integer(base, 11),
         position(children(children(base, 8), 1)), integer(config, 11), integer(config, 12),
         integer(config, 31, signed=True), integer(config, 14), integer(glass, 1), integer(glass, 2),
-        event.ts, event.opcode), False
+        event.ts, event.opcode, pet_base_id=integer(children(npc, 8), 4)), False
 
 
 def removed_ids(fields: list[dict]) -> tuple[tuple[int, ...], bool]:

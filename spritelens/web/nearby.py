@@ -79,7 +79,9 @@ def nearby_payload(
     data["radar_radius_raw"] = max(1, int(radar_radius_raw))
     data["actors"] = [dict(vars(actor), actor_id=str(actor.actor_id)) for actor in snapshot.actors]
     for row in data["actors"]:
-        base_id = static.scene_species_id(row["config_id"]) if static and row["config_id"] is not None else None
+        base_id = row.pop("pet_base_id")
+        if not base_id:
+            base_id = static.scene_species_id(row["config_id"]) if static and row["config_id"] is not None else None
         species = static.species(base_id) if static and base_id is not None else None
         row["base_id"] = base_id
         row["name"] = species.name if species else f"未收录精灵 · 配置 {row['config_id'] if row['config_id'] is not None else '未知'}"
@@ -90,6 +92,10 @@ def nearby_payload(
         row["marks"] = observation_marks(row["weight"], row["voice"], species.weight_range if species else (0, 0))
         mark_names = {mark["name"] for mark in row["marks"]}
         row["attention"] = "double" if ({"大块头", "小不点"} & mark_names and {"婉转声", "粗嗓门"} & mark_names) else "marked" if mark_names else "normal"
+        # 炫彩是游戏内固有外观：变异类型第 4 位（背包载荷 is_colorful 同口径），
+        # 与 attention（本地参考线推的奖牌潜力）互不覆盖，列表与雷达各自显示。
+        mutation = row.get("mutation")
+        row["colorful"] = bool((mutation if isinstance(mutation, int) else 0) & 8)
     # 不把本地会话地址暴露到用户功能接口。
     data.pop("session_id", None)
     return data
@@ -118,7 +124,8 @@ def register_nearby_routes(
     async def get_nearby(request: web.Request) -> web.Response:
         if repository is None:
             return web.json_response({"error": "当前实例未装配场景观察"}, status=503)
-        return web.json_response(await run_blocking(request, payload), headers={"Cache-Control": "no-store"})
+        body = await run_blocking(request, lambda: json.dumps(payload(), ensure_ascii=False, separators=(",", ":")))
+        return web.Response(text=body, content_type="application/json", headers={"Cache-Control": "no-store"})
 
     async def reset_coverage(request: web.Request) -> web.Response:
         """清空当前地图的本次足迹；只影响覆盖层，不重置精灵列表与观察周期。"""

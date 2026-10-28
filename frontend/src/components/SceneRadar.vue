@@ -1,20 +1,46 @@
 <script setup lang="ts">
-import { computed, useId } from 'vue'
+import { computed, onMounted, onUnmounted, ref, useId, watch } from 'vue'
 import UiIcon from './UiIcon.vue'
 import MapCoverage from './MapCoverage.vue'
 import type { WorldMapEntry } from '../types/worldMap'
 import { nearbyAttentionTone, type NearbyAttention, type NearbyActor, type NearbySnapshot } from '../types/nearby'
-const props = withDefaults(defineProps<{ data: NearbySnapshot | null; map?: WorldMapEntry | null; selected?: string; compact?: boolean; radius?: number; note?: string; visible?: boolean }>(), {
+const props = withDefaults(defineProps<{ data: NearbySnapshot | null; map?: WorldMapEntry | null; selected?: string; compact?: boolean; radius?: number; note?: string; visible?: boolean; preparing?: boolean }>(), {
   radius: 10000,
   note: '',
   visible: true,
 })
 const emit = defineEmits<{ select: [id: string] }>()
 const mapClipId = `radar-map-${useId()}`
+const colorfulClipId = `radar-colorful-clip-${useId()}`
+const colorfulGradientId = `radar-colorful-gradient-${useId()}`
+/** 游戏内炫彩标记（彩虹星）：雷达、悬浮条与列表共用同一份本地素材，不用自绘符号替代。 */
+const RARITY_COLORFUL = '/static/rarity/colorful-fit.webp'
+const failedIcons = ref(new Set<string>())
+function imageFailed(url: string) { failedIcons.value = new Set(failedIcons.value).add(url) }
+const mapReady = ref(false)
+watch(() => props.map?.image.url, () => { mapReady.value = false }, { immediate: true, flush: 'sync' })
 
 /** 固定 400×400 参考坐标系：圆心 200、外环屏显半径 180；所有文字标签都必须留在 viewBox 内。 */
 const VIEW_SIZE = 400
 const CENTER = VIEW_SIZE / 2
+const radarBody = ref<HTMLElement | null>(null)
+const bodySize = ref({ width: 0, height: 0 })
+let bodyObserver: ResizeObserver | undefined
+onMounted(() => {
+  if (!props.compact || !radarBody.value) return
+  bodyObserver = new ResizeObserver(([entry]) => {
+    if (entry) bodySize.value = { width: entry.contentRect.width, height: entry.contentRect.height }
+  })
+  bodyObserver.observe(radarBody.value)
+})
+onUnmounted(() => bodyObserver?.disconnect())
+const viewport = computed(() => {
+  const { width, height } = bodySize.value
+  if (!props.compact || !width || !height) return { x: 0, y: 0, width: VIEW_SIZE, height: VIEW_SIZE }
+  const scale = VIEW_SIZE / Math.min(width, height)
+  const w = width * scale, h = height * scale
+  return { x: CENTER - w / 2, y: CENTER - h / 2, width: w, height: h }
+})
 const OUTER_RADIUS = 180
 const RING_RADII = [60, 120, 180] as const
 const LABEL_MARGIN = 4
@@ -31,6 +57,8 @@ const MAX_RENDERED_TARGETS = 160
 interface RadarRow {
   actor: NearbyActor
   kind: NearbyAttention
+  /** 游戏内固有炫彩外观：与 kind（本地推的奖牌潜力）并行，各自有独立标点。 */
+  colorful: boolean
   dx: number
   dy: number
   distance: number
@@ -55,6 +83,15 @@ function labelFor(name: string, actorId: string, compact: boolean) {
   const value = name.trim() || `精灵 ${actorId.slice(-4)}`
   const maxLength = compact ? 4 : 8
   return value.length > maxLength ? `${value.slice(0, maxLength)}…` : value
+}
+function kindLabel(kind: NearbyAttention) {
+  return kind === 'double' ? '双牌' : kind === 'marked' ? '单牌' : '普通'
+}
+function targetTitle(row: RadarRow) {
+  return `${row.actor.name} · ${kindLabel(row.kind)}${row.colorful ? ' · 炫彩' : ''} · Lv.${row.actor.level ?? '未知'}`
+}
+function targetAria(row: RadarRow) {
+  return `${row.actor.name}${row.kind === 'normal' ? '' : `，${kindLabel(row.kind)}`}${row.colorful ? '，炫彩' : ''}`
 }
 /** 原始坐标 → 米：1 原始单位 ≈ 1 cm（大陆现场校准，见 docs/NEARBY_MAP_PLAN_2026-10-26.md §米制比例尺）。 */
 function formatMeters(raw: number) {
@@ -123,7 +160,9 @@ function budgetRows(rows: RadarRow[], selectedId?: string) {
   const keep = new Set<string>()
   const selected = rows.find(row => row.actor.actor_id === selectedId)
   if (selected) keep.add(selected.actor.actor_id)
-  const ranked = [...rows].sort((a, b) => (a.kind === 'normal' ? 1 : 0) - (b.kind === 'normal' ? 1 : 0)
+  // 炫彩是稀有外观，渲染预算里排在有牌目标之前，避免被密集点位挤掉。
+  const weight = (row: RadarRow) => row.colorful ? 0 : row.kind === 'normal' ? 2 : 1
+  const ranked = [...rows].sort((a, b) => weight(a) - weight(b)
     || a.distance - b.distance || a.actor.actor_id.localeCompare(b.actor.actor_id))
   for (const row of ranked) {
     if (keep.size >= MAX_RENDERED_TARGETS) break
@@ -132,8 +171,37 @@ function budgetRows(rows: RadarRow[], selectedId?: string) {
   return rows.filter(row => keep.has(row.actor.actor_id))
 }
 const range = computed(() => Number.isFinite(props.radius) && props.radius > 0 ? props.radius : 10000)
+const displayPosition = ref<[number, number] | null>(null)
+let positionFrame = 0
+watch([
+  () => props.data?.uid, () => props.data?.observation_id, () => props.data?.resource_id,
+  () => props.data?.instance_id, () => props.data?.scene_id,
+  () => props.data?.player_position?.[0], () => props.data?.player_position?.[1],
+  () => props.data?.position_source,
+], (next, previous) => {
+  cancelAnimationFrame(positionFrame)
+  const x = next[5], y = next[6]
+  if (typeof x !== 'number' || typeof y !== 'number') { displayPosition.value = null; return }
+  const target: [number, number] = [x, y]
+  const start = displayPosition.value
+  const sameObservation = previous && next.slice(0, 5).every((value, index) => value === previous[index])
+  if (!start || !sameObservation || next[7] === 'teleport' || next[7] === 'scene_entry'
+      || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    displayPosition.value = target
+    return
+  }
+  if (start[0] === x && start[1] === y) return
+  const started = performance.now()
+  const tick = (now: number) => {
+    const progress = Math.min(1, (now - started) / 250)
+    displayPosition.value = [start[0] + (x - start[0]) * progress, start[1] + (y - start[1]) * progress]
+    if (progress < 1) positionFrame = requestAnimationFrame(tick)
+  }
+  positionFrame = requestAnimationFrame(tick)
+}, { immediate: true, flush: 'sync' })
+onUnmounted(() => cancelAnimationFrame(positionFrame))
 const mapBackground = computed(() => {
-  const map = props.map, position = props.data?.player_position
+  const map = props.map, position = displayPosition.value
   if (!map || position?.[0] == null || position[1] == null) return null
   const scale = OUTER_RADIUS / range.value
   return {
@@ -143,6 +211,8 @@ const mapBackground = computed(() => {
     height: map.projection.side * scale,
   }
 })
+const radarPreparing = computed(() => Boolean(props.compact && (props.preparing || !bodySize.value.width || !bodySize.value.height
+  || (props.map && mapBackground.value && !mapReady.value))))
 /** 三环刻度：外环 = 半径、中环 = 半径/2、内环 = 半径/5；放在右下方避开十字轴与中心标签。 */
 const scale = computed(() => [
   { key: 'outer', radius: OUTER_RADIUS, value: range.value },
@@ -155,7 +225,7 @@ const scale = computed(() => [
   y: CENTER + tick.radius * Math.SQRT1_2 + 4,
 })))
 const projection = computed(() => {
-  const center = props.data?.player_position
+  const center = displayPosition.value
   const originX = center?.[0]
   const originY = center?.[1]
   if (originX == null || originY == null) return null
@@ -169,6 +239,7 @@ const projection = computed(() => {
     return [{
       actor,
       kind: actor.attention,
+      colorful: actor.colorful === true,
       dx,
       dy,
       distance: Math.hypot(dx, dy),
@@ -191,9 +262,10 @@ const projection = computed(() => {
   }
   // 选中的目标永远优先占位，即使它不在最近 6 个里。
   if (selectedRow) addLabel(selectedRow, selectedRow.label, SELECTED_FONT_SIZE, true)
-  // compact 模式只保留选中目标的名称；完整模式只给单牌/双牌标注名称（普通点不加文字），同名合并成「名称 ×N」。
-  if (!props.compact) {
-    const nearest = byDistance.filter(row => row.actor.actor_id !== selectedRow?.actor.actor_id && row.kind !== 'normal').slice(0, LABEL_LIMIT)
+  // 单牌/双牌和炫彩显示名称；选中项优先，密集点位按距离避让，同名合并。
+  {
+    const marked = byDistance.filter(row => row.actor.actor_id !== selectedRow?.actor.actor_id && (row.kind !== 'normal' || row.colorful))
+    const nearest = props.compact ? marked : marked.slice(0, LABEL_LIMIT)
     const groups = new Map<string, RadarRow[]>()
     for (const row of nearest) {
       const key = row.actor.name.trim() || row.actor.actor_id
@@ -220,21 +292,35 @@ const debugPosition = computed(() => {
 </script>
 <template>
   <section class="scene-radar" :class="{ 'is-overlay': compact }" aria-label="附近精灵雷达">
-    <header><strong>场景雷达</strong><span v-if="projection">{{ data?.position_source === 'client_target' ? '以移动目标位置为参考' : data?.position_source === 'teleport' ? '以传送落点为参考' : '以已观察位置为参考' }}</span></header>
+    <header><strong>场景雷达</strong><span v-if="projection">{{ data?.position_source === 'battle_return' ? '战前位置可能已过期' : data?.position_source === 'client_target' ? '以移动目标位置为参考' : data?.position_source === 'teleport' ? '以传送落点为参考' : '以已观察位置为参考' }}</span></header>
     <div v-if="!compact && projection" class="radar-legend" aria-label="雷达目标图例"><span><i class="radar-legend-dot" />普通</span><span><i class="radar-legend-dot is-marked" />单牌</span><span><i class="radar-legend-dot is-double" />双牌</span></div>
-    <div class="radar-body">
-      <svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMid meet" class="scene-radar-scope" role="group" aria-label="参考坐标雷达">
-        <defs><clipPath :id="mapClipId"><rect width="400" height="400" :rx="compact ? 10 : 0" /></clipPath></defs>
+    <div ref="radarBody" class="radar-body">
+      <svg :viewBox="`${viewport.x} ${viewport.y} ${viewport.width} ${viewport.height}`" preserveAspectRatio="xMidYMid meet" class="scene-radar-scope" :class="{ 'is-preparing': radarPreparing }" role="group" aria-label="参考坐标雷达">
+        <defs><clipPath :id="mapClipId"><rect :x="viewport.x" :y="viewport.y" :width="viewport.width" :height="viewport.height" :rx="compact ? 10 : 0" /></clipPath><clipPath :id="colorfulClipId"><circle r="11" /></clipPath><linearGradient :id="colorfulGradientId" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#f2c94c" /><stop offset="34%" stop-color="#7ed3a0" /><stop offset="66%" stop-color="#5fb4f2" /><stop offset="100%" stop-color="#b57cf0" /></linearGradient></defs>
         <g v-if="map && mapBackground" :clip-path="`url(#${mapClipId})`" class="radar-map">
-          <image :href="map.image.url" :x="mapBackground.x" :y="mapBackground.y" :width="mapBackground.width" :height="mapBackground.height" preserveAspectRatio="none" />
+          <image :key="map.image.url" :href="map.image.url" :x="mapBackground.x" :y="mapBackground.y" :width="mapBackground.width" :height="mapBackground.height" preserveAspectRatio="none" @load="mapReady = true" @error="mapReady = true" />
           <g v-if="visible" :transform="`translate(${mapBackground.x},${mapBackground.y}) scale(${mapBackground.width / map.image.width},${mapBackground.height / map.image.height})`"><MapCoverage :coverage="visibleCoverage" :map="map" /></g>
         </g>
         <circle v-for="radius in RING_RADII" :key="radius" cx="200" cy="200" :r="radius" class="radar-ring" />
         <path d="M20 200H380M200 20V380" class="radar-axis" />
         <g v-if="!compact" class="radar-scale" aria-hidden="true"><text v-for="tick in scale" :key="tick.key" class="radar-scale-label" :x="tick.x" :y="tick.y" text-anchor="middle">{{ tick.text }}</text></g>
         <g v-if="projection">
-          <g v-for="row in projection.rows" :key="row.actor.actor_id" class="radar-target" :class="[`is-${row.kind}`, `attention-tone-${row.attentionTone}`, { selected: selected === row.actor.actor_id }]" :transform="`translate(${row.x},${row.y})`" tabindex="0" role="button" :aria-label="`${row.actor.name}${row.kind === 'double' ? '，双牌' : row.kind === 'marked' ? '，单牌' : ''}`" @click="emit('select', row.actor.actor_id)" @keydown.enter="emit('select', row.actor.actor_id)" @keydown.space.prevent="emit('select', row.actor.actor_id)">
-            <title>{{ row.actor.name }} · {{ row.kind === 'double' ? '双牌' : row.kind === 'marked' ? '单牌' : '普通' }} · Lv.{{ row.actor.level ?? '未知' }}</title><circle r="12" class="radar-hit"/><circle v-if="row.kind !== 'normal'" r="10" class="radar-attention-ring" /><circle :r="row.kind === 'double' ? 7 : row.kind === 'marked' ? 6 : 5" class="radar-point" />
+          <g v-for="row in projection.rows" :key="row.actor.actor_id" class="radar-target" :class="[`is-${row.kind}`, `attention-tone-${row.attentionTone}`, { selected: selected === row.actor.actor_id, colorful: row.colorful }]" :transform="`translate(${row.x},${row.y})`" tabindex="0" role="button" :aria-label="targetAria(row)" @click="emit('select', row.actor.actor_id)" @keydown.enter="emit('select', row.actor.actor_id)" @keydown.space.prevent="emit('select', row.actor.actor_id)">
+            <title>{{ targetTitle(row) }}</title>
+            <circle :r="row.colorful ? 20 : 12" class="radar-hit" />
+            <template v-if="row.colorful">
+              <circle r="19" class="radar-colorful-glow" />
+              <circle r="14" class="radar-colorful-frame" :stroke="`url(#${colorfulGradientId})`" />
+              <circle r="12" class="radar-colorful-well" />
+              <image v-if="row.actor.icon_url && !failedIcons.has(row.actor.icon_url)" :href="row.actor.icon_url" x="-11" y="-11" width="22" height="22" preserveAspectRatio="xMidYMid slice" :clip-path="`url(#${colorfulClipId})`" class="radar-colorful-avatar" @error="imageFailed(row.actor.icon_url)" />
+              <circle v-else r="6" class="radar-colorful-point" :fill="`url(#${colorfulGradientId})`" />
+              <image :href="RARITY_COLORFUL" x="3.5" y="3.5" width="16" height="16" class="radar-colorful-badge" />
+              <circle v-if="row.kind !== 'normal'" r="3.2" cx="-9" cy="9" class="radar-colorful-attention" />
+            </template>
+            <template v-else>
+              <circle v-if="row.kind !== 'normal'" r="10" class="radar-attention-ring" />
+              <circle :r="row.kind === 'double' ? 7 : row.kind === 'marked' ? 6 : 5" class="radar-point" />
+            </template>
           </g>
           <g v-for="label in projection.labels" :key="`label-${label.id}`" class="radar-label" :class="{ selected: label.selected }" aria-hidden="true">
             <rect class="radar-label-bg" :x="label.rect.x" :y="label.rect.y" :width="label.rect.width" :height="label.rect.height" rx="3" /><text class="radar-target-label" :x="label.x" :y="label.y" :text-anchor="label.anchor">{{ label.text }}</text>
@@ -243,6 +329,7 @@ const debugPosition = computed(() => {
         </g>
         <text v-else x="200" y="200" text-anchor="middle">等待玩家位置</text>
       </svg>
+      <span v-if="radarPreparing" class="radar-loading" role="status">正在加载雷达…</span>
     </div>
     <p v-if="compact && debugPosition" class="radar-debug is-compact">{{ debugPosition }}</p>
     <template v-if="!compact">
@@ -264,7 +351,9 @@ const debugPosition = computed(() => {
 .scene-radar header span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scene-radar header span, .scene-radar p { min-width: 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.6; overflow-wrap: anywhere; }
 /* svg 外层吃掉剩余高度并居中；svg 自身撑满容器，viewBox 等比缩放保证圆盘完整可见。 */
-.radar-body { flex: 1 1 0; min-height: 0; min-width: 0; display: grid; place-items: center; }
+.radar-body { position: relative; flex: 1 1 0; min-height: 0; min-width: 0; display: grid; place-items: center; }
+.radar-loading { position: absolute; color: var(--muted); font-size: var(--fs-xs); }
+.scene-radar-scope.is-preparing { visibility: hidden; }
 .radar-map { pointer-events: none; }
 .radar-map image { opacity: .9; }
 .scene-radar-scope { display: block; width: 100%; height: 100%; max-width: 100%; max-height: 100%; aspect-ratio: 1; background: var(--surface-1); border-radius: var(--radius-sm); }
@@ -284,12 +373,31 @@ const debugPosition = computed(() => {
 .radar-legend-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--teal); }
 .radar-legend-dot.is-marked { background: var(--amber); }
 .radar-legend-dot.is-double { width: 11px; height: 11px; background: var(--danger); border: 1px solid var(--danger-ink); }
+/* 炫彩图例直接用游戏内彩虹星标，与点位徽章同一素材。 */
 .radar-player { fill: var(--teal-deep); stroke: var(--panel); stroke-width: 3; }
 .radar-player-icon { color: var(--panel); width: 14px; height: 14px; }
 .scene-radar .radar-self-label { fill: var(--panel); font-size: var(--fs-3xs); font-weight: 700; paint-order: stroke; stroke: var(--teal-deep); stroke-width: 4; stroke-linejoin: round; }
 .radar-target { cursor: pointer; outline: none; }
 .radar-label { pointer-events: none; }
 .radar-hit { fill: transparent; }
+/* 炫彩目标：头像圆章 + 游戏内彩虹星徽 + 呼吸光晕，替代原先不明显的紫色虚线圈。
+   稀有外观要一眼可见：描边加粗到 3，光晕比描边大一圈，星徽挂到右下角外沿；左下小点继续承载单/双牌关注语义。 */
+.radar-colorful-glow { fill: var(--colorful-glow); pointer-events: none; animation: radar-colorful-pulse 2.4s ease-in-out infinite; }
+.radar-colorful-frame { fill: none; stroke-width: 3; filter: drop-shadow(0 0 2px rgba(0, 0, 0, .22)); }
+.radar-colorful-well { fill: color-mix(in srgb, var(--colorful-soft) 78%, var(--panel)); }
+.radar-colorful-avatar { pointer-events: none; }
+.radar-colorful-point { stroke: var(--panel); stroke-width: 1.5; }
+.radar-colorful-badge { pointer-events: none; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .5)); }
+.radar-colorful-attention { stroke: var(--panel); stroke-width: 1.4; }
+.radar-target.attention-tone-0 .radar-colorful-attention { fill: var(--radar-attention-0); }
+.radar-target.attention-tone-1 .radar-colorful-attention { fill: var(--radar-attention-1); }
+.radar-target.attention-tone-2 .radar-colorful-attention { fill: var(--radar-attention-2); }
+.radar-target.attention-tone-3 .radar-colorful-attention { fill: var(--radar-attention-3); }
+.radar-target.attention-tone-4 .radar-colorful-attention { fill: var(--radar-attention-4); }
+@keyframes radar-colorful-pulse { 0%, 100% { opacity: .48; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .radar-colorful-glow { animation: none; opacity: .82; }
+}
 .radar-attention-ring { fill: none; stroke-width: 2.5; }
 .radar-target.attention-tone-0 .radar-attention-ring { stroke: var(--radar-attention-0); }
 .radar-target.attention-tone-1 .radar-attention-ring { stroke: var(--radar-attention-1); }
@@ -305,8 +413,8 @@ const debugPosition = computed(() => {
 .scene-radar.is-overlay { flex: 1; min-height: 0; padding: 0; border: 0; background: transparent; --radar-label-bg: var(--radar-overlay-bg); }
 .is-overlay header { display: none; }
 .is-overlay .radar-legend { flex: none; margin: 0 0 var(--space-2); justify-content: center; }
-.is-overlay .radar-body { margin: 0; align-items: end; }
-.is-overlay .scene-radar-scope { width: 100%; height: auto; aspect-ratio: 1; background: transparent; border-radius: 10px; overflow: hidden; }
+.is-overlay .radar-body { margin: 0; }
+.is-overlay .scene-radar-scope { width: 100%; height: 100%; aspect-ratio: 1; background: transparent; border-radius: 10px; overflow: hidden; }
 .is-overlay .radar-point { fill: var(--radar-overlay-point); stroke: var(--radar-overlay-bg); }
 .is-overlay .radar-target-label { fill: var(--radar-overlay-ink); }
 .is-overlay .radar-label.selected .radar-target-label { fill: var(--radar-overlay-ink); }
@@ -315,6 +423,9 @@ const debugPosition = computed(() => {
 .scene-radar.is-overlay .radar-legend-dot { background: var(--radar-overlay-point); }
 .scene-radar.is-overlay .radar-legend-dot.is-marked { background: var(--amber-bright); }
 .scene-radar.is-overlay .radar-legend-dot.is-double { background: var(--danger); border-color: var(--danger); }
+.scene-radar.is-overlay .radar-colorful-well { fill: color-mix(in srgb, var(--colorful-soft) 32%, var(--radar-overlay-bg)); }
+.scene-radar.is-overlay .radar-colorful-point { stroke: var(--radar-overlay-bg); }
+.scene-radar.is-overlay .radar-colorful-badge { filter: drop-shadow(0 0 2px rgba(0, 0, 0, .6)); }
 .is-overlay .radar-player { fill: var(--radar-overlay-ink); stroke: var(--radar-overlay-bg); }
 .is-overlay .radar-player-cross { stroke: var(--radar-overlay-ink); }
 /* 悬浮雷达紧凑窗只在调试图标开启时多显示一行原始坐标，供游戏内就地记录地标。 */

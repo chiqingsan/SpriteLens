@@ -128,6 +128,7 @@
         var key = attention === "double";
         var wasKey = known.get(actor.actor_id) === "double";
         known.set(actor.actor_id, attention);
+        if (actor.stale) { continue; }
         /* 只在“本次才变成双牌”时提醒：持续留在列表里的同一实体不能每份快照都响；单牌新出现不响，之后升为双牌再响。 */
         if (key && !wasKey && !cooldown.has(actor.actor_id)) { candidates.push(actor.actor_id); }
       }

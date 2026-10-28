@@ -45,9 +45,10 @@ def event(opcode, fields=(), *, uid=None, session="s", direction="s2c"):
                        (uid, "synthetic", 1) if uid is not None else None)
 
 
-def actor_node(actor_id=9007199254740993, *, measurements=True, x=0, y=-3):
+def actor_node(actor_id=9007199254740993, *, measurements=True, x=0, y=-3, mutation=None):
     config = [field(1, 123)]
     if measurements: config.extend([field(11, 100), field(12, 200), field(31, (1 << 64) - 20)])
+    if mutation is not None: config.append(field(14, mutation))
     return field(7, children=[field(11, children=[
         field(1, children=[field(2, actor_id), field(11, 5),
             field(8, children=[field(1, children=[field(1, x), field(2, y)])])]),
@@ -79,6 +80,46 @@ class SceneTests(unittest.TestCase):
         self.assertFalse(repo.snapshot().actors)
         seed(repo, uid=102)
         self.assertIsNone(repo.snapshot().coverage)
+
+    def test_coverage_records_confirmed_continuous_move_samples(self):
+        """连续移动请求本身就是走过路径的证据：只有相邻请求相容才记格。"""
+        repo = SceneRepository(); seed(repo)
+
+        def move(t, x, y):
+            return event(0x0133, [field(1, t), field(17, 1),
+                field(2, children=[field(1, x), field(2, y)])], direction="c2s")
+
+        repo.handle_packet(move(1000, 320000, 420000))
+        self.assertIsNone(repo.snapshot().coverage)  # 第一条只作为基准位置
+        repo.handle_packet(move(1100, 320150, 420000))
+        coverage = repo.snapshot().coverage
+        self.assertEqual((coverage.cells, coverage.revision), (1, 1))
+        self.assertEqual(coverage.rows, ((210, 160, 1),))
+        # 远距离跳变（传送/脱战回位/重算路线）不记格，只更新基准位置。
+        repo.handle_packet(move(1200, 900000, 900000))
+        self.assertEqual(repo.snapshot().coverage, coverage)
+        repo.handle_packet(move(1300, 900150, 900000))
+        self.assertEqual(repo.snapshot().coverage.cells, 2)
+        # 间隔过久同样只更新基准，不把中间没走过的区域补成已探索。
+        repo.handle_packet(move(5000, 900300, 900000))
+        self.assertEqual(repo.snapshot().coverage.cells, 2)
+
+    def test_coverage_records_move_samples_again_right_after_clear(self):
+        """清除足迹后继续跑动应立即重新出格，不必等到下一个停止点。"""
+        repo = SceneRepository(); seed(repo)
+
+        def move(t, x, y):
+            return event(0x0133, [field(1, t), field(17, 1),
+                field(2, children=[field(1, x), field(2, y)])], direction="c2s")
+
+        repo.handle_packet(move(1000, 321900, 420000))
+        repo.handle_packet(move(1100, 322100, 420000))
+        before = repo.snapshot()
+        self.assertIsNotNone(before.coverage)
+        self.assertTrue(repo.reset_coverage(before.uid, before.resource_id, before.observation_id))
+        self.assertIsNone(repo.snapshot().coverage)
+        repo.handle_packet(move(1200, 322300, 420000))
+        self.assertEqual(repo.snapshot().coverage.rows, ((210, 161, 1),))
 
     def test_coverage_is_recorded_without_opening_map_and_returning_to_map_keeps_it(self):
         repo = SceneRepository(); seed(repo)
@@ -367,6 +408,17 @@ class SceneTests(unittest.TestCase):
         self.assertEqual(repo.snapshot().actors, ())
         self.assertIsNone(static.scene_species_id(123))
 
+    def test_pet_info_supplies_species_for_unmapped_scene_config(self):
+        repo = SceneRepository(); seed(repo)
+        node = actor_node()
+        npc = node["children"][0]["children"]
+        npc[1]["children"][0]["raw"] = 50571
+        npc.append(field(8, children=[field(1, 92243), field(4, 3229)]))
+        repo.handle_packet(event(0x014A, [node]))
+        row = nearby_payload(repo.snapshot(), load_static_data(static_dir()))["actors"][0]
+        self.assertEqual((row["config_id"], row["base_id"], row["name"]), (50571, 3229, "友爱星飞"))
+        self.assertTrue(row["icon_url"])
+
     def test_fields_unknowns_precision_and_partial_status(self):
         repo = SceneRepository(); seed(repo)
         repo.handle_packet(event(0x014A, [actor_node(), actor_node(77, measurements=False)]))
@@ -382,6 +434,17 @@ class SceneTests(unittest.TestCase):
         self.assertFalse(payload["complete"]); self.assertEqual(payload["coordinate_unit"], "unverified")
         self.assertNotIn("session_id", payload)
         self.assertEqual(len(payload["actors"]), 1)
+
+    def test_colorful_marks_colorful_from_mutation_bit_independent_of_attention(self):
+        repo = SceneRepository(); seed(repo)
+        repo.handle_packet(event(0x014A, [actor_node(1, mutation=8 | 1), actor_node(2, mutation=0), actor_node(3)]))
+        by_id = {row["actor_id"]: row for row in nearby_payload(repo.snapshot())["actors"]}
+        # 炫彩看变异类型第 4 位（与背包 is_colorful 同口径），和本地推的 attention 互不覆盖。
+        self.assertTrue(by_id["1"]["colorful"])
+        self.assertFalse(by_id["2"]["colorful"])
+        self.assertFalse(by_id["3"]["colorful"])
+        self.assertEqual(by_id["1"]["mutation"], 9)
+        self.assertEqual(by_id["1"]["attention"], "normal")
 
     def test_add_remove_wrapping_limits_and_unknown_actions(self):
         for opcode in (0x0413, 0x0414):
@@ -456,12 +519,77 @@ class SceneTests(unittest.TestCase):
         repo.handle_packet(event(0x0414, [add]))
         self.assertFalse(repo.snapshot().actors)
         repo.handle_packet(event(4908, [field(1, children=[field(19, 1234)])]))
-        self.assertEqual(repo.snapshot().phase, "awaiting_scene")
-        self.assertFalse(repo.snapshot().actors)
+        self.assertEqual(repo.snapshot().phase, "observing")
+        self.assertTrue(repo.snapshot().actors[0].stale)
         repo.handle_packet(event(0x0414, [add]))
         self.assertEqual(repo.snapshot().phase, "observing")
         self.assertGreaterEqual(len(repo.snapshot().actors), 1)
+        self.assertFalse(repo.snapshot().actors[0].stale)
         self.assertFalse(nearby_payload(repo.snapshot())["complete"])
+
+    def test_battle_resume_marks_old_position_and_actors_until_confirmed(self):
+        repo = SceneRepository(); seed(repo)
+        move = event(0x0133, [field(17, 1), field(2, children=[field(1, 100), field(2, 200)])], direction="c2s")
+        repo.handle_packet(move)
+        repo.handle_packet(event(0x014A, [actor_node(7), actor_node(8)]))
+        repo.handle_packet(event(4886, [field(6, children=[field(1, 1234)])]))
+        self.assertEqual(repo.snapshot().actors, ())
+        self.assertIsNone(repo.snapshot().player_position)
+        repo.handle_packet(event(4908, [field(1, children=[field(19, 1234)])]))
+        restored = repo.snapshot()
+        self.assertEqual(restored.player_position[:2], (100, 200))
+        self.assertEqual(restored.position_source, "battle_return")
+        self.assertEqual([(actor.actor_id, actor.stale) for actor in restored.actors], [(7, True), (8, True)])
+        add = field(1, children=[field(1, children=[field(1, children=actor_node(7)["children"])])])
+        remove = field(1, children=[field(2, children=[field(1, 8)])])
+        repo.handle_packet(event(0x0414, [add, remove]))
+        self.assertEqual([(actor.actor_id, actor.stale) for actor in repo.snapshot().actors], [(7, False)])
+        repo.handle_packet(move)
+        self.assertEqual(repo.snapshot().position_source, "client_target")
+
+    def test_battle_backup_is_discarded_on_switch_and_unknown_finish(self):
+        repo = SceneRepository(); seed(repo)
+        repo.handle_packet(event(0x014A, [actor_node(7)]))
+        repo.handle_packet(event(4886, [field(6, children=[field(1, 1234)])]))
+        repo.session_closed("s")
+        seed(repo, session="new")
+        repo.handle_packet(event(4908, [field(1, children=[field(19, 1234)])], session="new"))
+        self.assertFalse(repo.snapshot().actors)
+        repo.handle_packet(event(0x014A, [actor_node(8)], session="new"))
+        repo.handle_packet(event(4886, [field(6, children=[field(1, 1234)])], session="new"))
+        repo.handle_packet(event(4909, session="new"))
+        self.assertFalse(repo.snapshot().actors)
+
+    def test_full_scene_snapshot_replaces_unconfirmed_battle_actors(self):
+        repo = SceneRepository(); seed(repo)
+        repo.handle_packet(event(0x014A, [actor_node(7), actor_node(8)]))
+        repo.handle_packet(event(4886, [field(6, children=[field(1, 1234)])]))
+        repo.handle_packet(event(4908, [field(1, children=[field(19, 1234)])]))
+        repo.handle_packet(event(0x014A, [actor_node(7)]))
+        self.assertEqual([(actor.actor_id, actor.stale) for actor in repo.snapshot().actors], [(7, False)])
+
+    def test_battle_backup_is_discarded_after_teleport(self):
+        repo = SceneRepository(); seed(repo)
+        repo.handle_packet(event(0x014A, [actor_node(7)]))
+        repo.handle_packet(event(4886, [field(6, children=[field(1, 1234)])]))
+        repo.handle_packet(event(0x015C, [field(11, 1), field(12, 2), field(13, 3)]))
+        repo.handle_packet(event(4908, [field(1, children=[field(19, 1234)])]))
+        self.assertFalse(repo.snapshot().actors)
+
+    def test_battle_removals_are_not_restored_after_battle(self):
+        for opcode in (0x0413, 0x0414):
+            with self.subTest(opcode=opcode):
+                repo = SceneRepository(); seed(repo)
+                repo.handle_packet(event(0x014A, [actor_node(7), actor_node(8)]))
+                repo.handle_packet(event(4886, [field(6, children=[field(1, 1234)])]))
+                remove = field(1, children=[field(2, children=[field(1, 7)])])
+                payload = [field(1, children=[remove])] if opcode == 0x0413 else [remove]
+                repo.handle_packet(event(opcode, payload, session="other"))
+                self.assertEqual(repo.snapshot().actors, ())
+                repo.handle_packet(event(opcode, payload))
+                self.assertEqual(repo.snapshot().actors, ())
+                repo.handle_packet(event(4908, [field(1, children=[field(19, 1234)])]))
+                self.assertEqual([(actor.actor_id, actor.stale) for actor in repo.snapshot().actors], [(8, True)])
 
     def test_battle_exit_leaves_radar_empty_until_new_observation_arrives(self):
         repo = SceneRepository(); seed(repo)

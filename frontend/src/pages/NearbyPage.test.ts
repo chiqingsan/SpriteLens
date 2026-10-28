@@ -30,6 +30,16 @@ describe('附近精灵更新布局稳定性', () => {
     vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(640)
   })
   afterEach(() => vi.restoreAllMocks())
+  it('战前接续数据显示过期提示，重新确认的精灵不标记', async () => {
+    const load = vi.fn().mockResolvedValue({ ...snapshot(1, [{ ...actor('1', 1), stale: true }, actor('2', 2)]), position_source: 'battle_return' })
+    const wrapper = mount(NearbyPage, { props: { host: { load } } })
+    ;(wrapper.vm as unknown as { update(value: unknown): void }).update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    expect(wrapper.get('.nearby-count-note').text()).toBe('战前观察可能已过期')
+    expect(wrapper.get('#nearby-actor-1').text()).toContain('可能已过期')
+    expect(wrapper.get('#nearby-actor-2').text()).not.toContain('可能已过期')
+    wrapper.unmount()
+  })
   it('范围待实测时提示搜索覆盖已暂停，附近精灵仍显示', async () => {
     const load = vi.fn().mockResolvedValue({ ...snapshot(1, [actor('1', 1)]), coverage_paused: true })
     const wrapper = mount(NearbyPage, { props: { host: { load } } })
@@ -126,6 +136,45 @@ describe('附近精灵更新布局稳定性', () => {
     expect(wrapper.findAll('.nearby-card-marks.is-empty')).toHaveLength(2)
   })
 
+  it('炫彩精灵在列表里有独立徽章与卡片样式，和单牌/双牌并列', async () => {
+    const colorful = { ...actor('1', 1, [{ label: '大', name: '大块头', source: 'reference' }], 'marked'), mutation: 8, colorful: true }
+    const double = actor('2', 2, [{ label: '满重', name: '满重', source: 'reference' }, { label: '满分', name: '满分', source: 'reference' }], 'double')
+    const wrapper = mount(NearbyPage, { props: { host: { load: vi.fn().mockResolvedValue(snapshot(1, [colorful, double])), openFloating: vi.fn() } } })
+    ;(wrapper.vm as unknown as { update(value: unknown): void }).update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    await nextTick()
+    const colorfulCard = wrapper.get('#nearby-actor-1')
+    expect(colorfulCard.classes()).toContain('is-colorful')
+    expect(colorfulCard.get('.nearby-colorful-mark').text()).toBe('炫彩')
+    // 炫彩用游戏内星标贴纸表达：头像右下角与徽章内各一枚，不再只用纯文字徽章。
+    expect(colorfulCard.get('.nearby-portrait-colorful').attributes('src')).toBe('/static/rarity/colorful-fit.webp')
+    expect(colorfulCard.get('.nearby-colorful-mark img').attributes('src')).toBe('/static/rarity/colorful-fit.webp')
+    // 双牌卡片没有炫彩徽章，两条标记互不串味。
+    expect(wrapper.get('#nearby-actor-2').classes()).not.toContain('is-colorful')
+    expect(wrapper.get('#nearby-actor-2').find('.nearby-colorful-mark').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('炫彩精灵在最近观察与有牌优先两种排序下都置顶', async () => {
+    const mark = (name: string): NearbyMark => ({ label: name, name, source: 'reference' })
+    const colorful = { ...actor('2', 1), mutation: 8, colorful: true }
+    const actors = [actor('1', 9), colorful, actor('3', 5, [mark('满重'), mark('满分')], 'double')]
+    const wrapper = mount(NearbyPage, { props: { host: { load: vi.fn().mockResolvedValue(snapshot(1, actors)), openFloating: vi.fn() } } })
+    ;(wrapper.vm as unknown as { update(value: unknown): void }).update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    await nextTick()
+    const ids = () => wrapper.findAll('.nearby-card').map(card => card.attributes('id'))
+    // 默认有牌优先：炫彩置顶，其余按奖牌等级。
+    expect(ids()).toEqual(['nearby-actor-2', 'nearby-actor-3', 'nearby-actor-1'])
+    await wrapper.get('.nearby-sort').trigger('click')
+    const sortOptions = [...document.body.querySelectorAll<HTMLButtonElement>('.ui-picker__option')]
+    sortOptions.find(option => option.textContent?.includes('最近观察'))!.click()
+    await nextTick()
+    // 最近观察：炫彩依旧置顶，其余按最近观察顺序。
+    expect(ids()).toEqual(['nearby-actor-2', 'nearby-actor-1', 'nearby-actor-3'])
+    wrapper.unmount()
+  })
+
   it('超长列表只渲染可视区及缓冲项目', async () => {
     const actors = Array.from({ length: 1000 }, (_, index) => actor(String(index + 1), index + 1))
     const wrapper = mount(NearbyPage, { props: { host: { load: vi.fn().mockResolvedValue(snapshot(1, actors)), openFloating: vi.fn() } } })
@@ -218,11 +267,7 @@ describe('附近精灵更新布局稳定性', () => {
     ;(wrapper.vm as unknown as { update(value: unknown): void }).update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
     await flushPromises()
     await nextTick()
-    // 自制下拉的选项面板 teleport 到 body，点击要走原生 DOM
-    await wrapper.get('.nearby-sort').trigger('click')
-    const sortOptions = [...document.body.querySelectorAll<HTMLButtonElement>('.ui-picker__option')]
-    sortOptions.find(option => option.textContent?.includes('有牌优先'))!.click()
-    await nextTick()
+    // 默认排序即「有牌优先」，无需切换。
     expect(wrapper.findAll('.nearby-card').map(card => card.attributes('id'))).toEqual([
       'nearby-actor-2', 'nearby-actor-3', 'nearby-actor-4', 'nearby-actor-5', 'nearby-actor-1',
     ])

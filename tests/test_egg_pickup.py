@@ -38,11 +38,17 @@ def reward() -> PacketEvent:
 
 
 class EggPickupTests(unittest.TestCase):
-    def test_alternate_pickup_option_records_origin(self):
-        repo = EggBoxRepository(); repo.handle_packet(_identity_event(42))
-        alternate = replace(request(), decoded=[_field(1, 500), _field(2, 830000166)])
-        repo.observe_pickup(alternate, home(), {1: 7}); repo.handle_packet(reward())
-        self.assertIsNotNone(repo.snapshot()[0].pickup)
+    def test_any_interaction_option_on_a_scene_egg_records_origin(self):
+        # 实测 option_id 不固定：普通窝出现过 830000165/166/217，学院窝出现过 830000009。
+        for option in (830000165, 830000166, 830000217, 830000009):
+            with self.subTest(option=option):
+                repo = EggBoxRepository(); repo.handle_packet(_identity_event(42))
+                event = replace(request(), decoded=[_field(1, 500), _field(2, option)])
+                repo.observe_pickup(event, home(), {1: 7}); repo.handle_packet(reward())
+                origin = repo.snapshot()[0].pickup
+                self.assertIsNotNone(origin)
+                self.assertEqual(origin.nest_kind, "academy")
+                self.assertEqual(origin.mother.instance_id, 1)
 
     def test_freezes_parents_and_nest_and_marks_stale_pairing(self):
         tracker = EggPickupTracker()
@@ -76,12 +82,17 @@ class EggPickupTests(unittest.TestCase):
         repo.handle_packet(next_reward)
         self.assertEqual(next(row for row in repo.snapshot() if row.instance_id == 8).pickup.mother.instance_id, 1)
 
-    def test_does_not_assign_generic_rewards_or_overlapping_pickups(self):
+    def test_does_not_assign_generic_rewards_and_matches_latest_request(self):
         tracker = EggPickupTracker(); tracker.observe(request(), home(), {})
         self.assertIsNone(tracker.take(replace(reward(), decoded=[_field(2, 22)])))
+        # 连续快速收不同蛋：奖励按最近一次请求配给，不再把整段窗口丢弃。
         tracker.observe(replace(request(501), ts=10.01), home(), {})
+        latest = tracker.take(reward())
+        self.assertIsNotNone(latest)
+        self.assertEqual(latest.actor_id, 501)
         self.assertIsNone(tracker.take(reward()))
-        tracker.observe(replace(request(), ts=10.2), home(), {})
+        # 目标不是场景蛋时不会建立待关联请求。
+        tracker.observe(replace(request(999), ts=10.2), home(), {})
         self.assertIsNone(tracker.take(replace(reward(), ts=10.3)))
 
     def test_refresh_retry_restart_and_academy_nature_override(self):

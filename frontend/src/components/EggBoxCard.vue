@@ -19,6 +19,17 @@ const cardTags = computed(() => {
 })
 /* 标签行固定一行高：最多展示两枚，其余折叠成「+N」。
    有标签与没标签的卡片因此共用同一套行高，蛋图、名称、底栏在网格里全部对齐。 */
+/* 名称右侧的稀有度图标：异色用蓝色星标，炫彩用彩虹星标（同一套领取标记资源）。
+   蛋的 egg_kind 只可能是单一值，两枚图标不会同时出现。 */
+const kindIcon = computed(() => {
+  if (props.egg.egg_kind === 'shiny') {
+    return { kind: 'shiny', src: '/static/rarity/shiny-fit.webp', alt: '异色', title: '异色蛋' }
+  }
+  if (props.egg.egg_kind === 'colorful') {
+    return { kind: 'colorful', src: '/static/rarity/colorful-fit.webp', alt: '炫彩', title: '炫彩蛋' }
+  }
+  return null
+})
 const MAX_TAGS = 2
 const visibleTags = computed(() => cardTags.value.slice(0, MAX_TAGS))
 const hiddenTagCount = computed(() => cardTags.value.length - visibleTags.value.length)
@@ -44,7 +55,7 @@ function date(value: number) {
         <EggBoxArtwork :egg="egg" size="card" />
         <span v-if="egg.quantity > 1" class="eggbox-card-quantity" :title="`同种蛋 ${egg.quantity} 枚`">×{{ egg.quantity }}</span>
       </div>
-      <strong class="eggbox-card-name" :title="egg.egg_name"><span v-if="egg.egg_activity" class="eggbox-card-activity" title="活动来源的蛋">活动</span><span class="eggbox-card-name-text">{{ egg.egg_name }}</span><img v-if="egg.egg_kind === 'shiny'" class="eggbox-card-shiny-icon" src="/static/rarity/shiny-fit.webp" alt="异色" title="异色蛋"></strong>
+      <strong class="eggbox-card-name" :title="egg.egg_name"><span v-if="egg.egg_activity" class="eggbox-card-activity" title="活动来源的蛋">活动</span><span class="eggbox-card-name-text">{{ egg.egg_name }}</span><img v-if="kindIcon" class="eggbox-card-kind-icon" :class="`is-${kindIcon.kind}`" :src="kindIcon.src" :alt="kindIcon.alt" :title="kindIcon.title" :data-egg-kind="kindIcon.kind"></strong>
       <div class="eggbox-card-labels" :title="cardTags.length ? tagsTitle : undefined" aria-label="蛋标签">
         <span v-for="(tag, index) in visibleTags" :key="`${tag.kind}-${index}`" class="eggbox-card-tag" :class="`eggbox-card-tag--${tag.kind}`">{{ tag.label }}</span>
         <span v-if="hiddenTagCount > 0" class="eggbox-card-tag eggbox-card-tag--more">+{{ hiddenTagCount }}</span>

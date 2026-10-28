@@ -242,6 +242,9 @@
       if (name === "egg-dex" && revealGid) { eggDex.load(revealGid); }
       return;
     }
+    // 窄窗下背包/附近页会自动收窄侧栏，切换前后必须重新测量。
+    var sidebarLayoutChanges = window.matchMedia("(max-width: 760px)").matches &&
+      (state.page === "pets" || state.page === "nearby") !== (name === "pets" || name === "nearby");
     if (name === "pets" || name === "egg-box" || name === "nearby") { $("page-" + name).classList.add("page-cached"); }
     if (state.page === "egg-box" && name !== "egg-box") { pauseEggBoxPage(); }
     else { accountRequests.cancel(state.page); }
@@ -265,16 +268,20 @@
     window.SpriteLensUI.closeDetail(false, true);
     state.page = name;
     $("page-title").textContent = document.querySelector('.nav-item[data-page="' + name + '"]').textContent.trim();
-    document.querySelectorAll(".page").forEach(function (node) {
-      node.classList.toggle("active", node.id === "page-" + name);
-    });
     document.querySelectorAll(".nav-item").forEach(function (node) {
       node.classList.toggle("active", node.dataset.page === name);
       if (node.dataset.page === name) { node.setAttribute("aria-current", "page"); }
       else { node.removeAttribute("aria-current"); }
     });
-    syncNavIndicator();
-    window.requestAnimationFrame(syncNavIndicator);
+    // 侧栏尺寸不变时先测量，避免读取坐标同步触发新页面的整页布局。
+    if (!sidebarLayoutChanges) { syncNavIndicator(); }
+    document.querySelectorAll(".page").forEach(function (node) {
+      node.classList.toggle("active", node.id === "page-" + name);
+    });
+    if (sidebarLayoutChanges) {
+      syncNavIndicator();
+      window.requestAnimationFrame(syncNavIndicator);
+    }
     if (name === "pets") {
       petFilters.activate();
       if (revealGid) { petInventory.reveal(revealGid).catch(function (err) { toast("精灵定位失败：" + err.message, true); }); }

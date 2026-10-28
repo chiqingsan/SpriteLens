@@ -16,6 +16,9 @@ const props = withDefaults(defineProps<{
 }>(), { selected: '', sceneKey: '', visible: true })
 const emit = defineEmits<{ select: [id: string] }>()
 
+/** 游戏内炫彩标记（彩虹星）：与雷达点位、悬浮条、列表共用同一份本地素材。 */
+const RARITY_COLORFUL = '/static/rarity/colorful-fit.webp'
+
 const MIN_ZOOM = 0.05
 /** 底图原始分辨率就到 1 像素 ≈ 1 米；3 倍仍是放大查看，不假装有更多细节。 */
 const MAX_ZOOM = 3
@@ -44,6 +47,8 @@ interface MapMarker {
   id: string
   name: string
   kind: NearbyAttention
+  /** 游戏内固有炫彩外观（mutation 第 4 位），与奖牌关注级别互不覆盖。 */
+  colorful: boolean
   tone: number
   x: number
   y: number
@@ -119,11 +124,12 @@ const player = computed(() => {
 const movingTarget = computed(() => props.data?.position_source === 'client_target')
 const referenceLabel = computed(() => {
   if (!player.value) return '等待参考位置'
+  if (props.data?.position_source === 'battle_return') return '战前位置可能已过期'
   if (movingTarget.value) return '移动目标参考'
   if (props.data?.position_source === 'client_sample' || props.data?.position_source === 'client_stop') return '客户端位置采样'
   return props.data?.position_source === 'teleport' ? '传送落点参考' : '最近观察参考'
 })
-const playerTag = computed(() => (movingTarget.value ? '你的移动目标' : '你的位置'))
+const playerTag = computed(() => props.data?.position_source === 'battle_return' ? '战前位置' : (movingTarget.value ? '你的移动目标' : '你的位置'))
 /** 覆盖归属校验：只画当前账号、当前地图的足迹；切号/切图残留的旧包不画，也不报错。 */
 const visibleCoverage = computed(() => {
   const data = props.data
@@ -151,6 +157,7 @@ const markerView = computed<{ markers: MapMarker[]; total: number }>(() => {
       id: actor.actor_id,
       name: actor.name,
       kind: actor.attention,
+      colorful: actor.colorful === true,
       tone: nearbyAttentionTone(actor.actor_id),
       x: point.x,
       y: point.y,
@@ -409,10 +416,12 @@ watch([player, imageState, viewportWidth, viewportHeight, () => props.visible], 
       <div class="scene-map-stage" :style="stageStyle">
         <img :key="imageIdentity" class="scene-map-image" :src="map.image.url + (imageAttempt ? `?retry=${imageAttempt}` : '')" alt="" draggable="false" decoding="async" @load="onImageLoad" @error="onImageError">
         <svg v-if="imageState === 'ready' && visible" class="scene-map-scan" :viewBox="`0 0 ${map.image.width} ${map.image.height}`" preserveAspectRatio="none" aria-hidden="true"><MapCoverage :coverage="visibleCoverage" :map="map" /></svg>
-        <button v-for="marker in markers" :key="marker.id" type="button" class="scene-map-marker" :class="[`is-${marker.kind}`, `attention-tone-${marker.tone}`, { selected: selected === marker.id }]" :style="{ left: `${marker.x * zoom}px`, top: `${marker.y * zoom}px` }" :aria-label="`${marker.name}${marker.kind === 'double' ? '，双牌' : marker.kind === 'marked' ? '，单牌' : ''}`" :aria-pressed="selected === marker.id" @pointerenter="hoveredId = marker.id" @pointerleave="hoveredId = null" @focus="hoveredId = marker.id" @blur="hoveredId = null" @click.stop="selectMarker($event, marker.id)">
+        <button v-for="marker in markers" :key="marker.id" type="button" class="scene-map-marker" :class="[`is-${marker.kind}`, `attention-tone-${marker.tone}`, { selected: selected === marker.id, colorful: marker.colorful }]" :style="{ left: `${marker.x * zoom}px`, top: `${marker.y * zoom}px` }" :aria-label="`${marker.name}${marker.kind === 'double' ? '，双牌' : marker.kind === 'marked' ? '，单牌' : ''}${marker.colorful ? '，炫彩' : ''}`" :aria-pressed="selected === marker.id" @pointerenter="hoveredId = marker.id" @pointerleave="hoveredId = null" @focus="hoveredId = marker.id" @blur="hoveredId = null" @click.stop="selectMarker($event, marker.id)">
           <span class="scene-map-marker-halo" aria-hidden="true"></span>
           <span class="scene-map-marker-dot" aria-hidden="true"></span>
           <span v-if="marker.kind === 'double'" class="scene-map-marker-ring" aria-hidden="true"></span>
+          <span v-if="marker.colorful" class="scene-map-marker-colorful-ring" aria-hidden="true"></span>
+          <img v-if="marker.colorful" class="scene-map-marker-colorful-badge" :src="RARITY_COLORFUL" alt="" aria-hidden="true">
         </button>
         <span v-for="label in labels" :key="`label-${label.id}`" class="scene-map-label" :class="{ selected: label.selected }" :style="{ left: `${label.left}px`, top: `${label.top}px`, transform: label.anchor === 'end' ? 'translateX(-100%)' : 'none' }" aria-hidden="true">{{ label.text }}</span>
         <div v-if="player" class="scene-map-player" :class="{ 'is-moving': movingTarget }" :style="playerStyle" aria-hidden="true">
@@ -428,16 +437,10 @@ watch([player, imageState, viewportWidth, viewportHeight, () => props.visible], 
         <button type="button" class="scene-map-button" data-action="locate" title="回到参考位置" aria-label="回到参考位置" :disabled="!player" @pointerdown.stop @click="locate"><UiIcon name="current-location" /></button>
         <button type="button" class="scene-map-button" data-action="follow" :aria-pressed="follow" :aria-label="follow ? '暂停跟随参考位置' : '恢复跟随参考位置'" :title="follow ? '跟随中；拖动或缩放后仍锁定参考位置，点击暂停' : '已暂停跟随；点击恢复'" @pointerdown.stop @click="toggleFollow"><UiIcon name="route" /></button>
       </div>
-      <ul v-if="imageState === 'ready'" class="scene-map-legend" title="记录范围依据历史日志估计，不代表服务器保证的下发范围；精灵可能刷新，不能保证格内全部精灵已检查。">
-        <li v-if="visibleCoverage"><span class="scene-map-legend-swatch is-scanned"></span>记录范围 · {{ visibleCoverage.cells }} 格<span v-if="visibleCoverage.updated_at"> · 最近新增 {{ new Date(visibleCoverage.updated_at * 1000).toLocaleString('zh-CN') }}</span></li>
-        <li v-if="visibleCoverage?.radius_raw">估计半径 {{ visibleCoverage.map_id === '10003' ? `约 ${visibleCoverage.radius_raw / 100} 米` : `${visibleCoverage.radius_raw.toLocaleString('zh-CN')} 原始单位` }}</li>
-        <li><span class="scene-map-legend-swatch is-unscanned"></span>未记录</li>
-        <li><span class="scene-map-legend-dot is-normal"></span>普通</li>
-        <li><span class="scene-map-legend-dot is-marked"></span>单牌</li>
-        <li><span class="scene-map-legend-dot is-double"></span>双牌</li>
-        <li><span class="scene-map-legend-dot is-player"></span>{{ movingTarget ? '移动目标' : '当前位置' }}</li>
-        <li v-if="markerTotal > markers.length">显示 {{ markers.length }} / {{ markerTotal }} 个，优先选中和有标记的精灵</li>
-      </ul>
+      <div v-if="imageState === 'ready'" class="scene-map-legend" aria-label="地图图例" title="记录范围依据历史日志估计，不代表服务器保证的下发范围；精灵可能刷新，不能保证格内全部精灵已检查。">
+        <div v-if="visibleCoverage" class="scene-map-legend-summary"><span><i class="scene-map-legend-swatch is-scanned"></i>记录范围 <b>{{ visibleCoverage.cells }} 格</b></span><span v-if="visibleCoverage.radius_raw">估计半径 {{ visibleCoverage.map_id === '10003' ? `约 ${visibleCoverage.radius_raw / 100} 米` : `${visibleCoverage.radius_raw.toLocaleString('zh-CN')} 原始单位` }}</span><span v-if="visibleCoverage.updated_at">最近新增 {{ new Date(visibleCoverage.updated_at * 1000).toLocaleString('zh-CN') }}</span></div>
+        <div class="scene-map-legend-items"><span><i class="scene-map-legend-swatch is-unscanned"></i>未记录</span><span><i class="scene-map-legend-dot is-normal"></i>普通</span><span><i class="scene-map-legend-dot is-marked"></i>单牌</span><span><i class="scene-map-legend-dot is-double"></i>双牌</span><span><i class="scene-map-legend-dot is-player"></i>{{ movingTarget ? '移动目标' : '当前位置' }}</span><span v-if="markerTotal > markers.length">显示 {{ markers.length }} / {{ markerTotal }} 个，优先选中和有标记的精灵</span></div>
+      </div>
       <div v-if="imageState === 'loading'" class="scene-map-state">
         <span class="scene-map-spinner" aria-hidden="true"></span>
         <p>正在加载地图…</p>
@@ -480,6 +483,9 @@ watch([player, imageState, viewportWidth, viewportHeight, () => props.visible], 
 .scene-map-marker.attention-tone-2 .scene-map-marker-ring { border-color: var(--radar-attention-2); }
 .scene-map-marker.attention-tone-3 .scene-map-marker-ring { border-color: var(--radar-attention-3); }
 .scene-map-marker.attention-tone-4 .scene-map-marker-ring { border-color: var(--radar-attention-4); }
+/* 炫彩：与雷达点位同一套语言——彩虹渐变描边 + 游戏内星标，与双牌/关注色环可同时出现。 */
+.scene-map-marker-colorful-ring { position: absolute; inset: -3px; border-radius: 50%; padding: 2.5px; background: var(--colorful-gradient); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2.5px)); mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2.5px)); }
+.scene-map-marker-colorful-badge { position: absolute; right: -2px; bottom: -2px; z-index: 1; width: 13px; height: 13px; object-fit: contain; pointer-events: none; filter: drop-shadow(0 1px 2px rgb(20 30 20 / 55%)); }
 .scene-map-marker-halo { position: absolute; width: 26px; height: 26px; border-radius: 50%; background: none; transition: background .12s ease; }
 .scene-map-marker:hover .scene-map-marker-halo { background: color-mix(in srgb, var(--ink) 8%, transparent); }
 .scene-map-marker.selected .scene-map-marker-halo { background: color-mix(in srgb, var(--teal) 22%, transparent); }
@@ -511,8 +517,12 @@ watch([player, imageState, viewportWidth, viewportHeight, () => props.visible], 
 .scene-map-button:disabled { opacity: .4; cursor: default; }
 .scene-map-button :deep(.ui-icon) { width: 17px; height: 17px; }
 
-.scene-map-legend { position: absolute; z-index: 5; left: var(--space-2); right: var(--space-2); bottom: var(--space-2); width: fit-content; max-width: calc(100% - 16px); display: flex; flex-wrap: wrap; gap: 2px var(--space-2); margin: 0; padding: 4px var(--space-2); list-style: none; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--panel) 86%, transparent); backdrop-filter: blur(6px); color: var(--muted); font-size: var(--fs-2xs); }
-.scene-map-legend li { display: inline-flex; align-items: center; gap: 4px; }
+.scene-map-legend { position: absolute; z-index: 5; left: var(--space-2); bottom: var(--space-2); width: fit-content; max-width: calc(100% - 16px); display: grid; gap: 4px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--panel) 92%, transparent); backdrop-filter: blur(6px); color: var(--ink-soft); font-size: var(--fs-2xs); }
+.scene-map-legend-summary, .scene-map-legend-items { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
+.scene-map-legend-summary { color: var(--muted); }
+.scene-map-legend-summary b { color: var(--ink); font-weight: 600; }
+.scene-map-legend-summary > span, .scene-map-legend-items > span { display: inline-flex; align-items: center; gap: 4px; }
+.scene-map-legend-dot, .scene-map-legend-swatch { flex: none; }
 .scene-map-legend-dot { width: 9px; height: 9px; border-radius: 50%; border: 1px solid #fff; background: var(--teal); }
 .scene-map-legend-swatch { width: 11px; height: 9px; border-radius: 3px; border: 1px solid var(--line); }
 .scene-map-legend-swatch.is-scanned { background: color-mix(in srgb, var(--radar-attention-3) 45%, var(--panel)); border-color: var(--panel); }

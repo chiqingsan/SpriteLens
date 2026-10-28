@@ -12,7 +12,7 @@ function egg(instanceId: number): EggBoxEntry {
     egg_type_name: '', egg_activity: false, egg_kind: 'regular', egg_group_names: [], hatch_label: '', quantity: 1,
     obtained_at: instanceId, historical: false, hatching: false, hatch_known: false,
     historical_hatching: false, favorite: false, hatch_progress: 0, special_egg_conf_id: 0,
-    height_cm: 0, weight_g: 0, home_egg: false, pickup: null, category: 0,
+    height_cm: 0, weight_g: 0, home_egg: false, pickup: null, voice_prediction: null, category: 0,
     from_player_name: '', from_pet_name: '', from_player_uin: 0, from_pet_gid: 0,
     annotations: { ...annotations },
     tags: { nature: '', weight: null, voice: null, medals: [], nest: '' },

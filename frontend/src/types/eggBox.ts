@@ -26,6 +26,16 @@ export interface EggPickupOrigin {
   mother_nature_id: number
 }
 
+export interface EggVoiceFather { instance_id: number; voice: number }
+export interface EggVoicePrediction {
+  mother_voice: number
+  voice_db: number | null
+  range: [number, number]
+  tags: string[]
+  unanimous: boolean
+  father_voices: EggVoiceFather[]
+}
+
 export interface EggBoxEntry {
   instance_id: number
   egg_conf_id: number
@@ -55,6 +65,7 @@ export interface EggBoxEntry {
   weight_g: number
   home_egg: boolean
   pickup: EggPickupOrigin | null
+  voice_prediction: EggVoicePrediction | null
   category: number
   from_player_name: string
   from_pet_name: string
@@ -140,6 +151,7 @@ function isEntry(value: unknown): value is EggBoxEntry {
     && typeof value.favorite === 'boolean'
     && typeof value.home_egg === 'boolean' && isAnnotations(value.annotations)
     && (value.pickup === null || isPickup(value.pickup))
+    && (value.voice_prediction === null || isVoicePrediction(value.voice_prediction))
     && isTags(value.tags)
     && finite(value.hatch_progress) && value.hatch_progress >= 0 && value.hatch_progress <= 1
     && isRanges(value.measurement_ranges)
@@ -156,6 +168,16 @@ function isPickup(value: unknown): value is EggPickupOrigin {
     && safeInteger(value.nest_config_id) && safeInteger(value.mother_nature_id)
     && finite(value.observed_at) && typeof value.pairing_stale === 'boolean'
     && (value.mother === null || isParent(value.mother)) && Array.isArray(value.fathers) && value.fathers.every(isParent)
+}
+
+function isVoicePrediction(value: unknown): value is EggVoicePrediction {
+  return record(value) && safeInteger(value.mother_voice)
+    && (value.voice_db === null || safeInteger(value.voice_db))
+    && Array.isArray(value.range) && value.range.length === 2
+    && value.range.every(item => Number.isInteger(item) && item >= -100 && item <= 100)
+    && strings(value.tags) && typeof value.unanimous === 'boolean'
+    && Array.isArray(value.father_voices)
+    && value.father_voices.every(item => record(item) && safeInteger(item.instance_id) && safeInteger(item.voice))
 }
 
 function isEggBox(value: unknown): value is EggBox {

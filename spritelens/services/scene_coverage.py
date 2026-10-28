@@ -45,6 +45,8 @@ class SceneCoverage:
         self._radii: dict[int, int] = {}
         self.error: str | None = None
         self._cells: dict[int, set[tuple[int, int]]] = {}
+        self._row_cells: dict[int, dict[int, set[int]]] = {}
+        self._row_runs: dict[int, dict[int, tuple[tuple[int, int, int], ...]]] = {}
         self._revisions: dict[int, int] = {}
         self._rows: dict[int, tuple[tuple[int, int, int], ...]] = {}
 
@@ -56,6 +58,8 @@ class SceneCoverage:
         if uid != self._uid:
             self._uid = uid
             self._cells.clear()
+            self._row_cells.clear()
+            self._row_runs.clear()
             self._revisions.clear()
             self._rows.clear()
             self._loaded.clear()
@@ -79,6 +83,10 @@ class SceneCoverage:
                     raise ValueError("搜索覆盖格格式无效，原文件已保留")
                 cells.update((row[0], x) for x in range(row[1], row[1] + row[2]))
             self._cells[resource] = cells
+            by_row: dict[int, set[int]] = {}
+            for gy, gx in cells:
+                by_row.setdefault(gy, set()).add(gx)
+            self._row_cells[resource] = by_row
             self._revisions[resource] = 1
             self._updated[resource] = raw["updated_at"]
             self._radii[resource] = raw["radius"]
@@ -121,6 +129,11 @@ class SceneCoverage:
             return False
         cells.update(new)
         self._cells[resource] = cells
+        by_row = self._row_cells.setdefault(resource, {})
+        runs = self._row_runs.setdefault(resource, {})
+        for gy, gx in new:
+            by_row.setdefault(gy, set()).add(gx)
+            runs.pop(gy, None)
         self._revisions[resource] = self._revisions.get(resource, 0) + 1
         # 行区间按需重算：只有新增格才失效，读快照不反复排序。
         self._rows.pop(resource, None)
@@ -163,10 +176,14 @@ class SceneCoverage:
         """清空指定地图的足迹；resource 为 None 时清空全部地图。"""
         if resource is None:
             self._cells.clear()
+            self._row_cells.clear()
+            self._row_runs.clear()
             self._revisions.clear()
             self._rows.clear()
             return
         self._cells.pop(resource, None)
+        self._row_cells.pop(resource, None)
+        self._row_runs.pop(resource, None)
         self._revisions.pop(resource, None)
         self._rows.pop(resource, None)
         self._updated.pop(resource, None)
@@ -187,7 +204,7 @@ class SceneCoverage:
         return CoverageSnapshot(
             self._cell_size,
             self._revisions.get(resource, 0),
-            self._rows_for(resource, cells),
+            self._rows_for(resource),
             len(cells),
             self._updated.get(resource),
             self._store is not None,
@@ -200,24 +217,29 @@ class SceneCoverage:
             return "地图或坐标版本不可用，历史搜索记录已保留但暂不显示"
         return None
 
-    def _rows_for(self, resource: int, cells: set[tuple[int, int]]) -> tuple[tuple[int, int, int], ...]:
+    def _rows_for(self, resource: int) -> tuple[tuple[int, int, int], ...]:
         cached = self._rows.get(resource)
         if cached is not None:
             return cached
-        by_row: dict[int, list[int]] = {}
-        for gy, gx in cells:
-            by_row.setdefault(gy, []).append(gx)
+        by_row = self._row_cells[resource]
+        cached_runs = self._row_runs.setdefault(resource, {})
         rows: list[tuple[int, int, int]] = []
         for gy in sorted(by_row):
+            if gy in cached_runs:
+                rows.extend(cached_runs[gy])
+                continue
             columns = sorted(by_row[gy])
+            row_runs: list[tuple[int, int, int]] = []
             start = previous = columns[0]
             for gx in columns[1:]:
                 if gx == previous + 1:
                     previous = gx
                     continue
-                rows.append((gy, start, previous - start + 1))
+                row_runs.append((gy, start, previous - start + 1))
                 start = previous = gx
-            rows.append((gy, start, previous - start + 1))
+            row_runs.append((gy, start, previous - start + 1))
+            cached_runs[gy] = tuple(row_runs)
+            rows.extend(row_runs)
         result = tuple(rows)
         self._rows[resource] = result
         return result

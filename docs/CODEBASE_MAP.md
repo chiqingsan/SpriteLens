@@ -86,7 +86,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `capture/npcap_source.py` | scapy AsyncSniffer 接入（轻量回调 + 队列 + worker 投递；FIN/RST/空闲淘汰释放流，关闭事件经队列保序） |
 | `capture/nic_rank.py` | 活跃网卡识别与排序（Get-NetAdapter Status=Up → 设备列表前置） |
 | `capture/key_store.py` | 密钥解析与持久化：latest.key + session.json v1 的逐连接集合（flow/密钥/身份/服务端序号/关闭标记，原子写） |
-| `system/environment.py` | Npcap 检测与 RSC 处理、官方版本解析；PowerShell 首选下载、Python 回退、PE 校验、等待安装器退出 |
+| `system/environment.py` | Npcap 检测与抓包网卡 RSC 判定（默认路由/显式选择，虚拟网卡不参与）、官方版本解析；PowerShell 首选下载、Python 回退、PE 校验、等待安装器退出 |
 | `system/webview_guard.py` | WebView2 运行时预检测（注册表/env）+ 缺失时原生对话框引导安装 |
 | `system/window_geometry.py` | 初始窗口尺寸：工作区 + 系统 DPI 缩放适配（fit_window 纯函数） |
 | `system/single_instance.py` | 单实例控制：命名互斥锁 + 唤醒事件 + Win32 强制置顶；后台采集与主界面使用不同实例标识 |
@@ -98,7 +98,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `domain/identity.py` | 玩家身份语义层：登录 player_info/brief_info 与场景 self_info/avatar/base → PlayerIdentity（uid 归属） |
 | `domain/static_data.py` | 静态映射：物种/性格/系别/技能/奖牌（base_conf_id 关联，含图鉴元数据与进化链成员） |
 | `domain/measurements.py` | 参考范围工具：cm/g → m/kg 文案、范围位置比例与越界状态（纯函数） |
-| `domain/pet_marks.py` | 紧凑标记：体型大/小、声音粗/婉（含佩戴奖牌来源），组内互斥最多两项 |
+| `domain/pet_marks.py` | 紧凑标记：体型大/小、声音粗/婉（含佩戴奖牌来源），组内互斥最多两项；另含蛋的声音遗传取平均（`egg_voice`）与奖牌标签（`voice_tags`） |
 | `domain/pet_locations.py` | 真实箱位：Backpack/PetBox（30 格箱表 + 3×6 队伍 + 移动增量 + v2 快照恢复） |
 | `domain/eggs.py` | 蛋目录：蛋静态数据索引（egg_conf_id / base_id 联查，孵蛋工具链底座）；活动蛋等变体配置按 pet_conf_id // 1000 回退同族蛋，仅补展示字段 |
 | `domain/color_cards.py` | 色卡目录：44 张卡（底色×混色）+ glass→卡号判定（赛季 s1-s4） |
@@ -144,7 +144,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `web/background_run.py` | 按需后台模式：游戏进程存在期间启动采集、托盘打开主界面、游戏退出后清理 |
 | `web/close_coordinator.py` | 桌面关闭握手：等待页面保存确认、采集停止与缓存 flush；失败保留窗口或显式放弃 |
 | `web/payloads.py` | 宠物域载荷（宠物行/列表页/箱位/WS 状态统计）+ 目录域兼容重导出（无 UI 依赖） |
-| `web/payloads_catalog.py` | 目录域载荷：图鉴/色卡/家园/蛋仓/蛋图鉴（阶段1.4 自 payloads.py 拆出） |
+| `web/payloads_catalog.py` | 目录域载荷：图鉴/色卡/家园/蛋仓/蛋图鉴（阶段1.4 自 payloads.py 拆出）；蛋仓行额外输出 `pickup.mother/fathers[].icon_url` 与声音推算 `voice_prediction` |
 | `web/account_state.py`、`web/static/account-requests.js` | F02：state 跨域归属核对与原生账号页请求取消/代次/序号/uid/域版本校验 |
 | `web/pet_media.py` | 物种 ID → 本地头像/立绘 URL（pet_media.json；缺图映射到同源图片路由） |
 | `web/pet_media_cache.py` | 精灵图本地优先；缺失时按需校验、转码、缓存官方 CDN 图片并记录哈希 |
@@ -211,7 +211,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `test_build.py` | Nuitka 发布命令包含管理员权限开关 |
 | `test_world_maps.py` | C13-01 世界地图 manifest：图片尺寸/哈希/来源指纹、原点/边缘/留出点投影、负原点不钳制、坏源与改坐标失败、静态目录打包包含；C13-02 运行时清单载荷与 `/api/world-maps` 路由（200 子集、缺文件 503、no-store） |
 | `test_browser_open.py` | 设置页浏览器调试入口：鉴权、当前服务 URL 与浏览器打开失败 |
-| `test_environment.py` | 启动 quick 探测不调用慢 RSC 检查、Npcap 版本数字排序、PowerShell/Python 下载回退与安装器等待 |
+| `test_environment.py` | 启动 quick 探测不调用慢 RSC 检查、RSC 只判定抓包网卡（默认路由/显式选择，虚拟网卡不误报、查不到时不谎报已关闭）、Npcap 版本数字排序、PowerShell/Python 下载回退与安装器等待 |
 | `test_event_logger.py` | 异步落盘、关闭 flush、过载计数与关闭超时所有权 |
 
 ## 三主题与资源补齐（2026-10-12）
@@ -341,9 +341,9 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 
 | 文件 | 职责 |
 | --- | --- |
-| `frontend/src/pages/NearbyPage.vue`、`composables/useNearby.ts`、`types/nearby.ts` | 附近观察列表、搜索/排序、DTO校验、周期清空与请求失效；右侧面板在雷达与地图之间切换，共用同一选中与列表 |
+| `frontend/src/pages/NearbyPage.vue`、`composables/useNearby.ts`、`types/nearby.ts` | 附近观察列表、搜索/排序、DTO校验、周期清空与请求失效；右侧面板在雷达与地图之间切换，共用同一选中与列表；2026-10-28 增炫彩标识（`colorful` 徽章与卡片描边，与单牌/双牌并列，后者来自本地参考线） |
 | `spritelens/web/world_maps.py` | 只读世界地图清单路由：校验 manifest 后下发投影/校准子集，缺文件或坏清单 503，统一 no-store |
-| `frontend/src/components/SceneMap.vue`、`SceneMap.test.ts` | 4096 底图相机（缩放/拖拽/全图/定位/跟随）、越界过滤、选中联动、标签错行与失败重试；2026-10-27 视觉重做：牛眼玩家锚点与常驻标签、分级标记与图例、图标控件列、默认 80% 街景比例 |
+| `frontend/src/components/SceneMap.vue`、`SceneMap.test.ts` | 4096 底图相机（缩放/拖拽/全图/定位/跟随）、越界过滤、选中联动、标签错行与失败重试；2026-10-27 视觉重做：牛眼玩家锚点与常驻标签、分级标记与图例、图标控件列、默认 80% 街景比例；2026-10-28 炫彩点位加虚线环与图例项 |
 | `frontend/src/domain/mapProjection.ts`、`frontend/src/types/worldMap.ts` | 原始坐标↔底图像素纯函数与逆变换；运行时清单严格解析、可用性判定与不可用原因 |
 | `frontend/src/components/MapCoverage.vue`、`frontend/src/domain/mapCoverage.ts` | 地图/雷达共用本次足迹格网；按行区间拼成单条路径，填充、外沿与外部遮罩三个节点复用同一份 `d` |
 | `frontend/src/composables/useWorldMaps.ts` | 按会话读取一次地图清单、失败显式重试、8 秒超时、损坏整块失效 |
@@ -358,7 +358,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 
 | 雷达新增文件 | 职责 |
 | --- | --- |
-| `frontend/src/components/SceneRadar.vue`、`SceneRadar.test.ts` | 原始二维坐标雷达、缺坐标等待、按字符串ID选择与投影回归 |
+| `frontend/src/components/SceneRadar.vue`、`SceneRadar.test.ts` | 原始二维坐标雷达、缺坐标等待、按字符串ID选择与投影回归；2026-10-28 炫彩目标加虚线紫环与图例第 4 项，`title`/`aria-label` 追加「炫彩」 |
 | `frontend/src/pages/FloatingRadar.vue`、`spritelens/web/static/radar.html`、`radar.js` | 独立悬浮内容、广播订阅、版本/周期校验与释放，不建WS；`radar.js` 只 import `vue/radar-entry.js` |
 | `frontend/src/radar.ts`、`floatingRadarBridge.ts` | 雷达独立入口与其 Vue 桥；主窗壳经 `nearbyBridge.ts` 保留同名导出，共享同一实现 |
 | `spritelens/web/radar_window.py`、`tests/test_radar_window.py` | 原生单实例置顶窗口、关闭通知、重新打开与主窗口退出生命周期 |

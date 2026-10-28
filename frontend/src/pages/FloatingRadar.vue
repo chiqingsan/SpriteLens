@@ -7,12 +7,15 @@ import { useWorldMaps } from '../composables/useWorldMaps'
 import { usableWorldMap } from '../types/worldMap'
 import { nearbyAttentionTone, parseNearby, parseNearbySummary, type NearbyActor, type NearbySnapshot, type NearbySummary } from '../types/nearby'
 const props = defineProps<{ channel: BroadcastChannel; host: { close: () => Promise<unknown>; setOpacity: (percent: number) => Promise<unknown>; loadMaps?: () => Promise<unknown> } }>()
+/** 游戏内炫彩标记（彩虹星）：与列表、雷达点位共用同一份本地素材。 */
+const RARITY_COLORFUL = '/static/rarity/colorful-fit.webp'
 const data = shallowRef<NearbySnapshot | null>(null), summary = shallowRef<NearbySummary | null>(null)
-const { catalog, error: mapsError, refresh: refreshMaps, stop: stopMaps } = useWorldMaps(props.host.loadMaps)
+const { catalog, loading: mapsLoading, error: mapsError, refresh: refreshMaps, stop: stopMaps } = useWorldMaps(props.host.loadMaps)
 const currentMap = computed(() => usableWorldMap(catalog.value, data.value?.resource_id ?? null))
 void refreshMaps()
 onUnmounted(stopMaps)
 const error = ref(''), stale = ref(false), staleMessage = ref(''), selected = ref(''), opacity = ref(85), settingsOpen = ref(false), linkLost = ref(false)
+const received = ref(false)
 const displayError = computed(() => error.value || mapsError.value)
 let pendingOpacity: number | null = null, applying = false, confirmedOpacity = 85
 const HEARTBEAT_TIMEOUT = 3000
@@ -28,12 +31,20 @@ function markMessage() {
 function attentionRank(actor: NearbyActor) {
   const fullSize = actor.marks.some(mark => mark.name === '满重')
   const fullVoice = actor.marks.some(mark => mark.name === '满分')
-  if (actor.attention === 'double') return fullSize && fullVoice ? 0 : 1
-  return fullSize || fullVoice ? 2 : 3
+  // 炫彩是游戏内稀有外观，排在有牌精灵之前；组内仍按奖牌潜力排序。
+  const base = actor.attention === 'double'
+    ? (fullSize && fullVoice ? 0 : 1)
+    : fullSize || fullVoice ? 2 : 3
+  return (actor.colorful === true ? 0 : 1) * 10 + base
 }
+/** 顶部条同时承载有标记精灵和稀有炫彩精灵，避免炫彩只在雷达圆盘里可发现。 */
 const attentionActors = computed(() => [...(data.value?.actors || [])]
-  .filter(actor => actor.attention !== 'normal')
+  .filter(actor => actor.attention !== 'normal' || actor.colorful === true)
   .sort((a, b) => attentionRank(a) - attentionRank(b) || a.actor_id.localeCompare(b.actor_id)))
+function chipLabel(actor: NearbyActor) {
+  const kind = actor.attention === 'double' ? '双牌' : actor.attention === 'marked' ? '单牌' : ''
+  return `${actor.name}${kind ? `，${kind}` : ''}${actor.colorful ? '，炫彩' : ''}${actor.stale ? '，战前观察可能已过期' : ''}`
+}
 const failedImages = ref(new Set<string>())
 async function flushOpacity() {
   if (applying || pendingOpacity === null) return
@@ -64,6 +75,7 @@ props.channel.onmessage = event => {
       const next = parseNearby(event.data.payload), expected = summary.value
       if (expected && (next.uid !== expected.uid || next.observation_id < expected.observation_id)) return
       if (data.value && next.uid === data.value.uid && next.version < data.value.version) return
+      received.value = true
       data.value = next
       if (!expected || next.version >= expected.version) summary.value = next
       if (!next.actors.some(actor => actor.actor_id === selected.value)) selected.value = ''
@@ -72,8 +84,8 @@ props.channel.onmessage = event => {
       /* 刷新失败但主窗口仍有同周期图像：保留实体，只标注可能过期，等待下一次成功快照清除。 */
       staleMessage.value = `刷新失败，显示的是稍早的结果${event.data.message ? '：' + event.data.message : ''}`
       stale.value = true
-    } else if (event.data.kind === 'error') { data.value = null; selected.value = ''; error.value = String(event.data.message); clearStale() }
-  } catch (cause) { data.value = null; selected.value = ''; error.value = cause instanceof Error ? cause.message : String(cause); clearStale() }
+    } else if (event.data.kind === 'error') { received.value = true; data.value = null; selected.value = ''; error.value = String(event.data.message); clearStale() }
+  } catch (cause) { received.value = true; data.value = null; selected.value = ''; error.value = cause instanceof Error ? cause.message : String(cause); clearStale() }
 }
 props.channel.postMessage({ kind: 'subscribe' })
 let closed = false
@@ -81,6 +93,7 @@ function checkHeartbeat() {
   if (closed || linkLost.value || Date.now() - lastMessageAt <= HEARTBEAT_TIMEOUT) return
   // 主窗口 JS 挂死、采集连接断开或事件循环阻塞时不再有任何消息，清掉旧图并明确提示，恢复后由新消息自动清除。
   linkLost.value = true
+  received.value = true
   data.value = null; selected.value = ''; clearStale()
   error.value = '数据已失效（采集连接断开或主窗口未响应）'
 }
@@ -98,7 +111,7 @@ onUnmounted(() => { window.removeEventListener('pagehide', leave); leave() })
   <main class="floating-radar">
     <header class="floating-titlebar"><div class="floating-drag"><UiIcon name="eye"/><strong>附近雷达</strong></div><div class="floating-legend" aria-label="雷达目标图例"><span><i class="floating-legend-dot" />普通</span><span><i class="floating-legend-dot is-marked" />单牌</span><span><i class="floating-legend-dot is-double" />双牌</span></div><button class="floating-settings" :aria-expanded="settingsOpen" aria-label="雷达设置" @click.stop="settingsOpen = !settingsOpen"><UiIcon name="settings"/></button><button class="floating-close" aria-label="关闭悬浮雷达" @click="close"><UiIcon name="x"/></button></header>
     <div v-if="settingsOpen" class="floating-settings-panel" role="dialog" aria-label="雷达设置"><label for="radar-opacity">不透明度 <output for="radar-opacity">{{ opacity }}%</output></label><input id="radar-opacity" type="range" min="35" max="90" step="1" :value="opacity" @input="changeOpacity"></div>
-    <div class="floating-content"><p v-if="displayError || stale" class="floating-error" :class="{ 'is-stale': stale && !displayError }" :role="displayError ? 'alert' : 'status'">{{ displayError || staleMessage }}</p><div class="floating-attention-slot" aria-label="有标记精灵" @wheel="scrollAttention"><div class="floating-attention-list" :class="{ 'is-empty': !attentionActors.length }"><button v-for="actor in attentionActors" :key="actor.actor_id" class="floating-attention-chip" :class="[`attention-tone-${nearbyAttentionTone(actor.actor_id)}`, { selected: selected === actor.actor_id }]" :aria-pressed="selected === actor.actor_id" :aria-label="`${actor.name}，${actor.attention === 'double' ? '双牌' : '单牌'}`" @click="selectAttention(actor)"><span class="floating-attention-avatar"><img v-if="actor.icon_url && !failedImages.has(actor.icon_url)" :src="actor.icon_url" alt="" @error="imageFailed(actor.icon_url)"><UiIcon v-else name="eye"/></span><span class="floating-attention-medals"><MedalIcon v-for="mark in actor.marks" :key="mark.name" :name="mark.name" :source="mark.source"/></span></button></div></div><SceneRadar :data="data" :map="currentMap" :selected="selected" :radius="data?.radar_radius_raw" compact @select="selected = $event" /></div>
+    <div class="floating-content"><p v-if="displayError || stale" class="floating-error" :class="{ 'is-stale': !displayError }" :role="displayError ? 'alert' : 'status'">{{ displayError || staleMessage }}</p><div class="floating-attention-bar"><div class="floating-attention-slot" aria-label="有标记与炫彩精灵" @wheel="scrollAttention"><div class="floating-attention-list" :class="{ 'is-empty': !attentionActors.length }"><button v-for="actor in attentionActors" :key="actor.actor_id" class="floating-attention-chip" :class="[`attention-tone-${nearbyAttentionTone(actor.actor_id)}`, { selected: selected === actor.actor_id, 'is-colorful': actor.colorful === true }]" :aria-pressed="selected === actor.actor_id" :aria-label="chipLabel(actor)" @click="selectAttention(actor)"><span class="floating-attention-avatar"><img v-if="actor.icon_url && !failedImages.has(actor.icon_url)" :src="actor.icon_url" alt="" @error="imageFailed(actor.icon_url)"><UiIcon v-else name="eye"/><img v-if="actor.colorful" class="floating-attention-colorful" :src="RARITY_COLORFUL" alt=""></span><span class="floating-attention-medals"><MedalIcon v-for="mark in actor.marks" :key="mark.name" :name="mark.name" :source="mark.source"/></span></button></div></div></div><SceneRadar :data="data" :map="currentMap" :selected="selected" :radius="data?.radar_radius_raw" :preparing="!received || Boolean(data && mapsLoading)" compact @select="selected = $event" /></div>
   </main>
 </template>
 <style scoped>
@@ -145,7 +158,8 @@ onUnmounted(() => { window.removeEventListener('pagehide', leave); leave() })
 .floating-content { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; padding: var(--space-3); }
 .floating-error { flex: none; max-height: 22%; margin: 0 0 var(--space-2); overflow-y: auto; padding-left: var(--space-3); border-left: 2px solid var(--amber); color: var(--radar-overlay-ink); font-size: var(--fs-2xs); line-height: 1.5; overflow-wrap: anywhere; }
 .floating-error.is-stale { border-left-color: var(--radar-overlay-line); color: var(--radar-overlay-muted); }
-.floating-attention-slot { flex: none; box-sizing: border-box; height: 46px; min-height: 46px; overflow-x: auto; overflow-y: hidden; padding-bottom: var(--space-3); scrollbar-width: none; -ms-overflow-style: none; }
+.floating-attention-bar { display: flex; flex: none; gap: var(--space-2); min-width: 0; }
+.floating-attention-slot { flex: 1; min-width: 0; box-sizing: border-box; height: 46px; min-height: 46px; overflow-x: auto; overflow-y: hidden; padding-bottom: var(--space-3); scrollbar-width: none; -ms-overflow-style: none; }
 .floating-attention-slot::-webkit-scrollbar { display: none; }
 .floating-attention-list { display: flex; flex-wrap: nowrap; align-items: flex-start; gap: var(--space-2); width: max-content; min-width: 100%; min-height: 34px; }
 .floating-attention-list.is-empty { visibility: hidden; }
@@ -158,9 +172,13 @@ onUnmounted(() => { window.removeEventListener('pagehide', leave); leave() })
 .floating-attention-chip:hover { border-color: color-mix(in srgb, var(--radar-overlay-ink) 62%, transparent); }
 .floating-attention-chip.selected { border-color: var(--radar-overlay-ink); box-shadow: 0 0 0 2px var(--radar-overlay-point); }
 .floating-attention-chip:focus-visible { outline: 2px solid var(--radar-overlay-point); outline-offset: 2px; }
-.floating-attention-avatar { display: grid; place-items: center; width: 26px; height: 26px; flex: none; overflow: hidden; border-radius: 50%; background: var(--radar-overlay-line); }
-.floating-attention-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.floating-attention-avatar { position: relative; display: grid; place-items: center; width: 26px; height: 26px; flex: none; border-radius: 50%; background: var(--radar-overlay-line); }
+.floating-attention-avatar > img:not(.floating-attention-colorful) { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
 .floating-attention-avatar .ui-icon { width: 14px; height: 14px; }
+/* 炫彩胶囊：头像外圈彩虹环 + 右下角游戏内彩虹星标，与普通关注胶囊一眼可分。 */
+.floating-attention-chip.is-colorful { border-color: transparent; background: linear-gradient(135deg, color-mix(in srgb, var(--colorful) 30%, var(--radar-attention-0)), color-mix(in srgb, var(--colorful-bright) 22%, var(--radar-attention-2))); filter: drop-shadow(0 0 6px color-mix(in srgb, var(--colorful) 42%, transparent)); }
+.floating-attention-chip.is-colorful .floating-attention-avatar { border: 2.5px solid transparent; background: linear-gradient(var(--radar-overlay-line), var(--radar-overlay-line)) padding-box, var(--colorful-gradient) border-box; }
+.floating-attention-colorful { position: absolute; right: -5px; bottom: -4px; width: 16px; height: 16px; object-fit: contain; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .65)); }
 .floating-attention-medals { display: inline-flex; align-items: center; gap: 1px; min-width: 0; }
 .floating-attention-medals :deep(.medal-icon) { width: 22px; height: 22px; object-fit: contain; }
 .floating-attention-medals :deep(.medal-icon-text) { max-width: 3em; overflow: hidden; font-size: var(--fs-3xs); text-overflow: ellipsis; }

@@ -25,6 +25,30 @@ function setup(request: ReturnType<typeof vi.fn>) {
 }
 afterEach(() => { bridge?.unmount(); vi.useRealTimers() })
 describe('附近主窗口与悬浮窗桥接', () => {
+  it('悬浮雷达按 500 毫秒合并后台更新', async () => {
+    const request = vi.fn().mockResolvedValueOnce(summary)
+      .mockResolvedValueOnce({ ...summary, version: 11 })
+      .mockResolvedValueOnce({ ...summary, version: 12 })
+    setup(request); await flushPromises()
+    bridge.update({ ...summary, version: 11 }); await flushPromises()
+    bridge.update({ ...summary, version: 12 })
+    expect(request).toHaveBeenCalledTimes(2)
+    vi.advanceTimersByTime(499); await flushPromises()
+    expect(request).toHaveBeenCalledTimes(2)
+    vi.advanceTimersByTime(1); await flushPromises()
+    expect(request).toHaveBeenCalledTimes(3)
+    expect(messages.filter(m => m.kind === 'snapshot').at(-1)?.payload?.version).toBe(12)
+  })
+  it('战斗后观察周期变化立即取回快照，不受普通后台节流影响', async () => {
+    const request = vi.fn().mockResolvedValueOnce(summary)
+      .mockResolvedValueOnce({ ...summary, version: 11 })
+      .mockResolvedValueOnce({ ...summary, version: 12, observation_id: 2 })
+    setup(request); await flushPromises()
+    bridge.update({ ...summary, version: 11 }); await flushPromises()
+    bridge.update({ ...summary, version: 12, observation_id: 2 }); await flushPromises()
+    expect(request).toHaveBeenCalledTimes(3)
+    expect(messages.filter(m => m.kind === 'snapshot').at(-1)?.payload?.observation_id).toBe(2)
+  })
   it('慢请求期间合并推送，返回后发布进展并补一次读取', async () => {
     let finish: (value: unknown) => void = () => {}
     const request = vi.fn().mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))

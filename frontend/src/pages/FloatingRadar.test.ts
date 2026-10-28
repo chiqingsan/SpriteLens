@@ -2,6 +2,12 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { afterEach, describe, it, expect, vi } from 'vitest'
 import FloatingRadar from './FloatingRadar.vue'
 
+vi.stubGlobal('ResizeObserver', class {
+  constructor(private callback: ResizeObserverCallback) {}
+  observe() { this.callback([{ contentRect: { width: 300, height: 300 } } as ResizeObserverEntry], {} as ResizeObserver) }
+  disconnect() {}
+})
+
 function channel() { return { onmessage: null, postMessage: vi.fn(), close: vi.fn() } as unknown as BroadcastChannel }
 const snapshotPayload = (overrides: Record<string, unknown> = {}) => ({
   uid: '1', version: 1, observation_id: 1, phase: 'observing', complete: false, source: 'observed_partial', mapping_available: true, radar_radius_raw: 10000,
@@ -12,6 +18,42 @@ const snapshotPayload = (overrides: Record<string, unknown> = {}) => ({
 })
 afterEach(() => { vi.useRealTimers() })
 describe('自绘悬浮雷达', () => {
+  it('首次快照、清单和底图就绪后一次显示，普通更新不再隐藏', async () => {
+    let resolveMap: (value: unknown) => void = () => {}
+    const wire = channel()
+    const wrapper = mount(FloatingRadar, { props: { channel: wire, host: {
+      close: vi.fn(), setOpacity: vi.fn(), loadMaps: () => new Promise(resolve => { resolveMap = resolve }),
+    } } })
+    expect(wrapper.get('.scene-radar-scope').classes()).toContain('is-preparing')
+    wire.onmessage?.({ data: { kind: 'snapshot', payload: snapshotPayload({ resource_id: '10003' }) } } as MessageEvent)
+    await flushPromises()
+    expect(wrapper.get('.scene-radar-scope').classes()).toContain('is-preparing')
+    resolveMap({ schema_version: 1, coordinate_version: 1, maps: { '10003': {
+      name: '地图', availability: 'supported', image: { url: '/static/map.webp', width: 4096, height: 4096 },
+      projection: { origin_x: 0, origin_y: 0, side: 100000 }, calibration: { level: 'verified' },
+    } } })
+    await flushPromises()
+    expect(wrapper.get('.scene-radar-scope').classes()).toContain('is-preparing')
+    await wrapper.get('.radar-map image').trigger('load')
+    expect(wrapper.get('.scene-radar-scope').classes()).not.toContain('is-preparing')
+    wire.onmessage?.({ data: { kind: 'snapshot', payload: snapshotPayload({ version: 2, resource_id: '10003' }) } } as MessageEvent)
+    await flushPromises()
+    expect(wrapper.get('.scene-radar-scope').classes()).not.toContain('is-preparing')
+    wrapper.unmount()
+  })
+  it('战前位置和实体接续时提示可能过期，重新确认后清除提示', async () => {
+    const wire = channel()
+    const wrapper = mount(FloatingRadar, { props: { channel: wire, host: { close: vi.fn(), setOpacity: vi.fn() } } })
+    const actor = { ...snapshotPayload().actors[0], stale: true }
+    wire.onmessage?.({ data: { kind: 'snapshot', payload: snapshotPayload({ position_source: 'battle_return', actors: [actor] }) } } as MessageEvent)
+    await flushPromises()
+    expect(wrapper.find('.floating-battle-stale').exists()).toBe(false)
+    expect(wrapper.get('.floating-attention-chip').attributes('aria-label')).toContain('可能已过期')
+    wire.onmessage?.({ data: { kind: 'snapshot', payload: snapshotPayload({ version: 2 }) } } as MessageEvent)
+    await flushPromises()
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
   it('慢快照可推进同周期画面，版本较小的新账号也能清空旧图', async () => {
     const wire = channel()
     const wrapper = mount(FloatingRadar, { props: { channel: wire, host: { close: vi.fn(), setOpacity: vi.fn() } } })
@@ -108,6 +150,28 @@ describe('自绘悬浮雷达', () => {
     expect(await wrapper.findAll('.floating-attention-chip').map(chip => chip.attributes('aria-label'))).toEqual([
       '4，双牌', '2，双牌', '3，单牌', '1，单牌'
     ])
+    wrapper.unmount()
+  })
+  it('炫彩精灵进入顶部条：头像挂星标、胶囊置顶', async () => {
+    const wire = channel()
+    const base = { config_id: 1, base_id: 1, type_names: [], level: 1, height: 0, weight: 0, voice: 0, updated_at: 1, position: [1, 0, 0] }
+    const wrapper = mount(FloatingRadar, { props: { channel: wire, host: { close: vi.fn(), setOpacity: vi.fn() } } })
+    wire.onmessage?.({ data: { kind: 'snapshot', payload: {
+      uid: '1', version: 1, observation_id: 1, phase: 'observing', complete: false, source: 'observed_partial', mapping_available: true, radar_radius_raw: 10000,
+      scene_id: 1, updated_at: 1, unresolved_updates: 0, rejected_actors: 0, player_position: [0, 0, null], position_source: 'client_target',
+      actors: [
+        { ...base, actor_id: '1', name: '单牌精灵', icon_url: '/static/pet.png', attention: 'marked', marks: [{ label: '婉', name: '婉转声', source: 'reference' as const }] },
+        { ...base, actor_id: '2', name: '炫彩精灵', icon_url: '/static/pet.png', attention: 'normal', colorful: true, mutation: 8, marks: [] },
+      ],
+    } } } as MessageEvent)
+    await flushPromises()
+    const chips = wrapper.findAll('.floating-attention-chip')
+    // 炫彩即使没有单/双牌也进顶部条，并排在有牌精灵之前。
+    expect(chips.map(chip => chip.attributes('aria-label'))).toEqual(['炫彩精灵，炫彩', '单牌精灵，单牌'])
+    expect(chips[0].classes()).toContain('is-colorful')
+    expect(chips[0].get('.floating-attention-colorful').attributes('src')).toBe('/static/rarity/colorful-fit.webp')
+    expect(chips[0].get('.floating-attention-avatar img').attributes('src')).toBe('/static/pet.png')
+    expect(wrapper.get('.floating-legend').text()).not.toContain('炫彩')
     wrapper.unmount()
   })
   it('超过 3 秒无消息时清空实体并提示，恢复心跳后自动清除', async () => {

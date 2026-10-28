@@ -169,7 +169,7 @@
   min-height: 0;
 }
 
-.breeder-column { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.breeder-column { display: flex; flex-direction: column; min-width: 0; min-height: 0; container-type: inline-size; }
 .breeder-column + .breeder-column { border-left: 1px solid color-mix(in srgb, var(--ink) 9%, transparent); }
 
 .breeder-column > header {
@@ -198,6 +198,12 @@
   white-space: nowrap;
 }
 
+/* 列头空间不足时，「点击选择父本」这类辅助提示先让位：它只解释操作，
+   而分页与计数是必需控件。省下的宽度给计数与前后翻页，避免提示被截成「点…」。 */
+@container (max-width: 300px) {
+  .breeder-column-actions > small { display: none; }
+}
+
 .breeder-column.gender-1 > header .breeder-column-title > .ui-icon { color: var(--male-ink); }
 .breeder-column.gender-2 > header .breeder-column-title > .ui-icon { color: var(--female-ink); }
 
@@ -219,16 +225,18 @@
 /* 空态在列里垂直居中，只作用于纯空态列 */
 .breeder-grid:has(> .breeder-empty:only-child) { align-content: center; }
 
-/* 候选卡：白卡落在浅色托盘上，靠面差 + 墨色 30% 描边 + 1px 淡影三层分开，
-   不再是「白纸一条淡线」；30% 让描边对白底达到 1.87:1，1× 下也能一眼看到卡片边界。 */
+/* 候选卡：白卡落在浅色托盘上，靠面差 + 墨色 20% 描边 + 1px 淡影三层分开。
+   结构分三段：身份行（立绘 + 名称/性格/蛋组 + 性别）、三列数据带、位置/详情底栏。 */
 .breeder-card {
   position: relative;
   min-width: 0;
-  border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent);
   border-radius: var(--radius-lg);
   background: var(--panel);
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--ink) 10%, transparent);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--ink) 9%, transparent);
   overflow: hidden;
+  /* 卡片密度按自身宽度决定，不用窗口断点猜列宽 */
+  container-type: inline-size;
   transition:
     border-color var(--motion-fast) var(--motion-ease),
     background-color var(--motion-fast) var(--motion-ease),
@@ -236,23 +244,23 @@
 }
 
 .breeder-card:hover {
-  border-color: color-mix(in srgb, var(--teal) 42%, var(--ink));
+  border-color: color-mix(in srgb, var(--teal) 38%, var(--ink));
   box-shadow: var(--shadow-1);
 }
 
 .breeder-card.selected {
   border-color: var(--teal);
-  background: color-mix(in srgb, var(--teal-soft) 34%, var(--panel));
+  background: color-mix(in srgb, var(--teal-soft) 26%, var(--panel));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 10%, transparent);
 }
 
 .breeder-card-select {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  flex-direction: column;
+  gap: var(--space-2);
   width: 100%;
   min-width: 0;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-4) var(--space-2);
   border: 0;
   background: transparent;
   color: var(--ink);
@@ -262,22 +270,28 @@
 .breeder-card-select:focus-visible,
 .breeder-detail-link:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 
+.breeder-identity { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+
 .breeder-portrait {
+  position: relative;
   display: grid;
   place-items: center;
   width: 56px;
   height: 64px;
   flex: none;
   border-radius: var(--radius-md);
-  /* 白卡上的立绘托底：用托盘同色，精灵不会陷进白色里 */
+  /* 立绘托底按性别上色，和收集线、家园的亲本卡保持同一套识别方式 */
   background: var(--surface-2);
   color: var(--muted);
   font-size: var(--fs-lg);
 }
 
+.breeder-card.gender-1 .breeder-portrait { background: color-mix(in srgb, var(--male) 72%, var(--panel)); }
+.breeder-card.gender-2 .breeder-portrait { background: color-mix(in srgb, var(--female) 72%, var(--panel)); }
+
 .breeder-portrait img { width: 100%; height: 100%; object-fit: contain; }
 
-.breeder-copy { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.breeder-copy { display: flex; flex-direction: column; gap: var(--space-1); flex: 1; min-width: 0; }
 
 .breeder-card-title { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
 
@@ -292,19 +306,23 @@
 }
 
 .breeder-card-title small {
+  flex: none;
   color: var(--muted);
   font-size: var(--fs-3xs);
   font-variant-numeric: tabular-nums;
 }
 
-.breeder-card-title > .ui-icon { width: 14px; height: 14px; margin-left: auto; color: var(--male-ink); }
-.gender-2 .breeder-card-title > .ui-icon { color: var(--female-ink); }
+/* 性别符号固定在身份行右端：名称再长也只压缩名称，符号位置不动 */
+.breeder-card-title > .breeder-gender { width: 15px; height: 15px; margin-left: auto; flex: none; color: var(--male-ink); }
+.gender-2 .breeder-card-title > .breeder-gender { color: var(--female-ink); }
 
 .breeder-traits { display: flex; align-items: center; gap: var(--space-2); min-height: 22px; }
 
 .breeder-traits > .chip {
   display: inline-flex;
   align-items: center;
+  /* 性格标签不参与收缩：空间不足时宁可整行溢出提示，也不能把两个字压成竖排 */
+  flex: none;
   min-height: 20px;
   padding: 0 var(--space-2);
   border: 1px solid var(--egg-tag-nature-line);
@@ -313,9 +331,10 @@
   color: var(--egg-tag-nature-ink);
   font-size: var(--fs-3xs);
   line-height: 18px;
+  white-space: nowrap;
 }
 
-.breeder-traits img { width: 22px; height: 22px; object-fit: contain; }
+.breeder-traits img { flex: none; width: 22px; height: 22px; object-fit: contain; }
 
 .breeder-groups {
   overflow: hidden;
@@ -325,18 +344,53 @@
   white-space: nowrap;
 }
 
+/* 三列数据带：与箱位卡 .point-metrics 同一套「细线分栏 + 数值加粗」写法，
+   把身高/体重/声音从一行稀疏标签变成可横向比较的等宽三档。 */
 .breeder-measures {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px var(--space-3);
-  color: var(--ink-soft);
-  font-size: var(--fs-3xs);
-  font-variant-numeric: tabular-nums;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  padding-top: var(--space-2);
+  border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
 }
 
-.breeder-measures > span { white-space: nowrap; }
+.breeder-measure {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--space-1);
+  min-width: 0;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 
-.breeder-rarity { color: var(--teal-dark); font-size: var(--fs-3xs); font-weight: 500; }
+.breeder-measure + .breeder-measure { border-left: 1px solid color-mix(in srgb, var(--ink) 8%, transparent); }
+
+.breeder-measure > small { flex: none; color: var(--muted-2); font-size: var(--fs-3xs); }
+.breeder-measure > b { min-width: 0; overflow: hidden; font-size: var(--fs-xs); font-weight: 600; text-overflow: ellipsis; }
+.breeder-measure.is-out > b { color: var(--amber-ink); }
+
+/* 窄卡：三列同排时「标签 + 100.0%」放不进 1/3 宽，第三列会被切掉。
+   此时把标签移到数值上方，每列只需容纳数值本身，读数不丢。 */
+@container (max-width: 300px) {
+  .breeder-measure { flex-direction: column; align-items: center; gap: 0; }
+  .breeder-measure > b { font-size: var(--fs-3xs); }
+}
+
+/* 窄卡里奖牌不是主信息：允许换行，避免把性格标签挤成竖排 */
+@container (max-width: 300px) {
+  .breeder-traits { flex-wrap: wrap; row-gap: var(--space-1); }
+}
+
+@container (max-width: 340px) {
+  .breeder-portrait { width: 48px; height: 56px; }
+}
+
+/* 稀有度：沿用家园卡的 22px 透明徽章，替换原来的「异色/炫彩」纯文字行，
+   避免与性格标签抢同一行的视觉权重。 */
+.breeder-rarity { display: inline-flex; flex: none; width: 20px; height: 20px; }
+.breeder-rarity img { width: 100%; height: 100%; object-fit: contain; }
 
 .breeder-card > footer {
   display: flex;
@@ -378,10 +432,11 @@
 .breeder-detail-link:hover { background: var(--teal-soft); color: var(--teal-dark); }
 .breeder-detail-link .ui-icon { width: 12px; height: 12px; }
 
+/* 选中角标压在立绘左上角：右下角会盖住身份行第三行的蛋组文字 */
 .breeder-selected-mark {
   position: absolute;
-  top: var(--space-2);
-  left: var(--space-2);
+  top: -5px;
+  left: -5px;
   width: 18px;
   height: 18px;
   color: var(--teal-dark);

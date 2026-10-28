@@ -1,8 +1,14 @@
 import { mount } from '@vue/test-utils'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import SceneRadar from './SceneRadar.vue'
 import { parseNearby } from '../types/nearby'
 import type { WorldMapEntry } from '../types/worldMap'
+let resizeCallback: ResizeObserverCallback
+vi.stubGlobal('ResizeObserver', class {
+  constructor(callback: ResizeObserverCallback) { resizeCallback = callback }
+  observe() {}
+  disconnect() {}
+})
 const payload = { uid: '1', version: 1, observation_id: 1, phase: 'observing', complete: false, source: 'observed_partial', mapping_available: true, radar_radius_raw: 10000, scene_id: 1, updated_at: 1, unresolved_updates: 0, rejected_actors: 0, player_position: [0, 0, null], position_source: 'client_target', actors: [
   { actor_id: '9007199254740993', config_id: 1, base_id: null, name: '未知精灵', icon_url: '', type_names: [], level: null, height: null, weight: 0, voice: 0, updated_at: 1, marks: [{ label: '婉', name: '婉转声', source: 'reference' }], attention: 'marked', position: [-300, 400, null] },
   { actor_id: '2', config_id: 1, base_id: null, name: '缺位置精灵', icon_url: '', type_names: [], level: 1, height: 0, weight: 0, voice: null, updated_at: 1, marks: [], attention: 'normal', position: [null, 0, 0] },
@@ -17,6 +23,14 @@ const labelPositions = (wrapper: ReturnType<typeof mount>) => wrapper.findAll('.
   y: Number(node.attributes('y')),
 }))
 describe('参考坐标雷达', () => {
+  it('紧凑雷达在非正方形区域扩展视野，保留圆环的比例', async () => {
+    const wrapper = mount(SceneRadar, { props: { data: snapshot(), compact: true } })
+    resizeCallback([{ contentRect: { width: 500, height: 400 } } as ResizeObserverEntry], {} as ResizeObserver)
+    await wrapper.vm.$nextTick()
+    expect(wrapper.get('svg.scene-radar-scope').attributes('viewBox')).toBe('-50 0 500 400')
+    expect(wrapper.get('clipPath rect').attributes()).toMatchObject({ x: '-50', y: '0', width: '500', height: '400' })
+    wrapper.unmount()
+  })
   it('保留零坐标与负坐标，不把缺坐标放在中心；点击保留字符串实体ID', async () => {
     const wrapper = mount(SceneRadar, { props: { data: snapshot(), radius: 2000 } })
     expect(wrapper.findAll('.radar-target')).toHaveLength(1)
@@ -83,13 +97,13 @@ describe('参考坐标雷达', () => {
     expect(wrapper.get('.radar-legend').text()).toContain('单牌')
     expect(wrapper.get('.radar-legend').text()).toContain('双牌')
   })
-  it('紧凑雷达只在选中目标时显示名称', () => {
+  it('紧凑雷达显示有标记的目标名称，普通目标不显示', () => {
     const wrapper = mount(SceneRadar, { props: { data: snapshot(), compact: true, selected: '9007199254740993' } })
     expect(wrapper.get('.radar-target').classes()).toContain('selected')
     expect(wrapper.get('.radar-target-label').text()).toBe('未知精灵')
     expect(wrapper.findAll('.radar-scale-label')).toHaveLength(0)
     const silent = mount(SceneRadar, { props: { data: snapshot(), compact: true } })
-    expect(silent.findAll('.radar-target-label')).toHaveLength(0)
+    expect(silent.get('.radar-target-label').text()).toContain('未知精灵')
   })
   it('玩家中心使用独立定位图标', () => {
     const wrapper = mount(SceneRadar, { props: { data: snapshot() } })
@@ -210,6 +224,28 @@ describe('覆盖格网与渲染预算', () => {
   const withCoverage = (extra: Record<string, unknown> = {}) => parseNearby({
     ...payload, resource_id: '10003', coverage, ...extra,
   })
+  it('平滑移动时底图和目标使用同一位置，周期变化及失效立即切换', async () => {
+    let frame: FrameRequestCallback = () => {}
+    const request = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => { frame = callback; return 1 })
+    const cancel = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(1000)
+    const wrapper = mount(SceneRadar, { props: { data: withCoverage(), map: MAP } })
+    const imageX = () => Number(wrapper.get('.radar-map image').attributes('x'))
+    const startX = imageX()
+    await wrapper.setProps({ data: withCoverage({ player_position: [1000, 0, null] }) })
+    expect(imageX()).toBe(startX)
+    frame(1125)
+    await wrapper.vm.$nextTick()
+    expect(imageX()).toBe(startX - 9)
+    expect(wrapper.get('.radar-target').attributes('transform')).toBe('translate(185.6,207.2)')
+    await wrapper.setProps({ data: withCoverage({ observation_id: 2, player_position: [2000, 0, null] }) })
+    expect(imageX()).toBe(startX - 36)
+    await wrapper.setProps({ data: null })
+    expect(wrapper.find('.radar-map').exists()).toBe(false)
+    expect(wrapper.find('.radar-target').exists()).toBe(false)
+    wrapper.unmount()
+    request.mockRestore(); cancel.mockRestore(); clock.mockRestore()
+  })
   it('覆盖格网只生成一份 path，fill/border/mask 复用', () => {
     const wrapper = mount(SceneRadar, { props: { data: withCoverage(), map: MAP } })
     const d = wrapper.get('.map-coverage-fill').attributes('d')
@@ -231,6 +267,36 @@ describe('覆盖格网与渲染预算', () => {
     const otherAccount = mount(SceneRadar, { props: { data: withCoverage({ coverage: { ...coverage, uid: '2' } }), map: MAP } })
     expect(otherAccount.find('.map-coverage').exists()).toBe(false)
     otherMap.unmount(); otherAccount.unmount()
+  })
+  it('炫彩目标用头像 + 星标表达，与奖牌关注级别并存', () => {
+    const colorful = actor('8', '炫彩乖乖鹄', [120, 0, 0], {
+      mutation: 8, colorful: true, icon_url: '/static/pet-media/13000169-normal-portrait.webp', attention: 'double', marks: [
+        { label: '大', name: '大块头', source: 'reference' },
+        { label: '婉', name: '婉转声', source: 'reference' },
+      ],
+    })
+    const wrapper = mount(SceneRadar, { props: { data: snapshot([colorful]), radius: 2000 } })
+    const target = wrapper.get('.radar-target')
+    // 炫彩与双牌是两条独立维度，同时成立时两个标点都要在。
+    expect(target.classes()).toContain('colorful')
+    expect(target.classes()).toContain('is-double')
+    // 头像裁进彩虹环内，右下角挂游戏内星标；强调级别收成小圆点，不再占用独立环。
+    expect(wrapper.get('.radar-colorful-avatar').attributes('href')).toBe('/static/pet-media/13000169-normal-portrait.webp')
+    expect(wrapper.get('.radar-colorful-frame').attributes('r')).toBe('14')
+    expect(wrapper.get('.radar-colorful-glow').exists()).toBe(true)
+    expect(wrapper.get('.radar-colorful-badge').attributes('href')).toBe('/static/rarity/colorful-fit.webp')
+    expect(wrapper.get('.radar-colorful-attention').exists()).toBe(true)
+    expect(wrapper.find('.radar-attention-ring').exists()).toBe(false)
+    expect(wrapper.get('.radar-target title').text()).toContain('炫彩')
+    expect(target.attributes('aria-label')).toContain('炫彩')
+    // 炫彩只做样式，图例仍只说明普通/单牌/双牌。
+    expect(wrapper.get('.radar-legend').text()).not.toContain('炫彩')
+    wrapper.unmount()
+    // 旧壳层缓存没有 colorful 字段时按 mutation 第 4 位兜底，不静默丢掉炫彩；无头像时退回渐变圆点。
+    const fallback = mount(SceneRadar, { props: { data: snapshot([actor('9', '旧缓存精灵', [10, 0, 0], { mutation: 8 })]), radius: 2000 } })
+    expect(fallback.get('.radar-target').classes()).toContain('colorful')
+    expect(fallback.get('.radar-colorful-point').exists()).toBe(true)
+    fallback.unmount()
   })
   it('密集场景只渲染最近 160 个目标，选中项仍在且页脚说明', () => {
     const dense = Array.from({ length: 200 }, (_, index) => actor(

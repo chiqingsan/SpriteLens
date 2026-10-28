@@ -3,10 +3,15 @@ export interface NearbyMark { label: string; name: string; source: 'reference' |
 export type NearbyAttention = 'normal' | 'marked' | 'double'
 export interface NearbyActor {
   position: (number | null)[] | null
+  stale?: boolean
   actor_id: string; config_id: number | null; base_id: number | null
   name: string; icon_url: string; type_names: string[]; level: number | null
   height: number | null; weight: number | null; voice: number | null; updated_at: number
   chain_names: string[]
+  /** 场景帧原始外观字段，旧壳层/旧缓存可能没有；mutation 第 4 位即炫彩。 */
+  mutation?: number | null; glass_type?: number | null; glass_value?: number | null
+  /** 游戏内固有炫彩外观（与背包 is_colorful 同口径），独立于 attention 的奖牌潜力。 */
+  colorful?: boolean
   marks: NearbyMark[]; attention: NearbyAttention
 }
 export function nearbyAttentionTone(actorId: string): number {
@@ -63,6 +68,11 @@ function parseAttention(v: unknown): NearbyAttention {
   if (v !== 'normal' && v !== 'marked' && v !== 'double') throw Error('附近精灵关注级别无效')
   return v
 }
+/** 炫彩：变异类型第 4 位（背包 is_colorful 同口径）；后端已算好 colorful，旧包按 mutation 兜底。 */
+function colorfulOf(v: Record<string, unknown>): boolean {
+  if (typeof v.colorful === 'boolean') return v.colorful
+  return typeof v.mutation === 'number' && Number.isSafeInteger(v.mutation) && (v.mutation & 8) !== 0
+}
 const phases = ['awaiting_identity', 'awaiting_scene', 'resumed_stale', 'observing', 'battle_unverified', 'disconnected', 'stopped', 'historical_account']
 export function parseNearbySummary(v: unknown): NearbySummary {
   if (!record(v) || typeof v.uid !== 'string' || !/^\d+$/.test(v.uid)
@@ -77,9 +87,16 @@ function parseActor(v: unknown): NearbyActor {
     || !Array.isArray(v.type_names) || !v.type_names.every(t => typeof t === 'string')
     || (v.chain_names !== undefined && (!Array.isArray(v.chain_names) || !v.chain_names.every(name => typeof name === 'string')))
     || !optional(v.level) || !optional(v.height) || !optional(v.weight) || !optional(v.voice)
+    || (v.stale !== undefined && typeof v.stale !== 'boolean')
+    || (v.mutation !== undefined && !optional(v.mutation)) || (v.glass_type !== undefined && !optional(v.glass_type))
+    || (v.glass_value !== undefined && !optional(v.glass_value)) || (v.colorful !== undefined && typeof v.colorful !== 'boolean')
     || typeof v.updated_at !== 'number' || !Number.isFinite(v.updated_at)) throw Error('附近精灵响应格式无效')
   const list = parseMarks(v.marks)
-  return { ...v, chain_names: (v.chain_names ?? []) as string[], marks: list, attention: parseAttention(v.attention) } as NearbyActor
+  // 只在为真时补字段：普通精灵保持原样，避免给旧缓存/测试夹具凭空加键。
+  return {
+    ...v, chain_names: (v.chain_names ?? []) as string[], marks: list, attention: parseAttention(v.attention),
+    ...(colorfulOf(v) ? { colorful: true } : {}),
+  } as NearbyActor
 }
 /** 严格校验覆盖格网 DTO：非法整包抛错（load 失败会保留同周期数据），不静默丢字段。 */
 function parseCoverage(v: unknown): NearbyCoverage | null {

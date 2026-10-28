@@ -16,7 +16,7 @@ from spritelens.domain.eggs import EggCatalog, display_egg_name
 from spritelens.domain.home_breeding import HomeBreedingProfile, infer_range_couples
 from spritelens.domain.breeding_nature import parent_nature_reference
 from spritelens.domain.measurements import range_position, range_text
-from spritelens.domain.pet_marks import pet_marks
+from spritelens.domain.pet_marks import egg_voice, pet_marks, voice_tags
 from spritelens.web.pet_media import pet_images
 from spritelens.services.egg_repository import EggBoxSnapshot
 from spritelens.services.home_repository import HomeRepoSnapshot
@@ -49,6 +49,40 @@ def _egg_pickup_payload(pickup) -> dict:
         "mother_nature_id": pickup.mother_nature_id,
         "mother": _egg_parent_payload(pickup.mother) if pickup.mother is not None else None,
         "fathers": [_egg_parent_payload(father) for father in pickup.fathers],
+    }
+
+
+def _egg_voice_prediction(pickup, pet_voices: dict[int, int] | None) -> dict | None:
+    """按亲代声音推算蛋的声音（母本与每个候选父本取平均、向下取整）。
+
+    收蛋时只拿到候选父本、实际父本未知：所有候选算出的声音相同才给出单值
+    （voice_db），否则给出区间；所有候选得到同一组声音标签时才允许自动打标。
+    """
+    mother = pickup.mother if pickup is not None else None
+    if mother is None or not pickup.fathers or not pet_voices:
+        return None
+    mother_voice = pet_voices.get(mother.instance_id)
+    if mother_voice is None:
+        return None
+    candidates = []
+    for father in pickup.fathers:
+        father_voice = pet_voices.get(father.instance_id)
+        if father_voice is None:
+            continue
+        candidates.append((father.instance_id, father_voice, egg_voice(mother_voice, father_voice)))
+    if not candidates:
+        return None
+    voices = [voice for _, _, voice in candidates]
+    tag_sets = {voice_tags(voice) for voice in voices}
+    unanimous = len(set(voices)) == 1
+    tags = list(next(iter(tag_sets))) if len(tag_sets) == 1 else []
+    return {
+        "mother_voice": mother_voice,
+        "voice_db": voices[0] if unanimous else None,
+        "range": [min(voices), max(voices)],
+        "tags": tags,
+        "unanimous": unanimous,
+        "father_voices": [{"instance_id": gid, "voice": voice} for gid, voice, _ in candidates],
     }
 
 
@@ -576,7 +610,8 @@ def home_payload(home_repo, static: StaticData | None, pet_repository=None, egg_
         "couples_stale": couples_stale,
         **metadata,
     }
-def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_options=()) -> dict:
+def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_options=(),
+                    pet_voices: dict[int, int] | None = None) -> dict:
     """蛋蛋仓库载荷：蛋仓快照 + 蛋目录联查（名字/孵化时长/图标）+ 聚合统计。"""
     view = (
         egg_box if isinstance(egg_box, EggBoxSnapshot)
@@ -599,6 +634,7 @@ def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_o
         note = str(annotation.get("note", ""))
         voice_tag = str(annotation.get("voice_tag", ""))
         voice_db = annotation.get("voice_db")
+        prediction = _egg_voice_prediction(egg.pickup, pet_voices)
         favorite = bool(annotation.get("is_favorite", False))
         info = catalog.inventory_egg(egg.egg_conf_id, egg.pet_conf_id, egg.special_egg_conf_id) if catalog is not None else None
         species_label = info.species_name if info is not None else ""
@@ -631,6 +667,9 @@ def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_o
             elif egg.weight_g == low:
                 weight_label = "底重"
         voice_label = voice_tag if voice_tag in ("满分", "底分") else None
+        auto_voice_tags = (
+            prediction["tags"] if prediction is not None and prediction["tags"] and not voice_tag else []
+        )
         chain_names = [
             species.name for base_id in (info.chain_members if info else ())
             if static is not None and (species := static.species(base_id)) is not None
@@ -645,6 +684,10 @@ def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_o
                 medals.append("大块头")
         if voice_tag in ("婉转声", "粗嗓门"):
             medals.append(voice_tag)
+        medals.extend(tag for tag in auto_voice_tags if tag in ("婉转声", "粗嗓门"))
+        if auto_voice_tags:
+            voice_label = voice_label or next(
+                (tag for tag in auto_voice_tags if tag in ("满分", "底分")), None)
         nature_label = nature_names.get(nature_id, str(nature_id)) if nature_id else ""
         nest_label = {"normal": "普通窝", "green": "学院绿窝"}.get(
             nest_override or ("green" if egg.pickup and egg.pickup.nest_kind == "academy"
@@ -696,6 +739,7 @@ def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_o
                 "weight_g": egg.weight_g,
                 "home_egg": egg.home_egg,
                 "pickup": _egg_pickup_payload(egg.pickup) if egg.pickup else None,
+                "voice_prediction": prediction,
                 "annotations": {"nature_id": nature_id, "nest_override": nest_override,
                                 "note": note, "voice_tag": voice_tag, "voice_db": voice_db},
                 "tags": {"nature": nature_label, "weight": weight_label, "voice": voice_label,

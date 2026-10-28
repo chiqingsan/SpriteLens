@@ -67,20 +67,26 @@ class PetMediaCache:
             now = time.monotonic()
             if self._misses.get(name, 0) > now or self._network_retry_after > now:
                 continue
-            async with self._downloads:
-                # 同一种图片等待并发请求完成后再检查，避免重复下载。
+            task = self._inflight.get(name)
+            if task is None:
+                await self._downloads.acquire()
                 local = self._local_asset(name)
-                if local is not None:
-                    return local
                 now = time.monotonic()
-                if self._misses.get(name, 0) > now or self._network_retry_after > now:
-                    continue
                 task = self._inflight.get(name)
+                if local is not None or self._misses.get(name, 0) > now or self._network_retry_after > now:
+                    self._downloads.release()
+                    if local is not None:
+                        return local
+                    continue
                 if task is None:
                     task = asyncio.create_task(self._download_and_remember(name, species_id, candidate, use))
                     self._inflight[name] = task
                     task.add_done_callback(lambda completed, key=name: self._clear_inflight(key, completed))
-                cached, retry_after = await asyncio.shield(task)
+                    # 请求取消不会停止下载；实际任务结束后才能释放许可。
+                    task.add_done_callback(lambda _: self._downloads.release())
+                else:
+                    self._downloads.release()
+            cached, _ = await asyncio.shield(task)
             if cached is not None:
                 return cached
         return None

@@ -23,6 +23,13 @@ RADAR_DELETE_DISTANCE = DEFAULT_MAX_DISTANCE_RAW  # 兼容旧引用；实例以�
 # 雷达显示半径（原始坐标单位），不代表服务器下发半径。
 DEFAULT_RADAR_RADIUS_RAW = 10000
 RESUMED_STALE = "resumed_stale"
+# 连续移动采样的可信界限：客户端行走时约 10Hz 发 0x0133，to_pos 每个 tick
+# 只前进约 100~200 原始单位（真实会话实测骑乘速度 p99≈1,723 原始单位/秒）。
+# 间隔或位移超出该上限说明发生了传送、脱战回位或路线重算，此时只更新参考
+# 位置，不把没走过的区域画成已探索。
+MOVE_SAMPLE_MAX_GAP_MS = 2000
+MOVE_SAMPLE_MAX_SPEED_RAW = 4000
+MOVE_SAMPLE_TOLERANCE_RAW = 400
 
 
 @dataclass(frozen=True)
@@ -82,7 +89,9 @@ class SceneRepository:
         self._position: tuple[int | None, int | None, int | None] | None = None
         self._position_source: str | None = None
         self._last_position_sample = 0
+        self._last_move_sample = 0
         self._battle_id: int | None = None
+        self._battle_backup: tuple[tuple[int | None, int | None, int | None] | None, tuple[SceneActor, ...]] | None = None
         self._updated_at: float | None = None
         self._actors: dict[int, SceneActor] = {}
         self._motions: dict[int, tuple[float, tuple[int, ...], tuple[tuple[int, int, int | None], ...]]] = {}
@@ -125,6 +134,7 @@ class SceneRepository:
         self._instance = checkpoint.instance_id
         self._position = None
         self._position_source = None
+        self._last_move_sample = 0
         self._updated_at = None
         self._actors = {}
         self._unresolved = 0
@@ -224,6 +234,28 @@ class SceneRepository:
         """客户端移动目标只用于展示参考，不能据此否定已观察到的实体。"""
         return self._position_source in ("teleport", "scene_entry")
 
+    def _record_move_sample(self, target: tuple[int | None, int | None, int | None] | None,
+                            request_time: int | None) -> None:
+        """连续移动请求本身就是走过位置的证据。
+
+        客户端在行走中以约 10Hz 发 0x0133，`to_pos` 贴着当前行走位置推进
+        （每个 tick 约 100~200 原始单位）；传送、脱战回位和重新规划路线才会
+        出现远超正常移动速度的跳变。只有与上一条移动请求在时间与位移上都
+        相容时才记足迹，跳变只更新参考位置，保留未确认缺口。
+        """
+        previous = self._position
+        elapsed = (request_time - self._last_move_sample) if (
+            request_time is not None and self._last_move_sample > 0) else 0
+        self._last_move_sample = request_time or 0
+        if self._phase != "observing" or target is None or target[0] is None or target[1] is None:
+            return
+        if (previous is None or previous[0] is None or previous[1] is None
+                or not 0 < elapsed <= MOVE_SAMPLE_MAX_GAP_MS):
+            return
+        distance = hypot(target[0] - previous[0], target[1] - previous[1])
+        if distance <= MOVE_SAMPLE_MAX_SPEED_RAW * elapsed / 1000 + MOVE_SAMPLE_TOLERANCE_RAW:
+            self._coverage.record(self._resource, target)
+
     def _prune_distant_actors(self) -> None:
         if not self._has_confirmed_position():
             return
@@ -312,10 +344,13 @@ class SceneRepository:
                         self._clear("awaiting_scene")
                         self._session = event.session_id
                     self._scene = scene
-                    self._position = position(children(fs, 2))
-                    self._position_source = "client_target" if self._position is not None else None
-                    # 只接纳请求时刻以前的历史分段；计划目标仍只作参考。
                     request_time = integer(fs, 1)
+                    target = position(children(fs, 2))
+                    # 连续移动请求本身是走过位置的证据；只有与上一条请求相容才记格。
+                    self._record_move_sample(target, request_time)
+                    self._position = target
+                    self._position_source = "client_target" if target is not None else None
+                    # 只接纳请求时刻以前的历史分段；计划目标仍只作参考。
                     for segment in nodes(fs, 12):
                         content = segment.get("children", [])
                         if not isinstance(content, list):
@@ -383,7 +418,14 @@ class SceneRepository:
                         return
                 if event.opcode == 4886:
                     self._clear_checkpoint_locked(self._account.display_uid, self._session)
+                    battle_id = integer(children(fs, 6), 1)
+                    self._battle_backup = ((self._position, tuple(self._actors.values()))
+                                           if self._phase == "observing" and self._scene is not None
+                                           and battle_id is not None else None)
+                backup = self._battle_backup if (event.opcode == 4908 and self._phase == "battle_unverified"
+                                                  and self._battle_id is not None) else None
                 self._last_position_sample = 0
+                self._last_move_sample = 0
                 self._actors.clear()
                 self._motions.clear()
                 self._observation_id += 1
@@ -394,14 +436,39 @@ class SceneRepository:
                     self._phase = "battle_unverified"
                 else:
                     self._phase = "awaiting_scene"
-                # 战斗结束不恢复战前快照（用户决策 2026-10-24）：保持空态，
-                # 等服务器按新观察周期重新下发 AOI 增量或完整快照后再重建。
+                    self._battle_backup = None
+                    if backup is not None:
+                        self._position, actors = backup
+                        self._position_source = "battle_return" if self._position is not None else None
+                        self._actors = {value.actor_id: replace(value, stale=True) for value in actors}
+                        self._phase = "observing"
             elif self._phase == "battle_unverified":
+                # 战斗中场景离开消息仍可能移除战前实体（例如捕获目标）。只更新
+                # 接续备份，不把战斗场景的新增或位置显示为野外观察。
+                if event.opcode in (0x0413, 0x0414) and self._battle_backup is not None:
+                    wrappers = nodes(fs, 1)
+                    if event.opcode == 0x0413:
+                        wrappers = [action for wrapper in wrappers for action in nodes(children([wrapper], 1), 1)]
+                    removed: set[int] = set()
+                    for wrapper in wrappers:
+                        for action in children([wrapper], 1):
+                            if action.get("no") == 2:
+                                content = action.get("children")
+                                if not isinstance(content, list):
+                                    self._unresolved += 1
+                                    continue
+                                ids, invalid = removed_ids(content)
+                                removed.update(ids)
+                                self._unresolved += int(invalid)
+                    if removed:
+                        old_position, actors = self._battle_backup
+                        self._battle_backup = (old_position, tuple(value for value in actors if value.actor_id not in removed))
                 return
             elif event.opcode == 0x014A and self._scene is not None:
                 if integer(children(fs, 1), 1) not in (None, 0):
                     return
                 self._phase = "observing"
+                self._actors = {key: value for key, value in self._actors.items() if not value.stale}
                 for node in nodes(fs, 7):
                     self._add(node, event)
             elif event.opcode in (0x0413, 0x0414):

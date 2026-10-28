@@ -46,19 +46,24 @@ def check_npcap(
     search_paths: tuple[str, ...] | None = None,
     check_rsc=None,
     quick: bool = False,
+    iface: str = "",
 ) -> NpcapReport:
-    """探测 Npcap：查 wpcap.dll 存在性 + RSC 状态（RSC 会导致入站数据包抓不到）。
+    """探测 Npcap：查 wpcap.dll 存在性 + 抓包网卡的 RSC 状态（RSC 会导致入站数据包抓不到）。
 
     RSC（接收段合并）开启时，网卡把入站 TCP 数据合并成大段，Npcap 经常
     看不到这些包——症状是"小包（ACK/心跳）能抓到、业务数据包消失"，
     且间歇性出现。抓包机应禁用 RSC（Npcap 官方建议）。
+
+    iface 是实际抓包的网卡名；为空时按默认路由网卡判定。只有这块网卡的
+    RSC 会影响抓包，其它网卡（Hyper-V 虚拟交换机、WSL 等默认开启 RSC 的
+    虚拟网卡）不参与判定，否则装过虚拟化的机器会一直误报环境异常。
 
     quick=True 时只做文件存在性检查（毫秒级），跳过 RSC 的 PowerShell
     探活（实测约 1.8s）——启动路径用它先拿到 installed 结论，RSC 结果
     由调用方异步补齐（见 CaptureViewModel 的 npcap-probe 线程）。
     """
     candidates = search_paths or _NPCAP_PATH_CANDIDATES
-    rsc_probe = check_rsc if check_rsc is not None else _check_rsc
+    rsc_probe = check_rsc if check_rsc is not None else (lambda: _check_rsc(iface))
     for candidate in candidates:
         if Path(candidate).is_file():
             if quick:
@@ -72,16 +77,25 @@ def check_npcap(
                 return NpcapReport(
                     installed=True,
                     wpcap_path=candidate,
-                    message=f"已检测到 Npcap（{candidate}），但网卡「{rsc_adapter}」开启了 RSC"
+                    message=f"已检测到 Npcap（{candidate}），但抓包网卡「{rsc_adapter}」开启了 RSC"
                     "（接收段合并）——入站数据包会被合并导致抓不到。请点「一键禁用 RSC」"
                     "或以管理员运行: Disable-NetAdapterRsc -Name \"" + rsc_adapter + "\"",
                     rsc_enabled=True,
                     rsc_adapter=rsc_adapter,
                 )
+            if not rsc_adapter:
+                return NpcapReport(
+                    installed=True,
+                    wpcap_path=candidate,
+                    message=f"已检测到 Npcap（{candidate}），但未能读取抓包网卡的 RSC 状态"
+                    "（未选择网卡且无法确定默认路由，或查询失败）。不影响启动采集；"
+                    "若抓不到业务数据，请在「抓包网卡」中显式选择后重新检测。",
+                )
             return NpcapReport(
                 installed=True,
                 wpcap_path=candidate,
-                message=f"已检测到 Npcap（{candidate}），RSC 已关闭，抓包环境正常",
+                message=f"已检测到 Npcap（{candidate}），抓包网卡「{rsc_adapter}」RSC 已关闭，抓包环境正常",
+                rsc_adapter=rsc_adapter,
             )
     return NpcapReport(
         installed=False,
@@ -124,27 +138,52 @@ def _run_powershell(script: str, *, timeout: float) -> str:
     return out.stdout or ""
 
 
-def _check_rsc() -> tuple[bool, str]:
-    """检查所有物理网卡的 IPv4 RSC；任一开启即返回 (True, 网卡名)。"""
+def _check_rsc(iface: str = "") -> tuple[bool, str]:
+    """检查抓包网卡的 IPv4 RSC；返回 (是否开启, 实际检查的网卡名)。
+
+    只检查真正承载抓包流量的那块网卡：iface 非空时用它，否则取默认路由
+    网卡。Hyper-V/WSL 等虚拟交换机默认开启 RSC 却与游戏流量无关，遍历
+    所有网卡会把装过虚拟化的机器一律判成环境异常。
+    网卡无法定位时返回 (False, "")，由调用方给出"未能确定抓包网卡"。
+    """
     import json as _json
 
+    # 中文网卡名在重定向输出下会变成乱码，必须先切 UTF-8 输出编码
     stdout = _run_powershell(
-        "Get-NetAdapterRsc | ConvertTo-Json -Compress",
+        "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; "
+        "$ErrorActionPreference='SilentlyContinue'; "
+        "$route=Get-NetRoute -DestinationPrefix '0.0.0.0/0' | Sort-Object RouteMetric,ifIndex "
+        "| Select-Object -First 1; "
+        "$adapters=@(Get-NetAdapterRsc | Select-Object Name,InterfaceAlias,IPv4Enabled); "
+        "[pscustomobject]@{default_route=if($route){$route.InterfaceAlias}else{''};adapters=$adapters} "
+        "| ConvertTo-Json -Depth 3 -Compress",
         timeout=15,
     )
     try:
-        data = _json.loads(stdout) if stdout.strip() else []
+        data = _json.loads(stdout) if stdout.strip() else {}
     except ValueError as exc:
         logger.debug("RSC 检测结果无法解析（视为未开启）: %s", exc)
         return False, ""
-    if isinstance(data, dict):
-        data = [data]
-    for item in data or []:
-        try:
-            if item.get("IPv4Enabled") and item.get("Name"):
-                return True, str(item["Name"])
-        except AttributeError as exc:
-            logger.debug("RSC 条目结构异常（跳过）: %s", exc)
+    if not isinstance(data, dict):
+        return False, ""
+    adapters = data.get("adapters") or []
+    if isinstance(adapters, dict):
+        adapters = [adapters]
+    wanted = (iface or str(data.get("default_route") or "")).strip()
+    if not wanted:
+        logger.debug("RSC 检测跳过：未选择网卡且无法确定默认路由网卡")
+        return False, ""
+    target = wanted.casefold()
+    for item in adapters:
+        if not isinstance(item, dict):
+            continue
+        names = (str(item.get("Name") or ""), str(item.get("InterfaceAlias") or ""))
+        if any(name and name.casefold() == target for name in names):
+            enabled = bool(item.get("IPv4Enabled"))
+            return enabled, names[0] or wanted
+    # 查不到该网卡的 RSC 项（回环等无此设置，或名称对不上）：
+    # 返回空网卡名让调用方说明"无法检查"，不能谎报已关闭
+    logger.debug("RSC 列表中没有网卡「%s」，无法判定", wanted)
     return False, ""
 
 

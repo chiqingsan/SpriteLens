@@ -14,6 +14,8 @@ import type { NearbyActor, NearbyMark } from '../types/nearby'
 import { usableWorldMap, type WorldMapEntry } from '../types/worldMap'
 
 const props = defineProps<{ host: NearbyHost }>()
+/** 游戏内炫彩标记（彩虹星），与雷达点位、悬浮条共用同一份本地素材。 */
+const RARITY_COLORFUL = '/static/rarity/colorful-fit.webp'
 const { data, summary, loading, error, stale, load, update, pause, resume } = useNearby(props.host)
 const initialLoading = computed(() => loading.value && !data.value && !error.value)
 // 提醒音开关由壳层持有并负责试听，Vue 只镜像 toggle 返回的状态；旧壳层没有 alert 时整枚按钮不渲染。
@@ -66,7 +68,7 @@ async function selectActor(id: string) {
   await nextTick()
   document.getElementById(`nearby-actor-${id}`)?.scrollIntoView({ block: 'nearest', behavior: 'auto' })
 }
-const search = ref(''), sort = ref('recent'), failedImages = ref(new Set<string>())
+const search = ref(''), sort = ref('marks'), failedImages = ref(new Set<string>())
 const sortOptions = [{ value: 'recent', label: '最近观察' }, { value: 'marks', label: '有牌优先' }]
 const recentOrder = ref<string[]>([])
 let recentObservation: number | null = null
@@ -105,8 +107,11 @@ const rows = computed(() => {
   const filtered = (data.value?.actors || []).filter(row => `${row.name} ${row.config_id ?? ''} ${row.actor_id} ${(row.chain_names || []).join(' ')}`.toLocaleLowerCase().includes(needle))
   const order = new Map(recentOrder.value.map((id, index) => [id, index]))
   const recent = (a: NearbyActor, b: NearbyActor) => (order.get(a.actor_id) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.actor_id) ?? Number.MAX_SAFE_INTEGER)
-  if (sort.value === 'marks') return filtered.sort((a, b) => attentionRank(a) - attentionRank(b) || recent(a, b))
-  return filtered.sort(recent)
+  const compare = sort.value === 'marks'
+    ? (a: NearbyActor, b: NearbyActor) => attentionRank(a) - attentionRank(b) || recent(a, b)
+    : recent
+  // 炫彩是游戏内固有外观：两种排序下都置顶，组内再按当前排序规则比较。
+  return filtered.sort((a, b) => Number(b.colorful === true) - Number(a.colorful === true) || compare(a, b))
 })
 // 计数并进列表头：空列表不显示「0 只」，搜索时给出「结果 / 总数」。
 const countLabel = computed(() => {
@@ -118,7 +123,8 @@ const listViewport = ref<HTMLElement | null>(null)
 const rowVirtualizerOptions = computed(() => ({
   count: rows.value.length,
   getScrollElement: () => listViewport.value,
-  estimateSize: () => 74,
+  // 估计值取「名称行 + 标记行 + 三列数值」常见卡片实测高度（89~112）；实际高度仍由 measureRow 校正。
+  estimateSize: () => 96,
   getItemKey: (index: number) => rows.value[index]?.actor_id ?? index,
   gap: 8,
   initialRect: { width: 640, height: 600 },
@@ -154,6 +160,7 @@ watch([search, sort, () => summary.value?.uid, () => summary.value?.observation_
   if (listViewport.value) listViewport.value.scrollTop = 0
 }, { flush: 'post' })
 const phase = computed(() => summary.value?.phase || 'awaiting_identity')
+const battleStale = computed(() => Boolean(data.value && (data.value.position_source === 'battle_return' || data.value.actors.some(actor => actor.stale))))
 // 页面级说明统一收进雷达面板底部，避免页面左右两端各挂一句零散文字。
 const radarNote = '只显示本次连接观察到的精灵，切号或切场景后清空；缺少位置的精灵仍保留在列表。'
 const { catalog: mapCatalog, error: mapsError, refresh: refreshMaps, stop: stopMaps } = useWorldMaps(props.host.loadMaps)
@@ -208,6 +215,7 @@ const countNote = computed(() => {
   if (coverageError.value) return '清除足迹失败，请重试'
   if (summary.value?.coverage_error) return '搜索记录异常'
   if (stoppedNote.value) return stoppedNote.value
+  if (battleStale.value) return '战前观察可能已过期'
   if (data.value && !data.value.mapping_available) return '部分精灵资料缺失'
   if (stale.value) return '刷新失败，显示的是稍早的结果'
   if (data.value?.coverage_paused) return '记录已暂停'
@@ -223,6 +231,7 @@ const countNoteTitle = computed(() => {
       ? '服务器已停止采集本周期附近数据；地图、覆盖范围与本次足迹继续保留，可继续浏览，重新开始采集后恢复实时更新。'
       : '与游戏的连接已断开；展示的是断开前最后一份附近观察，重新连接后恢复实时更新。'
   }
+  if (battleStale.value) return '战斗结束后接续的战前位置或精灵尚未重新确认，可能已过期。'
   if (data.value && !data.value.mapping_available) return '精灵映射表未加载，名称、头像及体型参考标识可能缺失；原始观察数据仍会保留。'
   if (stale.value) return `刷新失败，显示的是稍早的结果${error.value ? '：' + error.value : ''}`
   if (data.value?.coverage_paused) return '服务器下发范围尚待实测，当前不会记录搜索覆盖；附近精灵仍正常显示。'
@@ -266,24 +275,26 @@ defineExpose({ update, load, pause, resume })
       <div class="nearby-list-panel">
         <header class="nearby-list-header">
           <h3>附近观察</h3>
-          <span class="nearby-count-note" :class="{ 'is-stale': stale, 'is-error': error && !stale || floatingError || coverageError || summary?.coverage_error, 'is-warning': Boolean(stoppedNote) || Boolean(data && (!data.mapping_available || data.coverage_paused)) }" :title="countNoteTitle" role="status">{{ countNote }}</span>
+          <span class="nearby-count-note" :class="{ 'is-stale': stale || battleStale, 'is-error': error && !stale || floatingError || coverageError || summary?.coverage_error, 'is-warning': Boolean(stoppedNote) || Boolean(data && (!data.mapping_available || data.coverage_paused)) }" :title="countNoteTitle" role="status">{{ countNote }}</span>
           <span v-if="countLabel" class="nearby-list-count">{{ countLabel }}</span>
         </header>
         <div ref="listViewport" class="nearby-list-pane">
         <section v-if="rows.length" class="nearby-grid" aria-label="附近精灵列表" :aria-busy="loading">
           <div class="nearby-virtual-space" :style="{ height: `${virtualHeight}px` }">
-            <article v-for="entry in virtualCards" :key="entry.actor.actor_id" :ref="measureRow" class="nearby-card nearby-virtual-row" :class="{ 'is-selected': selected === entry.actor.actor_id }" :data-index="entry.item.index" :id="`nearby-actor-${entry.actor.actor_id}`" tabindex="0" role="button" :aria-pressed="selected === entry.actor.actor_id" :style="{ transform: `translateY(${entry.item.start}px)` }" @click="selected = entry.actor.actor_id" @keydown.enter="selected = entry.actor.actor_id" @keydown.space.prevent="selected = entry.actor.actor_id">
-              <div class="nearby-portrait"><img v-if="entry.actor.icon_url && !failedImages.has(entry.actor.icon_url)" :src="entry.actor.icon_url" alt="" loading="lazy" @error="imageFailed(entry.actor.icon_url)"><UiIcon v-else name="eye" /></div>
+            <article v-for="entry in virtualCards" :key="entry.actor.actor_id" :ref="measureRow" class="nearby-card nearby-virtual-row" :class="{ 'is-selected': selected === entry.actor.actor_id, 'is-colorful': entry.actor.colorful }" :data-index="entry.item.index" :id="`nearby-actor-${entry.actor.actor_id}`" tabindex="0" role="button" :aria-pressed="selected === entry.actor.actor_id" :style="{ transform: `translateY(${entry.item.start}px)` }" @click="selected = entry.actor.actor_id" @keydown.enter="selected = entry.actor.actor_id" @keydown.space.prevent="selected = entry.actor.actor_id">
+              <div class="nearby-portrait"><img v-if="entry.actor.icon_url && !failedImages.has(entry.actor.icon_url)" :src="entry.actor.icon_url" alt="" loading="lazy" @error="imageFailed(entry.actor.icon_url)"><UiIcon v-else name="eye" /><img v-if="entry.actor.colorful" class="nearby-portrait-colorful" :src="RARITY_COLORFUL" alt="" loading="lazy"></div>
               <div class="nearby-card-copy">
                 <div class="nearby-card-top">
                   <div class="nearby-card-identity">
                     <h3 :title="entry.actor.name">{{ entry.actor.name }}</h3>
-                    <span class="nearby-level">Lv.{{ entry.actor.level ?? '?' }}</span>
-                    <div class="nearby-types"><template v-for="type in entry.actor.type_names" :key="type"><span class="nearby-type-chip"><img v-if="data?.type_icons[type]" class="nearby-type-icon" :src="data.type_icons[type]" alt="" loading="lazy">{{ type }}</span></template><span v-if="!entry.actor.type_names.length" class="nearby-type-chip">属性未知</span></div>
+                    <span class="nearby-level nearby-level-lv">Lv.{{ entry.actor.level ?? '?' }}</span>
+                    <span v-if="entry.actor.stale" class="nearby-level nearby-level-stale" title="战前观察，尚未重新确认">可能已过期</span>
+                    <div class="nearby-types"><template v-for="type in entry.actor.type_names" :key="type"><span class="nearby-type-chip"><img v-if="data?.type_icons[type]" class="nearby-type-icon" :src="data.type_icons[type]" :alt="type" loading="lazy">{{ type }}</span></template><span v-if="!entry.actor.type_names.length" class="nearby-type-chip">属性未知</span></div>
                   </div>
                   <time class="nearby-time" :title="entry.actor.updated_at === null ? '尚无更新' : '观察于 ' + time(entry.actor.updated_at)">{{ relativeTime(entry.actor.updated_at) }}</time>
                 </div>
-                <div v-if="entry.actor.marks.length || entry.actor.attention === 'double'" class="nearby-card-marks" aria-label="精灵标记">
+                <div class="nearby-card-marks" :class="{ 'is-empty': !entry.actor.colorful && !entry.actor.marks.length && entry.actor.attention !== 'double' }" aria-label="精灵标记">
+                  <span v-if="entry.actor.colorful" class="nearby-colorful-mark" title="游戏内炫彩外观（变异类型标记），与本地奖牌参考线无关"><img :src="RARITY_COLORFUL" alt="" loading="lazy">炫彩</span>
                   <span v-if="entry.actor.attention === 'double'" class="nearby-double-mark" title="体型与声音均命中当前参考线，尚未确认游戏奖牌">双牌</span>
                   <template v-for="mark in entry.actor.marks" :key="mark.name"><MedalIcon v-if="isMedalMark(mark)" :name="mark.name" :source="mark.source" /><span v-else class="nearby-reference-mark" :title="`${mark.name} · 数值参考`">{{ mark.name }}</span></template>
                 </div>
@@ -367,28 +378,47 @@ defineExpose({ update, load, pause, resume })
 .nearby-map-empty-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-2); }
 .nearby-grid { min-width: 0; padding: var(--space-3); container-type: inline-size; }
 .nearby-virtual-space { position: relative; min-width: 0; }
-.nearby-virtual-row { position: absolute; inset: 0 0 auto; }
-.nearby-card { display: flex; align-items: flex-start; gap: var(--space-3); min-width: 0; padding: var(--space-3) var(--space-4); background: var(--surface-1); border: 1px solid var(--line-soft); border-radius: var(--radius-md); cursor: pointer; }
-.nearby-card:hover { background: var(--surface-2); }
-.nearby-card.is-selected, .nearby-card:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-.nearby-portrait { display: grid; place-items: center; flex: none; width: 48px; height: 48px; background: var(--surface-2); border-radius: var(--radius-sm); color: var(--muted); }
-.nearby-portrait img { width: 100%; height: 100%; object-fit: contain; }
+/* 虚拟行必须脱离文档流：`.nearby-card` 自带 position 声明，这里用双类名保证覆盖顺序无关。 */
+.nearby-card.nearby-virtual-row { position: absolute; inset: 0 0 auto; }
+.nearby-card { position: relative; display: flex; align-items: flex-start; gap: var(--space-3); min-width: 0; padding: var(--space-3); background: var(--surface-1); border: 1px solid var(--line-soft); border-radius: var(--radius-md); cursor: pointer; }
+.nearby-card:hover { background: var(--surface-2); border-color: var(--line); }
+/* 选中/聚焦描边贴在卡片边框外沿，不压内部内容，也不会和炫彩边框叠成双线。 */
+.nearby-card.is-selected, .nearby-card:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 0; }
+/* 头像略大于文字行高，给名称/属性一个稳定的左侧锚点；炫彩卡在头像外包彩虹环并挂游戏内星标。 */
+.nearby-portrait { position: relative; display: grid; place-items: center; flex: none; width: 52px; height: 52px; background: var(--surface-2); border-radius: var(--radius-md); color: var(--muted); }
+.nearby-portrait > img:not(.nearby-portrait-colorful) { width: 100%; height: 100%; border-radius: var(--radius-md); object-fit: contain; }
+.nearby-portrait-colorful { position: absolute; right: -6px; bottom: -6px; width: 20px; height: 20px; object-fit: contain; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .4)); }
 .nearby-card-copy { display: flex; flex-direction: column; gap: var(--space-1); flex: 1; min-width: 0; }
 /* 身份行：名称/Lv/属性占左侧可换行区域，观察时间钉在右上角；属性再多也不会把时间挤走。 */
 .nearby-card-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; column-gap: var(--space-3); min-width: 0; }
 .nearby-card-identity { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); min-width: 0; }
-.nearby-card h3 { min-width: 0; max-width: 100%; margin: 0; overflow: hidden; font-size: var(--fs-md); font-weight: 700; line-height: 1.35; flex: 0 1 auto; text-overflow: ellipsis; white-space: nowrap; }
-.nearby-level { flex: none; color: var(--muted); font-size: var(--fs-xs); line-height: 1.35; font-variant-numeric: tabular-nums; }
+.nearby-card h3 { min-width: 0; max-width: 100%; margin: 0; overflow: hidden; font-size: var(--fs-lg); font-weight: 700; line-height: 1.35; flex: 0 1 auto; text-overflow: ellipsis; white-space: nowrap; }
+.nearby-level { flex: none; color: var(--muted); font-size: var(--fs-3xs); line-height: 1.35; font-variant-numeric: tabular-nums; }
+/* Lv 是稳定属性，用浅底胶囊与名称分隔；过期提示是警告文案，只用琥珀色不带底。 */
+.nearby-level-lv { display: inline-flex; align-items: center; min-height: 20px; padding: 0 6px; border-radius: var(--radius-pill); background: var(--surface-2); }
+.nearby-level-stale { color: var(--amber-ink); }
 .nearby-types { display: flex; flex-wrap: wrap; gap: var(--space-1); min-width: 0; max-width: 100%; }
-.nearby-type-chip { display: inline-flex; align-items: center; gap: var(--space-1); min-height: 20px; max-width: 100%; padding: 0 var(--space-2); border: 1px solid var(--line-soft); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--ink-soft); font-size: var(--fs-3xs); line-height: 1; white-space: nowrap; }
-.nearby-type-icon { width: 15px; height: 15px; flex: none; object-fit: contain; border-radius: 50%; }
+.nearby-type-chip { display: inline-flex; align-items: center; gap: 3px; min-height: 19px; max-width: 100%; padding: 0 6px; border: 1px solid var(--line-soft); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--ink-soft); font-size: var(--fs-3xs); line-height: 1; white-space: nowrap; }
+.nearby-type-icon { width: 13px; height: 13px; flex: none; object-fit: contain; border-radius: 50%; }
 .nearby-time { flex: none; padding-top: 1px; color: var(--muted); font-size: var(--fs-3xs); line-height: 1.35; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.nearby-card-marks { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1) var(--space-2); min-width: 0; max-width: 100%; }
+/* 标记行始终占位（无标记时 .is-empty 隐藏），避免有无标记的卡片高度跳变。 */
+.nearby-card-marks { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1) var(--space-2); min-width: 0; max-width: 100%; min-height: 22px; }
+.nearby-card-marks.is-empty { visibility: hidden; }
 .nearby-card-marks > * { flex-shrink: 0; }
 .nearby-card-marks .medal-icon { width: 22px; height: 22px; }
 .nearby-reference-mark, .nearby-double-mark { display: inline-flex; align-items: center; min-height: 22px; padding: 0 var(--space-2); border: 1px solid var(--amber-line); border-radius: var(--radius-sm); background: var(--amber-soft); color: var(--amber-ink); font-size: var(--fs-3xs); font-weight: 700; white-space: nowrap; }
 .nearby-double-mark { border-color: var(--teal); background: var(--accent); color: var(--teal-deep); }
-.nearby-card-meta { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin: 0; min-width: 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.4; }
+/* 炫彩：游戏内固有外观（mutation 第 4 位），独立于本地奖牌参考线。
+   用彩虹竖条 + 淡彩底 + 头像彩虹环 + 星标贴纸表达稀缺度，不再依赖虚线紫框。 */
+/* 炫彩：游戏内固有外观（mutation 第 4 位），独立于本地奖牌参考线。
+   稀有卡片用左浓右淡的紫雾底 + 头像彩虹环 + 右下角星标表达；不再压彩虹竖条，
+   避免与选中/聚焦描边在同一圈位置上叠出双线。 */
+.nearby-card.is-colorful { border-color: var(--colorful-line); background: linear-gradient(100deg, color-mix(in srgb, var(--colorful-soft) 72%, var(--surface-1)) 0%, color-mix(in srgb, var(--colorful-soft) 26%, var(--surface-1)) 54%, var(--surface-1) 82%); }
+.nearby-card.is-colorful:hover { background: linear-gradient(100deg, color-mix(in srgb, var(--colorful-soft) 82%, var(--surface-2)) 0%, color-mix(in srgb, var(--colorful-soft) 30%, var(--surface-2)) 54%, var(--surface-2) 82%); }
+.nearby-card.is-colorful .nearby-portrait { border: 2.5px solid transparent; background: linear-gradient(var(--surface-2), var(--surface-2)) padding-box, var(--colorful-gradient) border-box; }
+.nearby-colorful-mark { display: inline-flex; align-items: center; gap: 3px; min-height: 22px; padding: 0 var(--space-2); border: 1px solid var(--colorful-line); border-radius: var(--radius-pill); background: var(--colorful-soft); color: var(--colorful-ink); font-size: var(--fs-3xs); font-weight: 700; white-space: nowrap; }
+.nearby-colorful-mark img { width: 14px; height: 14px; flex: none; object-fit: contain; }
+.nearby-card-meta { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin: 0; min-width: 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.4; }
 .nearby-card-meta > span { flex: none; white-space: nowrap; }
 .nearby-card-meta b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 .nearby-empty { height: 100%; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2); padding: var(--space-6); text-align: center; border: 0; border-radius: var(--radius-sm); background: var(--panel); }
@@ -418,7 +448,7 @@ defineExpose({ update, load, pause, resume })
 @media(max-width:480px) {
   .nearby-toolbar .nearby-search { flex-basis: 100%; }
   .nearby-card { padding: var(--space-2) var(--space-3); }
-  .nearby-portrait { width: 40px; height: 40px; }
+  .nearby-portrait { width: 44px; height: 44px; }
   .nearby-card-meta { font-size: var(--fs-3xs); }
 }
 </style>

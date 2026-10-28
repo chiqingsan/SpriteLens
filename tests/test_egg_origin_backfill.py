@@ -140,17 +140,26 @@ class EggOriginScannerTest(unittest.TestCase):
         self.assertEqual(scanner.records, ())
         self.assertEqual(scanner.unmatched_rewards, 1)
 
-    def test_other_pickup_options_and_actors_do_not_link(self) -> None:
-        """非收蛋交互选项的 0x0137 不产生关联。"""
+    def test_only_interactions_on_a_scene_egg_link(self) -> None:
+        """判据是目标 actor 是场景蛋，交互选项本身不固定。"""
         scanner = EggOriginScanner()
         for event in _home_events():
             scanner.feed(event, "p06")
-        unknown = replace(_request(1.0), decoded=[_bag_field(1, 901), _bag_field(2, 830000999)])
-        scanner.feed(unknown, "p07")
-        scanner.feed(_reward(1.05), "p07")
+        other = replace(_request(0.9), decoded=[_bag_field(1, 999), _bag_field(2, 830000009)])
+        scanner.feed(other, "p06")
+        scanner.feed(_reward(0.95), "p06")
 
         self.assertEqual(scanner.records, ())
         self.assertEqual(scanner.unmatched_rewards, 1)
+
+        # 未登记过的选项指向场景蛋时，仍按场景蛋关联。
+        scanner = EggOriginScanner()
+        for event in _home_events():
+            scanner.feed(event, "p06")
+        scanner.feed(replace(_request(1.0), decoded=[_bag_field(1, 901), _bag_field(2, 830000217)]), "p07")
+        scanner.feed(_reward(1.05), "p07")
+        self.assertEqual(len(scanner.records), 1)
+        self.assertEqual(scanner.records[0].origin.actor_id, 901)
 
 
 class EggStorePickupMergeTest(unittest.TestCase):
