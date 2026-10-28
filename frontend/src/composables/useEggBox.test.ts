@@ -7,12 +7,14 @@ const annotations = { nature_id: 0, nest_override: '' as const, note: '', voice_
 
 function egg(instanceId: number): EggBoxEntry {
   return {
-    instance_id: instanceId, egg_conf_id: 3001001, egg_name: `蛋${instanceId}`, species_name: '',
+    instance_id: instanceId, egg_conf_id: 3001001, egg_name: `蛋${instanceId}`, species_name: '', dex_no: 0,
     chain_names: [], description: '', description_source: '', icon_url: '', fallback_icon_url: '',
     egg_type_name: '', egg_activity: false, egg_kind: 'regular', egg_group_names: [], hatch_label: '', quantity: 1,
     obtained_at: instanceId, historical: false, hatching: false, hatch_known: false,
     historical_hatching: false, favorite: false, hatch_progress: 0, special_egg_conf_id: 0,
-    height_cm: 0, weight_g: 0, home_egg: false, annotations: { ...annotations },
+    height_cm: 0, weight_g: 0, home_egg: false, pickup: null, category: 0,
+    from_player_name: '', from_pet_name: '', from_player_uin: 0, from_pet_gid: 0,
+    annotations: { ...annotations },
     tags: { nature: '', weight: null, voice: null, medals: [], nest: '' },
     measurement_ranges: { height_cm: null, weight_g: null },
   }
@@ -67,6 +69,79 @@ function annotationHarness() {
 }
 
 describe('useEggBox annotation drafts', () => {
+  it('图鉴 ID 按数值升序，同编号按时间，未知编号靠后并保留收藏置顶', async () => {
+    const t = annotationHarness()
+    t.stored.get(42)!.eggs = [10, 2, 2, 0, 0].map((dexNo, index) => ({ ...egg(index + 1), dex_no: dexNo }))
+    await t.model.load()
+    t.model.filters.sort = 'dex'
+    const ids = () => t.model.visibleEggs.value.map(item => item.instance_id)
+    expect(ids()).toEqual([3, 2, 1, 5, 4])
+    t.model.filters.ascending = true
+    expect(ids()).toEqual([2, 3, 1, 4, 5])
+    t.model.setFavorite(1, true)
+    expect(ids()).toEqual([2, 3, 1, 4, 5])
+    t.model.pause(); await t.model.resume(1)
+    expect(ids()).toEqual([1, 2, 3, 4, 5])
+  })
+
+  it('收藏状态立即更新，后台同步保留位置，返回页面时才应用收藏置顶', async () => {
+    const t = annotationHarness(); await t.model.load()
+    const ids = () => t.model.visibleEggs.value.map(item => item.instance_id)
+    expect(ids()).toEqual([2, 1])
+    t.model.setFavorite(1, true)
+    t.stored.get(42)!.eggs[0]!.favorite = true
+    expect(t.model.data.value!.eggs[0]!.favorite).toBe(true)
+    expect(ids()).toEqual([2, 1])
+    await t.model.load()
+    expect(ids()).toEqual([2, 1])
+    t.model.pause(); await t.model.resume(1)
+    expect(ids()).toEqual([1, 2])
+    expect(t.host.load).toHaveBeenCalledTimes(2)
+    t.model.setFavorite(1, false)
+    t.stored.get(42)!.eggs[0]!.favorite = false
+    await t.model.load()
+    expect(ids()).toEqual([1, 2])
+    t.model.filters.ascending = true
+    expect(ids()).toEqual([1, 2])
+    t.model.filters.ascending = false
+    expect(ids()).toEqual([2, 1])
+    t.model.setFavorite(1, true)
+    t.model.filters.sort = 'large'
+    expect(ids()).toEqual([1, 2])
+  })
+
+  it('重量按五档标签排序，同档按时间；学院绿窝在前，收藏仍置顶', async () => {
+    const t = annotationHarness()
+    const eggs = Array.from({ length: 10 }, (_, index) => egg(index + 1))
+    eggs.forEach((item, index) => {
+      const label = ['满重', '大块头', '', '小不点', '底重'][Math.floor(index / 2)]!
+      if (label === '大块头' || label === '小不点') item.tags.medals = [label]
+      else item.tags.weight = label || null
+      // 跨物种的绝对克重不能替代五档标签。
+      item.weight_g = index * 1000
+    })
+    eggs[0]!.tags.nest = '学院绿窝'
+    eggs[8]!.tags.nest = '学院绿窝'
+    t.stored.get(42)!.eggs = eggs
+    await t.model.load()
+    const ids = () => t.model.visibleEggs.value.map(item => item.instance_id)
+    expect(ids()).toEqual([10, 9, 8, 7, 6, 5, 4, 3, 2, 1])
+    t.model.filters.sort = 'large'
+    expect(ids()).toEqual([2, 1, 4, 3, 6, 5, 8, 7, 10, 9])
+    t.model.filters.sort = 'small'
+    expect(ids()).toEqual([10, 9, 8, 7, 6, 5, 4, 3, 2, 1])
+    t.model.filters.ascending = true
+    expect(ids()).toEqual([9, 10, 7, 8, 5, 6, 3, 4, 1, 2])
+    t.model.filters.ascending = false
+    t.model.filters.sort = 'academy'
+    expect(ids()).toEqual([9, 1, 10, 8, 7, 6, 5, 4, 3, 2])
+    t.model.setFavorite(2, true)
+    t.model.filters.sort = 'large'
+    expect(ids()[0]).toBe(2)
+    await t.switchAccount(84)
+    expect(ids()).toEqual([2, 1])
+  })
+
   it('关闭前 flush 保存尚未失焦的声音，并等待服务端确认', async () => {
     const t = annotationHarness(); await t.model.load()
     t.edit({ voice_db: -20 }, false)

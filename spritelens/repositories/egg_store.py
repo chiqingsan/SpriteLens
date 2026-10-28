@@ -16,8 +16,9 @@ import json
 import sqlite3
 import threading
 import time
+from dataclasses import asdict, dataclass
 
-from spritelens.domain.egg_box import EggBoxEntry
+from spritelens.domain.egg_box import EggBoxEntry, EggParent, EggPickupOrigin
 from spritelens.logs import get_logger
 from spritelens.repositories.database import Database
 
@@ -41,6 +42,15 @@ ON CONFLICT (uid, instance_id) DO UPDATE SET
 """
 
 
+@dataclass(frozen=True)
+class PickupMergeResult:
+    """历史收蛋来源的合并结果：补上、保留已有、库中无此蛋。"""
+
+    applied: int
+    kept: int
+    missing: tuple[int, ...]
+
+
 def _detail_json(egg: EggBoxEntry) -> str:
     return json.dumps(
         {
@@ -51,6 +61,11 @@ def _detail_json(egg: EggBoxEntry) -> str:
             "hatch_updated_at": egg.hatch_updated_at,
             "start_hatch_time": egg.start_hatch_time,
             "category": egg.category,
+            "from_player_name": egg.from_player_name,
+            "from_pet_name": egg.from_pet_name,
+            "from_player_uin": egg.from_player_uin,
+            "from_pet_gid": egg.from_pet_gid,
+            "pickup": asdict(egg.pickup) if egg.pickup is not None else None,
             "special_egg_conf_id": egg.special_egg_conf_id,
             "appearance_type": egg.appearance_type,
             "extension_type": egg.extension_type,
@@ -197,6 +212,15 @@ class EggStore:
             detail = {}
         if not isinstance(detail, dict):
             detail = {}
+        pickup = detail.get("pickup")
+        origin = EggPickupOrigin(
+            actor_id=pickup["actor_id"], nest_guid=pickup["nest_guid"], nest_kind=pickup["nest_kind"],
+            nest_config_id=pickup["nest_config_id"], observed_at=pickup["observed_at"],
+            pairing_stale=pickup["pairing_stale"],
+            mother_nature_id=int(pickup.get("mother_nature_id") or 0),
+            mother=EggParent(**pickup["mother"]) if pickup["mother"] is not None else None,
+            fathers=tuple(EggParent(**row) for row in pickup["fathers"]),
+        ) if pickup is not None else None
         return EggBoxEntry(
             instance_id=int(row["instance_id"]),
             egg_conf_id=int(row["egg_conf_id"]),
@@ -211,6 +235,10 @@ class EggStore:
             hatch_updated_at=int(detail.get("hatch_updated_at") or 0),
             start_hatch_time=int(detail.get("start_hatch_time") or 0),
             category=int(detail.get("category") or 0),
+            from_player_name=str(detail.get("from_player_name") or ""),
+            from_pet_name=str(detail.get("from_pet_name") or ""),
+            from_player_uin=int(detail.get("from_player_uin") or 0),
+            from_pet_gid=int(detail.get("from_pet_gid") or 0),
             special_egg_conf_id=int(detail.get("special_egg_conf_id") or 0),
             appearance_type=int(detail.get("appearance_type") or 0),
             extension_type=int(detail.get("extension_type") or 0),
@@ -218,6 +246,7 @@ class EggStore:
             glass_type=int(detail.get("glass_type") or 0),
             glass_value=int(detail.get("glass_value") or 0),
             home_egg=bool(row["home_egg"]),
+            pickup=origin,
         )
 
     def annotations(self, uid: int) -> dict[int, dict[str, int | str | bool | None]]:
@@ -283,6 +312,45 @@ class EggStore:
                 "AND nest_override = '' AND note = '' AND voice_tag = '' AND voice_db IS NULL AND is_favorite = 0",
                 (uid, instance_id),
             )
+
+    # -- 历史补录 ------------------------------------------------------
+    def put_pickups(self, uid: int, pickups: dict[int, EggPickupOrigin]) -> PickupMergeResult:
+        """把历史回放得到的收蛋来源合并进 detail_json.pickup（补录用）。
+
+        只补缺失的来源：已有 pickup 的蛋不覆盖（实时采集按现场快照记的
+        优先级更高）；其它 detail 字段、updated_at 与 home_egg 一律不动
+        ——补录只补「来源」这一项，不伪装成一条新采集到的蛋记录。
+        """
+        if uid <= 0 or not pickups:
+            return PickupMergeResult(0, 0, ())
+        self.flush()
+        rows = self._db.query("SELECT instance_id, detail_json FROM eggs WHERE uid = ?", (uid,))
+        seen: set[int] = set()
+        applied = kept = 0
+        updates: list[tuple[str, int, int]] = []
+        for row in rows:
+            instance_id = int(row["instance_id"])
+            origin = pickups.get(instance_id)
+            if origin is None:
+                continue
+            seen.add(instance_id)
+            try:
+                detail = json.loads(row["detail_json"] or "{}")
+            except json.JSONDecodeError:
+                logger.error("蛋行 detail 损坏，跳过历史来源补录：uid=%s instance_id=%s", uid, instance_id)
+                continue
+            if not isinstance(detail, dict):
+                detail = {}
+            if detail.get("pickup") is not None:
+                kept += 1
+                continue
+            detail["pickup"] = asdict(origin)
+            updates.append((json.dumps(detail, ensure_ascii=False, separators=(",", ":")), uid, instance_id))
+            applied += 1
+        if updates:
+            self._db.execute_many("UPDATE eggs SET detail_json = ? WHERE uid = ? AND instance_id = ?", updates)
+        missing = tuple(sorted(instance_id for instance_id in pickups if instance_id not in seen))
+        return PickupMergeResult(applied, kept, missing)
 
     def load_latest(self) -> tuple[int, tuple[EggBoxEntry, ...]]:
         """最近活跃账号的蛋仓快照（离线展示用）。"""
@@ -391,4 +459,4 @@ class EggStore:
             return self._written
 
 
-__all__ = ["DEFAULT_FLUSH_INTERVAL", "EggStore"]
+__all__ = ["DEFAULT_FLUSH_INTERVAL", "EggStore", "PickupMergeResult"]

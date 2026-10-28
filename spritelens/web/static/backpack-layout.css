@@ -234,9 +234,6 @@
 }
 @media (max-width: 960px) {
   #page-pets .workspace.split, #page-pets .workspace.split.detail-collapsed { grid-template-columns: minmax(0, 1fr) !important; }
-  #page-pets .pet-toolbar { flex-wrap: wrap; }
-  #page-pets .pet-search-results { order: 0; justify-content: flex-start; flex-basis: 100%; }
-  .pet-search-results { width: 100%; }
   .pet-toolbar .segmented button { padding: 0 var(--space-2); }
   #page-pets .filter-rail { gap: 0; }
   #pet-grid.box-fill-grid { min-height: 672px; }

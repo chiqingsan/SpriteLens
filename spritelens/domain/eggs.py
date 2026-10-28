@@ -61,6 +61,7 @@ class EggInfo:
 class InventoryEggInfo:
     egg_name: str
     species_name: str
+    dex_no: int
     description: str
     description_source: str
     icon_item_id: int
@@ -202,6 +203,7 @@ class EggCatalog:
             precious = 0
         return InventoryEggInfo(
             egg_name=egg_name, species_name=name,
+            dex_no=species.dex_no if species and not random_id else 0,
             description=description.get("text", ""), description_source=description.get("source", ""),
             icon_item_id=item.get("icon_item_id", 0) or (variant.egg_item_id if variant else 0),
             egg_group_names=tuple(item.get("egg_group_names", species.egg_group_names if species else ())),

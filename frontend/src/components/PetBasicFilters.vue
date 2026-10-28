@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import type { PetFilterModel } from '../composables/usePetFilters'
 import DualRangeSlider from './DualRangeSlider.vue'
 import UiIcon from './UiIcon.vue'
+import UiSegmented from './UiSegmented.vue'
 import UiSearch from './UiSearch.vue'
 import UiSelect from './UiSelect.vue'
 
@@ -37,10 +38,10 @@ watch(() => model.active.value, active => {
     <label class="inline-field pet-sort-field" :hidden="fixed"><span class="pet-sort-label">排序</span>
       <UiSelect id="f-sort" size="sm" class="pet-sort-picker" :options="sortOptions" :model-value="filters.sort" :disabled="fixed" label="排序" @change="setSort" />
     </label>
-    <div v-if="!fixed" class="segmented pet-sort-direction" role="group" aria-label="排序方向">
+    <UiSegmented v-if="!fixed" class="pet-sort-direction" role="group" aria-label="排序方向">
       <button type="button" :class="{ active: !filters.desc }" :aria-pressed="!filters.desc" @click="setSortDirection(false)"><UiIcon name="arrow-up"></UiIcon>升</button>
       <button type="button" :class="{ active: filters.desc }" :aria-pressed="filters.desc" @click="setSortDirection(true)"><UiIcon name="arrow-down"></UiIcon>倒</button>
-    </div>
+    </UiSegmented>
   </Teleport>
   <section class="direct-filter" style="order: 0">
 <h3>异色与炫彩</h3><div class="filter-pair">

@@ -66,7 +66,8 @@ const detailTags = computed(() => [
   ...(props.egg.tags.nest ? [props.egg.tags.nest] : []),
   ...(props.egg.tags.voice ? [props.egg.tags.voice] : []),
 ])
-const nestSelection = computed(() => props.annotations.nest_override || (props.egg.home_egg ? 'normal' : ''))
+const nestSelection = computed(() => props.annotations.nest_override
+  || (props.egg.pickup?.nest_kind === 'academy' ? 'green' : props.egg.home_egg ? 'normal' : ''))
 function savePatch(patch: Partial<EggBoxAnnotations>) {
   emit('updateAnnotations', { ...props.annotations, ...patch })
   emit('saveAnnotations')
@@ -192,11 +193,31 @@ function updateNote(event: Event) {
     <div class="eggbox-hatch-content">
       <p class="eggbox-hatch-status" :class="{ active: egg.hatching }">{{ hatchStatus }}<template v-if="egg.hatching"> · {{ Math.round(egg.hatch_progress * 100) }}%</template></p>
       <div v-if="egg.hatching" class="eggbox-hatch-track"><i :style="{ width: `${Math.round(egg.hatch_progress * 100)}%` }"></i></div>
-      <dl class="eggbox-detail-meta">
+      <dl class="eggbox-detail-meta eggbox-origin-meta">
         <div><dt>获得时间</dt><dd>{{ date(egg.obtained_at) }}</dd></div>
         <div><dt>数量</dt><dd>{{ egg.quantity || 1 }} 枚</dd></div>
         <div><dt>记录来源</dt><dd>{{ egg.historical ? '历史缓存' : '已观察' }}</dd></div>
+        <div v-if="egg.home_egg"><dt>获取方式</dt><dd>家园拾取</dd></div>
+        <div v-if="egg.category"><dt>来源编号</dt><dd>{{ egg.category }}</dd></div>
+        <div v-if="egg.from_player_name"><dt>来源玩家</dt><dd>{{ egg.from_player_name }}</dd></div>
+        <div v-if="egg.from_player_uin"><dt>玩家 UID</dt><dd>{{ egg.from_player_uin }}</dd></div>
+        <div v-if="egg.from_pet_name"><dt>精灵昵称</dt><dd>{{ egg.from_pet_name }}</dd></div>
+        <div v-if="egg.from_pet_gid"><dt>精灵实例 ID</dt><dd>{{ egg.from_pet_gid }}</dd></div>
+        <template v-if="egg.pickup">
+          <div><dt>收取时间</dt><dd>{{ date(egg.pickup.observed_at) }}</dd></div>
+          <div><dt>收取小窝</dt><dd>{{ egg.pickup.nest_kind === 'academy' ? '学院绿窝' : '普通窝' }}</dd></div>
+          <div v-if="egg.pickup.mother"><dt>关联母本</dt><dd>
+            <button type="button" class="text-button eggbox-parent-link" :data-reveal-pet="egg.pickup.mother.instance_id"
+              :title="`查看精灵 #${egg.pickup.mother.instance_id}`">{{ egg.pickup.mother.name || '精灵' }} #{{ egg.pickup.mother.instance_id }}<UiIcon name="chevron-right" /></button>
+          </dd></div>
+          <div v-if="egg.pickup.fathers.length"><dt>候选父本</dt><dd class="eggbox-parent-list">
+            <button v-for="father in egg.pickup.fathers" :key="father.instance_id" type="button" class="text-button eggbox-parent-link"
+              :data-reveal-pet="father.instance_id" :title="`查看精灵 #${father.instance_id}`">{{ father.name || '精灵' }} #{{ father.instance_id }}<UiIcon name="chevron-right" /></button>
+          </dd></div>
+        </template>
       </dl>
+      <small v-if="egg.pickup?.mother || egg.pickup?.fathers.length" class="filter-note">按收取前观察的小窝与配对关联，候选父本不代表实际父本。<template v-if="egg.pickup.pairing_stale">配对快照有待同步，仅供参考。</template></small>
+      <small v-if="egg.home_egg && !egg.pickup" class="filter-note">这枚蛋未记录收取时的关联。后续收蛋前，请在采集开启后离开家园并重新进入，以取得现场小窝和配对数据。</small>
     </div>
   </section>
   </div>

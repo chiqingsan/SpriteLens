@@ -192,7 +192,7 @@ body, .app-shell, .sidebar, .main-shell, .topbar, .content-panel, .filter-rail,
   background: transparent;
 }
 
-.app-shell.rail-motion { transition: grid-template-columns var(--motion-base) var(--motion-ease), background-color var(--motion-base) var(--motion-ease), border-color var(--motion-base) var(--motion-ease), color var(--motion-base) var(--motion-ease); }
+.app-shell.rail-motion { transition: background-color var(--motion-base) var(--motion-ease), border-color var(--motion-base) var(--motion-ease), color var(--motion-base) var(--motion-ease); }
 .app-shell.rail-animating .nav-indicator { transition: none; }
 
 /* 侧栏：直接坐在环境光背景上 */

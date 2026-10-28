@@ -5,6 +5,7 @@ import type { CollectionLine } from '../types/collectionLines'
 import PageShell from '../components/PageShell.vue'
 import PagePager from '../components/PagePager.vue'
 import UiIcon from '../components/UiIcon.vue'
+import UiSegmented from '../components/UiSegmented.vue'
 import UiSearch from '../components/UiSearch.vue'
 import CollectionParentCard from '../components/CollectionParentCard.vue'
 import './collection-lines.css'
@@ -167,7 +168,7 @@ defineExpose({ load, pause, resetAccount })
         <div class="collection-side-body collection-filters">
           <section class="direct-filter"><h3>双牌目标</h3><div class="collection-goals"><button v-for="[key, label] in collectionGoals" :key="key" class="chip" :class="{ active: settings.goal === key }" :aria-pressed="settings.goal === key" @click="settings.goal = key; model.apply()"><span><img v-for="medal in goalMedals[key]" :key="medal" :src="`/static/medal-icons/${medal}.webp`" alt=""></span>{{ label }}</button></div></section>
           <section class="collection-filter-section"><h3>蛋组</h3><div class="chip-group collection-group-options"><button class="chip" :class="{ active: !group }" :aria-pressed="!group" @click="group = ''">全部</button><button v-for="name in groups" :key="name" class="chip" :class="{ active: group === name }" :aria-pressed="group === name" @click="group = group === name ? '' : name">{{ name }}</button></div></section>
-          <section class="collection-filter-section"><h3>声音条件</h3><div class="segmented collection-sound" role="group" aria-label="声音条件"><button v-for="[value, label] in [['', '不限'], ['100', '+100 dB'], ['-100', '−100 dB']]" :key="value" :class="{ active: settings.sound === value }" :aria-pressed="settings.sound === value" @click="settings.sound = value; model.apply()">{{ label }}</button></div></section>
+          <section class="collection-filter-section"><h3>声音条件</h3><UiSegmented class="collection-sound" role="group" aria-label="声音条件"><button v-for="[value, label] in [['', '不限'], ['100', '+100 dB'], ['-100', '−100 dB']]" :key="value" :class="{ active: settings.sound === value }" :aria-pressed="settings.sound === value" @click="settings.sound = value; model.apply()">{{ label }}</button></UiSegmented></section>
           <section class="collection-filter-section"><h3>统计条件</h3><div class="collection-parent-options"><button v-for="[key, label, icon] in ([['full_weight', '仅满体重亲本', 'weight'], ['colorful', '仅炫彩亲本', 'palette'], ['ignore_missing_male', '忽略缺种公', 'gender-female']] as const)" :key="key" class="chip" :class="{ active: settings[key] }" :aria-pressed="settings[key]" @click="settings[key] = !settings[key]; model.apply()"><UiIcon :name="icon" />{{ label }}<UiIcon name="circle-check" class="collection-option-check" :class="{ 'is-off': !settings[key] }" /></button></div></section>
         </div>
       </template>

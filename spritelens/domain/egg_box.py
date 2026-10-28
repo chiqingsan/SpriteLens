@@ -4,7 +4,8 @@
     蛋行   field1=instanceId(>0)  field2=itemConfId(>0)  field3=quantity
            field4=obtainedAtUnix  field14=bagType(==8)   field15=detail 子消息
     detail field1=petConfId  2=height_cm  3=weight_g  4=hatchedSeconds
-           5=hatchUpdatedAt  6=hatchSeconds  9=startHatchTime  10=category
+           5=hatchUpdatedAt  6=hatchSeconds  9=startHatchTime  10=src(category)
+           13=fromPlayerName  14=fromPetName  15=fromPlayerUin  16=fromPetGid
            17=randomEggConf  18=mutationType  19=glassInfo  21=preciousEggType
 
 bagType==8 是蛋背包标记；detail 子消息必须同时含孵化时长、身高和体重，
@@ -35,12 +36,36 @@ _D_HATCH_UPDATED_AT = 5
 _D_HATCH_SECONDS = 6
 _D_START_HATCH_TIME = 9
 _D_CATEGORY = 10
+_D_FROM_PLAYER_NAME = 13
+_D_FROM_PET_NAME = 14
+_D_FROM_PLAYER_UIN = 15
+_D_FROM_PET_GID = 16
 _D_SPECIAL_EGG_CONF_ID = 17
 _D_APPEARANCE_TYPE = 18
 _D_EXTENSION_TYPE = 21
 
 BAG_TYPE_EGG = 8
 OP_HATCH_SLOTS = 0x0312
+
+@dataclass(frozen=True)
+class EggParent:
+    instance_id: int
+    name: str
+    base_id: int
+
+
+@dataclass(frozen=True)
+class EggPickupOrigin:
+    actor_id: int
+    nest_guid: str
+    nest_kind: str
+    nest_config_id: int
+    mother: EggParent | None
+    fathers: tuple[EggParent, ...]
+    observed_at: float
+    pairing_stale: bool
+    mother_nature_id: int = 0
+
 
 @dataclass(frozen=True)
 class EggBoxEntry:
@@ -66,6 +91,11 @@ class EggBoxEntry:
     glass_type: int = 0
     glass_value: int = 0
     home_egg: bool = False
+    from_player_name: str = ""
+    from_pet_name: str = ""
+    from_player_uin: int = 0
+    from_pet_gid: int = 0
+    pickup: EggPickupOrigin | None = None
 
     @property
     def hatching(self) -> bool:
@@ -81,6 +111,12 @@ class EggBoxEntry:
 
 def _coerce_int(value: object) -> int:
     return value if isinstance(value, int) else 0
+
+
+def _coerce_text(value: object) -> str:
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value if isinstance(value, str) else ""
 
 
 def _raw_by_no(fields: list[dict], no: int) -> object:
@@ -143,6 +179,10 @@ def _egg_from_node(fields: list[dict]) -> EggBoxEntry | None:
         is_precious=bool(detail_int(11)),
         glass_type=_coerce_int(_raw_by_no(glass, 1)),
         glass_value=_coerce_int(_raw_by_no(glass, 2)),
+        from_player_name=_coerce_text(_raw_by_no(detail, _D_FROM_PLAYER_NAME)),
+        from_pet_name=_coerce_text(_raw_by_no(detail, _D_FROM_PET_NAME)),
+        from_player_uin=detail_int(_D_FROM_PLAYER_UIN),
+        from_pet_gid=detail_int(_D_FROM_PET_GID),
     )
 
 
