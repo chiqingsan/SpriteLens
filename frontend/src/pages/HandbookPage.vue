@@ -12,7 +12,7 @@ import DexTypeBadge from '../components/DexTypeBadge.vue'
 import DexFilterMenu from '../components/DexFilterMenu.vue'
 import UiIcon from '../components/UiIcon.vue'
 import UiSearch from '../components/UiSearch.vue'
-import UiSelect from '../components/UiSelect.vue'
+import UiSegmented from '../components/UiSegmented.vue'
 import './catalog-wiki.css'
 
 const props = defineProps<{ api: ApiClient; active: boolean }>()

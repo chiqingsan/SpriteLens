@@ -2,7 +2,6 @@
 import UiSelect from './UiSelect.vue'
 import { computed, ref } from 'vue'
 import type { WikiSkill } from '../types/wikiReference'
-import UiSearch from './UiSearch.vue'
 import UiSelect from './UiSelect.vue'
 const { skills } = defineProps<{ skills: WikiSkill[] }>()
 const search = ref(''), source = ref(''), type = ref('')

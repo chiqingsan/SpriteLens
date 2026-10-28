@@ -37,16 +37,14 @@ describe('图鉴详情', () => {
     const wrapper = mount(HandbookDetail, { props: { item: species({ matchups: { weak: [], resist: [], immune: [] } }) } })
     expect(wrapper.find('.dex-matchups').exists()).toBe(false)
   })
-  it('数据范围显示数值端点和范围跨度，并隐藏空分布', () => {
+  it('数据范围显示数值端点与体型、声音参考，并隐藏空分布', () => {
     const wrapper = mount(HandbookDetail, { props: { item: species() } })
     const text = wrapper.text()
     expect(text).toContain('身高 0.53–0.75 m')
     expect(text).toContain('0.53 m')
     expect(text).toContain('0.75 m')
-    expect(text).toContain('范围跨度 0.22 m')
     expect(text).toContain('小不点 ≤0.53m · 大块头 ≥0.75m')
     expect(text).toContain('体重 3.62–4.60 kg')
-    expect(text).toContain('范围跨度 0.98 kg')
     expect(text).toContain('体型参考')
     expect(text).toContain('小不点 ≤3.64kg · 大块头 ≥4.58kg')
     expect(text).toContain('粗嗓门 −100–−96 dB')

@@ -5,7 +5,7 @@ const props = defineProps<{ navigation?: boolean }>()
 const root = ref<HTMLElement | null>(null)
 const indicator = ref<HTMLElement | null>(null)
 const ready = ref(false)
-let observer: ResizeObserver
+let observer: ResizeObserver | null = null
 let readyFrame = 0
 let navigationTimer: ReturnType<typeof setTimeout> | undefined
 let finishNavigation: ((event?: TransitionEvent) => void) | undefined
@@ -51,12 +51,13 @@ function navigate(event: MouseEvent) {
 onMounted(() => {
   position()
   readyFrame = requestAnimationFrame(() => { ready.value = true })
+  if (typeof ResizeObserver === 'undefined' || !root.value) return
   observer = new ResizeObserver(position)
-  observer.observe(root.value!)
-  root.value!.querySelectorAll('button').forEach(button => observer.observe(button))
+  observer.observe(root.value)
+  root.value.querySelectorAll('button').forEach(button => observer!.observe(button))
 })
 onUpdated(position)
-onBeforeUnmount(() => { observer.disconnect(); if (finishNavigation) indicator.value?.removeEventListener('transitionend', finishNavigation); clearTimeout(navigationTimer); cancelAnimationFrame(readyFrame) })
+onBeforeUnmount(() => { observer?.disconnect(); if (finishNavigation) indicator.value?.removeEventListener('transitionend', finishNavigation); clearTimeout(navigationTimer); cancelAnimationFrame(readyFrame) })
 </script>
 
 <template>
