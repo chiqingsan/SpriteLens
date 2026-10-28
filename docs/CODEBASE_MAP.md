@@ -24,6 +24,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `tools/import_static_data.py` | 导入基础静态表（物种/性格/系别/技能）到 data/static |
 | `tools/import_assets.py` | 导入图鉴元数据 + 精灵图 + 系别图标 + 系别克制表 |
 | `tools/import_egg_data.py` | 导入蛋目录（蛋组/孵化时长/公母比/身高体重/进化链）到 data/static/eggs.json |
+| `tools/import_egg_icons.py` | 按道具 ID 从 wiki 资源站补缺失蛋图标（无损 webp，来源与 SHA-256 写入 resource_sync_report.json） |
 | `tools/import_pet_details.py` | 补全静态数据：图鉴描述并入 species.json（+sum 重算修正）、补技能名、奖牌表、蛋/奖牌图标 |
 | `tools/import_world_maps.py` | 从解包资源导入两张世界地图底图与坐标 manifest：固定来源哈希/尺寸/原点边长，暂存校验后发布，失败保留旧产物 |
 | `tools/sync_catalog_resources.py` | 官方目录/镜像同步：保留有效值的 ID 合并、镜像校验、可重复导入并出报告（resource_sync_report.json） |
@@ -98,7 +99,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `domain/measurements.py` | 参考范围工具：cm/g → m/kg 文案、范围位置比例与越界状态（纯函数） |
 | `domain/pet_marks.py` | 紧凑标记：体型大/小、声音粗/婉（含佩戴奖牌来源），组内互斥最多两项 |
 | `domain/pet_locations.py` | 真实箱位：Backpack/PetBox（30 格箱表 + 3×6 队伍 + 移动增量 + v2 快照恢复） |
-| `domain/eggs.py` | 蛋目录：蛋静态数据索引（egg_conf_id / base_id 联查，孵蛋工具链底座） |
+| `domain/eggs.py` | 蛋目录：蛋静态数据索引（egg_conf_id / base_id 联查，孵蛋工具链底座）；活动蛋等变体配置按 pet_conf_id // 1000 回退同族蛋，仅补展示字段 |
 | `domain/color_cards.py` | 色卡目录：44 张卡（底色×混色）+ glass→卡号判定（赛季 s1-s4） |
 | `domain/egg_box.py` | 蛋仓语义层：形状搜索提取 PacketEvent → EggBoxEntry（bagType==8 指纹） |
 | `domain/home.py` | 家园语义层：0x014A 双布局快照 + 0x0413/0x0414 已识别增量 → 居民/物种/家具/窝位/配对/场景蛋 |

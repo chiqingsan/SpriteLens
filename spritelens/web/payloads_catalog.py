@@ -575,6 +575,13 @@ def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_o
         voice_db = annotation.get("voice_db")
         favorite = bool(annotation.get("is_favorite", False))
         info = catalog.inventory_egg(egg.egg_conf_id, egg.pet_conf_id, egg.special_egg_conf_id) if catalog is not None else None
+        species_label = info.species_name if info is not None else ""
+        if info is not None and info.base_id and static is not None and (
+                not species_label or species_label == info.egg_name):
+            # 变体/活动蛋配置回退到同族蛋时，蛋目录里只存蛋名，物种名从物种表补
+            resolved = static.species(info.base_id)
+            if resolved is not None:
+                species_label = resolved.name
         kind = egg_kind(egg, info.precious_type if info else None, info.mutation_type if info else 0,
                         info.random if info else bool(egg.special_egg_conf_id))
         hatch_seconds = egg.hatch_seconds or (info.hatch_seconds if info else 0)
@@ -623,7 +630,7 @@ def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_o
                 "egg_name": display_egg_name(info.egg_name if info else f"蛋 #{egg.egg_conf_id}"),
                 # 活动来源的蛋（活动蛋 / 异色活动蛋）名字里不再带标识，改用角标说明出处
                 "egg_activity": bool(info is not None and "活动" in info.egg_type_name),
-                "species_name": info.species_name if info else "",
+                "species_name": species_label,
                 "chain_names": chain_names,
                 "description": info.description if info else "",
                 "description_source": info.description_source if info else "",

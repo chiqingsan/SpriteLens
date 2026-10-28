@@ -520,6 +520,31 @@ class EggBoxPayloadTests(unittest.TestCase):
             self.assertEqual(row["icon_url"], "/static/egg-icons/108001.webp")
             self.assertEqual(row["egg_group_names"], ["动物组"])
             self.assertEqual(row["measurement_ranges"]["height_cm"], {"min": 30, "max": 40})
+            # 活动蛋等变体配置没有蛋记录：按物种基础 ID 回退，名称/图标/物种/范围不再整块缺失
+            (directory / "eggs.json").write_text(json.dumps({"eggs": [{
+                "egg_key": "云梦豚#3784001", "egg_conf_id": 3784001, "base_id": 3784,
+                "name": "云梦豚的蛋", "egg_name": "云梦豚的蛋", "egg_item_id": 107249,
+                "egg_type_name": "普通蛋", "hatch_seconds": 57600,
+                "egg_group_names": ["海洋组"], "height_low": 14, "height_high": 21,
+                "weight_low": 4900, "weight_high": 11200,
+            }]}), encoding="utf-8")
+            variant_catalog = EggCatalog(directory)
+            variant_egg = replace(extract_eggs(_event(_egg_row(13, 150006)))[0], pet_conf_id=3784002)
+            variant_repo = SimpleNamespace(consistent_snapshot=lambda: SimpleNamespace(
+                entries=(variant_egg,), slots=frozenset(), slots_source="unknown",
+                historical_ids=frozenset(), source="observed", uid=101, version=1))
+
+            class VariantStatic:
+                def species(self, base_id):
+                    return SimpleNamespace(name="云梦豚") if base_id == 3784 else None
+
+            variant_row = egg_box_payload(variant_repo, variant_catalog, static=VariantStatic())["eggs"][0]
+            self.assertEqual(variant_row["egg_name"], "云梦豚的蛋")
+            self.assertEqual(variant_row["species_name"], "云梦豚")
+            self.assertEqual(variant_row["icon_url"], "/static/egg-icons/107249.webp")
+            self.assertEqual(variant_row["egg_group_names"], ["海洋组"])
+            self.assertEqual(variant_row["egg_kind"], "regular")
+            self.assertEqual(variant_row["measurement_ranges"]["height_cm"], {"min": 14, "max": 21})
             extreme_weights = tuple(
                 replace(egg, instance_id=index, weight_g=weight)
                 for index, weight in enumerate((500, 501, 508, 892, 899, 900), start=20)

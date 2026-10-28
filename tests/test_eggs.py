@@ -74,6 +74,23 @@ class EggCatalogTests(unittest.TestCase):
         by_search = egg_dex_payload(self.catalog, search="3002")
         self.assertEqual([e["name"] for e in by_search["eggs"]], ["岚鸟"])
 
+    def test_variant_conf_falls_back_to_species_egg(self) -> None:
+        """活动蛋等变体配置没有独立蛋记录时，按物种基础 ID 回退到同族蛋。"""
+        info = self.catalog.inventory_egg(0, 3002002)
+        self.assertEqual(info.egg_name, "岚鸟蛋")
+        self.assertEqual(info.icon_item_id, 107002)
+        self.assertEqual(info.egg_group_names, ("天空组",))
+        self.assertEqual(info.hatch_seconds, 28800)
+        self.assertEqual((info.height_low, info.height_high), (40, 60))
+        self.assertEqual(info.base_id, 3002)
+        self.assertEqual(info.egg_type_name, "活动蛋")
+        # 精确配置优先，回退不覆盖已有蛋记录
+        exact = self.catalog.inventory_egg(0, 3002001)
+        self.assertEqual((exact.egg_name, exact.base_id), ("岚鸟蛋", 3002))
+        # 回退失败时保持未知，不冒认物种
+        unknown = self.catalog.inventory_egg(0, 9999999)
+        self.assertEqual((unknown.egg_name, unknown.icon_item_id, unknown.base_id), ("蛋 #0", 0, 0))
+
     def test_search_expands_to_evolution_chain(self) -> None:
         """蛋图鉴搜索也按进化链扩展：搜链上另一形态也能找到该蛋。"""
         for name in ("natures", "types", "skills", "type_chart"):

@@ -5,6 +5,10 @@
   - egg_conf_id（协议 detail.conf_id）→ 蛋记录；itemConfId 是另一类道具 ID
   - base_id（物种 base_conf_id）→ 蛋记录（该物种产什么蛋）
 
+活动蛋等变体配置（如云梦豚活动蛋 3784002）没有独立蛋记录、道具表也可能没收录，
+查询时按协议约定用 pet_conf_id // 1000 取物种基础 ID 回退到同族普通蛋，
+只补名称/图标/蛋组/范围等展示字段，不往蛋目录写条目、不给随机蛋冒认物种。
+
 设计约束同 static_data：零 IO 副作用、加载失败整体降级空表。
 """
 
@@ -71,6 +75,7 @@ class InventoryEggInfo:
     weight_low: int
     weight_high: int
     chain_members: tuple[int, ...]
+    base_id: int = 0
 
 
 def display_egg_name(name: str) -> str:
@@ -175,32 +180,49 @@ class EggCatalog:
         config_id = pet_conf_id or item.get("egg_conf_id", 0)
         config = self._inventory["configs"].get(str(config_id), {})
         exact = self.egg(config_id)
-        species = exact or self.egg_by_base_id(item.get("base_id") or config.get("base_id", 0))
+        # 活动蛋等变体配置（如 3784002「云梦豚活动蛋」）没有独立蛋记录，
+        # 按物种基础 ID 回退到同族普通蛋，否则名称、图标、蛋组会整块缺失。
+        variant = exact or self._pet_variant(config_id)
+        species = exact or self.egg_by_base_id(item.get("base_id") or config.get("base_id", 0)) or variant
         random_id = random_conf_id or item.get("random_conf_id", 0)
         random_config = self._inventory["random"].get(str(random_id), {})
-        name = item.get("species_name") or config.get("name") or (exact.name if exact else "")
-        base_id = item.get("base_id") or config.get("base_id", 0)
+        name = item.get("species_name") or config.get("name") or (variant.name if variant else "")
+        base_id = item.get("base_id") or config.get("base_id", 0) or (variant.base_id if variant else 0)
         description = self._egg_descriptions.get("base_ids", {}).get(str(base_id), {}).get(item.get("kind", ""), {})
         item_name = item.get("name", "")
         egg_name = exact.egg_name if exact else item_name
         if not egg_name or egg_name == "精灵蛋":
-            egg_name = f"{name}蛋" if name else f"随机精灵蛋 #{item_id}" if random_id else f"蛋 #{item_id}"
+            egg_name = (variant.egg_name if variant else "") or (
+                f"{name}蛋" if name else f"随机精灵蛋 #{item_id}" if random_id else f"蛋 #{item_id}")
         precious = random_config.get("precious_type") if random_id else config.get("precious_type", exact.egg_type_id if exact else None)
         if item.get("kind") in ("special", "shiny", "colorful"):
             precious = {"special": 1, "shiny": 2, "colorful": 6}[item["kind"]]
+        elif precious is None and variant is not None and variant.egg_type_name in ("普通", "普通蛋"):
+            # 回退到普通蛋时按普通蛋计；活动等来源仍由 egg_kind 的 random/协议字段判断
+            precious = 0
         return InventoryEggInfo(
             egg_name=egg_name, species_name=name,
             description=description.get("text", ""), description_source=description.get("source", ""),
-            icon_item_id=item.get("icon_item_id", 0) or (exact.egg_item_id if exact else 0),
+            icon_item_id=item.get("icon_item_id", 0) or (variant.egg_item_id if variant else 0),
             egg_group_names=tuple(item.get("egg_group_names", species.egg_group_names if species else ())),
-            egg_type_name=exact.egg_type_name if exact else str(config.get("egg_type_name") or ""),
-            hatch_seconds=config.get("hatch_seconds", exact.hatch_seconds if exact else 0),
+            egg_type_name=exact.egg_type_name if exact else (
+                str(config.get("egg_type_name") or "") or (variant.egg_type_name if variant else "")),
+            hatch_seconds=config.get("hatch_seconds") or (variant.hatch_seconds if variant else 0),
             precious_type=precious,
             mutation_type=random_config.get("mutation_type", 0), random=bool(random_id),
             chain_members=species.chain_members if species else (),
-            **{field: config.get(field, getattr(exact, field) if exact else 0)
-               for field in ("height_low", "height_high", "weight_low", "weight_high")},
+            height_low=config.get("height_low") or (variant.height_low if variant else 0),
+            height_high=config.get("height_high") or (variant.height_high if variant else 0),
+            weight_low=config.get("weight_low") or (variant.weight_low if variant else 0),
+            weight_high=config.get("weight_high") or (variant.weight_high if variant else 0),
+            base_id=base_id,
         )
+
+    def _pet_variant(self, pet_conf_id: int) -> EggInfo | None:
+        """变体/活动蛋配置不是蛋配置时，用物种基础 ID（pet_conf_id // 1000）反查同族蛋。"""
+        if pet_conf_id < 1_000_000:
+            return None
+        return self.egg_by_base_id(pet_conf_id // 1000)
 
     def entries(self) -> tuple[EggInfo, ...]:
         return self._entries
