@@ -9,7 +9,7 @@ function egg(instanceId: number): EggBoxEntry {
   return {
     instance_id: instanceId, egg_conf_id: 3001001, egg_name: `蛋${instanceId}`, species_name: '',
     chain_names: [], description: '', description_source: '', icon_url: '', fallback_icon_url: '',
-    egg_type_name: '', egg_kind: 'regular', egg_group_names: [], hatch_label: '', quantity: 1,
+    egg_type_name: '', egg_activity: false, egg_kind: 'regular', egg_group_names: [], hatch_label: '', quantity: 1,
     obtained_at: instanceId, historical: false, hatching: false, hatch_known: false,
     historical_hatching: false, favorite: false, hatch_progress: 0, special_egg_conf_id: 0,
     height_cm: 0, weight_g: 0, home_egg: false, annotations: { ...annotations },

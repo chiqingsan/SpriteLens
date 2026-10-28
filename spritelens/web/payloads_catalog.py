@@ -13,7 +13,7 @@ from spritelens.domain.color_cards import ColorCatalog
 from spritelens.domain.static_data import StaticData
 from spritelens.domain.display import TYPE_COLORS
 from spritelens.domain.egg_box import EGG_KIND_LABELS, egg_kind
-from spritelens.domain.eggs import EggCatalog
+from spritelens.domain.eggs import EggCatalog, display_egg_name
 from spritelens.domain.home_breeding import HomeBreedingProfile, infer_range_couples
 from spritelens.domain.breeding_nature import parent_nature_reference
 from spritelens.domain.measurements import range_position, range_text
@@ -620,7 +620,9 @@ def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_o
             {
                 "instance_id": egg.instance_id,
                 "egg_conf_id": egg.egg_conf_id,
-                "egg_name": info.egg_name if info else f"蛋 #{egg.egg_conf_id}",
+                "egg_name": display_egg_name(info.egg_name if info else f"蛋 #{egg.egg_conf_id}"),
+                # 活动来源的蛋（活动蛋 / 异色活动蛋）名字里不再带标识，改用角标说明出处
+                "egg_activity": bool(info is not None and "活动" in info.egg_type_name),
                 "species_name": info.species_name if info else "",
                 "chain_names": chain_names,
                 "description": info.description if info else "",
@@ -717,7 +719,7 @@ def egg_dex_payload(
                 "egg_conf_id": info.egg_conf_id,
                 "can_same_ride": static.wiki_reference.can_double_ride(info.base_id, info.name) if static is not None else None,
                 "wiki": static.wiki_reference.species(info.base_id, info.name) if details and static is not None else None,
-                "egg_name": info.egg_name,
+                "egg_name": display_egg_name(info.egg_name),
                 "name": info.name,
                 "base_id": info.base_id,
                 "icon_url": species_icon_url(info.base_id) if info.base_id else "",

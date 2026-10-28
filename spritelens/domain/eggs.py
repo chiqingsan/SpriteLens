@@ -61,6 +61,7 @@ class InventoryEggInfo:
     description_source: str
     icon_item_id: int
     egg_group_names: tuple[str, ...]
+    egg_type_name: str
     hatch_seconds: int
     precious_type: int | None
     mutation_type: int
@@ -70,6 +71,15 @@ class InventoryEggInfo:
     weight_low: int
     weight_high: int
     chain_members: tuple[int, ...]
+
+
+def display_egg_name(name: str) -> str:
+    """显示用蛋名：异色由星标与蛋类型表达，名称里不再重复「异色」前缀。
+
+    游戏数据里只有独立的活动道具自带这个前缀（如「异色星星眼的蛋」），
+    物种蛋刷出异色时名字不带前缀，两种异色蛋并排就会一半带前缀一半不带。
+    """
+    return name[2:] if name.startswith("异色") else name
 
 
 class EggCatalog:
@@ -183,6 +193,7 @@ class EggCatalog:
             description=description.get("text", ""), description_source=description.get("source", ""),
             icon_item_id=item.get("icon_item_id", 0) or (exact.egg_item_id if exact else 0),
             egg_group_names=tuple(item.get("egg_group_names", species.egg_group_names if species else ())),
+            egg_type_name=exact.egg_type_name if exact else str(config.get("egg_type_name") or ""),
             hatch_seconds=config.get("hatch_seconds", exact.hatch_seconds if exact else 0),
             precious_type=precious,
             mutation_type=random_config.get("mutation_type", 0), random=bool(random_id),

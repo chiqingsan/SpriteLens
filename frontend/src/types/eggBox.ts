@@ -31,6 +31,7 @@ export interface EggBoxEntry {
   icon_url: string
   fallback_icon_url: string
   egg_type_name: string
+  egg_activity: boolean
   egg_kind: 'regular' | 'special' | 'shiny' | 'colorful' | 'mystery' | 'unknown'
   egg_group_names: string[]
   hatch_label: string
@@ -119,7 +120,7 @@ function isEntry(value: unknown): value is EggBoxEntry {
     && strings(value.chain_names)
     && typeof value.egg_kind === 'string' && ['regular', 'special', 'shiny', 'colorful', 'mystery', 'unknown'].includes(value.egg_kind)
     && strings(value.egg_group_names)
-    && ['historical', 'hatching', 'hatch_known', 'historical_hatching']
+    && ['historical', 'hatching', 'hatch_known', 'historical_hatching', 'egg_activity']
       .every(key => typeof value[key] === 'boolean')
     && typeof value.favorite === 'boolean'
     && typeof value.home_egg === 'boolean' && isAnnotations(value.annotations)

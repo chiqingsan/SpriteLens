@@ -415,6 +415,7 @@
 
 .eggbox-card-nest,
 .eggbox-card-status,
+.eggbox-card-activity,
 .eggbox-card-quantity {
   overflow: hidden;
   min-width: 0;
@@ -481,6 +482,19 @@
   background: var(--surface-2);
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* 活动来源角标：活动道具产出的蛋（含异色活动蛋）。贴展示台左下角，
+   不与角标行抢宽度；名字里已不再带「异色」前缀，出处由这个角标补齐。 */
+.eggbox-card-activity {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 2;
+  flex: none;
+  border-color: color-mix(in srgb, var(--amber-ink) 26%, transparent);
+  background: color-mix(in srgb, var(--amber-soft) 78%, var(--panel));
+  color: var(--amber-ink);
 }
 
 /* 蛋图展示台：固定 97px 高，蛋贴着台面站好（角标行从台面顶部浮过），
@@ -579,7 +593,8 @@
   align-items: center;
   justify-content: center;
   flex: none;
-  gap: 3px;
+  /* 名称与异色星标之间留 6px：3px 时星标几乎贴在末字上，读起来像一个字 */
+  gap: var(--space-2);
   width: 100%;
   min-width: 0;
   height: 19px;
