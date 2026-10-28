@@ -261,6 +261,26 @@ schema 为外挂数据文件，游戏版本更新只换文件不改代码。
 命中率可经 `StaticData.stats()` 观测；名字字段仅作兜底（协议直带优先），
 系别/种族值/技能名等版本稳定字段直接使用。
 
+### 目录增量更新（交互已留，服务端未接入）
+
+游戏每版都在加蛋/加精灵，随包目录会落后，表现为「有图无名」「区间缺失」。运行期
+图标补图见 `web/egg_icon_cache.py`；名称、尺寸/体重区间、蛋组只能靠目录快照，接缝
+在 `services/catalog_update.py`：
+
+- `CatalogStore`：用户数据目录 `data_root()/egg-catalog` 内的版本快照 +
+  `active.json` 指针（`{"current": {...}, "history": [...]}`）。指针先写临时文件再
+  `os.replace`，切换是原子的；快照缺失或损坏时 `resolve()` 退回随包 `data/static/`，
+  页面不会因更新失败变空；`rollback()` 退回上一个可用版本。
+- `CatalogSource`：更新源协议（`check(current) -> CatalogRelease | None`、
+  `fetch(release) -> bytes`）。默认 `DisabledCatalogSource`，不联网、不预取。
+- `CatalogUpdater`：check → fetch → sha256/结构校验 → 安装，返回
+  `disabled`/`up_to_date`/`installed`/`unavailable`/`rejected`，失败保留旧版本。
+
+`app_context.py` 已改为 `EggCatalog(CatalogStore(...).resolve(static_dir()))`，因此接入
+服务端只需新增一个 `CatalogSource` 实现并调用 `CatalogUpdater.update()`，存储与回滚
+不用改。服务端约定（manifest 字段、zip 内允许的三个文件、只带版本号不带账号信息、
+只在用户主动检查时拉取）写在模块 docstring 里。
+
 ## 前端层（Web 单形态）
 
 与竞品（蛋神助手）同型的形态：单进程，pywebview 用系统 WebView2 开窗，
