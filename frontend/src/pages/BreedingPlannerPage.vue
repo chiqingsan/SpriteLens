@@ -350,12 +350,12 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
           <div class="planner-capacity-main">
             <span class="planner-capacity-art" aria-hidden="true"><UiIcon name="home" /></span>
             <div class="planner-capacity-nests">
+              <span id="planner-nest-count-label" class="planner-capacity-label">普通小窝</span>
               <span class="planner-stepper" role="group" aria-labelledby="planner-nest-count-label">
                 <button type="button" :disabled="draft.capacity <= 0" aria-label="减少普通小窝" @click="draft.capacity = Math.max(0, draft.capacity - 1)">−</button>
                 <output class="planner-stepper-value" aria-live="polite">{{ draft.capacity }}</output>
                 <button type="button" :disabled="draft.capacity >= 10" aria-label="增加普通小窝" @click="draft.capacity = Math.min(10, draft.capacity + 1)">+</button>
               </span>
-              <span id="planner-nest-count-label" class="planner-capacity-label">普通小窝</span>
             </div>
             <label class="planner-capacity-academy">
               <input v-model="draft.academy" type="checkbox">

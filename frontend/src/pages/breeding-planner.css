@@ -944,7 +944,7 @@ button.planner-state-badge:focus-visible { outline: 2px solid var(--teal); outli
 .planner-capacity { margin-bottom: var(--space-3); border: 1px solid var(--line-soft); border-radius: var(--radius-md); background: var(--surface-1); overflow: hidden; }
 
 /* 容量卡：去掉左侧 40×40 装饰方块（纯装饰，占掉 360px 侧栏里 50px 宽度）。
-   一行排开：步进器在左、普通小窝标签紧随其后，学院绿窝靠行尾；放不下时学院绿窝整块换行。 */
+   一行排开：「普通小窝」标签在左、计数器紧随其后，学院绿窝靠行尾；放不下时学院绿窝整块换行。 */
 .planner-capacity-main {
   display: flex;
   align-items: center;
