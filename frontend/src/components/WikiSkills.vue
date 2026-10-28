@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import UiSelect from './UiSelect.vue'
 import { computed, ref } from 'vue'
 import type { WikiSkill } from '../types/wikiReference'
 import UiSelect from './UiSelect.vue'

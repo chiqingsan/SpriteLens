@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import UiSelect from '../components/UiSelect.vue'
 import { computed, nextTick, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import PageShell from '../components/PageShell.vue'
@@ -263,7 +262,6 @@ defineExpose({ update, load, pause, resume })
       <button v-if="alertHost" class="ghost-button small nearby-alert" type="button" :aria-pressed="alertOn" :title="alertOn ? '发现双牌重点精灵时播放提示音；点击关闭' : '声音提醒已关闭；点击开启并试听'" @click="toggleAlert"><UiIcon :name="alertOn ? 'bell' : 'bell-off'" />提醒音{{ alertOn ? '开' : '关' }}</button>
       <button v-if="host.resetCoverage" class="ghost-button small nearby-clear-coverage" type="button" :disabled="!canClearCoverage" :aria-busy="clearingCoverage || undefined" title="清除当前地图的本次足迹；只影响覆盖层，不重置附近列表与观察周期" @click="clearCoverage"><UiIcon name="trash" />清除足迹</button>
       <button v-if="mapsError" type="button" class="ghost-button small" @click="refreshMaps"><UiIcon name="refresh" />重试地图清单</button>
-      </div>
       </div>
     </template>
     <div class="nearby-workspace" :class="{ 'is-map': viewMode === 'map' }">

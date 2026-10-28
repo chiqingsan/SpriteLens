@@ -40,7 +40,7 @@ watch(() => model.active.value, active => {
     <div v-if="!fixed" class="segmented pet-sort-direction" role="group" aria-label="排序方向">
       <button type="button" :class="{ active: !filters.desc }" :aria-pressed="!filters.desc" @click="setSortDirection(false)"><UiIcon name="arrow-up"></UiIcon>升</button>
       <button type="button" :class="{ active: filters.desc }" :aria-pressed="filters.desc" @click="setSortDirection(true)"><UiIcon name="arrow-down"></UiIcon>倒</button>
-    </UiSegmented>
+    </div>
   </Teleport>
   <section class="direct-filter" style="order: 0">
 <h3>异色与炫彩</h3><div class="filter-pair">

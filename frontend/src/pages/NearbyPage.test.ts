@@ -110,8 +110,8 @@ describe('附近精灵更新布局稳定性', () => {
     ;(wrapper.vm as unknown as { update(value: unknown): void }).update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
     await flushPromises()
     await nextTick()
-    await wrapper.get('.nearby-sort .ui-select-trigger').trigger('click')
-    await wrapper.findAll('.nearby-sort [role=option]')[0]!.trigger('click')
+    await wrapper.get('.nearby-sort').trigger('click')
+    ;(document.querySelector('[role=listbox] [role=option]') as HTMLElement).click()
     await nextTick()
     expect(wrapper.findAll('.nearby-card').map(card => card.attributes('id'))).toEqual([
       'nearby-actor-3', 'nearby-actor-2', 'nearby-actor-1',

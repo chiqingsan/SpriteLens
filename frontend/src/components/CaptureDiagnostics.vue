@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import UiSelect from './UiSelect.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import UiIcon from './UiIcon.vue'
 import UiSelect from './UiSelect.vue'
