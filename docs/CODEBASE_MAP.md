@@ -136,6 +136,8 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `web/routes_capture.py` | 采集域路由与载荷（/api/capture*、/api/state、capture/state 载荷；阶段1.4 自 server.py 拆出） |
 | `web/routes_accounts.py` | `/api/accounts` 与 `/api/accounts/select`：账号列表、切换查看与结果 |
 | `web/server_helpers.py` | HTTP query 解析助手（路由模块共用） |
+| `web/egg_icon_cache.py` | 蛋图标按需补图：安装包优先，缺图时按道具 ID 从素材站下载一次并缓存到用户数据目录；404 负缓存、失败静默降级占位 |
+| `tests/test_egg_icon_cache.py` | 补图只请求一次、安装包优先、非法名不发请求、404 负缓存、异常来源不落盘 |
 | `web/run.py` | 界面入口：pywebview 窗口（系统 WebView2）+ 单实例唤醒 + 降级提示；支持按需打开后台采集的远程界面 |
 | `web/background_run.py` | 按需后台模式：游戏进程存在期间启动采集、托盘打开主界面、游戏退出后清理 |
 | `web/close_coordinator.py` | 桌面关闭握手：等待页面保存确认、采集停止与缓存 flush；失败保留窗口或显式放弃 |

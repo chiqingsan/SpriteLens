@@ -654,7 +654,11 @@ def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_o
             {
                 "instance_id": egg.instance_id,
                 "egg_conf_id": egg.egg_conf_id,
-                "egg_name": display_egg_name(info.egg_name if info else f"蛋 #{egg.egg_conf_id}"),
+                # 目录与道具表都解不出名称时（名称退化成「蛋 #配置号」）给中性文案，
+                # 不把内部配置号当名字摆在卡片上
+                "egg_name": display_egg_name(info.egg_name)
+                if info is not None and info.egg_name and not info.egg_name.startswith("蛋 #")
+                else "精灵蛋 · 数据待补",
                 # 活动来源的蛋（活动蛋 / 异色活动蛋）名字里不再带标识，改用角标说明出处
                 "egg_activity": bool(info is not None and "活动" in info.egg_type_name),
                 "species_name": species_label,
@@ -667,7 +671,8 @@ def egg_box_payload(egg_box, catalog, *, static=None, annotations=None, nature_o
                     if info is not None and info.icon_item_id
                     else ""
                 ),
-                "fallback_icon_url": "",
+                # 缺图时 /static/egg-icons 会在运行期按道具 ID 补一次图；仍失败则显示中性占位蛋
+                "fallback_icon_url": "/static/egg-icons/_fallback.webp",
                 "egg_kind": kind,
                 "egg_type_name": EGG_KIND_LABELS[kind],
                 "egg_group_names": list(info.egg_group_names) if info is not None else [],

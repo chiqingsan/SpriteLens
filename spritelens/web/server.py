@@ -45,6 +45,7 @@ from spritelens.web.payloads_catalog import (
 )
 from spritelens.web.pet_media_cache import PetMediaCache
 from spritelens.web.account_avatar_cache import AccountAvatarCache
+from spritelens.web.egg_icon_cache import EggIconCache
 from spritelens.web.background import RUN_BLOCKING
 from spritelens.web.nearby import register_nearby_routes
 from spritelens.web.world_maps import register_world_map_routes
@@ -122,6 +123,7 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         self._account_epoch = 0
         self._pet_media_cache: PetMediaCache | None = None
         self._account_avatar_cache: AccountAvatarCache | None = None
+        self._egg_icon_cache: EggIconCache | None = None
         self._stopped = False
         self._stop_future = None
 
@@ -315,6 +317,9 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         self._account_avatar_cache = AccountAvatarCache(
             self._static_dir, data_root() / "account-avatar-cache"
         )
+        self._egg_icon_cache = EggIconCache(
+            self._static_dir, data_root() / "egg-icon-cache"
+        )
         app = web.Application(
             middlewares=[self._auth_middleware, self._no_cache_middleware],
             client_max_size=8 * 1024 * 1024,
@@ -324,6 +329,8 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         app.router.add_get("/favicon.ico", self._favicon)
         app.router.add_get("/static/pet-media/{asset}", self._pet_media_asset)
         app.router.add_get("/static/account-avatars/{asset}", self._account_avatar_asset)
+        # 蛋图标：安装包内的同名文件直接命中；新版本蛋缺图时按道具 ID 补一次并缓存
+        app.router.add_get("/static/egg-icons/{asset}", self._egg_icon_asset)
         app.router.add_static("/static", self._static_dir, name="static")
         app.router.add_get("/api/bootstrap", self._api_bootstrap)
         app.router.add_get("/api/accounts", self._api_accounts)
@@ -404,11 +411,12 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         if runner is not None:
             await runner.cleanup()
             self._runner = None  # cleanup 完成前由 loop 唯一持有
-        for cache in (self._pet_media_cache, self._account_avatar_cache):
+        for cache in (self._pet_media_cache, self._account_avatar_cache, self._egg_icon_cache):
             if cache is not None:
                 await cache.close()
         self._pet_media_cache = None
         self._account_avatar_cache = None
+        self._egg_icon_cache = None
         if self._blocking_tasks:
             await asyncio.gather(*list(self._blocking_tasks), return_exceptions=True)
         await asyncio.sleep(0)
@@ -465,6 +473,16 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         if path is None:
             return web.Response(status=404)
         return web.FileResponse(path)
+
+    async def _egg_icon_asset(self, request: web.Request) -> web.Response:
+        """蛋图标先查安装包，缺图的新蛋按道具 ID 补一次再缓存；失败交给占位图。"""
+        if self._egg_icon_cache is None:
+            raise RuntimeError("蛋图标缓存尚未初始化")
+        path = await self._egg_icon_cache.resolve(request.match_info["asset"])
+        if path is None:
+            return web.Response(status=404)
+        # Windows 的 mime 表未必认识 webp，显式声明避免回成 octet-stream
+        return web.FileResponse(path, headers={"Content-Type": "image/webp"})
 
     @web.middleware
     async def _no_cache_middleware(self, request: web.Request, handler):
