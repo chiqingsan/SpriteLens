@@ -5,7 +5,7 @@ import type { CollectionLine } from '../types/collectionLines'
 import PageShell from '../components/PageShell.vue'
 import PagePager from '../components/PagePager.vue'
 import UiIcon from '../components/UiIcon.vue'
-import UiSegmented from '../components/UiSegmented.vue'
+import UiSearch from '../components/UiSearch.vue'
 import CollectionParentCard from '../components/CollectionParentCard.vue'
 import './collection-lines.css'
 
@@ -109,7 +109,7 @@ defineExpose({ load, pause, resetAccount })
           <span class="count-badge"><UiIcon name="checklist" />{{ settings.ignore_missing_male ? '种母收集' : '产线配齐' }} <b>{{ data?.totals.complete ?? '—' }}<span> / {{ data?.totals.eligible ?? '—' }}</span></b></span>
         </div>
         <div class="collection-controls">
-          <label class="collection-search"><UiIcon name="search" /><input v-model="keyword" type="search" placeholder="搜索精灵 / 图鉴编号" aria-label="搜索进化链"></label>
+          <UiSearch v-model="keyword" class="collection-search" label="搜索进化链" placeholder="搜索精灵 / 图鉴编号" />
           <button class="ghost-button small collection-filter-toggle" :class="{ active: filtersOpen && isNarrow }" :aria-expanded="isNarrow ? filtersOpen : undefined" @click="showFilters"><UiIcon name="adjustments" /><span>筛选条件</span></button>
           <button class="ghost-button small collection-refresh" :disabled="loading" aria-label="刷新产线记录" title="刷新记录" @click="model.load"><UiIcon name="refresh" /></button>
           <PagePager class="collection-pager" :page="page" :pages="pages" :page-size="24" unit="条" label="产线页码" @update:page="page = $event" />
@@ -131,9 +131,9 @@ defineExpose({ load, pause, resetAccount })
       <div class="collection-grid">
         <button v-for="line in visible" :key="line.key" class="collection-card" :class="{ selected: selected === line.key }" :aria-pressed="selected === line.key" @click="open(line, $event)">
           <div class="collection-card-topline"><span class="collection-card-groups" :title="line.groups.join(' / ')">{{ line.groups.join(' / ') }}</span><span class="collection-status" :class="line.status"><UiIcon v-if="line.status === 'collected'" name="circle-check" />{{ labels[line.status] }}</span></div>
-          <div class="collection-card-portrait"><img v-if="line.members[0]?.icon_url && !failed.has(line.key)" :src="line.members[0].icon_url" alt="" loading="lazy" decoding="async" @error="failed.add(line.key)"><span v-else>{{ line.members[0]?.name.slice(0, 1) || '?' }}</span></div>
-          <strong class="collection-card-name"><span :title="line.members[0]?.name">{{ line.members[0]?.name || '未知链' }}</span><small>#{{ line.members[0]?.dex_no || '—' }}</small></strong>
-          <div class="collection-natures"><span v-for="nature in natures(line)" :key="nature">{{ nature }}</span><small v-if="!natures(line).length">{{ line.status === 'unknown' ? '进化链资料待补' : line.mothers.length ? '等待兼容种公' : '暂无目标种母' }}</small></div>
+          <div class="collection-card-portrait"><img v-if="line.members[0]?.icon_url && !failed.has(line.key)" :src="line.members[0].icon_url" alt="" loading="lazy" decoding="async" @error="failed.add(line.key)"><span v-else>{{ line.members[0]?.name.slice(0, 1) || '?' }}</span><small class="collection-card-dex">#{{ line.members[0]?.dex_no || '—' }}</small></div>
+          <strong class="collection-card-name"><span :title="line.members[0]?.name">{{ line.members[0]?.name || '未知链' }}</span></strong>
+          <div class="collection-natures"><span v-for="nature in natures(line).slice(0, 3)" :key="nature">{{ nature }}</span><span v-if="natures(line).length > 3" class="collection-natures-more" :title="natures(line).join('、')">+{{ natures(line).length - 3 }}</span><small v-if="!natures(line).length">{{ line.status === 'unknown' ? '进化链资料待补' : line.mothers.length ? '等待兼容种公' : '暂无目标种母' }}</small></div>
           <div class="collection-card-counts"><span><UiIcon name="gender-female" />种母 <b>{{ line.mothers.length }}</b></span><span><UiIcon name="gender-male" />种公 <b>{{ fatherCount(line) }}</b></span></div>
         </button>
         <div v-if="!visible.length" class="empty-hint collection-empty"><UiIcon :name="loading ? 'clock' : 'search'" /><strong>{{ loading && !data ? '正在读取产线记录…' : data && !data.available ? '可繁育目录尚未加载' : data?.lines.length ? '没有符合条件的产线' : '暂无产线数据' }}</strong><button v-if="data?.lines.length" class="ghost-button small" @click="clearFilters"><UiIcon name="filter-off" />清除筛选</button></div>
@@ -165,11 +165,10 @@ defineExpose({ load, pause, resetAccount })
       <template v-else>
         <header class="collection-side-header"><h2>筛选产线</h2><button class="ghost-button small" @click="clearFilters"><UiIcon name="filter-off" />重置筛选</button></header>
         <div class="collection-side-body collection-filters">
-          <section class="direct-filter"><h3>双牌目标</h3><div class="collection-goals"><button v-for="[key, label] in collectionGoals" :key="key" class="chip" :class="{ active: settings.goal === key }" :aria-pressed="settings.goal === key" @click="settings.goal = key; model.apply()"><span><img v-for="medal in goalMedals[key]" :key="medal" :src="`/static/medal-icons/${medal}.webp`" alt=""></span>{{ label }}</button></div><p class="collection-rule-note">按体重与声音标记统计，满身高不替代大块头；数值参考不等于已获奖牌。</p></section>
+          <section class="direct-filter"><h3>双牌目标</h3><div class="collection-goals"><button v-for="[key, label] in collectionGoals" :key="key" class="chip" :class="{ active: settings.goal === key }" :aria-pressed="settings.goal === key" @click="settings.goal = key; model.apply()"><span><img v-for="medal in goalMedals[key]" :key="medal" :src="`/static/medal-icons/${medal}.webp`" alt=""></span>{{ label }}</button></div></section>
           <section class="collection-filter-section"><h3>蛋组</h3><div class="chip-group collection-group-options"><button class="chip" :class="{ active: !group }" :aria-pressed="!group" @click="group = ''">全部</button><button v-for="name in groups" :key="name" class="chip" :class="{ active: group === name }" :aria-pressed="group === name" @click="group = group === name ? '' : name">{{ name }}</button></div></section>
-          <section class="collection-filter-section"><h3>声音条件</h3><UiSegmented class="collection-sound" role="group" aria-label="声音条件"><button v-for="[value, label] in [['', '不限'], ['100', '+100 dB'], ['-100', '−100 dB']]" :key="value" :class="{ active: settings.sound === value }" :aria-pressed="settings.sound === value" @click="settings.sound = value; model.apply()">{{ label }}</button></UiSegmented></section>
-          <section class="collection-filter-section"><h3>统计条件</h3><div class="collection-parent-options"><button v-for="[key, label, icon] in ([['full_weight', '仅满体重亲本', 'weight'], ['colorful', '仅炫彩亲本', 'palette'], ['ignore_missing_male', '忽略缺种公', 'gender-female']] as const)" :key="key" class="chip" :class="{ active: settings[key] }" :aria-pressed="settings[key]" @click="settings[key] = !settings[key]; model.apply()"><UiIcon :name="icon" />{{ label }}<UiIcon v-if="settings[key]" name="circle-check" /></button></div></section>
-          <details class="collection-filter-section collection-rules"><summary>统计说明<UiIcon name="chevron-right" /></summary><p>本页收集同账号、同双标、同性格且蛋组相容的组合，统计全部已知性格。同性格是收集条件，不是生蛋前提。</p><p>体型、声音标记与背包使用同一规则；满身高不替代大块头，最低身高不替代小不点。数值参考不等于已获奖牌。</p><p>亲本配齐不代表已经配窝或子代必出双牌；观察记录可能含已移出个体，学院小窝另行验证。</p></details>
+          <section class="collection-filter-section"><h3>声音条件</h3><div class="segmented collection-sound" role="group" aria-label="声音条件"><button v-for="[value, label] in [['', '不限'], ['100', '+100 dB'], ['-100', '−100 dB']]" :key="value" :class="{ active: settings.sound === value }" :aria-pressed="settings.sound === value" @click="settings.sound = value; model.apply()">{{ label }}</button></div></section>
+          <section class="collection-filter-section"><h3>统计条件</h3><div class="collection-parent-options"><button v-for="[key, label, icon] in ([['full_weight', '仅满体重亲本', 'weight'], ['colorful', '仅炫彩亲本', 'palette'], ['ignore_missing_male', '忽略缺种公', 'gender-female']] as const)" :key="key" class="chip" :class="{ active: settings[key] }" :aria-pressed="settings[key]" @click="settings[key] = !settings[key]; model.apply()"><UiIcon :name="icon" />{{ label }}<UiIcon name="circle-check" class="collection-option-check" :class="{ 'is-off': !settings[key] }" /></button></div></section>
         </div>
       </template>
     </aside>

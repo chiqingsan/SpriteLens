@@ -2,18 +2,22 @@
 import UiSelect from './UiSelect.vue'
 import { computed, ref } from 'vue'
 import type { WikiSkill } from '../types/wikiReference'
+import UiSearch from './UiSearch.vue'
+import UiSelect from './UiSelect.vue'
 const { skills } = defineProps<{ skills: WikiSkill[] }>()
 const search = ref(''), source = ref(''), type = ref('')
 const types = computed(() => [...new Set(skills.map(row => row.type))])
+const sourceOptions = [{ value: '', label: '全部来源' }, { value: '自学', label: '自学' }, { value: '技能石', label: '技能石' }, { value: '血脉', label: '血脉' }]
+const typeOptions = computed(() => [{ value: '', label: '全部属性' }, ...types.value.map(name => ({ value: name, label: name }))])
 const filtered = computed(() => skills.filter(row => (!source.value || row.source === source.value)
   && (!type.value || row.type === type.value) && (!search.value.trim()
     || `${row.name} ${row.description}`.includes(search.value.trim()))))
 </script>
 <template>
   <div class="wiki-skill-filters">
-    <input v-model="search" type="search" placeholder="搜索技能名称 / 效果" aria-label="搜索技能">
-    <UiSelect v-model="source" label="技能来源" :options="[{ value: '', label: '全部来源' }, ...['自学', '技能石', '血脉'].map(name => ({ value: name, label: name }))]" />
-    <UiSelect v-model="type" label="技能属性" :options="[{ value: '', label: '全部属性' }, ...types.map(name => ({ value: name, label: name }))]" />
+    <UiSearch v-model="search" label="搜索技能" placeholder="搜索技能名称 / 效果" />
+    <UiSelect size="sm" :options="sourceOptions" :model-value="source" label="技能来源" @change="source = String($event ?? '')" />
+    <UiSelect size="sm" :options="typeOptions" :model-value="type" label="技能属性" @change="type = String($event ?? '')" />
     <span class="count-badge">
       {{ filtered.length }} / {{ skills.length }} 条
     </span>

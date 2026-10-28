@@ -39,30 +39,33 @@ onMounted(() => {
   syncCanvasHeight()
 })
 onBeforeUnmount(() => canvasObserver?.disconnect())
-// 连线和说明以格子中心为准；拖动中的窝跟随指针位置。
-function center(gid: string) {
-  const position = props.positions.find(item => item.gid === gid)
-  const x = drag.value?.gid === gid ? drag.value.cellX : position?.x
-  const y = drag.value?.gid === gid ? drag.value.cellY : position?.y
-  return x === undefined || y === undefined ? null : { x: x * 32 + 32, y: y * 32 + 32 }
-}
-function insetPoint(from: { x: number; y: number }, to: { x: number; y: number }, distance = 28) {
-  const dx = to.x - from.x, dy = to.y - from.y
-  const length = Math.hypot(dx, dy)
-  if (!length) return from
-  return { x: from.x + dx / length * distance, y: from.y + dy / length * distance }
-}
-const links = computed(() => (props.plan?.edges || []).flatMap(edge => {
-  const male = center(edge.male), female = center(edge.female)
-  if (!male || !female) return []
-  const start = insetPoint(male, female), end = insetPoint(female, male)
-  const interference = (props.plan?.mothers || []).some(mother => mother.gid === edge.female && mother.references.some(reference => reference.interference.includes(edge.male)))
-  const dim = !!props.selected && props.selected !== edge.male && props.selected !== edge.female
-  return [{ key: `${edge.male}:${edge.female}`, x1: start.x, y1: start.y, x2: end.x, y2: end.y, interference, dim }]
-}))
+// 画布上不再画父本连线：17 条线同时铺满画布会糊成一团，弧线、折线、正交线都试过，
+// 都会压住别人的立绘或贴着窝位边框走。配对关系改成「选中即描边」：
+// 选中某个窝后，与它配对的窝位各自亮起青色描边，其余窝位保持原样。
+const pairMates = computed(() => {
+  const mates = new Set<string>()
+  if (!props.selected || props.pending) return mates
+  for (const edge of props.plan?.edges || []) {
+    if (edge.male === props.selected) mates.add(edge.female)
+    else if (edge.female === props.selected) mates.add(edge.male)
+  }
+  return mates
+})
+const edgeCount = computed(() => props.plan?.edges?.length || 0)
+const interferenceCount = computed(() => (props.plan?.edges || []).filter(edge => (props.plan?.mothers || [])
+  .some(mother => mother.gid === edge.female && mother.references.some(reference => reference.interference.includes(edge.male)))).length)
 const connected = computed(() => new Set((props.plan?.edges || []).flatMap(edge => [edge.male, edge.female])))
-const selectedPosition = computed(() => props.positions.find(position => position.gid === props.selected) || null)
-const selectedCenter = computed(() => selectedPosition.value ? center(selectedPosition.value.gid) : null)
+// SVG 没有 z-index，谁后画谁在上面。选中的窝最后绘制，它自己的加粗描边、学院角标
+// 和下方名称才能压住相邻窝位；否则相邻窝的色块会把选中窝的下半截和名称切掉。
+// 编号仍按方案顺序，只有绘制顺序变了。
+const nestRows = computed(() => {
+  const rows = props.positions.map((position, index) => ({ position, index }))
+  const at = rows.findIndex(row => row.position.gid === props.selected)
+  if (at < 0 || at === rows.length - 1) return rows
+  const [picked] = rows.splice(at, 1)
+  rows.push(picked)
+  return rows
+})
 const shortName = (gid: string) => {
   const name = props.parents.get(gid)?.name || '记录缺失'
   return name.length > 5 ? `${name.slice(0, 5)}…` : name
@@ -78,8 +81,7 @@ const caption = computed(() => {
   const academy = props.positions.filter(position => position.kind === 'academy').length
   const nests = `共 ${props.positions.length} 个小窝（普通 ${props.positions.length - academy}／学院 ${academy}），按 2×2 占地、中心吸附半格摆放。`
   if (!props.plan) return `${nests}拖动窝位可移到空位或与另一窝交换，Enter 选择。`
-  const interference = links.value.filter(link => link.interference).length
-  return `${nests}${props.pending ? '布局已改动，正在重新评估…' : `当前 ${links.value.length} 条父本连线${interference ? `，其中 ${interference} 条为干扰连边（虚线）` : ''}。`}拖动窝位可交换，Enter 选择。`
+  return `${nests}${props.pending ? '布局已改动，正在重新评估…' : `当前 ${edgeCount.value} 组配对${interferenceCount.value ? `，其中 ${interferenceCount.value} 组存在迭代或目标干扰` : ''}；选中窝位后，可与它配对的窝位会亮起青色虚线描边。`}拖动窝位可交换，Enter 选择。`
 })
 
 // 2×2 占地下，间距小于 2 格视为重叠。
@@ -141,7 +143,7 @@ function key(event: KeyboardEvent, gid: string) {
       <svg :viewBox="`${boardBounds.x} ${boardBounds.y} ${boardBounds.size} ${boardBounds.size}`" preserveAspectRatio="xMidYMid meet" aria-label="小窝布局草图">
         <defs><pattern id="planner-grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" class="planner-grid-line" fill="none" /></pattern></defs>
         <rect class="planner-board-grid" :x="boardBounds.x" :y="boardBounds.y" :width="boardBounds.size" :height="boardBounds.size" fill="url(#planner-grid)" />
-        <g v-for="(position, index) in positions" :key="position.gid" class="planner-nest" :class="[{ selected: selected === position.gid, academy: position.kind === 'academy', dragging: drag?.gid === position.gid, 'drop-target': dropState?.targetGid === position.gid, unrelated: !!plan && !connected.has(position.gid) }, `gender-${parents.get(position.gid)?.gender}`]"
+        <g v-for="{ position, index } in nestRows" :key="position.gid" class="planner-nest" :class="[{ selected: selected === position.gid, 'is-partner': pairMates.has(position.gid), academy: position.kind === 'academy', dragging: drag?.gid === position.gid, 'drop-target': dropState?.targetGid === position.gid, unrelated: !!plan && !connected.has(position.gid) }, `gender-${parents.get(position.gid)?.gender}`]"
           :transform="`translate(${(drag?.gid === position.gid ? drag.cellX : position.x) * 32 + 32},${(drag?.gid === position.gid ? drag.cellY : position.y) * 32 + 32})`" :data-gid="position.gid" tabindex="0" role="button" :aria-label="`${index + 1}号，${parents.get(position.gid)?.name || '当前记录未找到'}，${parents.get(position.gid)?.gender === 1 ? '父本' : '母本'}${position.lock ? '，已锁定' : ''}，Enter 选择，也可拖动到空位或与另一窝交换位置`"
           @focus="emit('select', position.gid)" @pointerdown="pointerDown($event, position.gid)" @pointermove="pointerMove" @pointerup="pointerUp" @pointercancel="drag = null" @keydown="key($event, position.gid)">
           <rect x="-32" y="-32" width="64" height="64" rx="8" />
@@ -155,30 +157,27 @@ function key(event: KeyboardEvent, gid: string) {
           <g v-if="position.lock" class="planner-nest-badge is-lock" transform="translate(22,22)"><circle r="9" /><text y="4" text-anchor="middle">锁</text><title>{{ position.lock === 'position' ? '位置锁定：不能拖动或换位' : '参与锁定：保持在本方案中' }}</title></g>
           <g class="planner-nest-name" aria-hidden="true"><rect x="-30" y="34" width="60" height="16" rx="8" /><text x="0" y="45" text-anchor="middle">{{ shortName(position.gid) }}</text></g>
         </g>
-        <g v-if="!pending" class="planner-canvas-links" aria-hidden="true"><line v-for="link in links" :key="link.key" class="planner-edge" :class="{ interference: link.interference, dim: link.dim }" :x1="link.x1" :y1="link.y1" :x2="link.x2" :y2="link.y2" /></g>
-        <g v-if="selectedCenter" class="planner-selected-outline" :transform="`translate(${selectedCenter.x},${selectedCenter.y})`" aria-hidden="true"><rect x="-32" y="-32" width="64" height="64" rx="8" /></g>
         <g v-if="dropState" class="planner-drop-preview" :class="`is-${dropState.type}`" :transform="`translate(${dropState.x * 32 + 32},${dropState.y * 32 + 32})`" aria-hidden="true"><rect x="-32" y="-32" width="64" height="64" rx="8" /></g>
       </svg>
     </div>
     <div v-if="positions.length" class="planner-canvas-key" aria-label="小窝亲本索引">
+      <div class="planner-canvas-key-scroll">
       <div v-for="(position, index) in positions" :key="position.gid" class="planner-canvas-key-item">
         <button type="button" class="planner-canvas-key-select" :class="[{ active: selected === position.gid }, `gender-${parents.get(position.gid)?.gender}`]" :aria-pressed="selected === position.gid" @click="emit('select', position.gid)">
           <span>{{ index + 1 }}</span>
           <img v-if="parents.get(position.gid)?.icon_url" :src="parents.get(position.gid)!.icon_url" alt="" loading="lazy">
-          <strong class="planner-canvas-key-name" :title="[parents.get(position.gid)?.name || '记录缺失', parents.get(position.gid)?.gender === 1 ? '父本' : '母本', ...parentMarks(position.gid), position.kind === 'academy' ? '学院窝' : '普通窝', parents.get(position.gid)?.nature || '性格未知'].join(' · ')">
+          <strong class="planner-canvas-key-name" :title="[parents.get(position.gid)?.name || '记录缺失', parents.get(position.gid)?.gender === 1 ? '父本' : '母本', ...parentMarks(position.gid), position.kind === 'academy' ? '学院窝' : '普通窝', parents.get(position.gid)?.nature || '性格未知', locationLabel(position.gid)].join(' · ')">
             <span class="planner-canvas-key-label">{{ parents.get(position.gid)?.name || '记录缺失' }}</span>
             <span class="planner-canvas-key-gender" :class="parents.get(position.gid)?.gender === 1 ? 'male' : 'female'" :aria-label="parents.get(position.gid)?.gender === 1 ? '父本' : '母本'"><UiIcon :name="parents.get(position.gid)?.gender === 1 ? 'gender-male' : 'gender-female'" /></span>
             <span v-for="mark in parentMarks(position.gid)" :key="mark" class="planner-canvas-key-mark" :title="mark"><MedalIcon :name="mark" /></span>
           </strong>
-          <small>{{ position.kind === 'academy' ? '学院窝' : '普通窝' }}　{{ parents.get(position.gid)?.nature || '性格未知' }}</small>
+          <small><span v-if="position.kind === 'academy'" class="planner-canvas-key-academy">学院窝</span>{{ parents.get(position.gid)?.nature || '性格未知' }}<span class="planner-canvas-key-location"> · {{ locationLabel(position.gid) }}</span></small>
         </button>
-        <div class="planner-canvas-key-actions">
-          <button type="button" class="planner-canvas-key-locate" :aria-label="`定位${parents.get(position.gid)?.name || '当前精灵'}`" title="在游戏箱位中定位此精灵" @click="emit('locate', position.gid)">定位精灵</button>
-          <span class="planner-canvas-key-location" :title="locationLabel(position.gid)">{{ locationLabel(position.gid) }}</span>
-        </div>
+        <button type="button" class="planner-canvas-key-locate" :aria-label="`定位${parents.get(position.gid)?.name || '当前精灵'}`" :title="`在游戏箱位中定位此精灵 · ${locationLabel(position.gid)}`" @click="emit('locate', position.gid)"><UiIcon name="current-location" /></button>
+      </div>
       </div>
     </div>
-    <p class="planner-canvas-caption" role="status"><span v-if="hint" class="planner-warning">{{ hint }}　</span>{{ caption }}<span v-if="links.length && !pending" class="planner-canvas-legend"><i class="planner-legend-swatch" />合格支持<i class="planner-legend-swatch is-interference" />干扰连边</span></p>
+    <p class="planner-canvas-caption" role="status"><span v-if="hint" class="planner-warning">{{ hint }}　</span>{{ caption }}</p>
     <p v-if="outside" class="planner-canvas-outside">草稿中有窝位超出 20×20 草图范围，请重新规划或调整位置。</p>
   </div>
 </template>

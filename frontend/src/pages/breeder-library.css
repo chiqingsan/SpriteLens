@@ -20,7 +20,6 @@
 }
 
 .breeder-page .ui-page-toolbar { min-height: 0; padding: 0; border-bottom: 0; }
-.breeder-page .breeder-search { flex: 1 1 auto; max-width: 460px; }
 
 /* 两个面板都用全局 .panel，这里收回它的下外边距，间距交给 grid。 */
 .breeder-page .breeder-workspace,
@@ -39,77 +38,106 @@
 
 .breeder-page .ui-icon { width: 16px; height: 16px; flex: none; }
 
-/* 工具栏：搜索为主，性格开关与刷新为辅 */
+/* 候选区做成「浅色托盘 + 白卡」：卡面与面板同色时整屏白对白，只能靠一根描边分区，
+   看久了很累。托盘取 surface-2 与 surface-3 的中间值（比 surface-2 再深一格），
+   让白卡与托盘的面差达到可见的 1.15:1，卡片之间的 8px 空隙也变成可读的分隔。 */
+.breeder-page .breeder-workspace {
+  background: color-mix(in srgb, var(--surface-2) 40%, var(--surface-3));
+}
+
+/* 工具栏做成一条浅色「控制带」：下方是两个白面板，控件如果直接漂在页面底色上，
+   搜索框、裸文字、圆钮三种权重混在一条空板子里，和面板不是一个体系。
+   控制带用白底 + 墨色 14% 描边 + 大圆角，与下方白面板同材质，靠描边和 1px 淡影浮在上层。 */
 .breeder-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  min-height: 52px;
-  padding: var(--space-2) var(--space-4);
-  border-bottom: 1px solid var(--line-soft);
-  flex: none;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 6%, transparent);
 }
 
-.breeder-search {
+/* 外观统一由 .ui-search 承担，这里只给工具栏里的搜索框定宽度。
+   搜索框吃掉工具栏的剩余宽度（上限 720px），避免右侧记录摘要与动作之间留出
+   一条比控件还宽的空带 —— 那正是旧版看上去「三截互不相干」的主因。 */
+.breeder-toolbar .breeder-search { flex: 1 1 240px; min-width: 168px; max-width: 520px; }
+
+.breeder-toolbar-summary {
+  margin: 0 0 0 auto;
+  padding-left: var(--space-1);
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: var(--fs-3xs);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.breeder-toolbar-hint { color: var(--muted-2); }
+
+.breeder-toolbar-actions {
   display: flex;
   align-items: center;
+  gap: var(--space-3);
+  flex: none;
+  padding-left: var(--space-4);
+  border-left: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+/* 性格开关：轨道交给 .ui-switch；外面套一层与刷新按钮同高的胶囊，
+   让它是「控件」而不是一行跟着搜索框跑的裸文字。 */
+.breeder-nature-toggle {
   gap: var(--space-2);
-  flex: 1;
-  min-width: 0;
   height: 34px;
   padding: 0 var(--space-3);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
-  background: var(--surface-1);
+  border: 1px solid var(--field-line);
+  border-radius: 999px;
+  background: var(--panel);
   color: var(--muted);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
   transition:
     border-color var(--motion-fast) var(--motion-ease),
     background-color var(--motion-fast) var(--motion-ease),
-    box-shadow var(--motion-fast) var(--motion-ease);
+    color var(--motion-fast) var(--motion-ease);
 }
 
-.breeder-search:focus-within {
-  border-color: var(--teal);
-  background: var(--panel);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 14%, transparent);
+/* .ui-switch 的旋钮是按「label 高度 = 轨道高度」定位的，套进 34px 胶囊后
+   绝对定位的旋钮会跑到胶囊左上角，所以这里把它重新对准轨道中线。 */
+.breeder-nature-toggle::after {
+  top: 50%;
+  left: var(--space-3);
+  margin-top: -7px;
 }
 
-.breeder-search input {
-  min-width: 0;
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--ink);
-  font-size: var(--fs-sm);
-}
+.breeder-nature-toggle:hover { border-color: var(--field-line-hover); }
 
-.breeder-nature-toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex: none;
-  color: var(--ink-soft);
-  font-size: var(--fs-xs);
-  white-space: nowrap;
-  cursor: pointer;
+.breeder-nature-toggle:has(input:checked) {
+  border-color: color-mix(in srgb, var(--teal) 45%, var(--field-line));
+  background: color-mix(in srgb, var(--teal-soft) 70%, var(--panel));
+  color: var(--teal-dark);
 }
-
-.breeder-nature-toggle input { width: 16px; height: 16px; }
 
 /* 刷新按钮只留图标，尺寸与工具栏搜索框对齐 */
-.breeder-toolbar > .ghost-button {
+.breeder-refresh {
   display: grid;
   place-items: center;
   width: 34px;
   height: 34px;
   padding: 0;
+  border-color: var(--field-line);
   border-radius: var(--radius-md);
 }
 
-/* 状态行：一行灰字，只做信息，不抢视觉 */
+.breeder-refresh:hover { border-color: var(--field-line-hover); }
+
+/* 状态行：只在出错 / 范围非法 / 目录不可用时出现；正常态的总数与来源已并入工具栏右侧 */
 .breeder-status {
   display: flex;
   align-items: center;
@@ -121,8 +149,6 @@
   font-size: var(--fs-3xs);
   flex: none;
 }
-
-.breeder-status > span { margin-left: auto; font-variant-numeric: tabular-nums; }
 
 .breeder-status.has-error { color: var(--amber-ink); background: color-mix(in srgb, var(--amber-soft) 70%, var(--panel)); }
 
@@ -144,7 +170,7 @@
 }
 
 .breeder-column { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-.breeder-column + .breeder-column { border-left: 1px solid var(--line-soft); }
+.breeder-column + .breeder-column { border-left: 1px solid color-mix(in srgb, var(--ink) 9%, transparent); }
 
 .breeder-column > header {
   display: flex;
@@ -193,13 +219,15 @@
 /* 空态在列里垂直居中，只作用于纯空态列 */
 .breeder-grid:has(> .breeder-empty:only-child) { align-content: center; }
 
-/* 候选卡：白底、细描边，信息靠字重与留白分层 */
+/* 候选卡：白卡落在浅色托盘上，靠面差 + 墨色 30% 描边 + 1px 淡影三层分开，
+   不再是「白纸一条淡线」；30% 让描边对白底达到 1.87:1，1× 下也能一眼看到卡片边界。 */
 .breeder-card {
   position: relative;
   min-width: 0;
-  border: 1px solid var(--line-soft);
+  border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
   border-radius: var(--radius-lg);
   background: var(--panel);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--ink) 10%, transparent);
   overflow: hidden;
   transition:
     border-color var(--motion-fast) var(--motion-ease),
@@ -208,7 +236,7 @@
 }
 
 .breeder-card:hover {
-  border-color: color-mix(in srgb, var(--teal) 34%, var(--line-soft));
+  border-color: color-mix(in srgb, var(--teal) 42%, var(--ink));
   box-shadow: var(--shadow-1);
 }
 
@@ -241,7 +269,8 @@
   height: 64px;
   flex: none;
   border-radius: var(--radius-md);
-  background: var(--surface-1);
+  /* 白卡上的立绘托底：用托盘同色，精灵不会陷进白色里 */
+  background: var(--surface-2);
   color: var(--muted);
   font-size: var(--fs-lg);
 }
@@ -315,7 +344,7 @@
   justify-content: space-between;
   gap: var(--space-2);
   padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
-  border-top: 1px solid var(--line-soft);
+  border-top: 1px solid color-mix(in srgb, var(--ink) 9%, transparent);
 }
 
 .breeder-card > footer small {
@@ -497,8 +526,15 @@
 .breeder-range .dual-range { margin: var(--space-2) 0; }
 .breeder-range .dual-range-unit { margin-bottom: 0; font-size: var(--fs-3xs); }
 
+/* 700 以下摘要只剩「历史观察记…」这种半截文本，噪音大于信息：
+   整条收起，把宽度让给搜索框（来源与总数在列头计数里仍可读）。 */
+@media (max-width: 700px) {
+  .breeder-toolbar-summary { display: none; }
+}
+
 @media (max-width: 1200px) {
   .breeder-body { grid-template-columns: minmax(0, 1fr) 320px; }
+  .breeder-toolbar-hint { display: none; }
 }
 
 @media (max-width: 960px) {
@@ -514,8 +550,8 @@
   .breeder-columns { grid-template-columns: minmax(0, 1fr); overflow: auto; }
   .breeder-column { min-height: 360px; }
   .breeder-column + .breeder-column { border-left: 0; border-top: 1px solid var(--line-soft); }
-  .breeder-toolbar { flex-wrap: wrap; }
-  .breeder-search { flex-basis: 100%; }
-  .breeder-nature-toggle { margin-right: auto; }
+  .breeder-toolbar { flex-wrap: wrap; gap: var(--space-3); }
+  .breeder-toolbar .breeder-search { flex-basis: 100%; max-width: none; }
+  .breeder-toolbar-actions { margin-left: auto; padding-left: 0; border-left: 0; }
   .breeder-status { flex-wrap: wrap; }
 }

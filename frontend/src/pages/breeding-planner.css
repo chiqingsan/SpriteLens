@@ -38,12 +38,16 @@
 .planner-page small { color: var(--muted); font-size: var(--fs-xs); line-height: 1.5; }
 
 /* ── 工具栏 ─────────────────────────────────────────────────────────────── */
+/* 工具行要能收缩：sc 只给一部分宽度时（下面还有两个面板），
+   flex:none 会按 max-content 顶出横向滚动；状态区加进来后内容更宽，必须可换行。 */
 .planner-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  flex: none;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  flex: 1 1 auto;
   min-width: 0;
+  max-width: 100%;
   min-height: 52px;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--line-soft);
@@ -54,7 +58,9 @@
 /* 配窝模式：surface-2 容器 + 白色激活药丸，替代旧版实底深绿 */
 .planner-tabs {
   display: flex;
-  flex: 0 1 400px;
+  /* 按内容宽度收缩（两个等长页签），不走 400px 基准：固定基准会白占 167px，
+     把右侧状态区顶到第二行，白白多出一行工具行高度。 */
+  flex: 0 0 auto;
   gap: 2px;
   min-width: 0;
   padding: 2px;
@@ -97,24 +103,23 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   gap: var(--space-2);
   min-width: 0;
-  margin-left: auto;
 }
 
 .planner-generate { display: flex; align-items: center; gap: var(--space-2); }
 
 .planner-generate > .planner-primary { width: 128px; min-width: 128px; }
 
-/* 工具栏按钮统一「图标左、文字严格居中」：用三列网格占位，标签变化不推动布局 */
+/* 工具栏按钮统一「图标 + 文字」作为一个整体居中：以前用三列网格把文字钉在正中、
+   图标甩到最左，图标和文字之间空出半截，看着像内容没居中。 */
 .planner-toolbar-actions > .ghost-button,
 .planner-toolbar-actions > .planner-generate > .planner-primary {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  column-gap: var(--space-2);
+  display: inline-flex;
   align-items: center;
-  justify-items: center;
+  justify-content: center;
+  gap: var(--space-2);
   text-align: center;
   line-height: 1.2;
 }
@@ -131,26 +136,8 @@
 
 .planner-toolbar .planner-tabs > button > span { white-space: nowrap; }
 
-.planner-toolbar-actions > .ghost-button > .ui-icon,
-.planner-toolbar-actions > .planner-generate > .planner-primary > .ui-icon {
-  grid-column: 1;
-  grid-row: 1;
-  justify-self: start;
-}
-
 .planner-toolbar-actions > .ghost-button > span,
-.planner-toolbar-actions > .planner-generate > .planner-primary > span {
-  grid-column: 2;
-  grid-row: 1;
-  white-space: nowrap;
-}
-
-.planner-toolbar-actions > .ghost-button::after,
-.planner-toolbar-actions > .planner-generate > .planner-primary::after {
-  content: "";
-  grid-column: 3;
-  grid-row: 1;
-}
+.planner-toolbar-actions > .planner-generate > .planner-primary > span { white-space: nowrap; }
 
 /* ── 提示条 ─────────────────────────────────────────────────────────────── */
 .planner-notice {
@@ -179,6 +166,7 @@
 .planner-notice.is-success > .ui-icon { color: var(--teal-dark); }
 
 /* ── 主面板与状态行 ─────────────────────────────────────────────────────── */
+/* 方案状态是页面级元信息：搬到工具栏下方单独一行，不再占用左面板内部 34px + 分隔线 */
 .planner-page .planner-main,
 .planner-page .planner-sidebar {
   display: flex;
@@ -195,42 +183,74 @@
 
 .planner-page .planner-main { flex: 1; }
 
-.planner-status {
+/* ── 工具行右侧的配窝状态区 ──────────────────────────────────────────── */
+/* 原来「历史观察背包 / 可参与 / 状态文案 / 目标就绪」占页面顶部一整行，
+   「入住亲本 / 有配对母本 / 目标进度 / 查看产物」又占画布上方一整条摘要带，
+   两条带子说的是同一件事，压掉约 50px 还把视线分成三段。现在合并进工具行右侧的空白区：
+   徽标回答「现在什么状态」，四个两行小指标回答「数据是多少」。 */
+.planner-state {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-3);
-  flex: none;
-  min-height: 34px;
-  padding: 0 var(--space-4);
-  border-bottom: 1px solid var(--line-soft);
-  color: var(--muted);
-  font-size: var(--fs-3xs);
+  flex: 0 1 auto;
+  min-width: 0;
+  /* 靠右落在工具行末尾：左边是模式页签与三个动作，右边是状态，中间留白 */
+  margin-left: auto;
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--line-soft);
 }
 
-.planner-status-account {
+.planner-state-badge {
   display: inline-flex;
   align-items: center;
+  gap: var(--space-1);
+  flex: none;
+  height: 26px;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: var(--fs-3xs);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.planner-state-badge > .ui-icon { width: 14px; height: 14px; }
+
+.planner-state-badge.is-ready { border-color: color-mix(in srgb, var(--teal) 38%, transparent); background: var(--teal-soft); color: var(--teal-dark); }
+.planner-state-badge.is-warning { border-color: color-mix(in srgb, var(--amber) 42%, transparent); background: var(--amber-soft); color: var(--amber-ink); }
+.planner-state-badge.is-danger { border-color: color-mix(in srgb, var(--danger) 42%, transparent); background: var(--danger-soft); color: var(--danger-ink); }
+.planner-state-badge.is-busy { border-color: color-mix(in srgb, var(--teal) 26%, transparent); background: var(--surface-2); color: var(--teal-dark); }
+.planner-state-badge.is-idle { border-color: var(--line-soft); background: var(--surface-2); color: var(--muted); }
+
+button.planner-state-badge { cursor: pointer; }
+button.planner-state-badge:hover:not(:disabled) { border-color: color-mix(in srgb, var(--amber) 62%, transparent); }
+button.planner-state-badge:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+.planner-state-metrics {
+  display: flex;
+  align-items: center;
   flex-wrap: wrap;
-  gap: var(--space-1) var(--space-3);
-  flex: 1;
+  gap: var(--space-2) var(--space-4);
   min-width: 0;
 }
 
-.planner-status-eligible { color: var(--ink-soft); font-weight: 500; white-space: nowrap; }
-.planner-status-progress { flex: none; color: var(--ink-soft); font-weight: 500; font-variant-numeric: tabular-nums; }
-
-.planner-status-action {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--amber-ink);
-  font-size: var(--fs-3xs);
-  font-weight: 500;
-  cursor: pointer;
+/* 一个指标读作「标签 数值」一行、同一基线对齐。
+   原来标签压在数值上方排两行：在 36px 工具行里和左侧状态胶囊对不齐（胶囊居中于两行之间），
+   四个宽度不一的数值又各占一块地盘，整条读起来发飘。 */
+.planner-state-metric {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  min-width: 0;
+  line-height: 1;
+  white-space: nowrap;
 }
 
-.planner-status-action:hover { text-decoration: underline; text-underline-offset: 2px; }
+.planner-state-metric small { color: var(--muted); font-size: var(--fs-3xs); font-weight: 400; }
+.planner-state-metric strong { color: var(--ink); font-size: var(--fs-3xs); font-weight: 600; font-variant-numeric: tabular-nums; }
+.planner-state-metric strong i { margin-left: 1px; color: var(--muted); font-size: 11px; font-style: normal; font-weight: 500; }
+.planner-state-metric strong.is-idle { color: var(--muted); font-weight: 500; }
 
 .planner-scroll {
   flex: 1;
@@ -243,25 +263,26 @@
 }
 
 /* ── 区块标题 / 摘要 ────────────────────────────────────────────────────── */
+/* 标题与模式说明并成一行：原来标题两行 + 摘要带 + 状态带共吃掉约 140px，画布被挤到折叠线以下 */
 .planner-layout-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
   margin-bottom: var(--space-2);
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--line-soft);
 }
 
 .planner-layout-heading > div:first-child {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--space-2);
   min-width: 0;
+  overflow: hidden;
 }
 
-.planner-layout-heading strong { font-size: var(--fs-md); font-weight: 600; }
-.planner-layout-heading small { color: var(--muted); font-size: var(--fs-3xs); line-height: 1.4; }
+.planner-layout-heading strong { flex: none; font-size: var(--fs-md); font-weight: 600; }
+.planner-layout-heading small { overflow: hidden; min-width: 0; color: var(--muted); font-size: var(--fs-3xs); line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
 
 .planner-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); min-width: 0; }
 
@@ -273,16 +294,9 @@
   font-size: var(--fs-3xs);
 }
 
-.planner-actions select {
-  height: 28px;
-  max-width: 100%;
-  padding: 0 24px 0 var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background-color: var(--panel);
-  color: var(--ink-soft);
-  font-size: var(--fs-3xs);
-}
+/* 交换窝位的下拉：外观交给 .ui-picker；不参与收缩，空间不足时整条换行，
+   而不是把「交换到另一窝位」压成省略号 */
+.planner-actions .ui-picker { flex: 0 0 auto; min-width: 0; max-width: 100%; }
 
 .planner-actions .chip {
   display: inline-flex;
@@ -312,44 +326,17 @@
   font-weight: 600;
 }
 
-.planner-summary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
-  align-items: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
-  background: var(--surface-1);
-  transition:
-    border-color var(--motion-fast) var(--motion-ease),
-    background-color var(--motion-fast) var(--motion-ease);
-}
-
-.planner-summary > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.planner-summary small { color: var(--muted); font-size: var(--fs-3xs); line-height: 1.3; }
-.planner-summary strong { overflow: hidden; color: var(--ink); font-size: var(--fs-sm); font-weight: 600; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
-.planner-summary .breeder-detail-link { justify-self: end; padding: 0; font-size: var(--fs-2xs); }
-.planner-summary .breeder-detail-link .ui-icon { width: 12px; height: 12px; }
-
-.planner-summary.is-stale { border-color: color-mix(in srgb, var(--amber) 34%, var(--line-soft)); background: color-mix(in srgb, var(--amber-soft) 45%, var(--panel)); }
-.planner-summary.is-stale strong { color: var(--amber-ink); }
-
 /* ── 画布视图 ───────────────────────────────────────────────────────────── */
+/* 画布区去掉「盒中盒」：原来面板里再套一层浅底描边盒，四周还各吃 10px 内边距 */
 .planner-canvas-view {
   display: grid;
   grid-template-areas:
     "board key"
-    "caption caption"
+    "caption key"
     "warning warning";
-  grid-template-columns: minmax(0, 1.2fr) minmax(240px, 0.8fr);
-  gap: var(--space-2);
+  grid-template-columns: minmax(0, 1fr) minmax(264px, 300px);
+  gap: var(--space-2) var(--space-3);
   align-items: start;
-  padding: var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-lg);
-  background: var(--surface-1);
 }
 
 .planner-canvas {
@@ -371,11 +358,6 @@
 
 .planner-canvas text { font-family: var(--font-ui); }
 .planner-grid-line { stroke: var(--line-soft); stroke-width: 0.5; opacity: 0.7; }
-
-.planner-canvas-links { pointer-events: none; }
-.planner-edge { stroke: var(--teal); stroke-width: 3; opacity: 0.6; transition: opacity var(--motion-base) var(--motion-ease); }
-.planner-edge.dim { opacity: 0.12; }
-.planner-edge.interference { stroke: var(--amber-ink); stroke-dasharray: 6 4; opacity: 0.5; }
 
 .planner-canvas-outside {
   grid-area: warning;
@@ -407,14 +389,26 @@
 .planner-nest.related > rect { fill: var(--teal-soft); stroke: var(--teal); stroke-width: 3; }
 .planner-nest.unrelated { opacity: 0.3; }
 .planner-nest.academy > rect { fill: color-mix(in srgb, var(--teal-soft) 70%, var(--panel)); stroke: var(--teal); }
+/* 画布不再画连线，配对关系靠「选中即描边」表达：选中某个窝后，与它配对的窝位
+   换成青色虚线描边。用虚线而不是再加一圈实线，是因为实线描边已经承载性别色（蓝/粉）
+   与选中态（深青加粗），再加实线在雄性窝位上和性别描边几乎分不出来；
+   虚线在缩放、彩色与灰度下都能一眼认出「这些是可以配的」。
+   选中窝自己由 .planner-nest.selected 负责，不会走到这里。 */
+.planner-nest.is-partner > rect {
+  stroke: var(--teal);
+  stroke-width: 3;
+  stroke-dasharray: 6 3.5;
+}
 .planner-nest.match-iterative > rect { fill: var(--amber-soft); stroke: var(--amber-ink); stroke-dasharray: 5 3; }
 .planner-nest.dragging { cursor: grabbing; }
 .planner-nest.drop-target > rect { stroke: var(--teal-dark); stroke-dasharray: 6 3; stroke-width: 4; }
 
+/* 选中只用窝位自己那圈描边表达：加粗到 3.5px 再配一层柔光。不再往窝里套一圈细线——
+   那圈线看着像多出来的一道边框，和立绘、角标挤在一起。 */
 .planner-nest.selected > rect,
 .planner-nest:focus-visible > rect {
   stroke: var(--teal-dark);
-  stroke-width: 3;
+  stroke-width: 3.5;
   filter: drop-shadow(0 2px 3px color-mix(in srgb, var(--teal-deep) 25%, transparent));
 }
 
@@ -436,7 +430,6 @@
 .planner-nest.selected .planner-nest-name,
 .planner-nest:focus-visible .planner-nest-name { opacity: 1; }
 
-.planner-selected-outline rect { fill: none; stroke: var(--teal-dark); stroke-width: 2.5; pointer-events: none; }
 .planner-drop-preview rect { fill: none; stroke-width: 3; stroke-dasharray: 8 5; }
 .planner-drop-preview.is-valid rect,
 .planner-drop-preview.is-swap rect { stroke: var(--teal-dark); }
@@ -444,55 +437,70 @@
 
 .planner-canvas-empty { fill: var(--muted); font-size: 13px; }
 
+/* 说明文字跟着画布走，不再为「等高」预留 2.4em（那 31px 正是把它顶出可视区的原因之一） */
 .planner-canvas-caption {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-1);
   grid-area: caption;
-  min-height: 2.4em;
+  min-height: 0;
+  padding-top: var(--space-1);
   margin: 0;
   color: var(--muted);
   font-size: var(--fs-3xs);
   line-height: 1.5;
 }
 
-.planner-canvas-legend { display: inline-flex; align-items: center; gap: var(--space-1); margin-left: var(--space-2); color: var(--muted); }
-.planner-legend-swatch { display: inline-block; width: 16px; height: 0; margin: 0 var(--space-1); border-top: 3px solid var(--teal); border-radius: 2px; opacity: 0.8; }
-.planner-legend-swatch.is-interference { border-top-style: dashed; border-top-color: var(--amber-ink); }
-
 .planner-warning { color: var(--amber-ink); font-weight: 500; }
 
-/* 窝位索引列表 */
+/* 窝位索引列表：原来固定 height:min(324px,54cqw)，11 个窝只露 5 行、滚动条又被全局规则隐藏。
+   现在索引列与画布同高（align-self: stretch），窝位多时在列内滚动并显示细滚动条 */
 .planner-canvas-key {
-  display: grid;
+  position: relative;
   grid-area: key;
-  grid-template-columns: minmax(0, 1fr);
-  grid-auto-rows: minmax(64px, max-content);
   align-self: stretch;
-  align-content: start;
-  gap: var(--space-1);
   min-width: 0;
   min-height: 0;
-  height: var(--planner-canvas-height, auto);
+}
+
+.planner-canvas-key-scroll {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: minmax(46px, max-content);
+  align-content: start;
+  gap: var(--space-1);
   padding-right: 2px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
-.planner-canvas-key-item { position: relative; min-width: 0; min-height: 64px; }
+/* 索引行 = 整条可点区域 + 右侧 30px 定位图标按钮（原来把「定位精灵」文字按钮和位置文本绝对定位盖在行右半边，
+   逼得 select 让出 128px 内边距，名字稍长就被吃掉） */
+.planner-canvas-key-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1);
+  align-items: stretch;
+  min-width: 0;
+  min-height: 46px;
+}
 
 .planner-canvas-key-select {
   display: grid;
-  grid-template-columns: 20px 36px minmax(0, 1fr);
+  grid-template-columns: 18px 34px minmax(0, 1fr);
   grid-template-rows: auto auto;
   column-gap: var(--space-2);
-  row-gap: 1px;
+  row-gap: 0;
+  align-content: center;
   width: 100%;
   min-width: 0;
-  min-height: 52px;
-  padding: var(--space-2) 128px var(--space-2) var(--space-3);
+  min-height: 46px;
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-md);
   background: var(--panel);
@@ -535,7 +543,7 @@
   text-align: center;
 }
 
-.planner-canvas-key-select > img { grid-column: 2; grid-row: 1 / 3; align-self: center; width: 36px; height: 36px; object-fit: contain; }
+.planner-canvas-key-select > img { grid-column: 2; grid-row: 1 / 3; align-self: center; width: 34px; height: 34px; object-fit: contain; }
 
 .planner-canvas-key-select > strong {
   display: flex;
@@ -570,38 +578,28 @@
 }
 
 .planner-canvas-key-nature { color: var(--muted); font-size: var(--fs-3xs); font-weight: 500; }
+/* 普通窝是常态，不再逐行标注；只给需要特别处理的学院窝加个小标，把宽度让给箱位文本 */
+.planner-canvas-key-academy { margin-right: var(--space-1); color: var(--teal-dark); font-weight: 600; }
 
-.planner-canvas-key-actions {
-  position: absolute;
-  z-index: 1;
-  top: var(--space-2);
-  right: var(--space-2);
-  bottom: var(--space-2);
+.planner-canvas-key-locate {
   display: grid;
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  gap: var(--space-1);
-  width: 118px;
-}
-
-.planner-canvas-key-locate,
-.planner-canvas-key-location {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-width: 0;
-  padding: 0 var(--space-2);
+  place-items: center;
+  width: 30px;
+  min-height: 46px;
+  padding: 0;
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-sm);
   background: var(--panel);
   color: var(--teal-dark);
-  font-size: var(--fs-3xs);
-  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease);
 }
 
-.planner-canvas-key-locate { cursor: pointer; transition: background-color var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease); }
 .planner-canvas-key-locate:hover { border-color: var(--teal); background: var(--teal-soft); }
-.planner-canvas-key-location { overflow: hidden; background: var(--surface-2); color: var(--muted); text-overflow: ellipsis; }
+.planner-canvas-key-locate .ui-icon { width: 16px; height: 16px; }
+.planner-canvas-key-location { color: var(--muted-2); }
 
 /* ── 选中亲本卡 ─────────────────────────────────────────────────────────── */
 .planner-resident {
@@ -631,17 +629,7 @@
 
 .planner-coordinate > label { display: flex; align-items: center; gap: var(--space-2); flex: 1; min-width: 0; color: var(--ink-soft); font-size: var(--fs-2xs); font-weight: 500; }
 
-.planner-coordinate select {
-  flex: 1;
-  min-width: 0;
-  height: 30px;
-  padding: 0 24px 0 var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background-color: var(--panel);
-  color: var(--ink);
-  font-size: var(--fs-2xs);
-}
+.planner-coordinate .ui-picker { flex: 1; min-width: 0; }
 
 /* ── 产物分析 ───────────────────────────────────────────────────────────── */
 .planner-outcomes { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-4); }
@@ -937,7 +925,7 @@
 .planner-empty.planner-start { min-height: 320px; }
 
 /* ── 右侧栏 ─────────────────────────────────────────────────────────────── */
-.planner-sidebar > header { display: flex; align-items: center; gap: var(--space-2); flex: none; min-height: 48px; padding: 0 var(--space-4); border-bottom: 1px solid var(--line-soft); }
+.planner-sidebar > header { display: flex; align-items: center; gap: var(--space-2); flex: none; min-height: 40px; padding: 0 var(--space-4); border-bottom: 1px solid var(--line-soft); }
 
 .planner-sidebar-title-icon { display: grid; place-items: center; width: 18px; height: 18px; color: var(--teal-dark); }
 .planner-sidebar-title-icon .ui-icon { width: 16px; height: 16px; }
@@ -955,19 +943,19 @@
 /* 容量卡 */
 .planner-capacity { margin-bottom: var(--space-3); border: 1px solid var(--line-soft); border-radius: var(--radius-md); background: var(--surface-1); overflow: hidden; }
 
+/* 容量卡：去掉左侧 40×40 装饰方块（纯装饰，占掉 360px 侧栏里 50px 宽度）。
+   一行排开：「普通小窝」标签在左、计数器紧随其后，学院绿窝靠行尾；放不下时学院绿窝整块换行。 */
 .planner-capacity-main {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
+  display: flex;
   align-items: center;
-  column-gap: var(--space-2);
-  row-gap: var(--space-2);
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
   padding: var(--space-2) var(--space-4) var(--space-2) var(--space-3);
 }
 
-.planner-capacity-art { display: grid; place-items: center; width: 40px; height: 40px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--teal-soft) 75%, var(--panel)); color: var(--teal-dark); }
-.planner-capacity-art .ui-icon { width: 20px; height: 20px; }
+.planner-capacity-art { display: none; }
 
-.planner-capacity-nests { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; }
+.planner-capacity-nests { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .planner-capacity-label { color: var(--ink); font-size: var(--fs-2xs); font-weight: 600; white-space: nowrap; }
 
 .planner-stepper { display: inline-flex; align-items: stretch; flex: none; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); }
@@ -1005,9 +993,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  grid-column: 1 / -1;
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--line-soft);
+  flex: none;
+  margin-left: auto;
   cursor: pointer;
 }
 
@@ -1041,7 +1028,6 @@
 .planner-capacity-academy input:checked + .planner-check::after { opacity: 1; }
 .planner-capacity-academy input:focus-visible + .planner-check { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
-.planner-capacity-academy .planner-capacity-label { margin-right: auto; }
 .planner-capacity-cap { display: grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 50%; background: color-mix(in srgb, var(--teal-soft) 75%, var(--panel)); color: var(--teal-dark); }
 .planner-capacity-cap .ui-icon { width: 13px; height: 13px; }
 
@@ -1083,29 +1069,15 @@
 .planner-configured-title { margin-top: var(--space-3); }
 .planner-configured-title .count-badge { background: var(--teal); color: var(--white); }
 
-/* 搜索与目标蛋列表 */
-.planner-search {
-  width: 100%;
-  height: 34px;
-  margin-bottom: var(--space-2);
-  padding: 0 var(--space-3);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-md);
-  background: var(--surface-1);
-  color: var(--ink);
-  font-size: var(--fs-sm);
-  transition:
-    border-color var(--motion-fast) var(--motion-ease),
-    background-color var(--motion-fast) var(--motion-ease),
-    box-shadow var(--motion-fast) var(--motion-ease);
-}
+/* 搜索与目标蛋列表（外观由 .ui-search 承担） */
+.planner-search { width: 100%; margin-bottom: var(--space-2); }
 
-.planner-search:focus { outline: none; border-color: var(--teal); background: var(--panel); box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 14%, transparent); }
-
+/* 288px 只能装 4 个半按钮（按钮 56 + 间隔 8 = 64），第 5 行会被切一半；改成正好 4 整行的 248px */
 .planner-egg-choices {
   display: grid;
   gap: var(--space-2);
-  max-height: 288px;
+  max-height: 248px;
+  scrollbar-width: thin;
   margin-bottom: var(--space-2);
   padding-right: 2px;
   overflow-y: auto;
@@ -1224,34 +1196,14 @@
 .planner-goal-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin-top: var(--space-2); }
 .planner-goal-fields > label { display: flex; flex-direction: column; gap: 2px; min-width: 0; color: var(--muted); font-size: var(--fs-3xs); }
 
-.planner-goal-fields select {
-  width: 100%;
-  height: 28px;
-  min-width: 0;
-  padding: 0 24px 0 var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background-color: var(--panel);
-  color: var(--ink);
-  font-size: var(--fs-2xs);
-}
+.planner-goal-fields .ui-picker { width: 100%; min-width: 0; }
 
 /* 参与精灵 */
 .planner-add-pool { width: 100%; margin-bottom: var(--space-2); }
 
 .planner-participation { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); color: var(--ink-soft); font-size: var(--fs-2xs); font-weight: 500; }
 
-.planner-participation select {
-  flex: 1;
-  min-width: 0;
-  height: 30px;
-  padding: 0 var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background: var(--panel);
-  color: var(--ink);
-  font-size: var(--fs-2xs);
-}
+.planner-participation .ui-picker { flex: 1; min-width: 0; }
 
 .planner-participation-help { margin: 0 0 var(--space-2); padding: var(--space-2); border-radius: var(--radius-sm); background: var(--surface-1); color: var(--muted); font-size: var(--fs-3xs); line-height: 1.6; }
 .planner-participation-help.planner-warning { background: color-mix(in srgb, var(--amber-soft) 62%, var(--panel)); color: var(--amber-ink); }
@@ -1326,22 +1278,10 @@ dialog.planner-picker {
 
 .planner-picker-filters { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); flex: none; padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--line-soft); background: var(--surface-1); }
 
-.planner-picker-filters input,
-.planner-picker-filters select {
-  height: 32px;
-  padding: 0 var(--space-2);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-sm);
-  background: var(--panel);
-  color: var(--ink);
-  font-size: var(--fs-2xs);
-}
+.planner-picker-filters .ui-picker { min-width: 100px; }
 
-.planner-picker-filters input { flex: 1 1 200px; min-width: 140px; }
-.planner-picker-filters select { min-width: 100px; }
-
-.planner-picker-filters input:focus,
-.planner-picker-filters select:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 14%, transparent); }
+/* 搜索框跟弹窗里的下拉保持同一行高与圆角档，避免 30/32px 混排 */
+.planner-picker-filters .planner-picker-search { flex: 1 1 200px; min-width: 140px; height: 32px; border-radius: var(--radius-sm); }
 
 .planner-picker-grid {
   display: grid;
@@ -1391,21 +1331,21 @@ dialog.planner-picker {
 /* ── 滚动条与可见焦点 ───────────────────────────────────────────────────── */
 .planner-scroll::-webkit-scrollbar,
 .planner-sidebar-scroll::-webkit-scrollbar,
-.planner-canvas-key::-webkit-scrollbar,
+.planner-canvas-key-scroll::-webkit-scrollbar,
 .planner-egg-choices::-webkit-scrollbar,
 .planner-outcome-evidence-grid::-webkit-scrollbar,
-.planner-picker-grid::-webkit-scrollbar { width: 8px; height: 8px; }
+.planner-picker-grid::-webkit-scrollbar { display: block; width: 8px; height: 8px; }
 
 .planner-scroll::-webkit-scrollbar-track,
 .planner-sidebar-scroll::-webkit-scrollbar-track,
-.planner-canvas-key::-webkit-scrollbar-track,
+.planner-canvas-key-scroll::-webkit-scrollbar-track,
 .planner-egg-choices::-webkit-scrollbar-track,
 .planner-outcome-evidence-grid::-webkit-scrollbar-track,
 .planner-picker-grid::-webkit-scrollbar-track { background: transparent; }
 
 .planner-scroll::-webkit-scrollbar-thumb,
 .planner-sidebar-scroll::-webkit-scrollbar-thumb,
-.planner-canvas-key::-webkit-scrollbar-thumb,
+.planner-canvas-key-scroll::-webkit-scrollbar-thumb,
 .planner-egg-choices::-webkit-scrollbar-thumb,
 .planner-outcome-evidence-grid::-webkit-scrollbar-thumb,
 .planner-picker-grid::-webkit-scrollbar-thumb { border-radius: 4px; background: color-mix(in srgb, var(--line) 80%, transparent); }
@@ -1415,7 +1355,6 @@ dialog.planner-picker {
 .planner-picker-grid::-webkit-scrollbar-thumb:hover { background: var(--teal-bright); }
 
 .planner-page input:focus-visible,
-.planner-page select:focus-visible,
 .planner-page .planner-tabs > button:focus-visible,
 .planner-page .planner-canvas-key-select:focus-visible,
 .planner-page .planner-outcome-expand:focus-visible,
@@ -1424,43 +1363,72 @@ dialog.planner-picker {
 .planner-page .planner-parent-chip:focus-visible,
 .planner-page .planner-egg-choices > button:focus-visible,
 .planner-page .planner-canvas-key-locate:focus-visible,
-.planner-picker input:focus-visible,
-.planner-picker select:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.planner-picker input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
 /* ── 响应式 ─────────────────────────────────────────────────────────────── */
 @media (max-width: 1200px) {
   .planner-body { grid-template-columns: minmax(0, 1fr) 340px; }
+  /* 单列时说明紧跟画布，索引排在说明之后（原来说明在最后，被 567px 的索引顶远） */
   .planner-canvas-view {
     grid-template-areas:
       "board"
+      "caption"
       "key"
-      "warning"
-      "caption";
+      "warning";
     grid-template-columns: minmax(0, 1fr);
   }
-  .planner-canvas-key { align-self: start; height: 260px; }
+  /* 单列堆叠后索引排在画布下方，改回正常流并限高滚动 */
+  .planner-canvas-key { position: static; align-self: auto; }
+  .planner-canvas-key-scroll { position: static; max-height: 360px; }
+  /* 堆叠后画布按列宽铺满会得到 570px 的巨型方块，把索引与说明顶出首屏；收窄到 520 */
+  .planner-canvas { width: min(100%, 520px); max-width: 520px; }
 }
 
 @media (max-width: 960px) {
   #page-planner { height: auto; min-height: 100%; overflow: auto; }
   #breeding-planner-root { height: auto; min-height: 100%; }
   .planner-page { height: auto; min-height: 100%; overflow: visible; }
+  /* 页面本身开始滚动后，索引列不再需要内部滚动窗口，直接铺开；
+     用复合选择器压过文件末端的 @container (max-width:600px) 限高 */
+  .planner-canvas-key > .planner-canvas-key-scroll { max-height: none; }
   .planner-body { grid-template-columns: minmax(0, 1fr); }
   .planner-primary-column { min-height: 0; }
   .planner-main { min-height: 640px; }
   .planner-sidebar { max-height: 680px; }
 }
 
+/* 工具行放不下「页签 + 三个动作 + 状态区」时，状态区整行落到第二排：
+   与其把指标一个个藏起来（信息缺口比多一行更难受），不如让它独占一行重新铺开。
+   1240px 是实测临界点（页面可用宽度 1000px 时全量状态区正好一行）。 */
+@media (max-width: 1240px) {
+  .planner-state {
+    flex: 1 1 100%;
+    justify-content: space-between;
+    margin-left: 0;
+    padding: var(--space-2) 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--line-soft);
+  }
+  /* 状态徽标靠左、四个指标靠右：整行只在两端有内容，中间留白，比把四个指标均摊到满行更稳 */
+  .planner-state-metrics { flex: 0 1 auto; gap: var(--space-4); }
+}
+
 @media (max-width: 840px) {
-  .planner-toolbar { flex-wrap: wrap; }
+  /* 工具栏是 .ui-page-toolbar 的 flex 子项，原本 flex:none 会按 max-content 撑到 578px，
+     在 640px 窄窗把页面顶出 128px 横向滚动；窄窗改为可增长+可收缩并占满一行。 */
+  .planner-toolbar { flex: 1 1 auto; width: 100%; max-width: 100%; flex-wrap: wrap; }
   .planner-tabs { flex-basis: 100%; }
   .planner-toolbar-actions { width: 100%; margin-left: 0; justify-content: space-between; flex-wrap: wrap; }
   .planner-generate { margin-left: auto; }
   .planner-scroll { padding: var(--space-3); }
-  .planner-canvas-key { height: 300px; }
-  .planner-layout-heading { align-items: flex-start; flex-direction: column; }
-  .planner-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .planner-summary .breeder-detail-link { grid-column: 1 / -1; justify-self: start; }
+  .planner-layout-heading { flex-wrap: wrap; align-items: center; }
+  .planner-layout-heading > div:first-child { flex: 1 1 100%; }
+  /* 状态区（沿用 1240px 的独占行样式）在窄窗收紧间距，并收起两个次要指标：
+     一排放不下四个两行指标，硬塞会挤得标签互相贴住，信息也更难扫。 */
+  .planner-state { gap: var(--space-2); }
+  .planner-state-metrics { gap: var(--space-3); }
+  .planner-state-metric:nth-child(3),
+  .planner-state-metric:nth-child(4) { display: none; }
 }
 
 @media (max-width: 700px) {
@@ -1470,7 +1438,6 @@ dialog.planner-picker {
 @media (max-width: 560px) {
   #page-planner { padding: var(--space-3); }
   .planner-resident > header { flex-wrap: wrap; }
-  .planner-summary { grid-template-columns: minmax(0, 1fr); }
   .planner-outcome { padding: var(--space-2); }
   .planner-outcome-header { grid-template-columns: minmax(0, 1fr) auto; }
   .planner-outcome-header-meta { grid-column: 1 / -1; grid-row: 2; }
@@ -1478,6 +1445,11 @@ dialog.planner-picker {
   .planner-outcome-nature-summary { justify-content: flex-start; }
   .planner-egg-choices > button { grid-template-columns: 32px minmax(0, 1fr) 24px; min-height: 48px; }
   .planner-egg-choices > button > img { width: 32px; height: 32px; }
+}
+
+/* 窄容器仍保持卡片右侧操作区，列表只通过滚动承载更多窝位，不改变结构 */
+@container (max-width: 600px) {
+  .planner-canvas-key-scroll { max-height: 300px; }
 }
 
 @container (max-width: 420px) {

@@ -8,6 +8,7 @@ import EggBoxDetail from '../components/EggBoxDetail.vue'
 import PageInspector from '../components/PageInspector.vue'
 import PageShell from '../components/PageShell.vue'
 import UiIcon from '../components/UiIcon.vue'
+import UiSearch from '../components/UiSearch.vue'
 import type { EggBoxAnnotations, EggBoxEntry } from '../types/eggBox'
 import './egg-box.css'
 
@@ -244,11 +245,7 @@ defineExpose({
             <UiIcon :name="model.filters.ascending ? 'arrow-up' : 'arrow-down'" />
             <span>{{ model.filters.ascending ? '升序' : '倒序' }}</span>
           </button>
-          <label class="eggbox-search">
-            <UiIcon name="search" />
-            <span class="sr-only">搜索蛋</span>
-            <input v-model="model.filters.search" type="search" placeholder="搜索蛋名 / 精灵 / 进化链 / 编号">
-          </label>
+          <UiSearch v-model="model.filters.search" class="eggbox-search" compact label="搜索蛋" placeholder="搜索蛋名 / 精灵 / 进化链 / 编号" />
         </div>
     </template>
 

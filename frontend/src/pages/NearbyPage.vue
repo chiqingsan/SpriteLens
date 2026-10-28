@@ -4,6 +4,8 @@ import { computed, nextTick, onUnmounted, ref, watch, type ComponentPublicInstan
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import PageShell from '../components/PageShell.vue'
 import UiIcon from '../components/UiIcon.vue'
+import UiSearch from '../components/UiSearch.vue'
+import UiSelect from '../components/UiSelect.vue'
 import MedalIcon from '../components/MedalIcon.vue'
 import SceneRadar from '../components/SceneRadar.vue'
 import SceneMap from '../components/SceneMap.vue'
@@ -65,7 +67,8 @@ async function selectActor(id: string) {
   await nextTick()
   document.getElementById(`nearby-actor-${id}`)?.scrollIntoView({ block: 'nearest', behavior: 'auto' })
 }
-const search = ref(''), sort = ref('marks'), failedImages = ref(new Set<string>())
+const search = ref(''), sort = ref('recent'), failedImages = ref(new Set<string>())
+const sortOptions = [{ value: 'recent', label: '最近观察' }, { value: 'marks', label: '有牌优先' }]
 const recentOrder = ref<string[]>([])
 let recentObservation: number | null = null
 watch(data, snapshot => {
@@ -253,9 +256,8 @@ defineExpose({ update, load, pause, resume })
         <span class="nearby-count-note" :class="{ 'is-stale': stale, 'is-error': error && !stale || floatingError || coverageError || summary?.coverage_error, 'is-warning': Boolean(stoppedNote) || Boolean(data && (!data.mapping_available || data.coverage_paused)) }" :title="countNoteTitle" role="status">{{ countNote }}</span>
       </header>
       <div class="nearby-toolbar">
-      <label class="nearby-search"><UiIcon name="search" /><input v-model="search" type="search" aria-label="搜索附近精灵" placeholder="搜索名称、配置或实体编号"></label>
-      <div class="nearby-toolbar-actions">
-      <label class="nearby-sort">排序<UiSelect v-model="sort" label="附近精灵排序" :options="[{ value: 'recent', label: '最近观察' }, { value: 'marks', label: '有牌优先' }]" /></label>
+      <UiSearch v-model="search" class="nearby-search" label="搜索附近精灵" placeholder="搜索名称、配置或实体编号" />
+      <UiSelect class="nearby-sort" :options="sortOptions" :model-value="sort" label="附近精灵排序" @change="sort = $event === 'marks' ? 'marks' : 'recent'" />
       <button class="ghost-button small nearby-refresh" :aria-busy="refreshing" :aria-disabled="refreshing" :disabled="refreshing" @click="refresh"><UiIcon name="refresh" />刷新</button>
       <button class="ghost-button small nearby-floating" @click="openFloating"><UiIcon name="eye" />悬浮雷达</button>
       <button v-if="alertHost" class="ghost-button small nearby-alert" type="button" :aria-pressed="alertOn" :title="alertOn ? '发现双牌重点精灵时播放提示音；点击关闭' : '声音提醒已关闭；点击开启并试听'" @click="toggleAlert"><UiIcon :name="alertOn ? 'bell' : 'bell-off'" />提醒音{{ alertOn ? '开' : '关' }}</button>
@@ -323,14 +325,10 @@ defineExpose({ update, load, pause, resume })
 .nearby-count-inline { color: var(--ink); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
 .nearby-count-inline span { color: var(--muted); font-weight: normal; }
 .nearby-toolbar { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; min-width: 0; }
-.nearby-toolbar-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); min-width: 0; }
-.nearby-search { display: flex; align-items: center; gap: var(--space-3); flex: 1 1 240px; min-width: min(100%, 240px); border: 1px solid var(--line); border-radius: 999px; background: var(--panel); padding-inline: var(--space-4); }
-/* 搜索框用胶囊圆角：与同排的胶囊状态一致，只是外壳圆角，不改输入框本身。 */
-.nearby-search input { width: 100%; min-width: 0; border: 0; background: none; height: 34px; color: var(--ink); }
-.nearby-search:focus-within { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-.nearby-sort { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-xs); min-width: 0; max-width: 100%; }
-.nearby-sort select { min-width: 0; max-width: 100%; min-height: 34px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-sm); padding-inline: var(--space-3); }
-.nearby-refresh, .nearby-floating { background: var(--panel); border: 1px solid var(--teal); color: var(--teal-dark); min-height: 34px; min-width: 0; max-width: 100%; white-space: nowrap; }
+/* 外观统一由 .ui-search 承担；这里只决定它在工具条里的伸缩比例（原先的 999px 胶囊与同排 10px 圆角按钮不一致） */
+.nearby-search { flex: 1 1 240px; min-width: 0; }
+.nearby-sort { min-width: 0; max-width: 100%; font-size: var(--fs-xs); }
+.nearby-refresh, .nearby-floating { background: var(--panel); border: 1px solid var(--teal); color: var(--teal-dark); min-height: 34px; min-width: 0; max-width: 100%; white-space: normal; }
 /* 提醒音是偏好项，固定在工具条末尾。开/关都显示四个汉字、图标盒同为 18px，切换只换底色/描边，不改变按钮尺寸。 */
 .nearby-alert { background: var(--panel); border: 1px solid var(--line); color: var(--ink); min-height: 34px; min-width: 0; max-width: 100%; white-space: nowrap; }
 .nearby-alert:hover { background: var(--surface-2); border-color: var(--muted); }
@@ -403,7 +401,10 @@ defineExpose({ update, load, pause, resume })
 .nearby-page :is(p, h3, span, dd, strong) { overflow-wrap: anywhere; }
 /* 页面实际可用宽度也响应缩放，避免高 DPI 时仍按物理窗口宽度挤两栏。 */
 @container nearby (max-width: 620px) {
-  .nearby-heading, .nearby-toolbar { flex: none; }
+  /* PageShell 渲染的 .ui-page-toolbar 是 row 布局，早先这里的 flex:none 会让工具栏按最大内容宽（768px）摊开，
+     比容器宽 208px 造成页面横向溢出。标题独占一行，工具栏允许收缩并在行内换行。 */
+  .nearby-heading { flex: 1 1 100%; min-width: 0; }
+  .nearby-toolbar { flex: 1 1 auto; min-width: 0; max-width: 100%; }
   .nearby-workspace { grid-template-columns: minmax(0, 1fr); flex: none; }
   .nearby-radar-pane { order: -1; height: min(65vh, 480px); min-height: 280px; }
   .nearby-list-panel { height: min(62vh, 520px); min-height: 240px; }

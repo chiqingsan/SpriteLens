@@ -5,6 +5,7 @@ import BreederCard from '../components/BreederCard.vue'
 import DualRangeSlider from '../components/DualRangeSlider.vue'
 import PageShell from '../components/PageShell.vue'
 import UiIcon from '../components/UiIcon.vue'
+import UiSearch from '../components/UiSearch.vue'
 import './breeder-library.css'
 
 const props = defineProps<{ host: BreederHost }>()
@@ -22,6 +23,12 @@ function rangeSummary(field: 'voice' | 'height' | 'weight') {
   const unit = field === 'voice' ? ' dB' : '%'
   return low === high ? `${low}${unit}` : `${low}～${high}${unit}`
 }
+/* 记录摘要从原来的状态条搬到工具栏右侧：状态条只在出错时出现，正常态不再占一行灰带。 */
+const recordSummary = computed(() => {
+  const value = data.value
+  if (!value || !value.available) return ''
+  return `${value.source === 'history' ? '历史观察记录' : '当前账号观察记录'} · ${value.pet_count ?? '—'} 只`
+})
 function pause() { model.pause() }
 function resetAccount() { model.resetAccount() }
 onBeforeUnmount(pause)
@@ -31,18 +38,27 @@ defineExpose({ load: model.load, pause, resetAccount })
 <template>
   <PageShell class="breeder-page" data-vue-page>
     <template #toolbar>
-        <label class="breeder-search"><UiIcon name="search" /><input v-model="filters.search" type="search" aria-label="搜索配种精灵" placeholder="名称、性格、蛋组或个体 ID"></label>
-        <label class="breeder-nature-toggle"><input v-model="filters.same_nature" type="checkbox">性格一致</label>
-        <button class="ghost-button" title="刷新背包观察记录" aria-label="刷新筛选配对" @click="model.refresh"><UiIcon name="refresh" /></button>
-      </template>
+      <div class="breeder-toolbar">
+        <UiSearch v-model="filters.search" class="breeder-search" label="搜索配种精灵" placeholder="名称、性格、蛋组或个体 ID" />
+        <p v-if="recordSummary" class="breeder-toolbar-summary" title="仅限同账号候选">
+          {{ recordSummary }}<span class="breeder-toolbar-hint"> · 仅限同账号候选</span>
+        </p>
+        <div class="breeder-toolbar-actions">
+          <label class="ui-switch breeder-nature-toggle">
+            <input v-model="filters.same_nature" class="sr-only" type="checkbox">
+            性格一致
+          </label>
+          <button class="ghost-button breeder-refresh" title="刷新背包观察记录" aria-label="刷新筛选配对" @click="model.refresh"><UiIcon name="refresh" /></button>
+        </div>
+      </div>
+    </template>
     <div class="breeder-body">
     <section class="breeder-workspace panel">
       
-      <div class="breeder-status" :class="{ 'has-error': error || invalidRange }" role="status">
+      <div v-if="invalidRange || error || (data && !data.available)" class="breeder-status" :class="{ 'has-error': error || invalidRange }" role="status">
         <template v-if="invalidRange">请填写有效范围：声音 −100～100 dB，体型 0～100%，最小值不大于最大值。</template>
         <template v-else-if="error">{{ error }}<button class="breeder-detail-link" @click="model.refresh">重试</button></template>
-        <template v-else-if="data && !data.available">静态目录不可用，暂时无法确认蛋组与配对条件。</template>
-        <template v-else>{{ data?.source === 'history' ? '历史观察记录' : '当前账号观察记录' }} · {{ data?.pet_count ?? '—' }} 只<span>仅限同账号候选</span></template>
+        <template v-else>静态目录不可用，暂时无法确认蛋组与配对条件。</template>
       </div>
       <div v-if="data?.selection_changed" class="breeder-notice" role="status">部分亲本已失效或不再兼容，已取消该项选择。</div>
       <div class="breeder-columns" :aria-busy="loading">

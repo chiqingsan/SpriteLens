@@ -11,11 +11,14 @@ import DexPortrait from '../components/DexPortrait.vue'
 import DexTypeBadge from '../components/DexTypeBadge.vue'
 import DexFilterMenu from '../components/DexFilterMenu.vue'
 import UiIcon from '../components/UiIcon.vue'
-import UiSegmented from '../components/UiSegmented.vue'
+import UiSearch from '../components/UiSearch.vue'
+import UiSelect from '../components/UiSelect.vue'
 import './catalog-wiki.css'
 
 const props = defineProps<{ api: ApiClient; active: boolean }>()
 const { filters, data, loading, error, load, pause, resume, clear } = useEggDex(props.api)
+const { view, density } = useDexDisplay()
+const densityOptions = [{ value: 'comfortable', label: '舒适' }, { value: 'compact', label: '紧凑' }]
 const page = ref(1), groups = ref<string[]>([])
 const groupMode = ref<'union' | 'intersection'>('union')
 const sort = ref(''), groupCount = ref(''), sameRide = ref('')
@@ -154,10 +157,15 @@ defineExpose({ load, pause, resume, reveal, error })
         <p id="ed-count" class="ui-page-meta">资料条目 {{ data?.total || 0 }} 种 · {{ filtered.length === data?.total ? '浏览完整资料库' : `找到 ${filtered.length} 个结果` }}</p>
       </div>
       <div class="dex-toolbar-actions">
-        <input id="ed-search" v-model="filters.search" type="search" placeholder="搜索蛋名、精灵或编号" aria-label="搜索蛋蛋图鉴">
+        <UiSearch id="ed-search" v-model="filters.search" label="搜索蛋蛋图鉴" placeholder="搜索蛋名、精灵或编号" />
         <DexFilterMenu label="蛋类型" :options="typeOptions" :model-value="filters.egg_type ? [filters.egg_type] : []" :active="active" @update:model-value="filters.egg_type = $event[0] || ''" />
         <DexFilterMenu v-model="groups" v-model:mode="groupMode" label="蛋组" :options="groupOptions" multiple :active="active" />
         <button ref="moreFiltersButton" class="dex-filter-button dex-more-filter-trigger" :class="{ active: moreFiltersActive }" type="button" aria-haspopup="dialog" :aria-expanded="moreFiltersOpen" @click="openMoreFilters"><small>更多筛选</small><b>{{ moreFiltersSummary }}</b><UiIcon name="adjustments" /></button>
+        <UiSelect class="ui-density" size="sm" :options="densityOptions" :model-value="density" label="卡片密度" @change="density = $event === 'compact' ? 'compact' : 'comfortable'" />
+        <div class="ui-view-switch" role="group" aria-label="卡片视图">
+          <button type="button" :aria-pressed="view === 'grid'" title="网格视图" @click="view = 'grid'"><UiIcon name="layout-grid" /></button>
+          <button type="button" :aria-pressed="view === 'list'" title="列表视图" @click="view = 'list'"><UiIcon name="table" /></button>
+        </div>
       </div>
     </template>
     <dialog ref="moreFilters" class="dex-filter-dialog dex-more-filter-dialog" aria-labelledby="ed-more-filters-title" @click.self="closeMoreFilters()" @close="moreFiltersOpen = false">

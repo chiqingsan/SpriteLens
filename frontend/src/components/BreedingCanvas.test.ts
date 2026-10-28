@@ -28,21 +28,49 @@ function canvas(options: { plan?: Plan | null; pending?: boolean; positions?: Pl
 
 function viewBox(wrapper: ReturnType<typeof canvas>) { return (wrapper.get('svg').attributes('viewBox') ?? '').split(' ').map(Number) }
 const nests = (wrapper: ReturnType<typeof canvas>) => wrapper.findAll('g.planner-nest')
+const nestOf = (wrapper: ReturnType<typeof canvas>, gid: string) => wrapper.get(`g.planner-nest[data-gid="${gid}"]`)
 
 describe('小窝布局草图', () => {
-  it('按方案渲染父本连线，标出干扰连边并淡化无配对窝位', () => {
+  it('画布不再画父本连线，只按方案标记无配对窝位', () => {
     const wrapper = canvas()
-    const lines = wrapper.findAll('line.planner-edge')
-    expect(lines).toHaveLength(2)
-    expect(lines.filter(line => line.classes('interference'))).toHaveLength(1)
+    expect(wrapper.findAll('path.planner-edge')).toHaveLength(0)
+    expect(wrapper.find('.planner-canvas-links').exists()).toBe(false)
+    expect(wrapper.find('.planner-canvas-legend').exists()).toBe(false)
     expect(nests(wrapper)[0]!.classes()).not.toContain('unrelated')
     expect(nests(wrapper)[3]!.classes()).toContain('unrelated')
+  })
+  it('选中窝位后，可与它配对的窝位加上配对描边', () => {
+    expect(canvas({ selected: '4' }).findAll('.planner-nest.is-partner')).toHaveLength(0)
+    // 父本 1 与母本 2、3 配对
+    const wrapper = canvas({ selected: '1' })
+    expect(wrapper.findAll('.planner-nest.is-partner')).toHaveLength(2)
+    expect(nestOf(wrapper, '2').classes()).toContain('is-partner')
+    expect(nestOf(wrapper, '3').classes()).toContain('is-partner')
+    expect(nestOf(wrapper, '1').classes()).not.toContain('is-partner')
+    // 从配对另一端反查也成立：母本 2 只与父本 1 配对
+    const reverse = canvas({ selected: '2' })
+    expect(reverse.findAll('.planner-nest.is-partner')).toHaveLength(1)
+    expect(nestOf(reverse, '1').classes()).toContain('is-partner')
+  })
+  it('配对描边只由选中触发，悬停不点亮', async () => {
+    const wrapper = canvas()
+    await nests(wrapper)[0]!.trigger('pointerenter')
+    expect(wrapper.findAll('.planner-nest.is-partner')).toHaveLength(0)
+  })
+  it('选中的窝位最后绘制，名称与角标不会被相邻窝位盖住', () => {
+    const gids = (wrapper: ReturnType<typeof canvas>) => nests(wrapper).map(item => item.attributes('data-gid'))
+    // SVG 没有层级，后画者在上：选中的窝必须挪到末尾，它的名称与角标才会压住邻窝
+    expect(gids(canvas({ selected: '2' }))).toEqual(['1', '3', '4', '2'])
+    // 编号仍按草稿顺序，不随绘制顺序变化
+    expect(nestOf(canvas({ selected: '2' }), '2').get('text.planner-nest-number').text()).toBe('2')
+    expect(gids(canvas())).toEqual(['1', '2', '3', '4'])
   })
   it('说明区报告窝数与连线数，待重评和未生成方案时给出对应说明', () => {
     const caption = canvas().get('.planner-canvas-caption').text()
     expect(caption).toContain('共 4 个小窝（普通 4／学院 0）')
-    expect(caption).toContain('2 条父本连线')
-    expect(caption).toContain('1 条为干扰连边')
+    expect(caption).toContain('2 组配对')
+    expect(caption).toContain('1 组存在迭代或目标干扰')
+    expect(caption).toContain('选中窝位后')
     expect(canvas({ pending: true }).get('.planner-canvas-caption').text()).toContain('正在重新评估')
     expect(canvas({ plan: null }).get('.planner-canvas-caption').text()).toContain('拖动窝位可移到空位')
   })
@@ -97,21 +125,17 @@ describe('小窝布局草图', () => {
     expect(viewBox(legacy)[2]).toBeGreaterThan(640)
     expect(legacy.get('.planner-canvas-outside').text()).toContain('超出 20×20')
   })
-  it('待重评时隐藏旧连线，选中亲本后只强调相关连线', () => {
-    const pending = canvas({ pending: true })
-    expect(pending.findAll('line.planner-edge')).toHaveLength(0)
-    expect(pending.find('.planner-canvas-legend').exists()).toBe(false)
-    expect(canvas({ selected: '3' }).findAll('line.planner-edge.dim')).toHaveLength(1)
+  it('待重评时不用旧方案描配对边', () => {
+    const pending = canvas({ pending: true, selected: '1' })
+    expect(pending.findAll('.planner-nest.is-partner')).toHaveLength(0)
+    expect(canvas({ selected: '1' }).findAll('.planner-nest.is-partner')).toHaveLength(2)
   })
-  it('选中框和配对连线位于窝位之上，避免被相邻窝位覆盖', () => {
+  it('选中只加粗窝位自身描边，不再往窝里套第二圈边框', () => {
     const wrapper = canvas({ selected: '3' })
-    const children = Array.from(wrapper.get('svg').element.children)
-    const nestIndex = Math.max(...children.map((child, index) => child.classList.contains('planner-nest') ? index : -1))
-    const linkIndex = children.findIndex(child => child.classList.contains('planner-canvas-links'))
-    const selectedIndex = children.findIndex(child => child.classList.contains('planner-selected-outline'))
-    expect(linkIndex).toBeGreaterThan(nestIndex)
-    expect(selectedIndex).toBeGreaterThan(linkIndex)
-    expect(wrapper.get('.planner-selected-outline rect').attributes()).toMatchObject({ x: '-32', y: '-32', width: '64', height: '64', rx: '8' })
+    expect(wrapper.find('.planner-nest.selected').exists()).toBe(true)
+    // 一圈候选描边 + 一圈选中描边会看成两条边框：选中态统一由 .planner-nest.selected 表达。
+    expect(wrapper.find('.planner-selected-outline').exists()).toBe(false)
+    expect(wrapper.findAll('svg > g > rect').length).toBe(wrapper.findAll('g.planner-nest').length)
   })
   it('学院窝与锁定窝位用文字角标表达，不靠颜色', () => {
     const badges = canvas({ positions: [nest('1', 0, 0, 'academy'), nest('2', 2, 0, 'normal', 'position')] }).findAll('g.planner-nest-badge')
@@ -119,6 +143,9 @@ describe('小窝布局草图', () => {
     expect(badges[0]!.text()).toContain('学院')
     expect(badges[1]!.text()).toContain('锁')
     expect(badges[1]!.find('title').text()).toContain('位置锁定')
+    const academyKey = canvas({ positions: [nest('1', 0, 0, 'academy'), nest('2', 2, 0)] }).findAll('.planner-canvas-key-item')
+    expect(academyKey[0]!.find('.planner-canvas-key-academy').text()).toBe('学院窝')
+    expect(academyKey[1]!.find('.planner-canvas-key-academy').exists()).toBe(false)
   })
 
   it('窝位提供精灵名称提示，便于区分重复图片', () => {
@@ -135,10 +162,11 @@ describe('小窝布局草图', () => {
     expect(select.find('.planner-canvas-key-gender').attributes('aria-label')).toBe('母本')
     expect(select.find('.planner-canvas-key-gender .ui-icon use').attributes('href')).toBe('/static/icons/sprite.svg#gender-female')
     expect(select.find('.planner-canvas-key-mark img').attributes('alt')).toBe('大块头')
-    expect(select.find('small').text()).toContain('普通窝')
+    // 普通窝是常态不再逐行标注，只在学院窝上加小标
+    expect(select.find('.planner-canvas-key-academy').exists()).toBe(false)
     expect(select.find('small').text()).toContain('开朗')
     expect(item.find('.planner-canvas-key-locate').exists()).toBe(true)
-    expect(item.find('.planner-canvas-key-actions').find('.planner-canvas-key-location').text()).toBe('第3箱·第3行第2列')
+    expect(item.find('.planner-canvas-key-location').text()).toContain('第3箱·第3行第2列')
     await item.find('.planner-canvas-key-locate').trigger('click')
     expect(wrapper.emitted('locate')).toEqual([['2']])
   })

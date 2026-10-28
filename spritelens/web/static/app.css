@@ -53,6 +53,9 @@
      阴影由 0 1px 1px + 0 2px 4px 两层小偏移叠加，不用单层重投影。 ── */
   --hairline: color-mix(in srgb, var(--ink) 9%, transparent);
   --hairline-strong: color-mix(in srgb, var(--ink) 15%, transparent);
+  /* 输入类控件（搜索框、筛选 chip）的可见边界：白色面板上 15% 只剩 1.35:1 对比，太浅看不清 */
+  --field-line: color-mix(in srgb, var(--ink) 26%, transparent);
+  --field-line-hover: color-mix(in srgb, var(--ink) 34%, transparent);
   --ring-card: inset 0 0 0 1px color-mix(in srgb, var(--ink) 7%, transparent);
   --ring-top: inset 0 1px 0 rgba(255, 255, 255, .65);
   --field-bg: color-mix(in srgb, var(--ink) 2.2%, var(--panel));

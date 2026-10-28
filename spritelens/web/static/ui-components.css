@@ -119,6 +119,135 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--teal) 16%, transparent), var(--field-inset);
 }
 .ui-select { appearance: none; padding-right: var(--space-7); cursor: pointer; }
+
+/* 搜索框：边框 / 底色 / 焦点光晕都由外层容器承载，内部 input 全部复位。
+   WebView2 155 的 input[type=search] 原生 searchfield 会自绘白色底与描边（无视 border:0），
+   所以这里显式关掉 appearance 与所有原生伪元素，清除叉改用 .ui-search__clear。 */
+.ui-search {
+  position: relative; display: flex; align-items: center; gap: var(--space-2);
+  height: 34px; min-width: 0; padding: 0 var(--space-2) 0 var(--space-4);
+  border: 1px solid var(--field-line); border-radius: var(--radius-md);
+  background: var(--field-bg); color: var(--muted-2);
+  transition: border-color var(--motion-fast) var(--motion-ease),
+              box-shadow var(--motion-fast) var(--motion-ease),
+              background-color var(--motion-fast) var(--motion-ease),
+              color var(--motion-fast) var(--motion-ease);
+}
+.ui-search:hover { border-color: var(--field-line-hover); }
+.ui-search:focus-within {
+  background: var(--panel); color: var(--teal-dark);
+  border-color: color-mix(in srgb, var(--teal) 62%, var(--hairline));
+  box-shadow: 0 0 0 3px var(--focus-halo);
+}
+/* 用复合选择器压过 ui.css 的 .ui-icon 默认 18px（同特异度时后加载者赢） */
+.ui-search > .ui-search__icon { width: 16px; height: 16px; }
+.ui-search__input {
+  flex: 1 1 auto; min-width: 0; width: 100%; height: 100%; margin: 0; padding: 0;
+  appearance: none; -webkit-appearance: none;
+  border: 0; border-radius: 0; background: transparent; box-shadow: none;
+  color: var(--ink); font: inherit; font-size: var(--fs-sm); line-height: 1;
+  outline: none;
+}
+.ui-search__input::placeholder { color: var(--muted-2); }
+.ui-search__input::-webkit-search-cancel-button,
+.ui-search__input::-webkit-search-decoration,
+.ui-search__input::-webkit-search-results-button,
+.ui-search__input::-webkit-search-results-decoration { appearance: none; -webkit-appearance: none; display: none; }
+.ui-search__input::-ms-clear, .ui-search__input::-ms-reveal { display: none; width: 0; height: 0; }
+/* app.css 的全局 input 焦点规则特异度 (0,2,1)，这里必须更高，否则内部 input 又会画 teal 描边 */
+.ui-search input[type="search"]:focus, .ui-search input[type="search"]:focus-visible {
+  outline: none; border: 0; background: transparent; box-shadow: none;
+}
+.ui-search__clear {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none; width: 18px; height: 18px; padding: 0;
+  border: 0; border-radius: 50%; background: transparent; color: var(--muted-2);
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease);
+}
+.ui-search__clear:hover { background: var(--surface-3); color: var(--ink); }
+.ui-search__clear .ui-icon { width: 12px; height: 12px; }
+/* 无内容时保留占位而不是移除，避免工具栏宽度跳动 */
+.ui-search__clear.is-hidden { visibility: hidden; pointer-events: none; }
+.ui-search--compact { height: 30px; }
+.ui-search.is-disabled { opacity: .55; }
+/* 自制下拉（替换原生 select）：触发器沿用 .ui-search 的边框/焦点语言；
+   选项面板 fixed 定位，由组件按触发器位置贴放，下方放不下时向上翻。 */
+.ui-picker {
+  position: relative;
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  max-width: 100%; min-width: 0; height: 34px; padding: 0 var(--space-2) 0 var(--space-4);
+  border: 1px solid var(--field-line); border-radius: var(--radius-md);
+  background: var(--field-bg); color: var(--ink);
+  font: inherit; font-size: var(--fs-sm); text-align: left;
+  cursor: pointer;
+  transition: border-color var(--motion-fast) var(--motion-ease),
+              background-color var(--motion-fast) var(--motion-ease),
+              box-shadow var(--motion-fast) var(--motion-ease);
+}
+.ui-picker:hover { border-color: var(--field-line-hover); }
+.ui-picker:focus-visible, .ui-picker.is-open {
+  outline: none; background: var(--panel);
+  border-color: color-mix(in srgb, var(--teal) 62%, var(--hairline));
+  box-shadow: 0 0 0 3px var(--focus-halo);
+}
+.ui-picker:disabled { opacity: .55; cursor: not-allowed; }
+.ui-picker.is-empty > .ui-picker__label { color: var(--muted-2); }
+.ui-picker > .ui-picker__label {
+  flex: 1 1 auto; min-width: 0; overflow: hidden;
+  white-space: nowrap; text-overflow: ellipsis;
+}
+/* 复合选择器压过 ui.css 里 .ui-icon 的 18px 默认值（ui.css 后加载，同特异度会赢） */
+.ui-picker > .ui-picker__chevron {
+  flex: none; width: 14px; height: 14px; color: var(--muted-2);
+  transition: transform var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease);
+}
+.ui-picker.is-open > .ui-picker__chevron { transform: rotate(180deg); color: var(--teal-dark); }
+.ui-picker--sm { height: 30px; padding-left: var(--space-3); border-radius: var(--radius-sm); font-size: var(--fs-2xs); }
+.ui-picker--xs { height: 28px; padding-left: var(--space-2); border-radius: var(--radius-sm); font-size: var(--fs-3xs); }
+
+.ui-picker__panel {
+  position: fixed; z-index: 240;
+  display: flex; flex-direction: column;
+  min-width: 148px; padding: var(--space-1);
+  border: 1px solid var(--field-line); border-radius: var(--radius-md);
+  background: var(--panel); box-shadow: var(--shadow-pop);
+  overflow: hidden;
+}
+/* 弹层轻微展开：位移只有 4px，方向跟随弹出方向；reduced-motion 由 app.css 全局兜底 */
+.ui-picker__panel { animation: ui-picker-in var(--motion-fast) var(--motion-ease); }
+.ui-picker__panel.is-up { animation-name: ui-picker-in-up; }
+@keyframes ui-picker-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes ui-picker-in-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ui-picker__list {
+  display: flex; flex-direction: column; gap: 1px;
+  min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  /* 默认 thumb 在白色面板上是一整条深灰，压住右侧的勾选图标；压到 18% 只留可滚动提示 */
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink) 18%, transparent) transparent;
+}
+.ui-picker__option {
+  display: flex; align-items: center; gap: var(--space-2);
+  flex: none; min-height: 30px; padding: 0 var(--space-2);
+  border: 0; border-radius: var(--radius-xs); background: transparent;
+  color: var(--ink-soft); font: inherit; font-size: var(--fs-sm);
+  text-align: left; cursor: pointer;
+}
+.ui-picker__option.is-active { background: var(--surface-2); color: var(--ink); }
+.ui-picker__option.is-selected { color: var(--teal-dark); font-weight: 600; }
+.ui-picker__option > .ui-picker__option-label {
+  flex: 1 1 auto; min-width: 0; overflow: hidden;
+  white-space: nowrap; text-overflow: ellipsis;
+}
+.ui-picker__option > .ui-picker__option-hint { flex: none; color: var(--muted); font-size: var(--fs-3xs); font-weight: 500; }
+.ui-picker__option > .ui-picker__check { flex: none; width: 14px; height: 14px; color: var(--teal); }
+.ui-picker__empty { margin: 0; padding: var(--space-4) var(--space-3); color: var(--muted); font-size: var(--fs-3xs); text-align: center; }
 .ui-check {
   display: flex; align-items: center; gap: var(--space-3);
   min-height: 34px; padding: 0 var(--space-4);
@@ -391,7 +520,6 @@ select option { background: var(--panel); color: var(--ink); }
 
 /* 密度选择：与工具栏其它控件同高 */
 .ui-density { display: inline-flex; align-items: center; min-width: 0; }
-.ui-density select { height: 30px; padding: 0 var(--space-7) 0 var(--space-3); font-size: var(--fs-2xs); }
 
 /* ══════════ 分页条 ══════════ */
 .ui-pager {

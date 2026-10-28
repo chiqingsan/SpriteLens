@@ -2,6 +2,7 @@
 import UiSelect from './UiSelect.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import UiIcon from './UiIcon.vue'
+import UiSelect from './UiSelect.vue'
 import { parseCaptureDiagnostics, parseIfaces } from '../types/captureDiagnostics'
 import type { CaptureDiagnostics, CaptureDiagnosticsHost, DiagnosticCheck } from '../types/captureDiagnostics'
 const props = defineProps<{ host: CaptureDiagnosticsHost }>()
@@ -36,6 +37,11 @@ const stages = computed(() => [
   { id: 'decrypt', check: decrypt.value, label: decrypt.value?.status === 'ok' ? '已解密' : data.value?.any_key ? '已有密钥' : '等待密钥' },
 ])
 const missingSelected = computed(() => selected.value && !ifaces.value.some(row => row.name === selected.value))
+const ifaceOptions = computed(() => [
+  { value: '', label: '默认路由网卡' },
+  ...(missingSelected.value ? [{ value: selected.value, label: String(selected.value) + '（当前配置，尚未枚举）' }] : []),
+  ...ifaces.value.map(row => ({ value: row.name, label: row.description || row.name })),
+])
 const ports = computed(() => data.value ? [data.value.port, ...data.value.extra_ports].join(' · ') : '')
 const detailChecks = computed(() => data.value?.diagnostics.filter(check => check.id !== 'network' && check.id !== 'warnings') ?? [])
 watch(environmentNeedsHelp, needsHelp => { showDetails.value = needsHelp })
@@ -63,6 +69,10 @@ async function run(action: string, enabled?: boolean) {
   } catch (e) {
     if (active) { error.value = e instanceof Error ? e.message : String(e); selected.value = data.value?.iface ?? ''; showDetails.value = true }
   } finally { if (active) { busy.value = false; automationProgress.value = '' } }
+}
+function pickIface(value: string | number | null) {
+  selected.value = String(value ?? '')
+  void run('select')
 }
 async function applyKey() {
   if (busy.value || !active) return
@@ -167,7 +177,7 @@ defineExpose({ update })
     <template v-if="data">
       <div class="capture-setting-row capture-network-row">
         <div class="capture-setting-copy"><strong>抓包网卡</strong><span>下次启动采集时生效</span></div>
-        <div class="capture-network-controls"><div class="capture-select-row"><UiSelect v-model="selected" label="抓包网卡" :disabled="busy" :options="[{ value: '', label: '默认路由网卡' }, ...(missingSelected ? [{ value: selected, label: selected + '（当前配置，尚未枚举）' }] : []), ...ifaces.map(iface => ({ value: iface.name, label: iface.description || iface.name }))]" @change="run('select')" /><button class="ghost-button small" :disabled="busy" @click="run('ifaces')">刷新</button></div><span class="capture-port-note">监听端口 {{ ports }}</span><span v-if="selected" class="capture-port-note capture-selected-name">{{ selected }}</span></div>
+        <div class="capture-network-controls"><div class="capture-select-row"><UiSelect size="sm" :options="ifaceOptions" :model-value="selected" label="抓包网卡" placeholder="默认路由网卡" :disabled="busy" @change="pickIface" /><button class="ghost-button small" :disabled="busy" @click="run('ifaces')">刷新</button></div><span class="capture-port-note">监听端口 {{ ports }}</span><span v-if="selected" class="capture-port-note capture-selected-name">{{ selected }}</span></div>
       </div>
     </template>
     <div v-else class="capture-empty"><p role="status">{{ busy ? '正在加载采集设置…' : '尚无采集设置，请重试。' }}</p><button class="ghost-button small" :disabled="busy" @click="run('load')">重新加载</button></div>
@@ -255,7 +265,7 @@ defineExpose({ update })
 .capture-network-row { align-items: flex-start; }
 .capture-network-controls { display: grid; gap: var(--space-2); width: min(360px, 58%); min-width: 0; }
 .capture-select-row { display: flex; gap: var(--space-2); min-width: 0; }
-.capture-select-row select { flex: 1; width: 100%; min-width: 0; height: 32px; padding: 0 30px 0 var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-sm); background-color: var(--panel); color: var(--ink); font-size: var(--fs-xs); }
+.capture-select-row .ui-picker { flex: 1; width: 100%; min-width: 0; font-size: var(--fs-xs); }
 .capture-select-row button { flex: none; }
 .capture-port-note { color: var(--muted); font-size: var(--fs-2xs); line-height: 1.5; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .capture-selected-name { overflow-wrap: anywhere; }

@@ -3,16 +3,20 @@ import { computed, ref, watch } from 'vue'
 import type { PetFilterModel } from '../composables/usePetFilters'
 import DualRangeSlider from './DualRangeSlider.vue'
 import UiIcon from './UiIcon.vue'
+import UiSearch from './UiSearch.vue'
 import UiSelect from './UiSelect.vue'
-import UiSegmented from './UiSegmented.vue'
 
 const { model } = defineProps<{ model: PetFilterModel }>()
 const { filters, options, fixed, selectedMedals } = model
 const specialitiesOpen = ref(false)
 const specialityDetails = ref<HTMLDetailsElement | null>(null)
-const sortOptions = computed(() => options.value.sorts.map(item => ({ value: item.key, label: item.label })))
-function value(event: Event) { return (event.target as HTMLInputElement).value }
 function setSortDirection(desc: boolean) { if (filters.desc !== desc) model.patch({ desc }) }
+const sortOptions = computed(() => options.value.sorts.map(item => ({ value: item.key, label: item.label })))
+function setSort(value: string | number | null) {
+  const sort = String(value ?? '')
+  if (filters.sort !== sort) model.patch({ sort })
+  model.changed()
+}
 function syncSpecialitiesOpen(event: Event) {
   specialitiesOpen.value = (event.currentTarget as HTMLDetailsElement).open
 }
@@ -25,17 +29,15 @@ watch(() => model.active.value, active => {
 
 <template>
   <Teleport to="#pet-search-controls">
-    <label class="pet-search"><span class="sr-only">搜索名字、编号或图鉴 ID</span>
-      <input
-        id="f-search" :value="filters.search" type="text" placeholder="搜索名字 / 编号 / 图鉴 ID"
-        autocomplete="off" @input="model.search(value($event))">
-    </label>
+    <UiSearch
+      id="f-search" class="pet-search" :model-value="filters.search" label="搜索名字、编号或图鉴 ID"
+      placeholder="搜索名字 / 编号 / 图鉴 ID" @update:model-value="model.search($event)" />
   </Teleport>
   <Teleport to="#pet-sort-root">
-    <span class="inline-field pet-sort-field" :hidden="fixed">排序
-      <UiSelect id="f-sort" v-model="filters.sort" class="pet-sort-select" label="排序" :options="sortOptions" :disabled="fixed" @change="model.changed()" />
-    </span>
-    <UiSegmented v-if="!fixed" class="pet-sort-direction" role="group" aria-label="排序方向">
+    <label class="inline-field pet-sort-field" :hidden="fixed">排序
+      <UiSelect id="f-sort" size="sm" class="pet-sort-picker" :options="sortOptions" :model-value="filters.sort" :disabled="fixed" label="排序" @change="setSort" />
+    </label>
+    <div v-if="!fixed" class="segmented pet-sort-direction" role="group" aria-label="排序方向">
       <button type="button" :class="{ active: !filters.desc }" :aria-pressed="!filters.desc" @click="setSortDirection(false)"><UiIcon name="arrow-up"></UiIcon>升</button>
       <button type="button" :class="{ active: filters.desc }" :aria-pressed="filters.desc" @click="setSortDirection(true)"><UiIcon name="arrow-down"></UiIcon>倒</button>
     </UiSegmented>

@@ -151,13 +151,8 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { appearance:
 .pet-toolbar .segmented button.active { background: var(--panel); }
 .pet-tools { gap: var(--space-3); padding: 6px 12px; border-bottom-color: var(--hairline); }
 .pet-tools label[hidden] { display: none; }
+/* 外观统一由 .ui-search 承担，这里只保留工具栏里的伸缩行为 */
 .pet-search { flex: 1; min-width: 160px; }
-.pet-search input {
-  width: 100%; height: 32px; padding: 0 var(--space-4);
-  border: 1px solid var(--hairline); border-radius: var(--radius-sm);
-  background: var(--field-bg); box-shadow: var(--field-inset);
-}
-.pet-search input:hover { border-color: color-mix(in srgb, var(--teal) 38%, var(--hairline)); }
 .quick-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
 .quick-filters .chip { border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); font-weight: 500; height: 34px; display: inline-flex; align-items: center; justify-content: center; }
 
