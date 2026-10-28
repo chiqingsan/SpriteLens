@@ -96,7 +96,7 @@ onUnmounted(() => { window.removeEventListener('pagehide', leave); leave() })
 </script>
 <template>
   <main class="floating-radar">
-    <header class="floating-titlebar"><div class="floating-drag"><UiIcon name="eye"/><strong>附近雷达</strong><span v-if="summary?.uid" :title="`当前观察账号 ${summary.uid}`">账号 {{ summary.uid.slice(-6) }}</span><span>{{ data?.actors.length ?? 0 }} 只</span></div><div class="floating-legend" aria-label="雷达目标图例"><span><i class="floating-legend-dot" />普通</span><span><i class="floating-legend-dot is-marked" />单牌</span><span><i class="floating-legend-dot is-double" />双牌</span></div><button class="floating-settings" :aria-expanded="settingsOpen" aria-label="雷达设置" @click.stop="settingsOpen = !settingsOpen"><UiIcon name="settings"/></button><button class="floating-close" aria-label="关闭悬浮雷达" @click="close"><UiIcon name="x"/></button></header>
+    <header class="floating-titlebar"><div class="floating-drag"><UiIcon name="eye"/><strong>附近雷达</strong></div><div class="floating-legend" aria-label="雷达目标图例"><span><i class="floating-legend-dot" />普通</span><span><i class="floating-legend-dot is-marked" />单牌</span><span><i class="floating-legend-dot is-double" />双牌</span></div><button class="floating-settings" :aria-expanded="settingsOpen" aria-label="雷达设置" @click.stop="settingsOpen = !settingsOpen"><UiIcon name="settings"/></button><button class="floating-close" aria-label="关闭悬浮雷达" @click="close"><UiIcon name="x"/></button></header>
     <div v-if="settingsOpen" class="floating-settings-panel" role="dialog" aria-label="雷达设置"><label for="radar-opacity">不透明度 <output for="radar-opacity">{{ opacity }}%</output></label><input id="radar-opacity" type="range" min="35" max="90" step="1" :value="opacity" @input="changeOpacity"></div>
     <div class="floating-content"><p v-if="displayError || stale" class="floating-error" :class="{ 'is-stale': stale && !displayError }" :role="displayError ? 'alert' : 'status'">{{ displayError || staleMessage }}</p><div class="floating-attention-slot" aria-label="有标记精灵" @wheel="scrollAttention"><div class="floating-attention-list" :class="{ 'is-empty': !attentionActors.length }"><button v-for="actor in attentionActors" :key="actor.actor_id" class="floating-attention-chip" :class="[`attention-tone-${nearbyAttentionTone(actor.actor_id)}`, { selected: selected === actor.actor_id }]" :aria-pressed="selected === actor.actor_id" :aria-label="`${actor.name}，${actor.attention === 'double' ? '双牌' : '单牌'}`" @click="selectAttention(actor)"><span class="floating-attention-avatar"><img v-if="actor.icon_url && !failedImages.has(actor.icon_url)" :src="actor.icon_url" alt="" @error="imageFailed(actor.icon_url)"><UiIcon v-else name="eye"/></span><span class="floating-attention-medals"><MedalIcon v-for="mark in actor.marks" :key="mark.name" :name="mark.name" :source="mark.source"/></span></button></div></div><SceneRadar :data="data" :map="currentMap" :selected="selected" :radius="data?.radar_radius_raw" compact @select="selected = $event" /></div>
   </main>
@@ -128,7 +128,6 @@ onUnmounted(() => { window.removeEventListener('pagehide', leave); leave() })
 .floating-drag { display: flex; align-items: center; gap: var(--space-2); min-width: 0; user-select: none; }
 .floating-drag .ui-icon { width: 16px; height: 16px; flex: none; color: var(--radar-overlay-point); }
 .floating-drag strong { min-width: 0; overflow: hidden; font-size: var(--fs-sm); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.floating-drag span { flex: none; color: var(--radar-overlay-muted); font-size: var(--fs-3xs); font-variant-numeric: tabular-nums; }
 .floating-legend { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); min-width: max-content; padding: 0 var(--space-2); color: var(--radar-overlay-muted); font-size: var(--fs-3xs); white-space: nowrap; }
 .floating-legend > span { display: inline-flex; align-items: center; gap: var(--space-1); }
 .floating-legend-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--radar-overlay-point); }
@@ -143,10 +142,10 @@ onUnmounted(() => { window.removeEventListener('pagehide', leave); leave() })
 .floating-settings-panel output { color: var(--radar-overlay-ink); font-variant-numeric: tabular-nums; }
 .floating-settings-panel input { width: 100%; min-width: 0; accent-color: var(--radar-overlay-point); }
 
-.floating-content { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; padding: var(--space-3) var(--space-4) var(--space-2); }
+.floating-content { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; padding: var(--space-3); }
 .floating-error { flex: none; max-height: 22%; margin: 0 0 var(--space-2); overflow-y: auto; padding-left: var(--space-3); border-left: 2px solid var(--amber); color: var(--radar-overlay-ink); font-size: var(--fs-2xs); line-height: 1.5; overflow-wrap: anywhere; }
 .floating-error.is-stale { border-left-color: var(--radar-overlay-line); color: var(--radar-overlay-muted); }
-.floating-attention-slot { flex: none; box-sizing: border-box; height: 56px; min-height: 56px; overflow-x: auto; overflow-y: hidden; padding-bottom: var(--space-3); scrollbar-width: none; -ms-overflow-style: none; }
+.floating-attention-slot { flex: none; box-sizing: border-box; height: 46px; min-height: 46px; overflow-x: auto; overflow-y: hidden; padding-bottom: var(--space-3); scrollbar-width: none; -ms-overflow-style: none; }
 .floating-attention-slot::-webkit-scrollbar { display: none; }
 .floating-attention-list { display: flex; flex-wrap: nowrap; align-items: flex-start; gap: var(--space-2); width: max-content; min-width: 100%; min-height: 34px; }
 .floating-attention-list.is-empty { visibility: hidden; }
@@ -166,8 +165,12 @@ onUnmounted(() => { window.removeEventListener('pagehide', leave); leave() })
 .floating-attention-medals :deep(.medal-icon) { width: 22px; height: 22px; object-fit: contain; }
 .floating-attention-medals :deep(.medal-icon-text) { max-width: 3em; overflow: hidden; font-size: var(--fs-3xs); text-overflow: ellipsis; }
 
+@media (max-width: 320px) {
+  .floating-drag .ui-icon { display: none; }
+}
 @media (max-width: 380px) {
-  .floating-drag span { display: none; }
+  .floating-titlebar { grid-template-columns: minmax(0, 1fr) auto 34px 34px; padding-left: var(--space-2); }
+  .floating-settings, .floating-close { width: 34px; }
   .floating-legend { gap: var(--space-1); padding-inline: var(--space-1); }
 }
 </style>

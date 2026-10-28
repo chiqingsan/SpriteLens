@@ -22,6 +22,8 @@ class RadarWindowTests(unittest.TestCase):
             manager.open_radar(); manager.open_radar()
             self.assertEqual(create.call_count, 1)
             self.assertTrue(create.call_args.kwargs["on_top"])
+            self.assertFalse(create.call_args.kwargs["resizable"])
+            self.assertEqual((create.call_args.kwargs["width"], create.call_args.kwargs["height"]), (360, 460))
             self.assertFalse(create.call_args.kwargs["focus"])
             self.assertEqual(show.call_count, 2)
             first.events.closed.set()
@@ -59,6 +61,7 @@ class RadarWindowTests(unittest.TestCase):
 
     def test_maximize_requests_are_ignored(self):
         manager = RadarWindow("about:blank", Mock())
+        self.assertEqual(manager._tool_message(1, 0x112, 0xF000, 0, 1, 0), 0)
         self.assertEqual(manager._tool_message(1, 0x112, 0xF030, 0, 1, 0), 0)
         self.assertEqual(manager._tool_message(1, 0xA3, 0, 0, 1, 0), 0)
 

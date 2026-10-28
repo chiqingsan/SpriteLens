@@ -52,7 +52,7 @@ class RadarWindow:
                 return
             window = webview.create_window(
                 "小洛探探 · 悬浮雷达", "about:blank", width=360, height=460,
-                min_size=RADAR_MIN_SIZE, on_top=True, focus=False, hidden=True, frameless=True, easy_drag=False,
+                min_size=RADAR_MIN_SIZE, resizable=False, on_top=True, focus=False, hidden=True, frameless=True, easy_drag=False,
                 background_color="#17251f",
             )
             self._window = window
@@ -93,9 +93,9 @@ class RadarWindow:
             user32.SetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
             user32.SetWindowLongPtrW.restype = ctypes.c_ssize_t
             hwnd = native.Handle.ToInt64()
-            # 保留原生边缘缩放，非客户区由网页自行绘制；雷达不允许最大化。
+            # 固定悬浮窗大小，移除原生缩放边框和最大化按钮；标题栏仍由网页拖动。
             original_style = user32.GetWindowLongPtrW(hwnd, -16)
-            style_value = (original_style | 0x00040000) & ~0x00010000  # WS_THICKFRAME，清除 WS_MAXIMIZEBOX
+            style_value = original_style & ~0x00050000  # 清除 WS_THICKFRAME 和 WS_MAXIMIZEBOX
             ctypes.set_last_error(0)
             result = user32.SetWindowLongPtrW(hwnd, -16, style_value)
             if not result and ctypes.get_last_error():
@@ -140,7 +140,7 @@ class RadarWindow:
 
     def _tool_message(self, hwnd: int, message: int, wparam: int, lparam: int,
                       subclass_id: int, reference: int) -> int:
-        if message == 0x112 and (wparam & 0xFFF0) == 0xF030:  # WM_SYSCOMMAND / SC_MAXIMIZE
+        if message == 0x112 and (wparam & 0xFFF0) in (0xF000, 0xF030):  # WM_SYSCOMMAND / SC_SIZE、SC_MAXIMIZE
             return 0
         if message == 0xA3:  # WM_NCLBUTTONDBLCLK：禁止标题栏双击最大化。
             return 0

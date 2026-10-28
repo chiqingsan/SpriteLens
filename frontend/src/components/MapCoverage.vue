@@ -5,8 +5,21 @@ import type { NearbyCoverage } from '../types/nearby'
 import type { WorldMapEntry } from '../types/worldMap'
 
 const props = defineProps<{ coverage: NearbyCoverage | null; map: WorldMapEntry }>()
-/** 同一条 d 供 mask / fill / border 三个节点复用：整张图只生成一次 path 字符串。 */
-const d = computed(() => props.coverage ? coveragePath(props.coverage, props.map) : '')
+let previous: NearbyCoverage | null = null
+let previousMap = '', previousPath = ''
+/** 同版本快照仍要核对行内容：清除后版本号可能重新从 1 开始。 */
+const d = computed(() => {
+  const coverage = props.coverage
+  if (!coverage) { previous = null; previousPath = ''; return '' }
+  const { image, projection } = props.map
+  const mapKey = `${image.width}:${image.height}:${projection.origin_x}:${projection.origin_y}:${projection.side}`
+  if (previous && mapKey === previousMap && coverage.uid === previous.uid && coverage.map_id === previous.map_id
+    && coverage.layer === previous.layer && coverage.scope === previous.scope && coverage.revision === previous.revision
+    && coverage.cell_size === previous.cell_size && coverage.rows.length === previous.rows.length
+    && coverage.rows.every((row, i) => row[0] === previous!.rows[i]![0] && row[1] === previous!.rows[i]![1] && row[2] === previous!.rows[i]![2])) return previousPath
+  previous = coverage; previousMap = mapKey; previousPath = coveragePath(coverage, props.map)
+  return previousPath
+})
 const outsideMaskId = `coverage-outside-${useId()}`
 </script>
 

@@ -8,6 +8,7 @@ const ready = ref(false)
 let observer: ResizeObserver
 let readyFrame = 0
 let navigationTimer: ReturnType<typeof setTimeout> | undefined
+let finishNavigation: ((event?: TransitionEvent) => void) | undefined
 let navigating = false
 function moveTo(button: HTMLElement | null | undefined) {
   if (!button || !indicator.value) return
@@ -16,7 +17,7 @@ function moveTo(button: HTMLElement | null | undefined) {
 }
 function position() {
   if (!root.value?.getClientRects().length) return
-  if (props.navigation && navigationTimer) return
+  if (props.navigation && finishNavigation) return
   if (props.navigation) root.value.classList.remove('is-sliding')
   moveTo(root.value.querySelector<HTMLElement>(':scope > button.active'))
 }
@@ -24,20 +25,28 @@ function navigate(event: MouseEvent) {
   if (!props.navigation || navigating || matchMedia('(prefers-reduced-motion: reduce)').matches) return
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-goto-page]')
   if (!button) return
+  if (finishNavigation) indicator.value!.removeEventListener('transitionend', finishNavigation)
   clearTimeout(navigationTimer)
+  finishNavigation = undefined
   navigationTimer = undefined
   if (button.classList.contains('active')) { position(); return }
   event.stopPropagation()
   const active = root.value!.querySelector<HTMLElement>(':scope > button.active')!
   const previousWidth = active.offsetWidth, previousLeft = active.offsetLeft
   root.value!.classList.add('is-sliding')
-  moveTo(button)
-  navigationTimer = setTimeout(() => {
-    navigationTimer = undefined; navigating = true; button.click(); navigating = false
+  finishNavigation = (transitionEvent?: TransitionEvent) => {
+    if (transitionEvent && (transitionEvent.target !== indicator.value || transitionEvent.propertyName !== 'transform')) return
+    indicator.value!.removeEventListener('transitionend', finishNavigation!)
+    clearTimeout(navigationTimer)
+    navigationTimer = undefined; finishNavigation = undefined
+    if (root.value!.getClientRects().length) { navigating = true; button.click(); navigating = false }
     root.value!.classList.remove('is-sliding')
     indicator.value!.style.width = `${previousWidth}px`
     indicator.value!.style.transform = `translateX(${previousLeft}px)`
-  }, 120)
+  }
+  indicator.value!.addEventListener('transitionend', finishNavigation)
+  moveTo(button)
+  navigationTimer = setTimeout(() => finishNavigation?.(), 500)
 }
 onMounted(() => {
   position()
@@ -47,7 +56,7 @@ onMounted(() => {
   root.value!.querySelectorAll('button').forEach(button => observer.observe(button))
 })
 onUpdated(position)
-onBeforeUnmount(() => { observer.disconnect(); clearTimeout(navigationTimer); cancelAnimationFrame(readyFrame) })
+onBeforeUnmount(() => { observer.disconnect(); if (finishNavigation) indicator.value?.removeEventListener('transitionend', finishNavigation); clearTimeout(navigationTimer); cancelAnimationFrame(readyFrame) })
 </script>
 
 <template>

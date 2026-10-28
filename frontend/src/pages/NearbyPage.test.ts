@@ -63,7 +63,7 @@ describe('附近精灵更新布局稳定性', () => {
     const page = wrapper.vm as unknown as { update(value: unknown): void }
     page.update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
     await flushPromises()
-    const button = wrapper.get('.nearby-toolbar button')
+    const button = wrapper.get('.nearby-refresh')
     const element = button.element
     const viewport = wrapper.get('.nearby-list-pane').element
     viewport.scrollTop = 120
@@ -74,7 +74,7 @@ describe('附近精灵更新布局稳定性', () => {
     expect(button.attributes('aria-busy')).toBe('false')
     resolve(snapshot(2, [actor('2', 3), actor('3', 4)]))
     await flushPromises()
-    expect(wrapper.get('.nearby-toolbar button').element).toBe(element)
+    expect(wrapper.get('.nearby-refresh').element).toBe(element)
     expect(button.text()).toBe('刷新')
     expect(viewport.scrollTop).toBe(120)
     wrapper.unmount()
@@ -109,6 +109,9 @@ describe('附近精灵更新布局稳定性', () => {
     const wrapper = mount(NearbyPage, { props: { host: { load, openFloating: vi.fn() } } })
     ;(wrapper.vm as unknown as { update(value: unknown): void }).update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
     await flushPromises()
+    await nextTick()
+    await wrapper.get('.nearby-sort .ui-select-trigger').trigger('click')
+    await wrapper.findAll('.nearby-sort [role=option]')[0]!.trigger('click')
     await nextTick()
     expect(wrapper.findAll('.nearby-card').map(card => card.attributes('id'))).toEqual([
       'nearby-actor-3', 'nearby-actor-2', 'nearby-actor-1',
@@ -215,8 +218,7 @@ describe('附近精灵更新布局稳定性', () => {
     ;(wrapper.vm as unknown as { update(value: unknown): void }).update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
     await flushPromises()
     await nextTick()
-    await wrapper.get('.nearby-sort select').setValue('marks')
-    await nextTick()
+    expect(wrapper.get('.nearby-sort .ui-select-trigger').text()).toBe('有牌优先')
     expect(wrapper.findAll('.nearby-card').map(card => card.attributes('id'))).toEqual([
       'nearby-actor-2', 'nearby-actor-3', 'nearby-actor-4', 'nearby-actor-5', 'nearby-actor-1',
     ])
@@ -282,7 +284,7 @@ describe('附近精灵提醒音开关', () => {
     const host = { load: vi.fn().mockResolvedValue(snapshot(1, [])) }
     const wrapper = mount(NearbyPage, { props: { host } })
     expect(wrapper.find('.nearby-alert').exists()).toBe(false)
-    expect(wrapper.findAll('.nearby-toolbar > button').map(item => item.text())).toEqual(['刷新', '悬浮雷达'])
+    expect(wrapper.findAll('.nearby-toolbar-actions > button').map(item => item.text())).toEqual(['刷新', '悬浮雷达'])
     wrapper.unmount()
   })
 })
@@ -385,7 +387,7 @@ describe('附近精灵地图模式', () => {
     wrapper.unmount()
   })
 
-  it('页头显示当前观察账号，切号后更新为新账号', async () => {
+  it('切号后显示新账号的观察数据' , async () => {
     const load = vi.fn()
       .mockResolvedValueOnce(snapshot(1, [actor('1', 1)]))
       .mockResolvedValueOnce({ ...snapshot(1, [actor('2', 2)]), uid: '123456789012345' })
@@ -393,12 +395,11 @@ describe('附近精灵地图模式', () => {
     const page = wrapper.vm as unknown as { update(value: unknown): void }
     page.update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
     await flushPromises()
-    expect(wrapper.get('.nearby-account').text()).toBe('账号 1')
-    expect(wrapper.get('.nearby-account').attributes('title')).toContain('当前观察账号 1')
+    expect(wrapper.find('.nearby-account').exists()).toBe(false)
+    expect(wrapper.get('.nearby-card').attributes('id')).toBe('nearby-actor-1')
     page.update({ uid: '123456789012345', version: 1, observation_id: 1, phase: 'observing' })
     await flushPromises()
-    expect(wrapper.get('.nearby-account').text()).toMatch(/^账号 …\d{9}$/)
-    expect(wrapper.get('.nearby-account').attributes('title')).toContain('123456789012345')
+    expect(wrapper.get('.nearby-card').attributes('id')).toBe('nearby-actor-2')
     wrapper.unmount()
   })
 
@@ -477,7 +478,6 @@ describe('附近精灵地图模式', () => {
     await flushPromises()
     rejectReset(new Error('超时'))
     await flushPromises()
-    expect(wrapper.get('.nearby-account').text()).toBe('账号 2')
     expect(wrapper.get('.nearby-card').attributes('id')).toBe('nearby-actor-2')
     expect(load).toHaveBeenCalledTimes(2)
     wrapper.unmount()

@@ -226,7 +226,7 @@ const debugPosition = computed(() => {
     <div v-if="!compact && projection" class="radar-legend" aria-label="雷达目标图例"><span><i class="radar-legend-dot" />普通</span><span><i class="radar-legend-dot is-marked" />单牌</span><span><i class="radar-legend-dot is-double" />双牌</span></div>
     <div class="radar-body">
       <svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMid meet" class="scene-radar-scope" role="group" aria-label="参考坐标雷达">
-        <defs><clipPath :id="mapClipId"><rect width="400" height="400" /></clipPath></defs>
+        <defs><clipPath :id="mapClipId"><rect width="400" height="400" :rx="compact ? 10 : 0" /></clipPath></defs>
         <g v-if="map && mapBackground" :clip-path="`url(#${mapClipId})`" class="radar-map">
           <image :href="map.image.url" :x="mapBackground.x" :y="mapBackground.y" :width="mapBackground.width" :height="mapBackground.height" preserveAspectRatio="none" />
           <g v-if="visible" :transform="`translate(${mapBackground.x},${mapBackground.y}) scale(${mapBackground.width / map.image.width},${mapBackground.height / map.image.height})`"><MapCoverage :coverage="visibleCoverage" :map="map" /></g>
@@ -305,8 +305,8 @@ const debugPosition = computed(() => {
 .scene-radar.is-overlay { flex: 1; min-height: 0; padding: 0; border: 0; background: transparent; --radar-label-bg: var(--radar-overlay-bg); }
 .is-overlay header { display: none; }
 .is-overlay .radar-legend { flex: none; margin: 0 0 var(--space-2); justify-content: center; }
-.is-overlay .radar-body { margin: 0; }
-.is-overlay .scene-radar-scope { aspect-ratio: auto; background: transparent; }
+.is-overlay .radar-body { margin: 0; align-items: end; }
+.is-overlay .scene-radar-scope { width: 100%; height: auto; aspect-ratio: 1; background: transparent; border-radius: 10px; overflow: hidden; }
 .is-overlay .radar-point { fill: var(--radar-overlay-point); stroke: var(--radar-overlay-bg); }
 .is-overlay .radar-target-label { fill: var(--radar-overlay-ink); }
 .is-overlay .radar-label.selected .radar-target-label { fill: var(--radar-overlay-ink); }
