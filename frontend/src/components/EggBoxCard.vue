@@ -42,10 +42,9 @@ function date(value: number) {
           <span v-if="egg.hatching" class="eggbox-card-status" :title="`孵化中 ${Math.round(egg.hatch_progress * 100)}%`"><UiIcon name="clock" />{{ Math.round(egg.hatch_progress * 100) }}%</span>
         </div>
         <EggBoxArtwork :egg="egg" size="card" />
-        <span v-if="egg.egg_activity" class="eggbox-card-activity" title="活动来源的蛋">活动</span>
         <span v-if="egg.quantity > 1" class="eggbox-card-quantity" :title="`同种蛋 ${egg.quantity} 枚`">×{{ egg.quantity }}</span>
       </div>
-      <strong class="eggbox-card-name" :title="egg.egg_name"><span class="eggbox-card-name-text">{{ egg.egg_name }}</span><img v-if="egg.egg_kind === 'shiny'" class="eggbox-card-shiny-icon" src="/static/rarity/shiny-fit.webp" alt="异色" title="异色蛋"></strong>
+      <strong class="eggbox-card-name" :title="egg.egg_name"><span v-if="egg.egg_activity" class="eggbox-card-activity" title="活动来源的蛋">活动</span><span class="eggbox-card-name-text">{{ egg.egg_name }}</span><img v-if="egg.egg_kind === 'shiny'" class="eggbox-card-shiny-icon" src="/static/rarity/shiny-fit.webp" alt="异色" title="异色蛋"></strong>
       <div class="eggbox-card-labels" :title="cardTags.length ? tagsTitle : undefined" aria-label="蛋标签">
         <span v-for="(tag, index) in visibleTags" :key="`${tag.kind}-${index}`" class="eggbox-card-tag" :class="`eggbox-card-tag--${tag.kind}`">{{ tag.label }}</span>
         <span v-if="hiddenTagCount > 0" class="eggbox-card-tag eggbox-card-tag--more">+{{ hiddenTagCount }}</span>

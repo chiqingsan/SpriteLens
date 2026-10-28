@@ -484,17 +484,17 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 活动来源角标：活动道具产出的蛋（含异色活动蛋）。贴展示台左下角，
-   不与角标行抢宽度；名字里已不再带「异色」前缀，出处由这个角标补齐。 */
+/* 活动来源标签：活动道具产出的蛋（含异色活动蛋）。挂在蛋名前面，
+   补回名称里去掉的「异色」出处；做成紧凑的扁平小胶囊，不抢名字的宽度 */
 .eggbox-card-activity {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  z-index: 2;
+  align-self: center;
   flex: none;
-  border-color: color-mix(in srgb, var(--amber-ink) 26%, transparent);
-  background: color-mix(in srgb, var(--amber-soft) 78%, var(--panel));
+  height: 16px;
+  padding: 0 3px;
+  border: 0;
+  background: color-mix(in srgb, var(--amber-soft) 82%, var(--panel));
   color: var(--amber-ink);
+  line-height: 16px;
 }
 
 /* 蛋图展示台：固定 97px 高，蛋贴着台面站好（角标行从台面顶部浮过），
@@ -593,9 +593,11 @@
   align-items: center;
   justify-content: center;
   flex: none;
-  /* 名称与异色星标之间留 6px：3px 时星标几乎贴在末字上，读起来像一个字 */
-  gap: var(--space-2);
-  width: 100%;
+  gap: var(--space-1);
+  /* 名称行比文字区再宽 6px（左右各 3px，仍在卡片内边距里）：活动蛋要在名字前面
+     加一枚「活动」标签，13px 的蛋名有 7 个字时容易差几个像素 */
+  width: calc(100% + 2 * var(--space-2));
+  margin-inline: calc(-1 * var(--space-2));
   min-width: 0;
   height: 19px;
   color: var(--egg-card-ink);
@@ -614,6 +616,8 @@
 
 .eggbox-card-shiny-icon {
   flex: none;
+  /* 名称行间距收到 4px 后，星标单独补回 2px，保持文字与星标之间 6px */
+  margin-left: var(--space-0);
   width: 1em;
   height: 1em;
   object-fit: contain;
