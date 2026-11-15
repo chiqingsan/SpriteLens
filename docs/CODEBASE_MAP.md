@@ -11,6 +11,8 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | 文件 | 职责 |
 | --- | --- |
 | `AGENTS.md` | 仓库协作规则与必读入口 |
+| `docs/images/*.webp` | 根 README 功能截图；账号页面使用本人数据副本、隐藏 UID，图鉴使用实际目录；`nearby.webp` 与 `radar-game.webp` 为用户提供的附近页及游戏同屏悬浮雷达实拍；临时截图脚本与账号副本不入库 |
+| `docs/images/qq-group.png` | 用户提供的交流群二维码，供根 README「关于」使用 |
 | `main.py` | 入口转发到 `spritelens.main:main` |
 | `start.bat` | 双击启动界面（pythonw，无控制台窗口） |
 | `start_silent.vbs` | 零窗口启动（wscript 直接跑 pythonw，cmd 不闪窗） |
