@@ -6,6 +6,8 @@
 """
 
 import queue
+import subprocess
+import sys
 import threading
 import time
 import unittest
@@ -63,6 +65,61 @@ class _FakeSniffer:
 
 
 class NpcapSourceLogicTest(unittest.TestCase):
+    def test_capture_imports_decode_pcap_without_loading_all_layers(self):
+        """新进程验证实际入口的协议注册，避免其它测试导入 scapy.all 掩盖缺层。"""
+        import base64
+        import io
+        from pathlib import Path
+
+        from scapy.layers.inet import IP, TCP
+        from scapy.layers.inet6 import IPv6
+        from scapy.layers.l2 import Dot1Q, Ether
+        from scapy.utils import PcapWriter
+
+        stream = io.BytesIO()
+        writer = PcapWriter(stream, linktype=1, sync=True)
+        writer.write([
+            Ether() / IP() / TCP(dport=8195) / b"ipv4",
+            Ether() / IPv6() / TCP(dport=8195) / b"ipv6",
+            Ether() / Dot1Q(vlan=10) / IP() / TCP(dport=8195) / b"vlan",
+        ])
+        encoded = base64.b64encode(stream.getvalue()).decode("ascii")
+        writer.close()
+        script = """
+import base64
+import io
+import sys
+from spritelens.capture.npcap_source import NpcapCaptureSource
+
+source = NpcapCaptureSource(8195, on_chunk=lambda chunk: None)
+assert isinstance(source.list_ifaces(), list)
+def read_offline(sniffer_class):
+    sniffer = sniffer_class(offline=io.BytesIO(base64.b64decode(sys.argv[1])))
+    sniffer.start()
+    sniffer.join(timeout=5)
+    assert not sniffer.running
+    packets = sniffer.results
+    assert len(packets) == 3
+    assert packets[0].haslayer('IP')
+    assert packets[1].haslayer('IPv6')
+    assert packets[2].haslayer('Dot1Q')
+    assert [bytes(packet['TCP'].payload) for packet in packets] == [b'ipv4', b'ipv6', b'vlan']
+source._start_sniffer = read_offline
+try:
+    source.start()
+finally:
+    source.stop()
+assert 'scapy.all' not in sys.modules
+assert 'scapy.layers.bluetooth' not in sys.modules
+assert 'scapy.layers.kerberos' not in sys.modules
+"""
+        result = subprocess.run(
+            [sys.executable, "-B", "-c", script, encoded],
+            cwd=Path(__file__).resolve().parents[1],
+            capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def setUp(self):
         self.chunks = []
         self.events = []
@@ -217,23 +274,17 @@ class NpcapSourceLogicTest(unittest.TestCase):
             self.src._queue.get()
 
     def _patch_scapy_sniffer(self, sniffer_cls) -> None:
-        """用假 scapy.all 替换 sys.modules 里的条目（AsyncSniffer 在 start() 内延迟导入）。"""
-        import sys
-        import types
+        """替换延迟导入的 AsyncSniffer，不替换协议层注册模块。"""
+        import scapy.sendrecv
 
-        fake = types.ModuleType("scapy.all")
-        fake.AsyncSniffer = sniffer_cls
-        self._original_scapy_all = sys.modules.get("scapy.all")
-        sys.modules["scapy.all"] = fake
+        self._original_scapy_sniffer = scapy.sendrecv.AsyncSniffer
+        scapy.sendrecv.AsyncSniffer = sniffer_cls
         self.addCleanup(self._restore_scapy_sniffer)
 
     def _restore_scapy_sniffer(self) -> None:
-        import sys
+        import scapy.sendrecv
 
-        if getattr(self, "_original_scapy_all", None) is not None:
-            sys.modules["scapy.all"] = self._original_scapy_all
-        else:
-            sys.modules.pop("scapy.all", None)
+        scapy.sendrecv.AsyncSniffer = self._original_scapy_sniffer
 
     def test_start_failure_rolls_back_worker(self):
         """启动失败（sniffer 抛错）必须回收已创建的 worker 线程（R03）。

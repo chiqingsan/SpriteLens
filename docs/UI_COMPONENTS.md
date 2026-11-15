@@ -55,7 +55,6 @@
 | 详情面板（Vue） | `<PageInspector>`（`frontend/src/components/PageInspector.vue`，根类名 `ui-inspector`） | 右侧详情统一外壳：标题 + 副标题 + 操作区 + 关闭；左缘拖拽调宽、双击复位、宽度按 `storage-key` 记忆；窄屏自动切换为抽屉 |
 | 页面骨架（Vue） | `<PageShell>`（`frontend/src/components/PageShell.vue`，根类名 `ui-page`） | 统一页面骨架：`#toolbar` 槽 = 页头/工具行（`ui-page-toolbar`），默认槽 = 页面主体；`:busy` 标记加载中 |
 | 分页（Vue） | `<PagePager>`（`frontend/src/components/PagePager.vue`，类名 `ui-pager`） | 统一分页条：页码条 + 上/下页 + 总数说明；`:page` + `@update:page`；横向滚轮翻页，选中页自动滚入视野 |
-| 显示偏好 | `ui-view-switch`、`useDexDisplay`（`frontend/src/composables/useDexDisplay.ts`） | 网格/列表与舒适/紧凑密度，记忆在 `localStorage["spritelens.dex.view"]` / `["spritelens.dex.density"]`；列表/紧凑样式由页面加 `.is-list` / `.is-compact` |
 
 用法示例：
 
@@ -146,37 +145,30 @@
 ```
 
 - 已迁移：图鉴、蛋图鉴、蛋仓、筛选配对、双牌产线、智能配窝、附近精灵、我的家园；背包为原生页面，保留既有 `#page-pets .workspace.split` 结构（工具行与筛选栏由 `backpack-layout.css` 负责），后续如迁移需同步处理 `#pet-detail-root` 的网格列。
-- 分页统一用 `PagePager`；不再在页面内自行实现页码条。图鉴/蛋图鉴的网格/列表、舒适/紧凑由 `useDexDisplay` 驱动，列表与紧凑样式在 `catalog-wiki.css` 中以 `.is-list` / `.is-compact` 提供。
+- 分页统一用 `PagePager`；不再在页面内自行实现页码条。图鉴/蛋图鉴只保留网格视图，不提供网格/列表切换与舒适/紧凑密度选择（对应样式与状态已在界面重构中移除）。
 - 工具行内的分组用 `ui-page-heading`（标题/说明/状态）与 `ui-page-actions`（按钮组）排布；需要两行时让 `ui-page-toolbar` 自然换行，不要固定高度。
 - 迁移页面时不要再用 `.page > .xxx-page` 的旧包装器规则（`height:100%` / `overflow:hidden` 已由 `ui-page` 承担），否则会出现双滚动容器。
 
 ## 9. 常用组合（可直接照抄的页面骨架）
 
-### 9.1 列表页：工具行 + 网格/列表 + 分页 + 详情
+### 9.1 列表页：工具行 + 网格 + 分页 + 详情
 
 ```vue
 <PageShell class="catalog-dex" :busy="loading">
   <template #toolbar>
     <div class="ui-page-heading">
-      <div class="ui-view-switch" role="group" aria-label="显示方式">
-        <button class="is-active" aria-pressed="true" aria-label="网格">
-          <UiIcon name="layout-grid" />
-        </button>
-        <button aria-pressed="false" aria-label="列表"><UiIcon name="table" /></button>
-      </div>
       <p class="ui-page-meta">资料条目 {{ total }} 条</p>
     </div>
     <div class="ui-page-actions">
       <input class="field" placeholder="搜索名称 / 编号" />
       <button class="segmented">属性</button>
       <button class="segmented">蛋组</button>
-      <select class="ui-density" aria-label="显示密度">…</select>
       <PagePager :page="page" :pages="pages.length" :page-size="30" unit="只"
         label="精灵图鉴页码" @update:page="goPage" />
     </div>
   </template>
   <div class="dex-browser-layout">
-    <section class="dex-results" :class="[`is-${view}`, `is-${density}`]">…</section>
+    <section class="dex-results">…</section>
     <PageInspector v-if="detail" storage-key="handbook" title="精灵详情" @close="closeDetail()">
       <HandbookDetail :item="detail" />
     </PageInspector>
@@ -184,7 +176,7 @@
 </PageShell>
 ```
 
-要点：视图/密度状态来自 `useDexDisplay()`（记忆键见 §3）；分页只接 `PagePager`；详情只接 `PageInspector`。
+要点：分页只接 `PagePager`；详情只接 `PageInspector`；图鉴卡片固定网格视图，不再有视图/密度切换。
 
 ### 9.2 设置页两栏
 

@@ -122,7 +122,7 @@ describe('自绘悬浮雷达', () => {
     expect(wrapper.get('.floating-attention-chip').attributes('aria-label')).toContain('单牌精灵')
     expect(wrapper.get('.floating-attention-chip img').attributes('src')).toBe('/static/pet.png')
     expect(wrapper.find('.radar-attention-ring').exists()).toBe(true)
-    expect(wrapper.find('.radar-player').exists()).toBe(true)
+    expect(wrapper.find('.radar-heading').exists()).toBe(true)
     await wrapper.get('.floating-attention-chip').trigger('click')
     expect(wrapper.get('.radar-target').classes()).toContain('selected')
     wrapper.unmount()

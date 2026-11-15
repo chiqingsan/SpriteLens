@@ -645,7 +645,6 @@ class EggBoxPayloadTests(unittest.TestCase):
 
     def test_voice_prediction_from_parents(self) -> None:
         """声音遗传：母本与候选父本取平均向下取整；一致时自动打声音标签。"""
-        from dataclasses import replace
         from spritelens.domain.egg_box import EggParent, EggPickupOrigin
 
         def entry(mother: EggParent | None, fathers: tuple[EggParent, ...]) -> EggBoxEntry:

@@ -41,9 +41,13 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `spritelens/web/static/desktop-shell.js` / `desktop-shell.css` | 桌面顶栏、窗口操作与缩放边缘；浏览器模式隐藏 |
 | `data/schemas/` | 外挂 schema：`opcodes.json` + `messages/*.json`（字段级合并） |
 | `data/static/` | 静态映射：`species/natures/types/skills/type_chart/eggs/medals/specialities/color_cards.json` + 各 `_meta.json`；世界地图清单见 `world_maps.json`；特性来源见 `_specialities_meta.json` |
-| `spritelens/web/static/` | 前端资源：`index.html`（分组导航骨架）/ `boot.js`（启动自恢复链）/ `app.css`（布局与组件 token）/ `themes.css`（三套主题色值）/ `app.js`（数据渲染）/ `ui.css` / `ui.js`（详情抽屉、键盘与焦点）/ `appearance.js`（主题与显示偏好）/ `icons.js` + `icons/`（本地 SVG sprite）/ `favicon.png` / `pet-media/`（官方原始头像与全身图）/ `type-icons/` `egg-icons/` `medal-icons/`（奖牌及标记图标）/ `rarity/` `color-cards/` / `maps/`（世界地图底图，C13-01） |
+| `spritelens/web/static/` | 前端资源：`index.html`（分组导航骨架）/ `boot.js`（启动自恢复链）/ `app.css`（布局与组件 token）/ `themes.css`（三套主题色值）/ `app.js`（数据渲染）/ `ui.css` / `ui.js`（原生壳键盘与筛选面板交互；详情抽屉与焦点陷阱已由 Vue `PetDetailPanel` 自管）/ `appearance.js`（主题与显示偏好）/ `icons.js` + `icons/`（本地 SVG sprite）/ `favicon.png` / `pet-media/`（官方原始头像与全身图）/ `type-icons/` `egg-icons/` `medal-icons/`（奖牌及标记图标）/ `rarity/` `color-cards/` / `maps/`（世界地图底图，C13-01） |
 | `spritelens/web/account_avatar_cache.py` | 游戏名片头像 ID 映射、云端按需下载与用户数据目录缓存；失败由前端回退 Logo |
 | `data/recordings/` | 运行时录制产物（gitignore；本地回放样例不在版本库） |
+
+资源母版提醒：`spritelens/web/static/type-icons/sprites.css` 与 `sprite-0.webp` 运行时不被页面直接引用，
+但 `tools/import_assets.py` 以它们为母版、按 CSS 里的雪碧图坐标裁剪出 `type-{n}.webp`。
+清点时不要按"无引用"删除，删除会切断属性图标的复现链路（2026-11-15 健康检查已踩过一次）。
 
 ## 维护与审查文档
 
@@ -90,7 +94,8 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `system/webview_guard.py` | WebView2 运行时预检测（注册表/env）+ 缺失时原生对话框引导安装 |
 | `system/window_geometry.py` | 初始窗口尺寸：工作区 + 系统 DPI 缩放适配（fit_window 纯函数） |
 | `system/single_instance.py` | 单实例控制：命名互斥锁 + 唤醒事件 + Win32 强制置顶；后台采集与主界面使用不同实例标识 |
-| `system/game_process.py` | Windows 进程枚举、进程创建事件 4688 任务计划程序的安装/移除与后台启动命令 |
+| `system/game_process.py` | Windows 进程枚举与句柄等待、登录触发器任务计划程序的安装/移除、后台启动命令 |
+| `system/process_watch.py` | 用 `SetWinEventHook` 窗口创建事件零轮询地等待目标进程窗口出现 |
 | `system/runtime_session.py` | 后台采集与按需主界面之间的本机运行时地址交接文件 |
 | `system/tray.py` | 无第三方依赖的 Windows 通知区域图标与打开/退出动作 |
 | `system/net_diagnose.py` | --diagnose-net：宽抓会话统计，定位多连接的数据端口 |
@@ -112,7 +117,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `repositories/settings.py` | JSON 配置仓库（读取失败阻止写回、替换成功才更新缓存、字段归一、窗口几何） |
 | `services/monitor_service.py` | 采集管线编排：字节流 → 帧 → 解密 → 解码 → PacketEvent；会话释放/空闲回收/硬上限 |
 | `services/capture_service.py` | 采集运行服务：接入层创建与生命周期、录制 tee、手动密钥、副作用命令串行化（阶段1.3 自 capture_vm 抽出） |
-| `services/game_capture_automation.py` | 游戏进程自动监听设置：保存跟随状态、安装/移除 4688 触发任务 |
+| `services/game_capture_automation.py` | 游戏进程自动监听设置：保存跟随状态、安装/移除登录触发任务 |
 | `services/session_tracker.py` | 会话表（LRU，支持 drop）与全局统计 |
 | `services/account_tracker.py` | 账号切换判定；display_uid 是已加载/实时归属，写路径 uid 不变（同 uid 重复帧/离线加载登录不算切换） |
 | `services/account_selection_service.py` | 账号列表与采集中切换查看；历史数据先读完，失败保留选择 |
@@ -170,6 +175,38 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `tests/test_pet_snapshot_contract.py` | F01：读取后切号，列表/选项/REST/WS 与 bootstrap 的单响应同源、离线归属 |
 | `tests/test_account_domain_contract.py`、`tests/test_account_requests.py`、`tests/account_requests_cases.js` | F02：切号交错、历史语义、恢复竞争与原生页请求失效 |
 
+### 2026-11-15 健康检查补齐的模块
+
+以下模块已存在于源码，但此前未登记进本表；职责取模块文档字符串，状态以代码为准。
+
+| 文件 | 职责 |
+| --- | --- |
+| `domain/scene.py` | 场景观察字段提取；不推断完整 AOI，不换算坐标单位 |
+| `domain/navigation_scene.py` | 外部客户端晚连接时的交互 NPC 快照，只保留本次连接观察到的事实 |
+| `domain/pet_partner_marks.py` | 伙伴标记增量回执（改/摘标记不含完整 PetData） |
+| `domain/breeding_nature.py` | 家园与本地配窝共用的逐父母性格参考，不是实测成功率 |
+| `domain/breeding_solver.py` | 有预算的确定性联合选配与有限网格摆位搜索 |
+| `domain/breeder_library.py` | 筛选配对的静态候选规则，不代表实际配窝或已验证遗传 |
+| `domain/collection_lines.py` | 双牌产线参考规则：纯目录聚合与同账号候选 |
+| `services/scene_coverage.py` | 本次运行的观察覆盖（世界格网），与实时实体生命周期分开，不写场景 checkpoint |
+| `repositories/home_store.py` | 家园快照持久化：每账号保留最近一次观察结果 |
+| `repositories/scene_checkpoint_store.py` | 附近精灵场景上下文的轻量持久化缓存，不保存实体与坐标 |
+| `services/retention.py` | 记录保留策略：最近 3 天、总量不超过 300MB 的 eventlog/recordings |
+| `system/process_watch.py` | `SetWinEventHook` 窗口事件驱动的进程启动监听 |
+| `web/nearby.py` | 只读附近观察载荷与接口；静态联查用精确 NPC 映射，不换算距离 |
+| `web/world_maps.py` | 世界地图清单只读接口：下发投影参数与底图地址，前端完成画布投影 |
+| `web/breeding_planner.py` | 智能配窝鉴权 API，校验外部草稿并在工作线程计算 |
+| `web/breeder_library.py` | 筛选配对的独立鉴权路由及载荷转换 |
+| `web/collection_lines.py` | 独立产线路由与 JSON 契约，复用应用鉴权和账号快照 |
+| `web/ext_api.py` | 对外只读数据接口（ext API）：REST 查询 + 事件 WebSocket 推送 |
+| `web/debug_preview.py`、`web/static/debug-preview.js` | 隔离的临时新用户预览，子进程独占数据根目录 |
+| `web/static/onboarding.js`、`web/static/onboarding.css` | 首次启动引导层（采样/说明），独立于页面脚本 |
+| `web/static/settings-nav.js`、`web/static/shell-ui.js` | 设置页锚点导航与应用壳交互（折叠/布局） |
+| `tools/sync_wiki_chains.py`、`tests/test_wiki_chains.py` | Wiki 进化表补链与合成数据回归 |
+| `tests/test_navigation_scene.py`、`tests/test_pet_partner_marks.py` | 晚连接 NPC 快照与伙伴标记增量回执 |
+| `tests/test_retention.py`、`tests/test_scene_checkpoint.py` | 保留策略、场景 checkpoint 缓存 |
+| `tests/test_server_lifecycle.py`、`tests/test_ext_api.py`、`tests/test_debug_preview.py`、`tests/test_onboarding.py` | 服务生命周期、ext API 契约、隔离预览与引导 |
+
 ## tests/（unittest 平铺）
 
 | 文件 | 覆盖 |
@@ -194,7 +231,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `test_desktop_shell.py` | DPI/工作区适配、保存的宽高比例与多屏位置恢复 |
 | `test_app_icons.py` | 窗口大小图标消息、64 位句柄与图标加载失败回归 |
 | `test_single_instance.py` | 单实例互斥锁唯一性、唤醒事件投递与消费、close 幂等 |
-| `test_game_automation.py` | 内置游戏进程名、4688 触发任务 XML、跟随状态配置与运行时交接文件 |
+| `test_game_automation.py` | 内置游戏进程名、登录触发任务 XML、窗口监听器事件过滤与重新武装、后台等待与会话退出分支、跟随状态配置与运行时交接文件 |
 | `test_persistence.py` | 身份识别（NPC 不误取）、写库/重开/加载、跨账号隔离、schema 1 基线结构与旧库拒绝、外观字段往返、彩名恢复、损坏恢复 |
 | `test_settings.py` | 配置读取失败/非法 JSON 阻止写回，原子替换失败保持磁盘与内存原值 |
 | `test_view_models.py` | 手动密钥、采集/录制命令串行化、配置/录制失败与自动采集开关 |
@@ -275,7 +312,7 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | `frontend/src/components/PetDetailPanel.vue`、`PetDetail.vue` | 与筛选共用360px右栏、窄窗抽屉、焦点/连续浏览、正文滚动与低优先级获取信息 |
 | `PetDetailHero.vue`、`PetArtwork.vue` | 详情身份叠加；独立立绘展示与同URL复用，原图按整张立绘卡片宽度70%等比居中 |
 | `PetDetailStats.vue`、`PetMeasurementRow.vue` | 六维与已含加成、精灵/精灵蛋数值范围 |
-| `PetDetailMedals.vue`、`PetDetailEvolution.vue`、`pet-detail.css` | 横向获得奖牌、真实头像分支进化、限定背包的主题与响应式样式 |
+| `PetMarks.vue`、`PetDetailEvolution.vue`、`pet-detail.css` | 身份区奖牌/炫彩标记、真实头像分支进化、限定背包的主题与响应式样式；`pet.detail.awarded_medals` 全量奖牌条当前无挂载入口（原 `PetDetailMedals.vue` 已于 2026-11-15 健康检查删除） |
 | `spritelens/domain/pet_medals.py` | 登录集合按获得精灵归属；未核验增量失效相关集合 |
 | `spritelens/web/pet_details.py` | 既有宠物与静态资料生成详情DTO，不另读仓库 |
 | `tests/test_pet_detail.py` | 获得/佩戴归属、未知/空集合、合并落库与详情契约 |
@@ -285,11 +322,12 @@ Vue 3 + TypeScript + Vite 工程与蛋图鉴已落地；构建前置见 `FRONTEN
 | 文件 | 职责 |
 | --- | --- |
 | `tools/import_wiki_reference.py` | 从四份 Wiki Lua 数据模块生成暂存补充目录，记录来源 URL/哈希；不执行 Lua |
+| `tools/sync_wiki_chains.py` | 按 Wiki 进化表补全 species.json、eggs.json 缺失的 `chain_members` 与下一阶 `evolutions`；本地值是 Wiki 子集时扩充为 Wiki 链，本地独有成员保留并报冲突 |
+| `tests/test_wiki_chains.py` | 合成数据验证分支线（含首领形态）解析、名称歧义消解、跳过与冲突保留 |
 | `data/static/wiki_reference.json` | 离线技能、特性、进化、分布及特殊蛋来源快照 |
 | `spritelens/domain/wiki_reference.py` | 游戏 ID/名称匹配与只读补充资料联查 |
 | `frontend/src/types/wikiReference.ts` | 图鉴补充 DTO 与接口边界校验 |
-| `frontend/src/components/WikiSkills.vue` | 技能来源/属性/文本过滤与学习资料展示 |
-| `frontend/src/components/WikiAcquisition.vue` | 两个图鉴共享的分布、活动、特殊蛋来源展示 |
+| `frontend/src/components/WikiAcquisition.vue` | 两个图鉴共享的分布、活动、特殊蛋来源展示；技能列表 DTO 保留在 `types/wikiReference.ts`，当前页面不渲染技能筛选（原 `WikiSkills.vue` 已于 2026-11-15 健康检查删除） |
 | `frontend/src/pages/catalog-wiki.css` | 蛋神式分页卡片、常驻详情、雷达与窄窗样式 |
 | `tests/test_wiki_reference.py` | 合成数据验证身份匹配、学习来源、零能耗、按需载荷和导入数据边界 |
 | `docs/WIKI_REFERENCE.md` | 当前资料来源、导入操作和维护边界 |

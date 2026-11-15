@@ -105,16 +105,16 @@ describe('参考坐标雷达', () => {
     const silent = mount(SceneRadar, { props: { data: snapshot(), compact: true } })
     expect(silent.get('.radar-target-label').text()).toContain('未知精灵')
   })
-  it('玩家中心使用独立定位图标', () => {
+  it('玩家中心使用朝向箭头，并按主控朝向旋转', () => {
     const wrapper = mount(SceneRadar, { props: { data: snapshot() } })
-    const player = wrapper.get('.radar-player')
-    expect(player.classes()).not.toContain('radar-point')
-    expect(player.attributes('cx')).toBe('200')
-    expect(player.attributes('cy')).toBe('200')
-    expect(player.attributes('r')).toBe('8')
-    expect(wrapper.find('.radar-player-icon').exists()).toBe(true)
+    expect(wrapper.get('.radar-heading').attributes('transform')).toBe('rotate(0 200 200)')
+    expect(wrapper.get('.radar-heading-icon use').attributes('href')).toBe('/static/icons/sprite.svg#player-heading')
+    expect(wrapper.find('.radar-player').exists()).toBe(false)
     expect(wrapper.find('.radar-center-label').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('位置参考')
+    // 0.1° 整数换算成度：905 → 90.5°；缺失朝向退回 0°，不隐藏中心标记。
+    const turned = mount(SceneRadar, { props: { data: parseNearby({ ...payload, player_heading: 905 }) } })
+    expect(turned.get('.radar-heading').attributes('transform')).toBe('rotate(90.5 200 200)')
   })
   it('三环刻度按 1 单位 ≈ 1 cm 折算为米制并随半径缩放', () => {
     const wrapper = mount(SceneRadar, { props: { data: snapshot() } })

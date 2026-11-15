@@ -14,6 +14,7 @@ const d = computed(() => {
   const { image, projection } = props.map
   const mapKey = `${image.width}:${image.height}:${projection.origin_x}:${projection.origin_y}:${projection.side}`
   if (previous && mapKey === previousMap && coverage.uid === previous.uid && coverage.map_id === previous.map_id
+    && coverage.owner === previous.owner
     && coverage.layer === previous.layer && coverage.scope === previous.scope && coverage.revision === previous.revision
     && coverage.cell_size === previous.cell_size && coverage.rows.length === previous.rows.length
     && coverage.rows.every((row, i) => row[0] === previous!.rows[i]![0] && row[1] === previous!.rows[i]![1] && row[2] === previous!.rows[i]![2])) return previousPath

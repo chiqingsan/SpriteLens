@@ -1,3 +1,8 @@
 # 测试与资源工具依赖；unittest 使用 Python 标准库，不另装测试框架
 # 已验证口径：Python 3.12.10 + Pillow 12.3.0（2026-10-13，当前 venv）
 -r requirements.txt
+
+# 健康检查工具（2026-11-15）：只用于死代码/未定义名清点，不构成提交门禁，
+# 也不恢复统一 lint 门禁。安装：.venv\Scripts\pip install -r requirements-dev.txt
+ruff>=0.17
+vulture>=2.16

@@ -31,6 +31,16 @@ class PreferencesTest(unittest.TestCase):
         self.vm.update({"shortcuts": []})
         self.assertEqual(UIPreferencesViewModel(SettingsRepository(self.path)).snapshot()["shortcuts"], [])
 
+    def test_first_run_gets_four_default_shortcut_marks(self):
+        # 新用户从未保存过偏好：快捷条件应是四个预置奖牌，而不是空列表。
+        self.assertEqual([item["name"] for item in self.vm.snapshot()["shortcuts"]],
+                         ["大块头", "小不点", "婉转声", "粗嗓门"])
+        self.assertEqual([item["filters"] for item in self.vm.snapshot()["shortcuts"]],
+                         [{"marks": [name]} for name in ("大块头", "小不点", "婉转声", "粗嗓门")])
+        # 只保存其它偏好也必须保留默认快捷条件，不能把它们当作用户清空。
+        self.vm.update({"theme": "huohua"})
+        self.assertEqual(len(self.vm.snapshot()["shortcuts"]), 4)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)

@@ -61,6 +61,9 @@ def actor(node: dict, event: PacketEvent) -> tuple[SceneActor | None, bool]:
         return None, True
     npc = children(raw, 11)
     base, config = children(npc, 1), children(npc, 3)
+    # 家园蛋使用 detail_type 13 并附着在窝上；测量字段虽存在却全为零。
+    if integer(base, 1) == 13 and integer(children(npc, 23), 2):
+        return None, False
     if not any(nodes(config, no) for no in (11, 12, 31)):
         return None, False
     actor_id = integer(base, 2)

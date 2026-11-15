@@ -6,6 +6,7 @@ import json
 
 from aiohttp import web
 
+from spritelens.domain.measurements import range_position
 from spritelens.domain.pet_marks import observation_marks
 from spritelens.domain.static_data import StaticData
 from spritelens.services.scene_repository import DEFAULT_RADAR_RADIUS_RAW, SceneRepository, SceneSnapshot
@@ -21,11 +22,24 @@ def debug_coordinates_enabled() -> bool:
     return os.environ.get(DEBUG_COORDINATES_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def reference_pct(value: int | None, limits: tuple[int, int]) -> float | None:
+    """与精灵详情同口径：物种参考范围里的位置比例，不裁剪；<0 或 >1 由前端标「超界」。"""
+    if value is None:
+        return None
+    return range_position(value, limits)["ratio"]
+
+
+def voice_pct(voice: int | None) -> float | None:
+    """与精灵详情同口径：(voice + 100) / 200；0 与缺失一样算未知（详情页同样按 falsy 判未知）。"""
+    return None if not voice else (voice + 100) / 200
+
+
 def coverage_payload(snapshot: SceneSnapshot) -> dict | None:
     """本次运行足迹：只下发格索引，不含半径与圆心。
 
     无资源或无格时返回 None（前端不画覆盖）；uid/map_id 让前端在切号、
-    换图后拒绝旧数据，而不是把旧足迹画到新底图上。
+    换图后拒绝旧数据，而不是把旧足迹画到新底图上。owner 是这一桶所属的世界
+    所有者（0 = 自己的世界），切换世界后前端必须换图而不是沿用旧足迹。
     """
     coverage = snapshot.coverage
     if coverage is None or snapshot.resource_id is None:
@@ -33,6 +47,7 @@ def coverage_payload(snapshot: SceneSnapshot) -> dict | None:
     return {
         "uid": str(snapshot.uid),
         "map_id": str(snapshot.resource_id),
+        "owner": str(coverage.owner),
         "layer": "visit",
         "scope": "history" if coverage.persistent else "session",
         "revision": coverage.revision,
@@ -59,6 +74,8 @@ def nearby_payload(
     # 场景与实例归属供地图模式定位底图；64 位实例号超出 JS 安全整数，统一按字符串下发。
     data["resource_id"] = str(snapshot.resource_id) if snapshot.resource_id is not None else None
     data["instance_id"] = str(snapshot.instance_id) if snapshot.instance_id is not None else None
+    # 当前世界所有者（0 = 自己的世界）：覆盖层按它分桶，前端据此区分进度归属。
+    data["world_owner"] = str(snapshot.world_owner)
     data["complete"] = False
     data["source"] = "observed_partial"
     data["coordinate_unit"] = "unverified"
@@ -90,6 +107,11 @@ def nearby_payload(
         # 进化链名称：前端搜索时一并匹配，搜「恶魔叮」也能找到链上的其它形态。
         row["chain_names"] = list(static.chain_names(base_id)) if (static and base_id is not None) else []
         row["marks"] = observation_marks(row["weight"], row["voice"], species.weight_range if species else (0, 0))
+        # 三行布局的第三行：身高/体重按物种参考范围取比例，声音用家园页同一口径。
+        # 比例缺失（未知数值/物种无范围）下发 None，前端画空轨道而不是 0%。
+        row["height_pct"] = reference_pct(row["height"], species.height_range) if species else None
+        row["weight_pct"] = reference_pct(row["weight"], species.weight_range) if species else None
+        row["voice_pct"] = voice_pct(row["voice"])
         mark_names = {mark["name"] for mark in row["marks"]}
         row["attention"] = "double" if ({"大块头", "小不点"} & mark_names and {"婉转声", "粗嗓门"} & mark_names) else "marked" if mark_names else "normal"
         # 炫彩是游戏内固有外观：变异类型第 4 位（背包载荷 is_colorful 同口径），

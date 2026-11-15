@@ -8,7 +8,6 @@ from spritelens.capture.base import StreamChunk
 from spritelens.capture.key_store import KeyStore
 from spritelens.protocol.opcodes import OpcodeCatalog
 from spritelens.protocol.records import Direction
-from spritelens.protocol.schema import load_library
 from spritelens.services.monitor_service import MonitorService
 from spritelens.services.session_tracker import SessionTracker
 from tests._synth import (

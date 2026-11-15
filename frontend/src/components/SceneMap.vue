@@ -497,12 +497,12 @@ watch([player, imageState, viewportWidth, viewportHeight, () => props.visible], 
 .scene-map-label.selected { z-index: 3; border-color: var(--teal); color: var(--teal-deep); }
 
 .scene-map-player { position: absolute; z-index: 4; width: 0; height: 0; pointer-events: none; }
-.scene-map-player-halo { position: absolute; left: -17px; top: -17px; width: 34px; height: 34px; border-radius: 50%; background: color-mix(in srgb, var(--teal) 26%, transparent); border: 1px solid color-mix(in srgb, var(--teal) 55%, transparent); animation: scene-map-pulse 2.4s ease-out infinite; }
-.scene-map-player-dot { position: absolute; left: -20px; top: -20px; display: grid; place-items: center; width: 40px; height: 40px; color: var(--panel); border: 3px solid var(--panel); border-radius: 50%; background: var(--teal-deep); box-shadow: 0 0 0 3px var(--teal), 0 2px 6px rgb(20 30 20 / 55%); }
-.scene-map-player-dot :deep(.ui-icon) { width: 26px; height: 26px; }
-.scene-map-player-tag { position: absolute; top: 28px; left: 0; transform: translateX(-50%); padding: 3px 8px; border-radius: 5px; background: var(--teal-deep); color: var(--panel); font-size: var(--fs-3xs); font-weight: 700; line-height: 1.5; white-space: nowrap; }
+.scene-map-player-halo { position: absolute; left: -8.5px; top: -8.5px; width: 17px; height: 17px; border-radius: 50%; background: color-mix(in srgb, var(--teal) 26%, transparent); border: .5px solid color-mix(in srgb, var(--teal) 55%, transparent); animation: scene-map-pulse 2.4s ease-out infinite; }
+.scene-map-player-dot { position: absolute; left: -10px; top: -10px; display: grid; place-items: center; width: 20px; height: 20px; color: var(--panel); border: 1.5px solid var(--panel); border-radius: 50%; background: var(--teal-deep); box-shadow: 0 0 0 1.5px var(--teal), 0 1px 3px rgb(20 30 20 / 55%); }
+.scene-map-player-dot :deep(.ui-icon) { width: 13px; height: 13px; }
+.scene-map-player-tag { position: absolute; top: 18px; left: 0; transform: translateX(-50%); padding: 3px 8px; border-radius: 5px; background: var(--teal-deep); color: var(--panel); font-size: var(--fs-3xs); font-weight: 700; line-height: 1.5; white-space: nowrap; }
 .scene-map-player-tag::before { content: ''; position: absolute; top: -4px; left: 50%; margin-left: -4px; border: 4px solid transparent; border-bottom-color: var(--teal-deep); }
-.scene-map-player.is-moving .scene-map-player-dot { box-shadow: 0 0 0 1.5px rgb(20 30 20 / 40%), 0 2px 6px rgb(20 30 20 / 55%); }
+.scene-map-player.is-moving .scene-map-player-dot { box-shadow: 0 0 0 .75px rgb(20 30 20 / 40%), 0 1px 3px rgb(20 30 20 / 55%); }
 .scene-map-player.is-moving .scene-map-player-dot { background: var(--amber-ink); }
 .scene-map-player.is-moving .scene-map-player-halo { background: color-mix(in srgb, var(--amber) 22%, transparent); border-color: color-mix(in srgb, var(--amber) 55%, transparent); }
 .scene-map-player.is-moving .scene-map-player-tag { background: var(--amber-ink); }

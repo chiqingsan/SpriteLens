@@ -922,7 +922,216 @@ button.planner-state-badge:focus-visible { outline: 2px solid var(--teal); outli
 .planner-empty > strong { color: var(--ink); font-size: var(--fs-md); font-weight: 600; }
 .planner-empty > p { max-width: 440px; margin: 0; font-size: var(--fs-xs); line-height: 1.7; }
 .planner-empty > small { color: var(--muted); font-size: var(--fs-3xs); line-height: 1.6; }
-.planner-empty.planner-start { min-height: 320px; }
+
+/* ── 起步空态：说明 + 三步流程 + 直接动作 ───────────────────────────────
+   画布区在没有窝位时是空白画布，原来是图标加三行居中文案、下面接着一大片留白。
+   改成上方说明、中间三步流程、底部动作条：新用户不用先读完整页说明就知道第一步点哪里。 */
+.planner-start {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-4);
+  min-height: 320px;
+  padding: var(--space-6);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(90% 140% at 0% 0%, color-mix(in srgb, var(--teal-soft) 58%, transparent), transparent 56%),
+    radial-gradient(70% 120% at 100% 100%, color-mix(in srgb, var(--amber-soft) 30%, transparent), transparent 60%),
+    var(--panel);
+}
+
+/* 只有起步空态时把滚动区改成纵向 flex，空态才能撑满画布区；
+   正常有画布/产物时保持原来的块流布局，不改动既有高度关系。 */
+.planner-scroll:has(> .planner-start) {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 起步空态内部收成一条内容列：整块渐变面继续铺满画布，
+   但说明、步骤与动作保持可读行宽，不随窗口拉成横跨整页的长条。
+   三块统一靠左对齐（不再各自居中），左边缘与步骤卡对齐成一条竖线。 */
+.planner-start-head,
+.planner-start-steps,
+.planner-start-actions {
+  width: 100%;
+  max-width: 680px;
+  margin-inline: 0;
+}
+
+.planner-start-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.planner-start-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border: 1px solid color-mix(in srgb, var(--teal) 26%, var(--line-soft));
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--teal-soft) 74%, var(--panel));
+  color: var(--teal-dark);
+}
+
+.planner-start-mark > .ui-icon { width: 22px; height: 22px; }
+
+.planner-start-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.planner-start-copy > strong {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.planner-start-copy > p {
+  margin: 0;
+  max-width: 52ch;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  line-height: 1.7;
+  text-wrap: pretty;
+}
+
+.planner-start-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.planner-start-steps > li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+}
+
+.planner-start-index {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.planner-start-step {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.planner-start-step > strong {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.planner-start-step > small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--fs-3xs);
+  line-height: 1.5;
+  text-overflow: ellipsis;
+}
+
+.planner-start-arrow {
+  width: 14px;
+  height: 14px;
+  color: var(--muted-2);
+}
+
+.planner-start-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
+  padding-top: var(--space-1);
+}
+
+.planner-start-actions > .ghost-button,
+.planner-start-actions > .primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 32px;
+  min-height: 32px;
+  padding: 0 var(--space-5);
+  font-size: var(--fs-xs);
+}
+
+.planner-start-actions > .primary-button { min-width: 116px; }
+
+.planner-start-note {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted-2);
+  font-size: var(--fs-3xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 左栏被压窄（两栏并排但窗口不大）时收紧起步空态：
+   去掉每行的尾随箭头、允许说明折行，说明文字不再被挤成两行窄条。 */
+@container (max-width: 420px) {
+  .planner-start {
+    padding: var(--space-4);
+    gap: var(--space-3);
+  }
+
+  .planner-start-steps > li {
+    grid-template-columns: 22px minmax(0, 1fr);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .planner-start-arrow { display: none; }
+
+  .planner-start-step > small {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .planner-start-actions > .ghost-button,
+  .planner-start-actions > .primary-button {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* 动作已占满一行，计数说明改成整行、允许换行，不再被 ellipsis 截掉。 */
+  .planner-start-note {
+    flex-basis: 100%;
+    overflow: visible;
+    white-space: normal;
+  }
+}
 
 /* ── 右侧栏 ─────────────────────────────────────────────────────────────── */
 .planner-sidebar > header { display: flex; align-items: center; gap: var(--space-2); flex: none; min-height: 40px; padding: 0 var(--space-4); border-bottom: 1px solid var(--line-soft); }
@@ -1433,6 +1642,17 @@ dialog.planner-picker {
 
 @media (max-width: 700px) {
   .planner-outcome-list { grid-template-columns: minmax(0, 1fr); }
+  /* 起步空态：窄窗收紧内边距，步骤说明允许两行，动作条按内容换行。 */
+  .planner-start { padding: var(--space-4); gap: var(--space-3); }
+  .planner-start-mark { width: 38px; height: 38px; }
+  .planner-start-mark > .ui-icon { width: 18px; height: 18px; }
+  .planner-start-copy > strong { font-size: var(--fs-md); }
+  .planner-start-steps > li { grid-template-columns: 22px minmax(0, 1fr); padding: var(--space-2) var(--space-3); }
+  .planner-start-arrow { display: none; }
+  .planner-start-step > small { white-space: normal; }
+  .planner-start-actions > .ghost-button,
+  .planner-start-actions > .primary-button { flex: 1 1 auto; min-width: 0; }
+  .planner-start-note { flex-basis: 100%; }
 }
 
 @media (max-width: 560px) {

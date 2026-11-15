@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>小洛探探 SpriteLens</title>
+  <title>{{APP_TITLE}}</title>
   <link rel="icon" type="image/png" href="/favicon.ico">
   <!-- 启动样式内联：外部 CSS 尚未加载或加载失败时仍有可见的状态。 -->
   <style>
@@ -36,6 +36,7 @@
   <link rel="stylesheet" href="/static/ui-components.css">
   <link rel="stylesheet" href="/static/app.css">
   <link rel="stylesheet" href="/static/ui.css">
+  <link rel="stylesheet" href="/static/onboarding.css">
   <link rel="stylesheet" href="/static/desktop-shell.css">
   <link rel="stylesheet" href="/static/backpack-layout.css">
 </head>
@@ -43,7 +44,7 @@
   <header id="desktop-titlebar" class="desktop-titlebar" hidden>
     <div class="window-drag-area">
       <img src="/static/favicon.png" alt="">
-      <strong>小洛探探</strong><span>SpriteLens</span>
+      <strong>小洛探探</strong><span>SpriteLens</span><span class="window-version">v{{APP_VERSION}}</span>
       <span id="window-error" role="status"></span>
     </div>
     <div class="window-controls" aria-label="窗口操作">
@@ -139,6 +140,7 @@
           <span id="capture-message" hidden class="status-copy" role="status">开始采集后登录游戏，自动同步数据</span>
         </div>
         <div class="top-actions">
+          <button id="btn-exit-preview" class="ghost-button" type="button" hidden>退出调试预览</button>
           <button id="btn-toggle" class="primary-button">开始采集</button>
         </div>
       </header>
@@ -238,6 +240,11 @@
             <section id="settings-debug" class="settings-group">
               <div class="settings-group-head"><div><h2>诊断</h2><p class="muted">遇到布局或采集问题时，从这里打开检查工具。</p></div></div>
               <div class="settings-row">
+                <div class="settings-row-copy"><strong>调试模式</strong><span id="debug-preview-description">在临时空数据环境中查看新用户界面和首次引导。</span></div>
+                <button id="btn-debug-preview" type="button" class="ghost-button">进入调试预览</button>
+                <button id="btn-exit-preview-settings" type="button" class="ghost-button" hidden>退出调试预览</button>
+              </div>
+              <div class="settings-row">
                 <div class="settings-row-copy"><strong>浏览器调试</strong><span>打开当前页面，使用 F12 检查布局；调试时请保持软件运行。</span></div>
                 <button id="btn-open-browser" type="button" class="ghost-button">在浏览器中打开</button>
               </div>
@@ -245,8 +252,15 @@
 
             <section id="settings-about" class="settings-group">
               <div class="settings-group-head"><div><h2>关于</h2><p class="muted">《洛克王国：世界》本地数据观测工具，数据仅保存在本机。</p></div></div>
+              <div class="settings-row">
+                <div class="settings-row-copy"><strong>版本</strong><span id="app-version">v{{APP_VERSION}}</span></div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-copy"><strong>使用引导</strong><span>重新了解采集和常用功能。</span></div>
+                <button id="btn-onboarding" type="button" class="ghost-button">查看使用引导</button>
+              </div>
               <div class="settings-row settings-qq-row">
-                <div class="settings-row-copy"><strong>交流群</strong><span id="qq-group-number">1057031552</span></div>
+                <div class="settings-row-copy settings-qq-copy"><strong>交流群</strong><span id="qq-group-number">1057031552</span></div>
                 <div class="settings-actions settings-qq-actions">
                   <button id="btn-copy-qq-group" type="button" class="ghost-button">复制群号</button>
                   <button id="btn-join-qq-group" type="button" class="primary-button">一键加群</button>
@@ -261,7 +275,6 @@
   </div>
 
   <div id="modal-layer" class="modal-layer" aria-hidden="true"></div>
-  <div id="detail-backdrop" class="detail-backdrop" hidden></div>
   <div id="toast-layer" class="toast-layer" role="status" aria-live="polite"></div>
   <script src="/static/desktop-shell.js"></script>
   <script src="/static/ui.js"></script>
@@ -275,6 +288,8 @@
   <script src="/static/breeding-planner-page.js"></script>
   <script src="/static/nearby-alert.js"></script>
   <script src="/static/nearby-page.js"></script>
+  <script src="/static/onboarding.js"></script>
+  <script src="/static/debug-preview.js"></script>
   <script src="/static/app.js"></script>
   <script src="/static/shell-ui.js"></script>
 </body>

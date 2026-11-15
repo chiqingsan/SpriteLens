@@ -19,9 +19,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import secrets
 import sqlite3
 import threading
+import time
 import webbrowser
 from dataclasses import replace
 from pathlib import Path
@@ -51,6 +53,12 @@ from spritelens.web.nearby import register_nearby_routes
 from spritelens.web.world_maps import register_world_map_routes
 from spritelens.web.routes_capture import CaptureRoutesMixin
 from spritelens.web.routes_accounts import AccountRoutesMixin
+from spritelens.web.ext_api import (
+    API_VERSION as EXT_API_VERSION,
+    DEFAULT_EXT_OPCODES,
+    ExtEventHub,
+    ExtRoutesMixin,
+)
 from spritelens.web.collection_lines import register_collection_routes
 from spritelens.web.breeder_library import register_breeder_routes
 from spritelens.web.breeding_planner import register_planner_routes
@@ -67,6 +75,14 @@ def _app_version() -> str:
     from spritelens import __version__
 
     return __version__
+
+
+def render_index_html(html: str) -> str:
+    """首屏注入版本号：窗口标题、页面 title 与关于页由模板占位符一次填好，避免加载后再改文案。"""
+    from spritelens import APP_DISPLAY_NAME, APP_NAME
+
+    title = f"{APP_DISPLAY_NAME} {APP_NAME} v{_app_version()}"
+    return html.replace("{{APP_TITLE}}", title).replace("{{APP_VERSION}}", _app_version())
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 PUSH_INTERVAL = 0.5  # 状态推送节拍（秒）
@@ -86,7 +102,7 @@ def _quiet_connection_reset(loop: asyncio.AbstractEventLoop, context: dict) -> N
     loop.default_exception_handler(context)
 
 
-class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
+class LocalServer(AccountRoutesMixin, CaptureRoutesMixin, ExtRoutesMixin):
     """本地服务生命周期与路由；start() 后 `url` 可直接交给 pywebview。
 
     采集域 handler（/api/capture*、/api/state 与 capture/state 载荷）
@@ -102,12 +118,30 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         host: str = "127.0.0.1",
         port: int = 0,
         static_dir: Path | None = None,
+        ext_runtime_path: Path | None = None,
     ) -> None:
         self._context = context
+        from spritelens.web.debug_preview import PreviewManager
+        self._preview = PreviewManager()
         self._token = token or secrets.token_urlsafe(32)
         self._host = host
         self._port = port
         self._static_dir = Path(static_dir) if static_dir is not None else STATIC_DIR
+        # 对外数据接口（docs/EXT_API.md）：默认开启，配置 ext_api.enabled=false 关闭。
+        settings = getattr(context, "settings", None)
+        self._ext_enabled = (
+            bool(settings.get_bool("ext_api.enabled", True))
+            if settings is not None
+            else True
+        )
+        self._ext_runtime_path = (
+            Path(ext_runtime_path) if ext_runtime_path is not None else None
+        )
+        self._ext_token = secrets.token_urlsafe(32)
+        self._ext_hub = ExtEventHub(enabled=self._ext_enabled)
+        self._ext_listener = lambda event: self._ext_hub.submit(
+            event, generation=self._context.monitor.capture_generation)
+        self._ext_attached = False
         self._loop: asyncio.AbstractEventLoop | None = None
         self._runner: web.AppRunner | None = None
         self._thread: threading.Thread | None = None
@@ -150,6 +184,19 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
     @property
     def running(self) -> bool:
         return self._runner is not None and not self._stopped
+
+    @property
+    def ext_token(self) -> str:
+        """对外数据接口的独立 token（与 UI token 分离）。"""
+        return self._ext_token
+
+    @property
+    def ext_enabled(self) -> bool:
+        return self._ext_enabled
+
+    @property
+    def ext_runtime_path(self) -> Path | None:
+        return self._ext_runtime_path
 
     def start(self, *, timeout: float = 15.0) -> None:
         """启动后台事件循环并等待端口就绪（失败抛异常，由入口决定提示）。
@@ -275,6 +322,8 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         push_loop 任务可能仍 pending；loop.close 前必须取消并让它们退出，
         否则报 "Task was destroyed but it is pending" 且协程资源不回收。
         """
+        self._detach_ext_listener()
+        self._clear_ext_runtime()
         if self._push_task is not None:
             self._push_task.cancel()
             self._push_task = None
@@ -308,6 +357,83 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         except Exception as exc:  # noqa: BLE001 - 清理失败不阻断退出
             logger.debug("半成品 runner 清理异常: %s", exc)
 
+    # -- 对外数据接口（ext API，见 docs/EXT_API.md）---------------------
+    def _write_ext_runtime(self) -> None:
+        """把端口/独立 token 原子写入发现文件；仅入口显式给路径时写。"""
+        path = self._ext_runtime_path
+        if not self._ext_enabled or path is None or not self._bound_port:
+            return
+        payload = {
+            "app": "SpriteLens",
+            "version": _app_version(),
+            "api": EXT_API_VERSION,
+            "pid": os.getpid(),
+            "host": self._host,
+            "port": self._bound_port,
+            "base": f"http://{self._host}:{self._bound_port}",
+            "token": self._ext_token,
+            "endpoints": {
+                "ping": "/api/ext/v1/ping",
+                "state": "/api/ext/v1/state",
+                "events": "/api/ext/v1/events",
+                "stream": "/api/ext/v1/stream",
+            },
+            "opcodes_default": [
+                f"0x{opcode:04X}" for opcode in sorted(DEFAULT_EXT_OPCODES)
+            ],
+            "started_at": time.time(),
+        }
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            temporary = path.with_suffix(".json.tmp")
+            temporary.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            temporary.replace(path)
+            logger.info(
+                "对外数据接口已就绪: http://%s:%d/api/ext/v1/",
+                self._host,
+                self._bound_port,
+            )
+        except OSError as exc:
+            logger.warning("对外数据接口发现文件写入失败：%s", exc)
+
+    def _clear_ext_runtime(self) -> None:
+        path = self._ext_runtime_path
+        if path is None:
+            return
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        if not isinstance(payload, dict) or payload.get("token") != self._ext_token:
+            return
+        try:
+            path.unlink()
+        except OSError as exc:
+            logger.debug("对外数据接口发现文件清理失败：%s", exc)
+
+    def _attach_ext_listener(self) -> None:
+        """挂到采集管线；回调只做内存聚合与入队，不做 IO。"""
+        if not self._ext_enabled or self._ext_attached:
+            return
+        monitor = getattr(self._context, "monitor", None)
+        if monitor is None:
+            return
+        monitor.add_packet_listener(self._ext_listener)
+        monitor.add_session_close_listener(self._ext_hub.session_closed)
+        self._ext_attached = True
+
+    def _detach_ext_listener(self) -> None:
+        if not self._ext_attached:
+            return
+        self._ext_attached = False
+        monitor = getattr(self._context, "monitor", None)
+        if monitor is not None:
+            monitor.remove_packet_listener(self._ext_listener)
+            monitor.remove_session_close_listener(self._ext_hub.session_closed)
+
     async def _start_async(self) -> None:
         self._pet_media_cache = PetMediaCache(
             self._static_dir,
@@ -332,6 +458,8 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         # 蛋图标：安装包内的同名文件直接命中；新版本蛋缺图时按道具 ID 补一次并缓存
         app.router.add_get("/static/egg-icons/{asset}", self._egg_icon_asset)
         app.router.add_static("/static", self._static_dir, name="static")
+        app.router.add_post("/api/debug-preview/start", self._api_debug_preview_start)
+        app.router.add_post("/api/debug-preview/stop", self._api_debug_preview_stop)
         app.router.add_get("/api/bootstrap", self._api_bootstrap)
         app.router.add_get("/api/accounts", self._api_accounts)
         app.router.add_post("/api/accounts/select", self._api_accounts_select)
@@ -368,6 +496,10 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         app.router.add_post("/api/capture/npcap/install", self._api_npcap_install)
         app.router.add_post("/api/capture/rsc", self._api_rsc)
         app.router.add_get("/api/state", self._api_state)
+        app.router.add_get("/api/ext/v1/ping", self._api_ext_ping)
+        app.router.add_get("/api/ext/v1/state", self._api_ext_state)
+        app.router.add_get("/api/ext/v1/events", self._api_ext_events)
+        app.router.add_get("/api/ext/v1/stream", self._api_ext_stream)
         app.router.add_get("/ws", self._ws)
 
         runner = web.AppRunner(app, access_log=None)
@@ -388,9 +520,15 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
             sockets = getattr(getattr(site, "_server", None), "sockets", None) or []
             self._bound_port = int(sockets[0].getsockname()[1])
         loop = asyncio.get_running_loop()
+        self._attach_ext_listener()
+        self._write_ext_runtime()
         self._push_task = loop.create_task(self._push_loop())
 
     async def _shutdown(self) -> None:
+        self._detach_ext_listener()
+        self._ext_hub.close()
+        self._clear_ext_runtime()
+        await asyncio.to_thread(self._preview.stop)
         if self._push_task is not None:
             self._push_task.cancel()
             try:
@@ -426,15 +564,30 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
     @web.middleware
     async def _auth_middleware(self, request: web.Request, handler):
         path = request.path
-        if path.startswith("/api/") or path == "/ws":
+        if path.startswith("/api/ext/"):
+            supplied = request.headers.get("X-Local-Token") or request.query.get("token") or ""
+            if not self._ext_token_ok(supplied):
+                return web.json_response({"error": "unauthorized"}, status=401)
+        elif path.startswith("/api/") or path == "/ws":
             supplied = request.headers.get("X-Local-Token") or request.query.get("token") or ""
             if not self._token_ok(supplied):
                 return web.json_response({"error": "unauthorized"}, status=401)
+        if os.environ.get("SPRITELENS_DEBUG_PREVIEW") == "1" and request.method != "GET":
+            if path.startswith("/api/capture/") or path.startswith("/api/debug-preview/") or path in ("/api/ui/open-browser", "/api/ui/open-qq-group"):
+                return web.json_response({"error": "预览模式不能执行系统操作"}, status=403)
         return await handler(request)
 
     def _token_ok(self, supplied: str) -> bool:
         try:
             return secrets.compare_digest(supplied.encode("utf-8"), self._token.encode("utf-8"))
+        except Exception:  # noqa: BLE001 - 畸形输入一律拒绝
+            return False
+
+    def _ext_token_ok(self, supplied: str) -> bool:
+        try:
+            return secrets.compare_digest(
+                supplied.encode("utf-8"), self._ext_token.encode("utf-8")
+            )
         except Exception:  # noqa: BLE001 - 畸形输入一律拒绝
             return False
 
@@ -447,7 +600,9 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         path = self._static_dir / "index.html"
         if not path.is_file():
             return web.Response(status=500, text="前端资源缺失：static/index.html")
-        return web.FileResponse(path, headers={"Cache-Control": "no-cache"})
+        html = await asyncio.to_thread(path.read_text, encoding="utf-8")
+        return web.Response(text=render_index_html(html), content_type="text/html",
+                            headers={"Cache-Control": "no-cache"})
 
     async def _favicon(self, request: web.Request) -> web.Response:
         """浏览器标签页图标；缺图时回 204 不留 404 噪声。"""
@@ -500,6 +655,22 @@ class LocalServer(AccountRoutesMixin, CaptureRoutesMixin):
         return response
 
     # -- 数据 API ------------------------------------------------------
+    async def _api_debug_preview_start(self, request: web.Request) -> web.Response:
+        try:
+            url = await self._run_blocking(self._preview.start)
+            return web.json_response({"url": url})
+        except (OSError, RuntimeError, TimeoutError) as exc:
+            logger.exception("启动调试预览失败")
+            return web.json_response({"error": f"启动调试预览失败：{exc}"}, status=500)
+
+    async def _api_debug_preview_stop(self, request: web.Request) -> web.Response:
+        try:
+            await self._run_blocking(self._preview.stop)
+            return web.json_response({"ok": True})
+        except (OSError, RuntimeError, TimeoutError) as exc:
+            logger.exception("关闭调试预览失败")
+            return web.json_response({"error": f"关闭调试预览失败：{exc}"}, status=500)
+
     async def _api_bootstrap(self, request: web.Request) -> web.Response:
         try:
             return await self._thread_json_response(self._bootstrap_payload)

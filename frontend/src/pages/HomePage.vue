@@ -191,10 +191,22 @@ defineExpose({ load: model.load, resume: model.resume, pause: model.pause, reset
       正在读取家园快照…
     </div>
     <div v-else-if="!model.data.value?.available" class="home-empty">
-      <div class="home-empty-mark"><UiIcon name="home" /></div>
-      <strong>还没有观察到家园快照</strong>
-      <p>开始采集后进入游戏家园，收到场景数据后这里会显示家园精灵与配对关系。</p>
-      <button type="button" :disabled="model.loading.value" @click="model.load()">{{ model.loading.value ? '读取中…' : '重新读取' }}</button>
+      <div class="home-empty-body">
+        <span class="home-empty-mark"><UiIcon name="home" /></span>
+        <h2>还没有观察到家园快照</h2>
+        <p>开始采集后进入游戏家园，收到场景数据后这里会显示家园精灵与配对关系。</p>
+        <div class="home-empty-actions">
+          <button type="button" :disabled="model.loading.value" @click="model.load()">
+            <UiIcon name="refresh" />{{ model.loading.value ? '读取中…' : '重新读取' }}
+          </button>
+          <span class="home-empty-hint">也可以点右上角「开始采集」，再进入游戏家园。</span>
+        </div>
+      </div>
+      <ul class="home-empty-steps">
+        <li><span class="home-empty-step-index">1</span><strong>开始采集</strong><small>右上角开启后保持运行</small></li>
+        <li><span class="home-empty-step-index">2</span><strong>进入家园</strong><small>游戏内打开自己的家园场景</small></li>
+        <li><span class="home-empty-step-index">3</span><strong>回到这里</strong><small>精灵、小窝与配对会自动出现</small></li>
+      </ul>
     </div>
 
     <template v-else-if="model.data.value">

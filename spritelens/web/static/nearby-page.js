@@ -141,6 +141,7 @@
           /* 地图和雷达共用静态清单；页面读取一次，失败时显示重试入口。 */
           loadMaps: function () { return request("/api/world-maps"); },
           openFloating: function () {
+            if (new URLSearchParams(window.location.search).get("debug-preview") === "1") { return Promise.reject(new Error("调试预览中不能打开悬浮雷达")); }
             if (!window.pywebview || !window.pywebview.api.open_radar) { return Promise.reject(new Error("置顶悬浮雷达请在桌面版中打开")); }
             return window.pywebview.api.open_radar();
           },

@@ -1,7 +1,8 @@
 """目录域载荷：图鉴/色卡/家园/蛋仓/蛋图鉴（阶段1.4 拆分）。
 
-从 payloads.py 按业务域机械搬移，函数体未改动；前端契约稳定，
-payloads.py 保留兼容重导出。本模块不依赖 aiohttp 与 pywebview。
+从 payloads.py 按业务域机械搬移，函数体未改动；前端契约稳定。
+宠物列表/单行（pet_row、pets_payload）留在 payloads.py，本模块只导出目录域载荷。
+本模块不依赖 aiohttp 与 pywebview。
 """
 
 from __future__ import annotations
@@ -855,16 +856,6 @@ def egg_dex_payload(
     }
 
 
-__all__ = [
-    "egg_box_payload",
-    "home_payload",
-    "colors_payload",
-    "egg_dex_payload",
-    "handbook_payload",
-    "pet_row",
-    "pets_payload",
-    "type_color_for",
-]
 def type_color_for(static: StaticData | None, name: str) -> str:
     """系别名 → 主题色：优先静态表，缺失时退回内置常量。"""
     if static is not None:
@@ -872,3 +863,14 @@ def type_color_for(static: StaticData | None, name: str) -> str:
         if color:
             return color
     return TYPE_COLORS.get(name, "")
+
+
+__all__ = [
+    "egg_box_payload",
+    "home_payload",
+    "colors_payload",
+    "egg_dex_payload",
+    "handbook_payload",
+    "type_color_for",
+]
+

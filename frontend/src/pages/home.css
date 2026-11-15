@@ -932,66 +932,186 @@
 }
 
 /* 空态与提示 */
+/* 空态：左侧说明与操作、右侧三步流程。整块占满可用高度并居中，
+   避免新用户打开页面时只看到一块贴在顶部的小卡片和下方大片空白。 */
 .home-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 430px) minmax(0, 320px);
+  /* 两栏顶部对齐：左侧图标与右侧步骤卡的顶边在同一水平线上，
+     整块仍由 align-content 在页面内垂直居中。 */
+  align-items: start;
   justify-content: center;
-  gap: var(--space-3);
-  min-height: 320px;
-  padding: var(--space-8) var(--space-5);
-  border: 1px dashed var(--hairline-strong);
+  align-content: center;
+  gap: var(--space-8);
+  flex: 1 1 auto;
+  min-height: 360px;
+  padding: var(--space-8);
+  border: 1px solid var(--hairline);
   border-radius: var(--radius-xl);
-  background: var(--surface-1);
-  text-align: center;
+  background:
+    radial-gradient(90% 130% at 0% 0%, color-mix(in srgb, var(--teal-soft) 62%, transparent), transparent 58%),
+    radial-gradient(80% 120% at 100% 100%, color-mix(in srgb, var(--amber-soft) 34%, transparent), transparent 60%),
+    var(--panel);
+  text-align: left;
 }
 
 .home-empty--loading {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  text-align: center;
   color: var(--muted);
+}
+
+.home-empty-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+  max-width: 480px;
 }
 
 .home-empty-mark {
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: var(--surface-2);
-  color: var(--muted);
+  width: 52px;
+  height: 52px;
+  margin-bottom: var(--space-1);
+  border: 1px solid color-mix(in srgb, var(--teal) 26%, var(--hairline));
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--teal-soft) 72%, var(--panel));
+  color: var(--teal-deep);
 }
 
 .home-empty-mark .ui-icon {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
 }
 
-.home-empty strong {
-  font-size: var(--fs-md);
-  color: var(--ink);
-}
-
-.home-empty p {
-  max-width: 420px;
+.home-empty-body h2 {
   margin: 0;
-  font-size: var(--fs-xs);
-  color: var(--muted);
-  line-height: 1.6;
-}
-
-.home-empty button {
-  height: 32px;
-  padding: 0 var(--space-5);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
-  background: var(--panel);
-  color: var(--ink-soft);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-}
-
-.home-empty button:hover {
-  border-color: color-mix(in srgb, var(--teal) 42%, var(--hairline));
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--ink);
+}
+
+.home-empty-body p {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  line-height: 1.7;
+  text-wrap: pretty;
+}
+
+.home-empty-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.home-empty-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 34px;
+  padding: 0 var(--space-6);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--teal);
+  color: var(--white);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--motion-ease);
+}
+
+.home-empty-actions button:hover:not(:disabled) {
+  background: var(--teal-dark);
+}
+
+.home-empty-actions button:active:not(:disabled) {
+  background: var(--teal-deep);
+  transform: translateY(1px) scale(.98);
+}
+
+.home-empty-actions button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.home-empty-actions .ui-icon {
+  width: 15px;
+  height: 15px;
+}
+
+/* 按钮下方的二次说明独占一行，不与按钮抢水平空间。 */
+.home-empty-hint {
+  max-width: 100%;
+  font-size: var(--fs-3xs);
+  color: var(--muted-2);
+  line-height: 1.5;
+}
+
+.home-empty-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  list-style: none;
+}
+
+.home-empty-steps li {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-areas: "index title" ". hint";
+  align-items: center;
+  gap: 2px var(--space-3);
+  min-width: 0;
+  padding: var(--space-2) var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.home-empty-steps li + li {
+  border-top: 1px solid color-mix(in srgb, var(--hairline) 72%, transparent);
+}
+
+.home-empty-step-index {
+  grid-area: index;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-empty-steps strong {
+  grid-area: title;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.home-empty-steps small {
+  grid-area: hint;
+  min-width: 0;
+  font-size: var(--fs-3xs);
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .home-empty-inline {
@@ -1127,6 +1247,40 @@
 
   .home-hero h1 strong {
     font-size: 26px;
+  }
+}
+
+/* 空态收窄：两栏并排放不下时改为上下，说明块左对齐、步骤块通栏。 */
+@container home-page (max-width: 900px) {
+  .home-empty {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: var(--space-6);
+    padding: var(--space-6);
+  }
+
+  .home-empty-body {
+    max-width: none;
+  }
+}
+
+@container home-page (max-width: 640px) {
+  .home-empty {
+    padding: var(--space-5);
+    gap: var(--space-5);
+  }
+
+  .home-empty-body h2 {
+    font-size: var(--fs-lg);
+  }
+
+  .home-empty-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .home-empty-hint {
+    max-width: none;
   }
 }
 

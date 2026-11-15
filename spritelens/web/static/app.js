@@ -16,12 +16,13 @@
     if (matched) {
       var value = decodeURIComponent(matched[1]);
       try { sessionStorage.setItem(TOKEN_KEY, value); } catch (e) { /* 隐私模式忽略 */ }
-      history.replaceState(null, "", window.location.pathname);
+      history.replaceState(null, "", window.location.pathname + window.location.search);
       return value;
     }
     try { return sessionStorage.getItem(TOKEN_KEY) || ""; } catch (e) { return ""; }
   }
 
+  window.SpriteLensDebugPreview.captureReturnUrl();
   var TOKEN = readToken();
   var pendingWrites = new Set();
 
@@ -265,7 +266,6 @@
     if (state.page === "handbook") { handbookPage.leave(); }
     if (state.page === "colors") { colorsPage.leave(); }
     if (state.page === "nearby") { nearbyPage.leave(); }
-    window.SpriteLensUI.closeDetail(false, true);
     state.page = name;
     $("page-title").textContent = document.querySelector('.nav-item[data-page="' + name + '"]').textContent.trim();
     document.querySelectorAll(".nav-item").forEach(function (node) {
@@ -351,7 +351,6 @@
     collectionLines.resetAccount();
     breederLibrary.resetAccount();
     breedingPlanner.resetAccount();
-    if (state.page !== "egg-dex") { window.SpriteLensUI.closeDetail(false, true); }
     petInventory.resetAccount(); petFilters.resetAccount(); state._petsVersion = -1;
     colorsPage.resetAccount();
     eggBoxVersion = -1;
@@ -803,7 +802,7 @@
       petInventory.setView(payload.ui_preferences.pet_view);
       if (payload.app && payload.app.version) {
         var versionNode = $("app-version");
-        if (versionNode) { versionNode.textContent = "v" + payload.app.version + " · 纯本地运行"; }
+        if (versionNode) { versionNode.textContent = "v" + payload.app.version; }
       }
       renderCapture(payload.capture || {});
       renderState(payload.state || {});
@@ -814,6 +813,10 @@
       switchPage("pets");
       if (window.__spritelensBoot) { window.__spritelensBoot.ready(); }
       else { $("startup").hidden = true; $("app").hidden = false; }
+      window.SpriteLensDebugPreview.initialize(api, TOKEN, toast);
+      window.SpriteLensOnboarding.initialize(payload.ui_preferences.onboarding_pending, function () {
+        return api("/api/ui/preferences", { method: "POST", body: { onboarding_pending: false } });
+      });
     }).catch(function (err) {
       if (timer) { clearTimeout(timer); }
       if (remaining > 0) {

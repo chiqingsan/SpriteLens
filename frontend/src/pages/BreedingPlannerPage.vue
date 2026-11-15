@@ -18,6 +18,12 @@ const model = useBreedingPlanner(props.host)
 const { context, mode, draft, plan, result, busy, error, errorAction, notice, parents, dirty, unsaved } = model
 const selected = ref(''), picker = ref<HTMLDialogElement | null>(null), pickerSearch = ref<HTMLInputElement | null>(null), pickerKind = ref<'pool' | 'replace' | 'add'>('pool')
 const search = ref(''), gender = ref(''), nature = ref(''), group = ref(''), medal = ref(''), page = ref(1), eggSearch = ref('')
+const eggSearchInput = ref<InstanceType<typeof UiSearch> | null>(null)
+// 空态里的引导按钮把焦点送回右侧目标蛋搜索框：用户不用自己找该从哪里开始。
+async function focusEggSearch() {
+  await nextTick()
+  eggSearchInput.value?.focus()
+}
 const editingGoalIds = ref(new Set<string>())
 const expandedOutcomeIds = ref(new Set<string>())
 const iterationPage = ref(1), unusedPage = ref(1)
@@ -280,7 +286,44 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
       <div class="planner-scroll">
          <div class="planner-layout-heading"><div><strong>小窝布局</strong><small>{{ mode === 'target' ? '按培育条件选择亲本与窝位' : '分析所选精灵的配对关系与产物' }}</small></div><div v-if="draft.placements.length" class="planner-actions"><button class="ghost-button" :disabled="!!busy || !model.canUndo.value" title="撤销上一次窝位调整" @click="model.undo()">撤销</button><button class="ghost-button" :disabled="!!busy || !model.canRedo.value" title="重做被撤销的窝位调整" @click="model.undo(true)">重做</button><button v-if="model.canRestore.value" class="ghost-button" :disabled="!!busy" @click="model.restorePlan">恢复方案</button><button class="ghost-button" :disabled="!!busy" @click="model.run('evaluate')">重评布局</button><button class="ghost-button" :disabled="!context?.available || !!busy || mode === 'target' && !draft.goals.length" @click="showPicker('add')">补充布局亲本</button></div></div>
          <BreedingCanvas v-if="draft.placements.length" :positions="draft.placements" :parents="parents" :plan="plan" :selected="selected" :pending="dirty[mode] || busy === 'evaluate'" @select="selected = $event" @move="moveNest" @locate="host.openPet" />
-         <div v-else class="planner-empty planner-start"><UiIcon name="egg" /><strong>{{ mode === 'target' ? '从培育目标开始规划' : '选择精灵，分析配窝方案' }}</strong><p>{{ mode === 'target' ? '在右侧添加目标蛋，按需设置奖牌与性格，再生成方案。' : '在右侧选择参与精灵，确认参与方式与小窝容量，再生成方案。' }}</p><small>① {{ mode === 'target' ? '添加目标' : '选择精灵' }}　→　② 确认条件　→　③ 生成方案</small></div>
+         <div v-else class="planner-start">
+           <div class="planner-start-head">
+             <span class="planner-start-mark"><UiIcon name="egg" /></span>
+             <div class="planner-start-copy">
+               <strong>{{ mode === 'target' ? '从培育目标开始规划' : '选择精灵，分析配窝方案' }}</strong>
+               <p>{{ mode === 'target' ? '先确定想要的蛋种，再让系统按奖牌与性格条件排出最省窝的布局。' : '先选出参与配窝的精灵，再让系统分析配对关系与可能产物。' }}</p>
+             </div>
+           </div>
+           <ol class="planner-start-steps">
+             <li>
+               <span class="planner-start-index">1</span>
+               <span class="planner-start-step"><strong>{{ mode === 'target' ? '添加目标蛋' : '选择参与精灵' }}</strong><small>{{ mode === 'target' ? '在右侧点击蛋种；可搜索名称或蛋组' : '在右侧筛选性别、性格、蛋组后勾选' }}</small></span>
+               <UiIcon name="chevron-right" class="planner-start-arrow" />
+             </li>
+             <li>
+               <span class="planner-start-index">2</span>
+               <span class="planner-start-step"><strong>确认条件</strong><small>{{ mode === 'target' ? '按需追加体型/声音奖牌、目标性格与优先级' : '设置参与方式与本次规划的小窝容量' }}</small></span>
+               <UiIcon name="chevron-right" class="planner-start-arrow" />
+             </li>
+             <li>
+               <span class="planner-start-index">3</span>
+               <span class="planner-start-step"><strong>生成方案</strong><small>点击上方「生成方案」，布局与产物会出现在这里</small></span>
+               <UiIcon name="chevron-right" class="planner-start-arrow" />
+             </li>
+           </ol>
+           <div class="planner-start-actions">
+             <button v-if="mode === 'target'" type="button" class="ghost-button" :disabled="!context?.available || !!busy" @click="focusEggSearch">
+               <UiIcon name="egg" />去添加目标蛋
+             </button>
+             <button v-else type="button" class="ghost-button" :disabled="!context?.available || !!busy" @click="showPicker('pool')">
+               <UiIcon name="users" />选择参与精灵
+             </button>
+             <button type="button" class="planner-primary primary-button" :disabled="!model.canGenerate.value" :title="generationHint" @click="model.run('solve')">
+               <UiIcon name="arrows-shuffle" />{{ busy === 'solve' ? '正在规划' : '生成方案' }}
+             </button>
+             <span class="planner-start-note">{{ context?.available ? `当前可参与 ${context.parents.length} 只` : '尚未读取到背包资料' }}</span>
+           </div>
+         </div>
         <section v-if="selectedPosition" class="planner-resident">
           <header><strong>{{ parentName(selected) }}</strong><span>{{ selectedParent?.gender === 1 ? '父本' : '母本' }} · {{ selectedParent?.nature || '性格未知' }}</span><button class="breeder-detail-link" @click="host.openPet(selected)">背包详情</button></header>
           <div class="planner-actions"><button class="chip" :class="{ active: selectedPosition.lock }" :aria-pressed="!!selectedPosition.lock" @click="cycleLock">{{ { '': '未锁定', participation: '锁定参与', position: '锁定位置' }[selectedPosition.lock] }}</button><button class="ghost-button" :disabled="!!selectedPosition.lock" @click="showPicker('replace')">替换亲本</button><button class="ghost-button" :disabled="!!selectedPosition.lock" @click="removeParent">移出</button><UiSelect size="xs" :options="swapOptions" :model-value="''" label="交换到窝位" placeholder="交换到另一窝位" :disabled="selectedPosition.lock === 'position'" @change="swap(String($event ?? ''))" /></div>
@@ -372,7 +415,7 @@ defineExpose({ load: model.load, pause, flush: model.flush, resetAccount })
         </section>
         <template v-if="mode === 'target'">
            <div class="planner-section-title"><strong>添加目标蛋</strong><small>点击添加 · 最多 30 个</small></div>
-           <UiSearch v-model="eggSearch" class="planner-search" label="查找目标蛋" placeholder="搜索蛋名或蛋组，点击添加" />
+           <UiSearch ref="eggSearchInput" v-model="eggSearch" class="planner-search" label="查找目标蛋" placeholder="搜索蛋名或蛋组，点击添加" />
            <div class="planner-egg-choices"><button v-for="egg in visibleEggChoices" :key="egg.egg_key" type="button" :disabled="draft.goals.length >= 30" @click="addGoal(egg.egg_key)"><img :src="egg.icon_url" alt="" @error="($event.target as HTMLImageElement).style.visibility = 'hidden'"><span><strong>{{ egg.name }}</strong><small>{{ egg.groups.join(' / ') }} · 已观察母本 {{ motherCounts.get(egg.egg_key) || 0 }} 只</small></span><span aria-hidden="true">＋</span></button><p v-if="!eggChoices.length" class="planner-muted">没有匹配的目标蛋</p></div>
            <small v-if="eggChoices.length > 24" class="planner-muted">仅显示前 24 项，搜索蛋名可查找其他目标。</small>
            <div v-if="!draft.goals.length" class="planner-sidebar-empty">点击上方目标蛋即可添加；奖牌、性格默认不限。</div>

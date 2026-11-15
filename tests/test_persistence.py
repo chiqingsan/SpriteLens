@@ -404,13 +404,9 @@ class DatabaseBaselineTest(unittest.TestCase):
 
         旧实现备份失败后 unlink 原文件再建空库，使「原数据留证」保证失效。
         """
-        import sqlite3
-
         bad = self.tmp_path / "bad.sqlite"
         original_bytes = b"this is not a sqlite database" * 10
         bad.write_bytes(original_bytes)
-
-        import spritelens.repositories.database as db_mod
 
         original_replace = Path.replace
 
@@ -790,7 +786,6 @@ class DatabaseBaselineTest(unittest.TestCase):
         用 Event 挡住旧批次（旧值）的写库，让新批次先完成提交；旧实现
         没有 flush 互斥，旧批次随后提交会把最终值拉回旧值。
         """
-        import sqlite3
         import threading
 
         db = Database(self.db_path)
@@ -1071,7 +1066,6 @@ class AppContextCloseTest(unittest.TestCase):
     def _make_context(self):
         """最小装配：真实 Database + PetStore，事件日志用假对象观察调用。"""
         from spritelens.app_context import AppContext
-        from spritelens.protocol.opcodes import OpcodeCatalog
 
         db_path = self.tmp_path / "ctx.sqlite"
         database = Database(db_path)

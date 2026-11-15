@@ -191,6 +191,11 @@ Store 并发批次顺序、坏库备份失败保护与坏行隔离已有修复�
   安装器退出后自动检测，不自动重启程序，两条下载路径都失败时显示官方手动安装地址。
   **不要排除 scapy 的任何子模块**——scapy 内部动态 import 多，静态排除会
   在打包产物里才暴露为运行时失败（实测排除 `as_resolvers` 让网卡枚举直接挂）
+  采集与网络诊断按需导入 `scapy.sendrecv`，并显式注册 `l2`、`inet`、`inet6`；
+  不使用 `scapy.all`，避免触发 Nuitka 对 `scapy.layers.*` 的全量收集。
+  网卡枚举仍初始化 `scapy.arch`，所需间接依赖不添加排除项。相关回归在新进程中
+  用离线 PCAP 验证 IPv4、IPv6 和 VLAN/TCP 解码；实际打包耗时与打包态抓包待正常发包时确认。
+  不清理 `build/nuitka-cache`；Nuitka、Python、编译器或编译参数变化可能导致缓存失效。
 - **包内非 Python 资源必须显式附带**：`spritelens/web/static/`（前端 HTML/CSS/JS
   /精灵图）要写进 `include_data_dirs`，Nuitka 只编译 `.py`。漏带的症状是
   exe 启动即崩（服务报 `web/static does not exist`），而 `--smoke-test` 等
@@ -237,6 +242,8 @@ Store 并发批次顺序、坏库备份失败保护与坏行隔离已有修复�
 | 资源、启动或打包 | 本次资源引用/输出检查；受影响的启动或发布流程按需做 smoke、GUI/驱动实测 |
 
 保留 unittest 与 Vitest。Python 使用内存库、临时目录和 `tests/_synth.py` 合成数据，不依赖真实游戏；并发回归用 Event/Barrier 控制顺序。
+Vitest 使用 `pool: 'vmThreads'`（`frontend/vite.config.ts`）：jsdom 按 worker 建一次而不是每个测试文件重建，
+全量从约 8–9 s 降到约 4.5–5.3 s（35 文件 260 用例，连跑三次一致），文件级隔离仍保留；该配置只影响 `npm test`，不影响构建产物。
 发布前或跨多个核心域的改动，可运行 `python -B -m unittest discover -s tests -q`；只影响单域时仍按范围选择，不因“协议/持久化/组合根”标签强制全套。
 构建保留类型检查与产物校验，打包保留资源检查；发布继续验收实际 exe 启动。这些验证不在普通修改收尾时重复执行。
 无法执行所需验证时，明确说明缺少的工具、未验证范围与替代检查。

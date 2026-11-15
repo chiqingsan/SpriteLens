@@ -13,6 +13,7 @@
 .window-drag-area img { width: 22px; height: 22px; border-radius: 6px; pointer-events: none; }
 .window-drag-area strong { font-size: var(--fs-sm); font-weight: 600; pointer-events: none; }
 .window-drag-area span { font-size: var(--fs-3xs); color: var(--muted); pointer-events: none; }
+.window-version { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .window-controls { display: flex; flex: none; app-region: no-drag; align-items: center; padding-right: var(--space-2); gap: 2px; }
 .window-button {
   width: 40px; height: 30px; padding: 0; background: transparent;

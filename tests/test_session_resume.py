@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from spritelens.capture.base import StreamChunk
-from spritelens.capture.key_store import KeyStore, SessionCheckpoint
+from spritelens.capture.key_store import KeyStore
 from spritelens.domain.identity import PlayerIdentity
 from spritelens.protocol.opcodes import OpcodeCatalog
 from spritelens.protocol.schema import load_library

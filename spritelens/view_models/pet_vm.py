@@ -139,19 +139,19 @@ class PetViewModel:
         import math
 
         normalized: dict[str, float | None] = {}
-        for field in ("height", "weight", "voice", "height_position", "weight_position"):
+        for metric in ("height", "weight", "voice", "height_position", "weight_position"):
             pair = []
             for bound in ("min", "max"):
                 try:
-                    value = float(values.get(f"{field}_{bound}"))
-                    if not math.isfinite(value) or (field != "voice" and value < 0) or (field.endswith("_position") and value > 100):
+                    value = float(values.get(f"{metric}_{bound}"))
+                    if not math.isfinite(value) or (metric != "voice" and value < 0) or (metric.endswith("_position") and value > 100):
                         value = None
                 except (ValueError, TypeError):
                     value = None
                 pair.append(value)
             if all(v is not None for v in pair) and pair[0] > pair[1]:
                 pair.reverse()
-            normalized.update({f"{field}_min": pair[0], f"{field}_max": pair[1]})
+            normalized.update({f"{metric}_min": pair[0], f"{metric}_max": pair[1]})
         return normalized
 
     def set_sort(self, key: str, *, descending: bool = False) -> None:
@@ -287,9 +287,9 @@ class PetViewModel:
                   "voice": {"min": -100.0, "max": 100.0}}
         for pet in pets:
             species = self.species_of(pet)
-            for field, scale in (("height", 100), ("weight", 1000)):
-                reference = getattr(species, field + "_range", (0, 0))[1]
-                limits[field]["max"] = max(limits[field]["max"], getattr(pet, field) / scale, reference / scale)
+            for metric, scale in (("height", 100), ("weight", 1000)):
+                reference = getattr(species, metric + "_range", (0, 0))[1]
+                limits[metric]["max"] = max(limits[metric]["max"], getattr(pet, metric) / scale, reference / scale)
             limits["voice"]["min"] = min(limits["voice"]["min"], pet.voice)
             limits["voice"]["max"] = max(limits["voice"]["max"], pet.voice)
         return limits
@@ -338,17 +338,17 @@ class PetViewModel:
                 checks.append(pet.talent_rank >= filters.talent_min)
             if filters.gender:
                 checks.append(pet.gender == filters.gender)
-            for field, scale in (("height", 100), ("weight", 1000), ("voice", 1)):
-                low, high = getattr(filters, field + "_min"), getattr(filters, field + "_max")
+            for metric, scale in (("height", 100), ("weight", 1000), ("voice", 1)):
+                low, high = getattr(filters, metric + "_min"), getattr(filters, metric + "_max")
                 if low is not None or high is not None:
-                    value = getattr(pet, field) / scale
-                    checks.append(getattr(pet, field) != 0 and (low is None or value >= low) and (high is None or value <= high))
+                    value = getattr(pet, metric) / scale
+                    checks.append(getattr(pet, metric) != 0 and (low is None or value >= low) and (high is None or value <= high))
             groups = set(species.egg_groups) if species else set()
             checks.extend(group in groups for group in filters.egg_groups)
-            for field in ("height", "weight"):
-                low, high = getattr(filters, field + "_position_min"), getattr(filters, field + "_position_max")
+            for metric in ("height", "weight"):
+                low, high = getattr(filters, metric + "_position_min"), getattr(filters, metric + "_position_max")
                 if low is not None or high is not None:
-                    ratio = range_position(getattr(pet, field), getattr(species, field + "_range", (0, 0)))["ratio"]
+                    ratio = range_position(getattr(pet, metric), getattr(species, metric + "_range", (0, 0)))["ratio"]
                     checks.append(ratio is not None and 0 <= ratio <= 1 and (low is None or ratio * 100 >= low) and (high is None or ratio * 100 <= high))
             if static is not None:
                 types = set(species.type_names) if species else set()

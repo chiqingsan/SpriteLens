@@ -23,7 +23,7 @@ from spritelens.capture.key_store import KeyStore, parse_key_text
 from spritelens.paths import keys_dir
 from spritelens.protocol.crypto import extract_ack_key, iter_decrypt_variants
 from spritelens.protocol.frames import FrameStream
-from spritelens.protocol.records import Direction, split_record
+from spritelens.protocol.records import split_record
 from spritelens.recording.recorder import read_recording
 
 
@@ -95,7 +95,7 @@ def main(argv: list[str]) -> int:
     print("\n各流帧分类:")
     for fk, n in sorted(frames.items()):
         print(f"  {fk[0][-5:]} {fk[1][-3:]} {fk[2:]}: {n}")
-    print(f"\n业务 opcode 分布:")
+    print("\n业务 opcode 分布:")
     for (d, op), n in ops.most_common(30):
         print(f"  {d:>3} {op:<10} x{n}")
     print(f"\n宠物分页请求 0x1345: {len(pet_reqs)} 次 {pet_reqs[:5]}")

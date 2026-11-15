@@ -67,15 +67,12 @@ class AccountSessions:
         scene_coverage_enabled: bool = True,
         scene_coverage_store: SceneCoverageStore | None = None,
         scene_coverage_map_bounds: dict[int, tuple[int, int, int]] | None = None,
-        selection_explicit: bool = False,
     ) -> None:
         self.lock = threading.RLock()
         self.selected = initial
         self._accounts = {uid: initial} if uid else {}
         self._sessions: dict[str, int] = {}
         self._identities: dict[str, tuple[int, str, int]] = {}
-        self._selection_explicit = selection_explicit
-        self._seen_live = False
         self._pet_store = pet_store
         self._egg_store = egg_store
         self._home_store = home_store
@@ -103,6 +100,7 @@ class AccountSessions:
     def handle_packet(self, event: PacketEvent) -> None:
         identity = extract_identity(event)
         with self.lock:
+            previous_live = set(self._sessions.values())
             if identity is not None:
                 previous = self._sessions.get(event.session_id)
                 if previous is not None and previous != identity.uid:
@@ -118,10 +116,6 @@ class AccountSessions:
             repos = self._accounts.get(uid)
             if repos is None:
                 repos = self._accounts[uid] = self.new_account(uid)
-            if not self._seen_live:
-                if not self._selection_explicit:
-                    self.selected = repos
-                self._seen_live = True
             # 采集重新开始会清场景；只在本连接已确认身份时恢复观察归属。
             scene_event = event if identity is not None else replace(
                 event, resumed_identity=self._identities[event.session_id])
@@ -138,15 +132,26 @@ class AccountSessions:
                 except Exception:  # 业务回调故障不阻断同一事件的其他领域，保留可定位错误。
                     logger.exception("账号事件处理失败: domain=%s uid=%s opcode=0x%04X",
                                      type(repo).__name__, uid, event.opcode)
+            if previous_live != set(self._sessions.values()):
+                self._follow_single_live_account()
+
+    def _follow_single_live_account(self) -> None:
+        # 仅在在线账号集合变化时跟随；普通推送不能抢走用户手动选择的历史账号。
+        live = set(self._sessions.values())
+        if len(live) == 1:
+            self.selected = self._accounts[next(iter(live))]
 
     def session_closed(self, session_id: str) -> None:
         with self.lock:
+            previous_live = set(self._sessions.values())
             uid = self._sessions.pop(session_id, None)
             self._identities.pop(session_id, None)
             if uid is not None:
                 self._accounts[uid].eggs.clear_pickups(session_id)
                 self._accounts[uid].scene.session_closed(session_id)
                 self._accounts[uid].home.session_closed(session_id)
+                if previous_live != set(self._sessions.values()):
+                    self._follow_single_live_account()
 
     def select_cached(self, uid: int) -> bool:
         with self.lock:
@@ -154,14 +159,12 @@ class AccountSessions:
             if repos is None:
                 return False
             self.selected = repos
-            self._selection_explicit = True
             return True
 
     def select_prepared(self, uid: int, repos: AccountRepositories) -> None:
         with self.lock:
             # 读取历史期间可能已收到目标账号的实时事件，实时仓库优先。
             self.selected = self._accounts.setdefault(uid, repos)
-            self._selection_explicit = True
 
     def live_uids(self) -> tuple[int, ...]:
         with self.lock:

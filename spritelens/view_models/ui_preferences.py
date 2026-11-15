@@ -72,6 +72,12 @@ def validate_home_orders(raw: object) -> dict[str, list[str]]:
     return result
 
 
+def default_shortcuts() -> list:
+    """首次使用时的四个预置快捷条件。"""
+    from spritelens.domain.pet_conditions import MARK_NAMES
+    return [{"name": name, "filters": {"marks": [name]}} for name in MARK_NAMES]
+
+
 def normalize_preferences(raw: object) -> dict:
     raw = raw if isinstance(raw, dict) else {}
     fields = raw.get("fields") if isinstance(raw.get("fields"), dict) else {}
@@ -79,6 +85,10 @@ def normalize_preferences(raw: object) -> dict:
         shortcuts = validate_shortcuts(raw.get("shortcuts", []))
     except ValueError:
         shortcuts = []
+    else:
+        # 从未保存过快捷条件（键缺失）才注入预置项；显式保存的空列表保持为空。
+        if "shortcuts" not in raw:
+            shortcuts = default_shortcuts()
     try:
         home_orders = validate_home_orders(raw.get("home_orders", {}))
     except ValueError:
@@ -95,9 +105,14 @@ class UIPreferencesViewModel:
         self._settings = settings
 
     def snapshot(self) -> dict:
-        return normalize_preferences(self._settings.get_value("ui.preferences", {}))
+        result = normalize_preferences(self._settings.get_value("ui.preferences", {}))
+        result["onboarding_pending"] = self._settings.get_bool("onboarding.pending")
+        return result
 
     def update(self, changes: object) -> dict:
+        if isinstance(changes, dict) and set(changes) == {"onboarding_pending"} and changes["onboarding_pending"] is False:
+            self._settings.set_checked("onboarding.pending", False)
+            return self.snapshot()
         if not isinstance(changes, dict) or set(changes) - {"theme", "pet_view", "fields", "shortcuts", "home_orders"}:
             raise ValueError("只允许界面偏好与快捷条件定义")
         if "theme" in changes and (not isinstance(changes["theme"], str) or changes["theme"] not in THEMES):
@@ -118,4 +133,8 @@ class UIPreferencesViewModel:
             if home_orders is not None:
                 value["home_orders"] = home_orders
             return value
-        return normalize_preferences(self._settings.update_checked("ui.preferences", merge))
+        # 保留 update_checked 的写入失败语义（OSError 必须回传 500），
+        # 但返回体与 snapshot() 同形：缺 onboarding_pending 会被前端当成「引导待完成」再次弹出。
+        result = normalize_preferences(self._settings.update_checked("ui.preferences", merge))
+        result["onboarding_pending"] = self._settings.get_bool("onboarding.pending")
+        return result

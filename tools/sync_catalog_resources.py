@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from tools.import_egg_data import convert
+from tools.import_egg_data import convert  # noqa: E402  （仓库根需先入 sys.path）
 
 STAT_MAP = {"hp": "hp", "physical_attack": "atk", "magic_attack": "spa",
             "physical_defense": "def", "magic_defense": "spd", "speed": "spe"}
@@ -43,7 +43,8 @@ def merge_species(species: dict, records: list[dict]) -> tuple[list[str], list[d
             "gender_ratio": {"male": ratio.get("male_percent"), "female": ratio.get("female_percent")},
             "height_range": [ref.get("heightLow"), ref.get("heightHigh")],
             "weight_range": [ref.get("weightLow"), ref.get("weightHigh")],
-            "chain_members": ref.get("chainMembers"), "description": ref.get("description"),
+            # 进化链不从蛋神导入：链以 Wiki 进化表为准，由 sync_wiki_chains.py 维护
+            "description": ref.get("description"),
             "has_shiny": ref.get("hasShiny"), "has_ride_talent": ref.get("hasRideTalent"),
             "breedable": ref.get("breedable"), "form": ref.get("form"),
         }

@@ -133,7 +133,31 @@ describe('附近精灵更新布局稳定性', () => {
     expect(wrapper.findAll('.nearby-card').map(card => card.attributes('id'))).toEqual([
       'nearby-actor-3', 'nearby-actor-2', 'nearby-actor-1',
     ])
-    expect(wrapper.findAll('.nearby-card-marks.is-empty')).toHaveLength(2)
+    // 标记行改为按需渲染：只有带标记的精灵出现标记行，无标记卡片不再为空行预留高度。
+    expect(wrapper.findAll('.nearby-card-marks')).toHaveLength(1)
+  })
+
+  it('三行布局：奖牌并入信息行，数值带显示参考范围进度条', async () => {
+    const marked = { ...actor('1', 1, [{ label: '大', name: '大块头', source: 'reference' }], 'marked'), height_pct: 0.64, weight_pct: 0.47, voice_pct: 0.81 }
+    const unknown = { ...actor('2', 2), height: null, weight: null, voice: null, height_pct: null, weight_pct: null, voice_pct: null }
+    const wrapper = mount(NearbyPage, { props: { host: { load: vi.fn().mockResolvedValue(snapshot(1, [marked, unknown])), openFloating: vi.fn() } } })
+    ;(wrapper.vm as unknown as { update(value: unknown): void }).update({ uid: '1', version: 1, observation_id: 1, phase: 'observing' })
+    await flushPromises()
+    await nextTick()
+    const card = wrapper.get('#nearby-actor-1')
+    // 第一行：名称/Lv/系别之后接奖牌，不再单独占一行。
+    expect(card.find('.nearby-card-identity .nearby-card-marks').exists()).toBe(true)
+    const bars = card.findAll('.nearby-metric-bar')
+    expect(bars).toHaveLength(3)
+    // 读数行只放数值与单位；百分比贴在进度条右端，与轨道同一行。
+    expect(bars.map(bar => bar.get('.nearby-metric-pct').text())).toEqual(['64%', '47%', '81%'])
+    expect(card.findAll('.nearby-metric > dd:not(.nearby-metric-bar) .nearby-metric-pct')).toHaveLength(0)
+    expect(bars[0].get('.nearby-metric-track b').attributes('style')).toContain('width: 64%')
+    // 比例未知时整条进度条不渲染：空轨道会被误读成「0%」，读数区域已有「未知」。
+    const unknownCard = wrapper.get('#nearby-actor-2')
+    expect(unknownCard.findAll('.nearby-metric-bar')).toHaveLength(0)
+    expect(unknownCard.findAll('.nearby-metric dd b').map(node => node.text())).toEqual(['未知', '未知', '未知'])
+    wrapper.unmount()
   })
 
   it('炫彩精灵在列表里有独立徽章与卡片样式，和单牌/双牌并列', async () => {

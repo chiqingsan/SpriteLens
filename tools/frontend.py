@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from spritelens.web.frontend_assets import check_frontend_assets
+from spritelens.web.frontend_assets import check_frontend_assets  # noqa: E402  （仓库根需先入 sys.path）
 
 FRONTEND = ROOT / "frontend"
 STATIC = ROOT / "spritelens/web/static"

@@ -88,6 +88,7 @@ class MonitorService:
         self._emitted_total = 0
         self._history_warned = False
         self._source: CaptureSource | None = None
+        self._capture_generation = 0
         self._preset_key = preset_key
         self._checkpoints = {item.flow_id: item for item in key_store.load_sessions()}
         self._packet_listeners: list[Callable[[PacketEvent], None]] = []
@@ -101,15 +102,33 @@ class MonitorService:
         with self._lock:
             self._packet_listeners.append(callback)
 
+    def remove_packet_listener(self, callback: Callable[[PacketEvent], None]) -> None:
+        """注销业务监听（对外接口停用/重启时解绑；未注册时静默忽略）。"""
+        with self._lock:
+            try:
+                self._packet_listeners.remove(callback)
+            except ValueError:
+                pass
+
     def add_session_close_listener(self, callback: Callable[[str], None]) -> None:
         """场景观察随流关闭/SYN/会话回收失效；回调只操作内存。"""
         with self._lock:
             self._session_close_listeners.append(callback)
 
+    def remove_session_close_listener(self, callback: Callable[[str], None]) -> None:
+        with self._lock:
+            self._session_close_listeners.remove(callback)
+
+    @property
+    def capture_generation(self) -> int:
+        """每次绑定新的采集源递增，使外部临时场景缓存跨重启失效。"""
+        return self._capture_generation
+
     # -- 生命周期 ------------------------------------------------------
     def bind(self, source: CaptureSource) -> None:
         """组合根把接入层交给管线；回调接线由此完成。"""
         self._source = source
+        self._capture_generation += 1
 
     def start(self) -> None:
         if self._source is None:

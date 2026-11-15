@@ -7,6 +7,8 @@
 
 [场景实体观察快照](SCENE_OBSERVATIONS.md) — C02 当前协议证据、接口与待验收边界。
 
+[对外数据接口](EXT_API.md) — ext API v1 契约、发现文件与双 token 隔离、默认 opcode 与容量上限、meow 接入清单；待真实流量与桌面验收。
+
 [附近精灵列表](NEARBY_OBSERVATIONS.md) — C03 操作入口、解包适配来源、请求归属与观察版边界。
 
 [野生精灵搜索覆盖记录规格](NEARBY_EXPLORATION_SPEC.md) — 用户确认的网格覆盖目标、任意相交规则、可信采样、历史和验收边界；半径及刷新策略尚待确认。
@@ -56,6 +58,8 @@
 
 当前规格、历史 review 与方向（按需查阅）：
 
+- [PET_PRESENTATION_VERIFICATION.md](PET_PRESENTATION_VERIFICATION.md) — 2026-10-12 背包/详情展示改造与头像留白归一核验快照；资源与标记规则仍适用
+- [reviews/HEALTH_CHECK_2026-11-15.md](reviews/HEALTH_CHECK_2026-11-15.md) — 全项目健康检查与清理记录：指标基线、死代码/死资源清单、已做改动与回归证据、未处理风险
 - [reviews/PROJECT_REVIEW_2026-10-12.md](reviews/PROJECT_REVIEW_2026-10-12.md) — `114be08` 全项目初审快照；当前修复状态见路线图
 - [reviews/ARCHITECTURE_FOLLOWUP_2026-10-13.md](reviews/ARCHITECTURE_FOLLOWUP_2026-10-13.md) — `240b94c` 改动复核：录制回归、生命周期/HTTP 缺口与完成范围校正
 - [reviews/GLM_DELIVERY_REVIEW_2026-10-13.md](reviews/GLM_DELIVERY_REVIEW_2026-10-13.md) — `a106044` 交付复核：启动阻断、并发/停止/HTTP 返修证据与门禁边界
@@ -82,7 +86,7 @@
 - 资源台账：`archive/RESOURCE_COVERAGE_REPORT.md`（覆盖／缺口／冲突）
 
 维护约定：用户可见行为变更 → 更新 README；架构/分层变更 → ARCHITECTURE；
-新增文件 → CODEBASE_MAP；协议观察与排障经验 → PROTOCOL_NOTES；
+对外接口契约与安全边界 → EXT_API；新增文件 → CODEBASE_MAP；协议观察与排障经验 → PROTOCOL_NOTES；
 UI 视觉/组件规范 → UI_GUIDE；蛋神对标实施进度 → DANSHEN_FEATURE_SPEC；
 每轮迭代验收记录与下轮规格 → 本轮组（验收命名 `*_VERIFICATION.md`）。
 当前路线与验收顺序只维护在 `ROADMAP.md`，协作规则维护在 `DEVELOPMENT_GUIDE.md`；

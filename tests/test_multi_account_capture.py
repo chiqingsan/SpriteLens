@@ -107,6 +107,42 @@ class MultiAccountCaptureTest(unittest.TestCase):
         self.assertEqual(self.ctx.pet_repository.consistent_snapshot().uid, 303)
         self.assertEqual({p.gid for p in self.ctx.pet_repository.snapshot()}, {333})
 
+    def test_single_account_login_change_follows_all_domains(self):
+        self.feed(FLOW_A, make_ack_frame(SYNTH_KEY))
+        self.login(FLOW_A, 101, SYNTH_KEY)
+        self.pet(FLOW_A, SYNTH_KEY, 111)
+        self.login(FLOW_A, 202, SYNTH_KEY, sequence=13)
+        self.assertEqual(self.ctx.pet_repository.consistent_snapshot().uid, 202)
+        self.assertEqual(self.ctx.egg_box.consistent_snapshot().uid, 202)
+        self.assertEqual(self.ctx.home_repo.consistent_snapshot().uid, 202)
+        scene = self.ctx.scene_repository.snapshot()
+        self.assertEqual(scene.uid, 202)
+        self.assertFalse(scene.actors)
+        self.pet(FLOW_A, SYNTH_KEY, 222, sequence=14)
+        self.assertEqual({p.gid for p in self.ctx.pet_repository.snapshot()}, {222})
+        self.assertEqual({p.gid for p in self.ctx.pet_store.load(101)}, {111})
+
+    def test_closing_one_of_two_accounts_follows_remaining_account(self):
+        self.seed_two()
+        self.ctx.monitor.close_session(FLOW_A)
+        self.assertEqual(self.ctx.account_selection.accounts_payload()["selected_uid"], 202)
+        self.assertEqual({p.gid for p in self.ctx.pet_repository.snapshot()}, {202})
+        self.ctx.monitor.close_session(FLOW_B)
+        self.assertEqual(self.ctx.pet_repository.consistent_snapshot().uid, 202)
+        self.assertFalse(self.ctx.scene_repository.snapshot().actors)
+
+    def test_manual_history_selection_survives_updates_and_same_account_reconnect(self):
+        self.seed_two()
+        self.ctx.monitor.close_session(FLOW_B)
+        self.ctx.account_selection.select(202)
+        self.login(FLOW_A, 101, SYNTH_KEY, sequence=13)
+        self.pet(FLOW_A, SYNTH_KEY, 112, sequence=14)
+        self.feed("same-account", make_ack_frame(KEY_B))
+        self.login("same-account", 101, KEY_B)
+        self.ctx.monitor.close_session(FLOW_A)
+        self.assertEqual(self.ctx.pet_repository.consistent_snapshot().uid, 202)
+        self.assertEqual(self.ctx.account_selection.accounts_payload()["live_uids"], [101])
+
     def test_unknown_connection_never_writes_to_selected_account(self):
         self.seed_two()
         self.pet("10.0.0.5:53000", SYNTH_KEY, 999)
@@ -240,7 +276,7 @@ class StartupAccountSelectionTest(unittest.TestCase):
             finally:
                 context.close()
 
-    def test_explicit_startup_selection_is_not_overwritten_by_other_live_flow(self):
+    def test_single_live_account_replaces_remembered_offline_selection(self):
         with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"SPRITELENS_DATA_ROOT": temp}):
             database = Database(database_path())
             store = PetStore(database)
@@ -266,7 +302,7 @@ class StartupAccountSelectionTest(unittest.TestCase):
                     SYNTH_KEY, 0x0102, message(2, message(1, brief)), sequence=11
                 )
                 context.monitor.on_chunk(StreamChunk(FLOW_A, "s2c", login, 2))
-                self.assertEqual(context.account_selection.accounts_payload()["selected_uid"], 202)
+                self.assertEqual(context.account_selection.accounts_payload()["selected_uid"], 101)
                 self.assertEqual(context.account_selection.accounts_payload()["live_uids"], [101])
             finally:
                 context.close()

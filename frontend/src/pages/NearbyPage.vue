@@ -206,7 +206,7 @@ const displayMapData = computed(() => {
   if (!readOnlyPhase.value) return data.value
   const last = lastMapData.value
   if (!last || last.uid !== summary.value?.uid) return data.value
-  return { ...last, actors: [], player_position: null, position_source: null }
+  return { ...last, actors: [], player_position: null, position_source: null, player_heading: null }
 })
 onUnmounted(stopMaps)
 const countNote = computed(() => {
@@ -249,7 +249,15 @@ function relativeTime(value: number | null) {
   if (seconds < 86400) return `${Math.floor(seconds / 3600)} 小时前`
   return time(value)
 }
-function metric(value: number | null, divisor: number, unit: string) { return value === null ? '未知' : `${(value / divisor).toLocaleString('zh-CN', { maximumFractionDigits: 3 })} ${unit}` }
+function metricValue(value: number | null, divisor: number, digits: number) { return value === null ? '未知' : (value / divisor).toLocaleString('zh-CN', { minimumFractionDigits: digits, maximumFractionDigits: digits }) }
+/** 参考范围比例：旧壳层/旧缓存没有该字段时按未知处理，不画 0% 条。 */
+function percentOf(ratio: number | null | undefined) {
+  if (!hasRatio(ratio)) return '—'
+  return ratio < 0 || ratio > 1 ? '超界' : `${Number((ratio * 100).toFixed(2))}%`
+}
+function percentWidth(ratio: number | null | undefined) { return hasRatio(ratio) ? `${Math.max(0, Math.min(1, ratio)) * 100}%` : '0%' }
+// 比例未知（物种未收录或数值缺失）时不画进度条：空轨道会被误读成「0%」，不如让读数区域的「未知」单独说明。
+function hasRatio(ratio: number | null | undefined): ratio is number { return typeof ratio === 'number' && Number.isFinite(ratio) }
 function imageFailed(id: string) { failedImages.value = new Set(failedImages.value).add(id) }
 function measureRow(element: Element | ComponentPublicInstance | null) {
   if (element instanceof HTMLElement) rowVirtualizer.value.measureElement(element)
@@ -290,15 +298,31 @@ defineExpose({ update, load, pause, resume })
                     <span class="nearby-level nearby-level-lv">Lv.{{ entry.actor.level ?? '?' }}</span>
                     <span v-if="entry.actor.stale" class="nearby-level nearby-level-stale" title="战前观察，尚未重新确认">可能已过期</span>
                     <div class="nearby-types"><template v-for="type in entry.actor.type_names" :key="type"><span class="nearby-type-chip"><img v-if="data?.type_icons[type]" class="nearby-type-icon" :src="data.type_icons[type]" :alt="type" loading="lazy">{{ type }}</span></template><span v-if="!entry.actor.type_names.length" class="nearby-type-chip">属性未知</span></div>
+                    <div v-if="entry.actor.colorful || entry.actor.attention === 'double' || entry.actor.marks.length" class="nearby-card-marks" aria-label="精灵标记">
+                      <span v-if="entry.actor.colorful" class="nearby-colorful-mark" title="游戏内炫彩外观（变异类型标记），与本地奖牌参考线无关"><img :src="RARITY_COLORFUL" alt="" loading="lazy">炫彩</span>
+                      <span v-if="entry.actor.attention === 'double'" class="nearby-double-mark" title="体型与声音均命中当前参考线，尚未确认游戏奖牌">双牌</span>
+                      <template v-for="mark in entry.actor.marks" :key="mark.name"><MedalIcon v-if="isMedalMark(mark)" :name="mark.name" :source="mark.source" /><span v-else class="nearby-reference-mark" :title="`${mark.name} · 数值参考`">{{ mark.name }}</span></template>
+                    </div>
                   </div>
                   <time class="nearby-time" :title="entry.actor.updated_at === null ? '尚无更新' : '观察于 ' + time(entry.actor.updated_at)">{{ relativeTime(entry.actor.updated_at) }}</time>
                 </div>
-                <div class="nearby-card-marks" :class="{ 'is-empty': !entry.actor.colorful && !entry.actor.marks.length && entry.actor.attention !== 'double' }" aria-label="精灵标记">
-                  <span v-if="entry.actor.colorful" class="nearby-colorful-mark" title="游戏内炫彩外观（变异类型标记），与本地奖牌参考线无关"><img :src="RARITY_COLORFUL" alt="" loading="lazy">炫彩</span>
-                  <span v-if="entry.actor.attention === 'double'" class="nearby-double-mark" title="体型与声音均命中当前参考线，尚未确认游戏奖牌">双牌</span>
-                  <template v-for="mark in entry.actor.marks" :key="mark.name"><MedalIcon v-if="isMedalMark(mark)" :name="mark.name" :source="mark.source" /><span v-else class="nearby-reference-mark" :title="`${mark.name} · 数值参考`">{{ mark.name }}</span></template>
-                </div>
-                <p class="nearby-card-meta"><span>身高 <b>{{ metric(entry.actor.height, 100, 'm') }}</b></span><span>体重 <b>{{ metric(entry.actor.weight, 1000, 'kg') }}</b></span><span>音量 <b>{{ entry.actor.voice ?? '未知' }}</b></span></p>
+                <dl class="nearby-metrics" aria-label="精灵数值">
+                  <div class="nearby-metric" :class="{ 'is-unknown': entry.actor.height === null }" :title="entry.actor.height === null ? '身高未知' : `身高 ${metricValue(entry.actor.height, 100, 2)} m`">
+                    <dt><UiIcon name="ruler-2" />身高</dt>
+                    <dd><b>{{ metricValue(entry.actor.height, 100, 2) }}</b><small v-if="entry.actor.height !== null">m</small></dd>
+                    <dd v-if="hasRatio(entry.actor.height_pct)" class="nearby-metric-bar" :title="`参考范围位置 ${percentOf(entry.actor.height_pct)}`"><span class="nearby-metric-track"><b :style="{ width: percentWidth(entry.actor.height_pct) }"></b></span><small class="nearby-metric-pct">{{ percentOf(entry.actor.height_pct) }}</small></dd>
+                  </div>
+                  <div class="nearby-metric" :class="{ 'is-unknown': entry.actor.weight === null }" :title="entry.actor.weight === null ? '体重未知' : `体重 ${metricValue(entry.actor.weight, 1000, 3)} kg`">
+                    <dt><UiIcon name="weight" />体重</dt>
+                    <dd><b>{{ metricValue(entry.actor.weight, 1000, 3) }}</b><small v-if="entry.actor.weight !== null">kg</small></dd>
+                    <dd v-if="hasRatio(entry.actor.weight_pct)" class="nearby-metric-bar" :title="`参考范围位置 ${percentOf(entry.actor.weight_pct)}`"><span class="nearby-metric-track"><b :style="{ width: percentWidth(entry.actor.weight_pct) }"></b></span><small class="nearby-metric-pct">{{ percentOf(entry.actor.weight_pct) }}</small></dd>
+                  </div>
+                  <div class="nearby-metric" :class="{ 'is-unknown': entry.actor.voice === null }" :title="entry.actor.voice === null ? '音量未知' : `音量 ${entry.actor.voice} dB`">
+                    <dt><UiIcon name="activity" />音量</dt>
+                    <dd><b>{{ entry.actor.voice ?? '未知' }}</b><small v-if="entry.actor.voice !== null">dB</small></dd>
+                    <dd v-if="hasRatio(entry.actor.voice_pct)" class="nearby-metric-bar" :title="`声音位置 ${percentOf(entry.actor.voice_pct)}`"><span class="nearby-metric-track"><b :style="{ width: percentWidth(entry.actor.voice_pct) }"></b></span><small class="nearby-metric-pct">{{ percentOf(entry.actor.voice_pct) }}</small></dd>
+                  </div>
+                </dl>
               </div>
             </article>
           </div>
@@ -380,36 +404,39 @@ defineExpose({ update, load, pause, resume })
 .nearby-virtual-space { position: relative; min-width: 0; }
 /* 虚拟行必须脱离文档流：`.nearby-card` 自带 position 声明，这里用双类名保证覆盖顺序无关。 */
 .nearby-card.nearby-virtual-row { position: absolute; inset: 0 0 auto; }
-.nearby-card { position: relative; display: flex; align-items: flex-start; gap: var(--space-3); min-width: 0; padding: var(--space-3); background: var(--surface-1); border: 1px solid var(--line-soft); border-radius: var(--radius-md); cursor: pointer; }
+/* 卡片两段：左侧头像 + 右侧文案列（身份行、可选标记行、三列数值带）。
+   数值带在文案列内，头像高度不被空行撑高；标记行与数值带之间用一条淡分隔线，
+   把「是什么」和「多大」分开，数值因此可以等宽对齐。 */
+/* 卡片用网格：头像列固定 64px，文案列吃掉剩余宽度；行高由文案决定（头像 align-self: start）。 */
+.nearby-card { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: var(--space-3); min-width: 0; padding: var(--space-2) var(--space-3); background: var(--surface-1); border: 1px solid var(--line-soft); border-radius: var(--radius-md); cursor: pointer; container-type: inline-size; }
 .nearby-card:hover { background: var(--surface-2); border-color: var(--line); }
 /* 选中/聚焦描边贴在卡片边框外沿，不压内部内容，也不会和炫彩边框叠成双线。 */
 .nearby-card.is-selected, .nearby-card:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 0; }
-/* 头像略大于文字行高，给名称/属性一个稳定的左侧锚点；炫彩卡在头像外包彩虹环并挂游戏内星标。 */
-.nearby-portrait { position: relative; display: grid; place-items: center; flex: none; width: 52px; height: 52px; background: var(--surface-2); border-radius: var(--radius-md); color: var(--muted); }
+/* 头像略小于文案列，给名称/属性一个稳定的左侧锚点；炫彩卡在头像外包彩虹环并挂游戏内星标。 */
+/* 头像固定 64px 方形，不参与卡片高度计算：卡片高度只由文案内容决定，底部不会留下空带。
+   若改成「1:1 撑满行高」，头像宽度会反过来把网格行顶到 92px 上限，文案只有约 66px 时就空出 26px。 */
+.nearby-portrait { position: relative; display: grid; place-items: center; align-self: start; flex: none; width: 64px; height: 64px; aspect-ratio: 1 / 1; background: var(--surface-2); border-radius: var(--radius-md); color: var(--muted); }
 .nearby-portrait > img:not(.nearby-portrait-colorful) { width: 100%; height: 100%; border-radius: var(--radius-md); object-fit: contain; }
 .nearby-portrait-colorful { position: absolute; right: -6px; bottom: -6px; width: 20px; height: 20px; object-fit: contain; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .4)); }
-.nearby-card-copy { display: flex; flex-direction: column; gap: var(--space-1); flex: 1; min-width: 0; }
+.nearby-card-copy { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 /* 身份行：名称/Lv/属性占左侧可换行区域，观察时间钉在右上角；属性再多也不会把时间挤走。 */
 .nearby-card-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; column-gap: var(--space-3); min-width: 0; }
 .nearby-card-identity { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); min-width: 0; }
-.nearby-card h3 { min-width: 0; max-width: 100%; margin: 0; overflow: hidden; font-size: var(--fs-lg); font-weight: 700; line-height: 1.35; flex: 0 1 auto; text-overflow: ellipsis; white-space: nowrap; }
+.nearby-card h3 { min-width: 0; max-width: 100%; margin: 0; overflow: hidden; font-size: var(--fs-lg); font-weight: 700; line-height: 1.25; flex: 0 1 auto; text-overflow: ellipsis; white-space: nowrap; }
 .nearby-level { flex: none; color: var(--muted); font-size: var(--fs-3xs); line-height: 1.35; font-variant-numeric: tabular-nums; }
 /* Lv 是稳定属性，用浅底胶囊与名称分隔；过期提示是警告文案，只用琥珀色不带底。 */
-.nearby-level-lv { display: inline-flex; align-items: center; min-height: 20px; padding: 0 6px; border-radius: var(--radius-pill); background: var(--surface-2); }
-.nearby-level-stale { color: var(--amber-ink); }
+.nearby-level-lv { display: inline-flex; align-items: center; min-height: 20px; padding: 0 6px; border-radius: var(--radius-pill); background: var(--surface-3); color: var(--ink-soft); font-weight: 600; }
+.nearby-level-stale { min-height: 20px; padding: 0 var(--space-2); border-radius: var(--radius-pill); background: var(--amber-soft); color: var(--amber-ink); font-weight: 600; }
 .nearby-types { display: flex; flex-wrap: wrap; gap: var(--space-1); min-width: 0; max-width: 100%; }
-.nearby-type-chip { display: inline-flex; align-items: center; gap: 3px; min-height: 19px; max-width: 100%; padding: 0 6px; border: 1px solid var(--line-soft); border-radius: var(--radius-pill); background: var(--surface-2); color: var(--ink-soft); font-size: var(--fs-3xs); line-height: 1; white-space: nowrap; }
-.nearby-type-icon { width: 13px; height: 13px; flex: none; object-fit: contain; border-radius: 50%; }
-.nearby-time { flex: none; padding-top: 1px; color: var(--muted); font-size: var(--fs-3xs); line-height: 1.35; font-variant-numeric: tabular-nums; white-space: nowrap; }
-/* 标记行始终占位（无标记时 .is-empty 隐藏），避免有无标记的卡片高度跳变。 */
-.nearby-card-marks { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1) var(--space-2); min-width: 0; max-width: 100%; min-height: 22px; }
-.nearby-card-marks.is-empty { visibility: hidden; }
+.nearby-type-chip { display: inline-flex; align-items: center; gap: 3px; min-height: 20px; max-width: 100%; padding: 0 var(--space-2); border: 1px solid var(--line-soft); border-radius: var(--radius-pill); background: var(--panel); color: var(--ink-soft); font-size: var(--fs-3xs); line-height: 1; white-space: nowrap; }
+.nearby-type-icon { width: 14px; height: 14px; flex: none; object-fit: contain; border-radius: 50%; }
+.nearby-time { flex: none; padding-top: 1px; color: var(--muted-2); font-size: var(--fs-3xs); line-height: 1.35; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* 标记行只在有内容时渲染：无标记的卡片不再为一行空徽章预留 22px，虚拟行高度由内容决定。 */
+.nearby-card-marks { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1) var(--space-2); min-width: 0; max-width: 100%; }
 .nearby-card-marks > * { flex-shrink: 0; }
 .nearby-card-marks .medal-icon { width: 22px; height: 22px; }
 .nearby-reference-mark, .nearby-double-mark { display: inline-flex; align-items: center; min-height: 22px; padding: 0 var(--space-2); border: 1px solid var(--amber-line); border-radius: var(--radius-sm); background: var(--amber-soft); color: var(--amber-ink); font-size: var(--fs-3xs); font-weight: 700; white-space: nowrap; }
 .nearby-double-mark { border-color: var(--teal); background: var(--accent); color: var(--teal-deep); }
-/* 炫彩：游戏内固有外观（mutation 第 4 位），独立于本地奖牌参考线。
-   用彩虹竖条 + 淡彩底 + 头像彩虹环 + 星标贴纸表达稀缺度，不再依赖虚线紫框。 */
 /* 炫彩：游戏内固有外观（mutation 第 4 位），独立于本地奖牌参考线。
    稀有卡片用左浓右淡的紫雾底 + 头像彩虹环 + 右下角星标表达；不再压彩虹竖条，
    避免与选中/聚焦描边在同一圈位置上叠出双线。 */
@@ -418,9 +445,32 @@ defineExpose({ update, load, pause, resume })
 .nearby-card.is-colorful .nearby-portrait { border: 2.5px solid transparent; background: linear-gradient(var(--surface-2), var(--surface-2)) padding-box, var(--colorful-gradient) border-box; }
 .nearby-colorful-mark { display: inline-flex; align-items: center; gap: 3px; min-height: 22px; padding: 0 var(--space-2); border: 1px solid var(--colorful-line); border-radius: var(--radius-pill); background: var(--colorful-soft); color: var(--colorful-ink); font-size: var(--fs-3xs); font-weight: 700; white-space: nowrap; }
 .nearby-colorful-mark img { width: 14px; height: 14px; flex: none; object-fit: contain; }
-.nearby-card-meta { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin: 0; min-width: 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.4; }
-.nearby-card-meta > span { flex: none; white-space: nowrap; }
-.nearby-card-meta b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+/* 数值带：每个度量是一块独立小面板——标签在左、读数在右，下一行整宽进度条 + 百分比。
+   用面板边界把三列各自填满，等分列里不再出现「数值靠左、百分比飘在右边」的大片空白；
+   读数固定小数位，同一精灵在不同卡片上的写法一致。不足 420px 时改成单列面板堆叠。 */
+.nearby-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin: 0; }
+.nearby-metric { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; column-gap: var(--space-1); row-gap: 3px; min-width: 0; padding: 3px var(--space-2) 5px; border-radius: var(--radius-sm); background: var(--surface-2); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 6%, transparent); }
+.nearby-metric dt { display: inline-flex; align-items: center; gap: 3px; min-width: 0; color: var(--muted); font-size: var(--fs-3xs); line-height: 1.2; white-space: nowrap; }
+.nearby-metric dt .ui-icon { width: 12px; height: 12px; flex: none; opacity: .75; }
+.nearby-metric dd { display: flex; justify-content: flex-end; align-items: baseline; gap: 2px; min-width: 0; margin: 0; color: var(--ink); font-size: var(--fs-sm); font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; white-space: nowrap; }
+.nearby-metric dd b { min-width: 0; overflow: hidden; font-weight: 600; text-overflow: ellipsis; }
+.nearby-metric dd small { flex: none; color: var(--muted-2); font-size: var(--fs-3xs); font-weight: 400; }
+/* 未知值不与真实读数等价：降为弱色，单位同时省略，避免「未知 m」这种残留。 */
+.nearby-metric.is-unknown dd b { color: var(--muted-2); font-weight: 400; }
+/* 进度条：轨道始终整宽可见（0% 也能看出是在量程里，不再像缺数据），百分比贴在轨道右端；
+   比例未知时整条不渲染，避免把「数值未知」画成「最低值」。 */
+.nearby-metric-bar { display: flex; grid-column: 1 / -1; align-items: center; gap: var(--space-2); width: 100%; min-width: 0; margin: 0; }
+.nearby-metric-track { flex: 1; min-width: 0; height: 4px; overflow: hidden; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--ink) 12%, transparent); }
+.nearby-metric-track b { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--teal), var(--teal-bright)); }
+.nearby-metric-pct { flex: none; color: var(--muted); font-size: var(--fs-3xs); font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; }
+/* 卡片内容窄于 420px 时三列会互相挤压：改为单列面板，每块仍是「标签 / 读数右对齐 / 整行进度条」三行。
+   这里的标签与读数各占一行，是为了让极长读数（如 9876.543 kg）完整显示——同一行右对齐时超出部分会从
+   数字开头被裁掉，恰好藏掉最高位，比换行更糟。 */
+@container (max-width: 420px) {
+  .nearby-metrics { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
+  .nearby-metric { grid-template-columns: minmax(0, 1fr); row-gap: 2px; padding: 4px var(--space-2) 6px; }
+  .nearby-metric dd { justify-content: flex-end; }
+}
 .nearby-empty { height: 100%; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2); padding: var(--space-6); text-align: center; border: 0; border-radius: var(--radius-sm); background: var(--panel); }
 .nearby-empty-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--surface-2); color: var(--muted); }
 .nearby-empty-icon .ui-icon { width: 20px; height: 20px; }
@@ -447,8 +497,5 @@ defineExpose({ update, load, pause, resume })
 }
 @media(max-width:480px) {
   .nearby-toolbar .nearby-search { flex-basis: 100%; }
-  .nearby-card { padding: var(--space-2) var(--space-3); }
-  .nearby-portrait { width: 44px; height: 44px; }
-  .nearby-card-meta { font-size: var(--fs-3xs); }
 }
 </style>

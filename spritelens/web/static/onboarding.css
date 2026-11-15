@@ -1,0 +1,16 @@
+.onboarding-dialog {
+  box-sizing: border-box;
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: var(--space-6);
+  color: var(--ink);
+  overflow-y: auto;
+}
+.onboarding-content { min-width: 0; }
+.onboarding-step { margin: 0 0 var(--space-3); color: var(--muted); font-size: var(--fs-sm); }
+.onboarding-dialog h2 { margin: 0 0 var(--space-3); }
+.onboarding-copy { margin: 0; line-height: 1.7; overflow-wrap: anywhere; }
+.onboarding-error { color: var(--danger-ink); margin: var(--space-3) 0 0; overflow-wrap: anywhere; }
+.onboarding-error:empty { display: none; }
+.onboarding-dialog footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-6); }
+.onboarding-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }

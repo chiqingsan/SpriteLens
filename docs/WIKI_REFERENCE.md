@@ -25,6 +25,13 @@
 再将核对后的单个 JSON 发布到 data/static。更新差异应明确匹配/缺失数量变化。
 来源原始文件、临时脚本和截图不加入运行包。本机绝对路径不写入来源记录。
 
+进化链同样以 Wiki 的 `Evolutions` 模块为准：运行 `python tools/sync_wiki_chains.py` 补全
+species.json、eggs.json 中缺失的 `chain_members` 与下一阶 `evolutions`；本地链是 Wiki 链的
+子集时按 Wiki 扩充（只增不减），本地含 Wiki 之外成员时保留原值并列为冲突。成员按名称唯一
+命中且 `evolution_id` 一致解析，分支线包含 `lord_branches`（首领形态）。
+`tools/import_assets.py` 与 `tools/sync_catalog_resources.py` 不再从蛋神 petBaseData
+导入 `chain_members`。
+
 ## 运行边界
 
 StaticData 持有只读 WikiReference，按游戏 ID 与名称核对后返回补充资料。
@@ -34,7 +41,7 @@ Vue 独占详情请求和选择，切页/关闭取消并失效旧请求；加载
 缺文件表示没有补充数据；损坏的已发布 JSON 暴露加载错误，不静默冒充空目录。
 资源随现有 data/static 打包，不改变用户数据、账号、持久化和协议。
 
-验证最小集合：`tests.test_wiki_reference`、`tests.test_eggs`、`tests.test_web_server.HandbookPayloadTest`，
+验证最小集合：`tests.test_wiki_reference`、`tests.test_wiki_chains`、`tests.test_eggs`、`tests.test_web_server.HandbookPayloadTest`，
 以及前端现有图鉴生命周期回归和 Vue 构建。导入器/身份关联改动需保留必要数据正确性回归；
 布局用页面检查，不增加固定 DOM 或像素测试。WebView2/exe 另行实机验收。
 

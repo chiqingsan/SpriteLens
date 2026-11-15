@@ -75,8 +75,6 @@ class StartTimeoutReclaimTest(unittest.TestCase):
 
     def test_timeout_during_startup(self):
         """超时发生在 _start_async 执行中：loop 被停、半成品清理、不晚到。"""
-        release = threading.Event()
-
         class _SlowStart(LocalServer):
             async def _start_async(self):
                 await asyncio.sleep(0.5)  # 模拟慢启动（loop 已运行）

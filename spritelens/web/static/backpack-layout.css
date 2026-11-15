@@ -293,20 +293,106 @@
   .account-popover { width: min(340px, calc(100vw - var(--sidebar) - var(--space-6))); max-height: calc(100vh - var(--space-8)); }
 }
 
-.quick-settings-dialog { width: min(880px, calc(100vw - 40px)); max-height: min(800px, calc(100vh - 40px)); padding: var(--space-6); border: 1px solid var(--line-soft); border-radius: var(--radius-xl); background: var(--panel); color: var(--ink); box-shadow: var(--shadow-pop); }
-.quick-settings-dialog[open] { display: flex; flex-direction: column; gap: var(--space-3); }
+/* 快捷条件设置弹窗：顶部说明 + 工具行（搜索/计数/清空）+ 分组网格 + 底部预览与动作。
+   旧版把所有筛选项平铺成纯文字复选框，十几个分组连排下来没有任何视觉分层。 */
+.quick-settings-dialog {
+  width: min(920px, calc(100vw - 40px));
+  max-height: min(820px, calc(100vh - 40px));
+  padding: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-xl);
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--shadow-pop);
+  overflow: hidden;
+}
+.quick-settings-dialog[open] { display: flex; flex-direction: column; }
 .quick-settings-dialog::backdrop { background: var(--overlay); }
-.quick-settings-dialog header, .quick-settings-dialog footer { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); flex: none; }
-.quick-settings-dialog h2 { margin: 0; font-size: var(--fs-lg); }
-.quick-settings-scroll { overflow: auto; min-height: 0; }
-.quick-settings-scroll section { padding: var(--space-4) 0; border-top: 1px solid var(--line-soft); }
-.quick-settings-scroll h3 { margin: 0 0 var(--space-3); font-size: var(--fs-sm); }
+.quick-settings-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4);
+  flex: none; padding: var(--space-5) var(--space-6) var(--space-4);
+  border-bottom: 1px solid var(--line-soft);
+}
+.quick-settings-title { display: flex; align-items: flex-start; gap: var(--space-3); min-width: 0; }
+.quick-settings-mark {
+  display: grid; place-items: center; flex: none; width: 34px; height: 34px;
+  border-radius: var(--radius-md); background: var(--teal-soft); color: var(--teal-dark);
+}
+.quick-settings-mark .ui-icon { width: 18px; height: 18px; }
+.quick-settings-dialog h2 { margin: 0; font-size: var(--fs-lg); font-weight: 600; }
+.quick-settings-title .filter-note { margin-top: 2px; font-size: var(--fs-3xs); }
+.quick-settings-toolbar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3);
+  flex: none; padding: var(--space-3) var(--space-6);
+  border-bottom: 1px solid var(--line-soft); background: var(--surface-1);
+}
+.quick-settings-search { flex: 1 1 220px; min-width: 0; }
+.quick-settings-count { flex: none; color: var(--muted); font-size: var(--fs-3xs); white-space: nowrap; }
+.quick-settings-count strong { color: var(--teal-dark); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.quick-settings-tools { display: flex; align-items: center; gap: var(--space-2); margin-left: auto; }
+.quick-settings-tools .ghost-button { display: inline-flex; align-items: center; gap: var(--space-1); }
+.quick-settings-tools .ui-icon { width: 14px; height: 14px; }
+.quick-settings-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: var(--space-2) var(--space-6) var(--space-4); scrollbar-gutter: stable; }
+.quick-settings-group { padding: var(--space-4) 0; border-top: 1px solid var(--line-soft); }
+.quick-settings-group:first-child { border-top: 0; }
+/* 分组标题吸顶：长列表滚动时始终知道当前在看哪一类条件。 */
+.quick-settings-group-title {
+  position: sticky; top: 0; z-index: 1;
+  display: flex; align-items: center; gap: var(--space-2);
+  margin: 0 0 var(--space-3); padding: var(--space-2) 0;
+  background: var(--panel); font-size: var(--fs-sm); font-weight: 600;
+}
+.quick-settings-group-title .ui-icon { width: 15px; height: 15px; color: var(--teal-dark); }
+.quick-settings-group-title small { padding: 0 6px; border-radius: var(--radius-pill); background: var(--surface-2); color: var(--muted); font-size: 11px; font-weight: 500; line-height: 17px; font-variant-numeric: tabular-nums; }
 .quick-setting-list { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.quick-setting-list label { display: flex; align-items: center; gap: var(--space-3); min-width: 0; padding: var(--space-3); border: 1px solid var(--line-soft); border-radius: var(--radius-sm); cursor: pointer; }
-.quick-settings-dialog footer { padding-top: var(--space-3); border-top: 1px solid var(--line-soft); }
+/* 单选项：未选是安静的白底描边，选中整块转青底并把勾选框填实。
+   图标先行、文字在后，扫视时按图标定位而不是逐行读文字。 */
+.quick-setting-item {
+  position: relative; display: inline-flex; align-items: center; gap: var(--space-2);
+  min-width: 0; max-width: 100%; padding: 0 var(--space-3) 0 var(--space-2);
+  height: 34px; border: 1px solid var(--line-soft); border-radius: var(--radius-pill);
+  background: var(--panel); color: var(--ink-soft); cursor: pointer;
+  transition: border-color var(--motion-fast) var(--motion-ease), background-color var(--motion-fast) var(--motion-ease);
+}
+/* 纯文字胶囊（蛋组/性格/特性/获取方式）没有图标槽：左右等距内边距，文字落在胶囊中心。 */
+.quick-setting-item:not(:has(.quick-setting-icon)) { padding: 0 var(--space-3); }
+.quick-setting-item:hover:not(.is-picked) { border-color: color-mix(in srgb, var(--teal) 34%, var(--line-soft)); background: var(--surface-1); }
+.quick-setting-item.is-picked {
+  border-color: color-mix(in srgb, var(--teal) 48%, var(--line-soft));
+  background: color-mix(in srgb, var(--teal-soft) 72%, var(--panel));
+  color: var(--teal-dark); font-weight: 600;
+}
+.quick-setting-item:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.quick-setting-item input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.quick-setting-check { display: none; }
+.quick-setting-icon { display: grid; place-items: center; flex: none; width: 18px; height: 18px; color: currentColor; }
+.quick-setting-icon .ui-icon { width: 16px; height: 16px; }
+.quick-setting-icon .medal-icon { width: 20px; height: 20px; object-fit: contain; }
+.quick-setting-icon .medal-icon-text { font-size: 11px; font-weight: 600; }
+.quick-setting-icon img { width: 16px; height: 16px; object-fit: contain; }
+.quick-setting-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-xs); }
+/* 长名称在窄容器里也只截断不换行：单个 chip 永远保持一行高度。 */
+.quick-setting-item { flex: 0 1 auto; }
+.quick-settings-group .quick-setting-list { align-content: flex-start; }
+.quick-settings-none { margin: var(--space-6) 0; color: var(--muted); font-size: var(--fs-xs); text-align: center; }
+.quick-settings-error { margin: var(--space-3) 0 0; color: var(--danger-ink); }
+.quick-settings-foot {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3);
+  flex: none; padding: var(--space-3) var(--space-6);
+  border-top: 1px solid var(--line-soft); background: var(--surface-1);
+}
+.quick-settings-preview { min-width: 0; margin: 0; color: var(--muted); font-size: var(--fs-3xs); line-height: 1.5; }
+.quick-settings-foot-actions { display: flex; align-items: center; gap: var(--space-2); margin-left: auto; }
+@media (max-width: 760px) {
+  .quick-settings-dialog { width: calc(100vw - 24px); max-height: calc(100vh - 24px); }
+  .quick-settings-head, .quick-settings-toolbar, .quick-settings-scroll, .quick-settings-foot { padding-left: var(--space-4); padding-right: var(--space-4); }
+  .quick-settings-tools { margin-left: 0; }
+  .quick-settings-foot { align-items: stretch; }
+  .quick-settings-foot-actions { margin-left: 0; }
+  .quick-settings-foot-actions .primary-button { flex: 1; }
+}
 .pc-gender { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; flex: none; }
 .pc-gender .ui-icon { display: block; width: 14px; height: 14px; min-width: 14px; aspect-ratio: 1; stroke-width: 2; }
-.quick-settings-dialog footer { justify-content: flex-end; }
 
 .saved-shortcuts { display: grid; flex: none; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin-top: var(--space-2); max-height: 240px; overflow: auto; }
 .saved-shortcuts > .chip { display: grid; place-items: center; min-width: 0; width: 100%; height: 34px; padding: var(--space-2); border-radius: var(--radius-sm); font-size: var(--fs-xs); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

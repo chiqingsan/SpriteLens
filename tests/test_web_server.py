@@ -182,12 +182,17 @@ class LocalServerTest(unittest.TestCase):
 
     def test_index_is_public(self):
         """静态页与资源不需要 token（页面本身不含数据）。"""
+        from spritelens import __version__
         request = urllib.request.Request(f"http://127.0.0.1:{self.server.port}/")
         with urllib.request.urlopen(request, timeout=5) as response:
             self.assertEqual(response.status, 200)
             body = response.read().decode("utf-8")
             self.assertIn("小洛探探", body)
             self.assertNotIn("page-events", body)
+            # 版本号首屏注入：标题栏与关于页都要有，模板占位符不得泄漏到页面。
+            self.assertIn(f"小洛探探 SpriteLens v{__version__}", body)
+            self.assertIn(f'<span id="app-version">v{__version__}</span>', body)
+            self.assertNotIn("{{", body)
         status, _ = _http_get(
             f"http://127.0.0.1:{self.server.port}/api/events", token=self.server.token
         )

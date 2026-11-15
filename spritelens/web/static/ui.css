@@ -15,7 +15,7 @@ button:not(.nav-item):has(> .ui-icon) { display: inline-flex; align-items: cente
   margin: 0 auto var(--space-4); color: var(--muted);
 }
 .empty-hint .button-row { justify-content: center; margin-top: var(--space-5); }
-.hb-card:focus-visible, tr[role="button"]:focus-visible, td[role="button"]:focus-visible {
+tr[role="button"]:focus-visible, td[role="button"]:focus-visible {
   outline: 2px solid var(--focus-ring); outline-offset: -2px;
 }
 
@@ -103,7 +103,6 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { appearance:
 .detail-panel.detail-closed { display: none !important; }
 .detail-backdrop { position: fixed; inset: 0; background: var(--overlay); z-index: 110; }
 .detail-backdrop:not([hidden]) { animation: fade-in var(--motion-base) var(--motion-ease) both; }
-.drawer-open .page.active { overflow: hidden; }
 #btn-pet-filters, #btn-close-pet-filters { display: none; }
 
 .active-filters { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--hairline); }
@@ -130,7 +129,6 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { appearance:
 .advanced-settings[open] > summary { margin-bottom: var(--space-6); }
 .advanced-settings > .panel:last-child { margin-bottom: 0; }
 
-.hb-head > div { min-width: 0; overflow-wrap: anywhere; }
 #pill-key, #pill-record { display: none; }
 .sidebar-foot { flex-wrap: wrap; font-size: var(--fs-3xs); }
 .sidebar-foot span { font-size: var(--fs-3xs); }
@@ -365,8 +363,11 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { appearance:
 .settings-status { margin: var(--space-4) 0 0; padding-top: var(--space-3); border-top: 1px solid var(--hairline); font-size: var(--fs-xs); }
 .settings-group #npcap-banner { margin: var(--space-4) 0 0; }
 .settings-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); padding-top: var(--space-4); }
-.settings-qq-row { justify-content: flex-start; gap: var(--space-6); }
-.settings-qq-actions { padding-top: 0; }
+.settings-qq-row { justify-content: flex-start; gap: var(--space-4); flex-wrap: nowrap; }
+/* 交流群固定一行：名称与群号并排，操作按钮紧随其后，不再上下堆成三行。 */
+.settings-qq-copy { display: flex; align-items: baseline; gap: var(--space-2); flex: 0 1 auto; white-space: nowrap; }
+.settings-qq-copy strong { flex: none; }
+.settings-qq-actions { flex: none; flex-wrap: nowrap; padding-top: 0; }
 .settings-hint { min-height: 18px; margin: var(--space-3) 0 0; line-height: 1.45; }
 #c-game-auto-guidance { margin-bottom: var(--space-7); }
 .settings-diagnostic-block { padding: var(--space-5) 0 0; }
@@ -430,6 +431,16 @@ input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { appearance:
   .settings-control, .settings-control select, .settings-control input { width: 100%; }
   .settings-actions { align-items: stretch; flex-direction: column; }
   .settings-actions button { width: 100%; }
+  /* 交流群在窄屏保持单行：名称、群号与两个按钮同一基线。
+     .settings-qq-row 放在 .settings-actions 竖排规则之后，才能覆盖按钮满宽。 */
+  .settings-row.settings-qq-row {
+    align-items: center; flex-direction: row; flex-wrap: wrap;
+    justify-content: space-between; gap: var(--space-2) var(--space-3);
+  }
+  .settings-row.settings-qq-row .settings-qq-actions {
+    align-items: center; flex-direction: row; flex-wrap: nowrap; gap: var(--space-2);
+  }
+  .settings-row.settings-qq-row .settings-qq-actions button { width: auto; padding: 0 var(--space-4); }
   .settings-diagnostic-block .button-row { align-items: stretch; flex-direction: column; }
   .settings-diagnostic-block .button-row .ghost-button { align-self: flex-start; }
   .settings-group #npcap-banner { align-items: stretch; flex-direction: column; }

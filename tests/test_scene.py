@@ -60,6 +60,19 @@ def seed(repo, uid=101, session="s"):
 
 
 class SceneTests(unittest.TestCase):
+    def test_move_request_records_heading_and_keeps_last_valid_direction(self):
+        repo = SceneRepository(); seed(repo)
+        point = lambda x, y: [field(1, x), field(2, y)]
+        rot = lambda z: [field(1, 0), field(2, 0), field(3, z)]
+        self.assertIsNone(repo.snapshot().player_heading)
+        repo.handle_packet(event(0x0133, [field(1, 1000), field(17, 1), field(2, children=point(10, 20)),
+                                          field(3, children=rot((1 << 32) - 1225))], direction="c2s"))
+        self.assertEqual(repo.snapshot().player_heading, -1225)
+        # 目标坐标无效时不写入朝向，保留上一次有效方向而不是清零。
+        repo.handle_packet(event(0x0133, [field(1, 1100), field(17, 1), field(2, children=[]),
+                                          field(3, children=rot(900))], direction="c2s"))
+        self.assertEqual(repo.snapshot().player_heading, -1225)
+
     def test_coverage_records_past_samples_but_not_future_targets_and_survives_battle(self):
         repo = SceneRepository(); seed(repo)
         point = lambda x, y: [field(1, x), field(2, y)]
@@ -120,6 +133,46 @@ class SceneTests(unittest.TestCase):
         self.assertIsNone(repo.snapshot().coverage)
         repo.handle_packet(move(1200, 322300, 420000))
         self.assertEqual(repo.snapshot().coverage.rows, ((210, 161, 1),))
+
+    def test_coverage_follows_world_owner_and_keeps_each_progress(self):
+        """覆盖按世界所有者分桶：他人世界是另一份进度，回到自己的世界原样恢复。"""
+        repo = SceneRepository(); seed(repo)
+
+        def move(t, x, y):
+            return event(0x0133, [field(1, t), field(17, 1),
+                field(2, children=[field(1, x), field(2, y)])], direction="c2s")
+
+        repo.handle_packet(move(1000, 321900, 420000))
+        repo.handle_packet(move(1100, 322100, 420000))
+        own = repo.snapshot()
+        self.assertEqual((own.world_owner, own.coverage.owner), (0, 0))
+        self.assertEqual(nearby_payload(own)["world_owner"], "0")
+        self.assertEqual(nearby_payload(own)["coverage"]["owner"], "0")
+
+        # 0x039D 的 online_visit_owner 非 0：进入他人世界，换用对方的进度。
+        repo.handle_packet(event(0x039D, [field(1, 369460069)]))
+        current = repo.snapshot()
+        self.assertEqual((current.world_owner, current.coverage), (369460069, None))
+        repo.handle_packet(move(3000, 330000, 420000))
+        repo.handle_packet(move(3100, 330200, 420000))
+        external = repo.snapshot()
+        self.assertEqual(external.coverage.owner, 369460069)
+        self.assertNotEqual(external.coverage.rows, own.coverage.rows)
+        self.assertEqual(nearby_payload(external)["world_owner"], "369460069")
+
+        # 0x039D 归 0：退出他人世界，恢复自己那一份进度。
+        repo.handle_packet(event(0x039D, [field(1, 0)]))
+        restored = repo.snapshot()
+        self.assertEqual((restored.world_owner, restored.coverage), (0, own.coverage))
+        # 再一次进入他人世界，仍恢复对方那一份；0x0152 / 0x0160 的同一字段是次级来源。
+        repo.handle_packet(event(0x039D, [field(1, 369460069)]))
+        self.assertEqual(repo.snapshot().coverage, external.coverage)
+        repo.handle_packet(event(0x0152, [field(2, 1), field(3, 2), field(4, 3), field(7, 0)]))
+        self.assertEqual((repo.snapshot().world_owner, repo.snapshot().coverage), (0, own.coverage))
+        repo.handle_packet(event(0x0160, [field(2, children=[field(14, 369460069)])]))
+        self.assertEqual(repo.snapshot().world_owner, 369460069)
+        repo.handle_packet(event(0x0160, [field(2, children=[field(14, 0)])]))
+        self.assertEqual((repo.snapshot().world_owner, repo.snapshot().coverage), (0, own.coverage))
 
     def test_coverage_is_recorded_without_opening_map_and_returning_to_map_keeps_it(self):
         repo = SceneRepository(); seed(repo)
@@ -364,7 +417,7 @@ class SceneTests(unittest.TestCase):
         self.assertIsInstance(payload.pop("updated_at"), float)
         self.assertEqual(payload.pop("radius_raw"), 0)
         self.assertEqual(payload, {
-            "uid": "101", "map_id": "2", "layer": "visit", "scope": "session",
+            "uid": "101", "map_id": "2", "owner": "0", "layer": "visit", "scope": "session",
             "revision": 1, "cell_size": 2000, "cells": 1, "rows": [[210, 160, 1]],
         })
 
@@ -418,6 +471,37 @@ class SceneTests(unittest.TestCase):
         row = nearby_payload(repo.snapshot(), load_static_data(static_dir()))["actors"][0]
         self.assertEqual((row["config_id"], row["base_id"], row["name"]), (50571, 3229, "友爱星飞"))
         self.assertTrue(row["icon_url"])
+
+    def test_nearby_payload_carries_reference_range_pct(self):
+        repo = SceneRepository(); seed(repo)
+        node = actor_node()
+        config = node["children"][0]["children"][1]["children"]
+        config[0]["raw"] = 10011  # 迪莫：身高参考 0.54–0.78 m、体重参考 5.5–7.0 kg
+        config[1]["raw"] = 66
+        config[2]["raw"] = 6250
+        config[3]["raw"] = 50
+        repo.handle_packet(event(0x014A, [node]))
+        row = nearby_payload(repo.snapshot(), load_static_data(static_dir()))["actors"][0]
+        self.assertEqual((row["height_pct"], row["weight_pct"]), (0.5, 0.5))
+        # 声音与家园页同口径映射到 -100..100 区间：(50 + 100) / 200。
+        self.assertEqual(row["voice_pct"], 0.75)
+        # 物种未收录时不给比例：前端画空轨道，而不是把「不知道」画成 0%。
+        unmapped = actor_node(2)
+        unmapped["children"][0]["children"][1]["children"][0]["raw"] = 50571
+        unmapped["children"][0]["children"][1]["children"][3]["raw"] = 50
+        repo.handle_packet(event(0x014A, [unmapped]))
+        rows = {row["actor_id"]: row for row in nearby_payload(repo.snapshot(), load_static_data(static_dir()))["actors"]}
+        self.assertIsNone(rows["2"]["height_pct"])
+        self.assertEqual(rows["2"]["voice_pct"], 0.75)
+
+    def test_home_egg_is_not_in_nearby_actors(self):
+        repo = SceneRepository(); seed(repo)
+        egg = actor_node(1)
+        npc = egg["children"][0]["children"]
+        npc[0]["children"].append(field(1, 13))
+        npc.append(field(23, children=[field(1, 1), field(2, 12345)]))
+        repo.handle_packet(event(0x014A, [egg, actor_node(2)]))
+        self.assertEqual([row.actor_id for row in repo.snapshot().actors], [2])
 
     def test_fields_unknowns_precision_and_partial_status(self):
         repo = SceneRepository(); seed(repo)
@@ -594,7 +678,6 @@ class SceneTests(unittest.TestCase):
     def test_battle_exit_leaves_radar_empty_until_new_observation_arrives(self):
         repo = SceneRepository(); seed(repo)
         repo.handle_packet(event(0x014A, [actor_node()]))
-        before = repo.snapshot()
         repo.handle_packet(event(4886, [field(6, children=[field(1, 1234)])]))
         self.assertFalse(repo.snapshot().actors)
         repo.handle_packet(event(4909))

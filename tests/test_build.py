@@ -1,10 +1,16 @@
 """发布配置的关键命令行回归。"""
 
+import time
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import build
+
+
+def expected_timestamp(seconds: int) -> str:
+    """与 build_timestamp 同口径的期望值，避免测试断言依赖运行机器时区。"""
+    return f"{time.strftime('%m%d', time.localtime(seconds))}{seconds % 10000:04d}"
 
 
 class BuildConfigTest(unittest.TestCase):
@@ -16,12 +22,12 @@ class BuildConfigTest(unittest.TestCase):
     def test_release_name_includes_build_timestamp(self):
         config = build.load_config(build.DEFAULT_CONFIG)
         timestamp = build.build_timestamp(now_seconds=1234567890)
-        self.assertEqual(timestamp, "7890")
-        self.assertEqual(build.build_timestamp(now_seconds=1203), "1203")
-        self.assertEqual(build.build_timestamp(now_seconds=7), "0007")
+        self.assertEqual(timestamp, expected_timestamp(1234567890))
+        self.assertEqual(build.build_timestamp(now_seconds=1203), expected_timestamp(1203))
+        self.assertEqual(build.build_timestamp(now_seconds=7), expected_timestamp(7))
         self.assertEqual(
             build.build_output_name(config, "0.0.0", timestamp=timestamp),
-            "小洛探探_SpriteLens_0.0.0_7890",
+            f"小洛探探_SpriteLens_0.0.0_{timestamp}",
         )
 
     def test_existing_release_name_gets_sequence_suffix(self):

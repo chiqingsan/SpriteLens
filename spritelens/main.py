@@ -26,6 +26,7 @@ def _build_parser() -> argparse.ArgumentParser:
         prog=spritelens.APP_NAME,
         description=f"{spritelens.APP_DISPLAY_NAME}（{spritelens.APP_NAME}）—《洛克王国：世界》数据观测工具",
     )
+    parser.add_argument("--debug-preview-worker", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--version", action="version", version=f"%(prog)s {spritelens.__version__}")
     parser.add_argument("--smoke-test", action="store_true", help="组件自检，不打开窗口")
     parser.add_argument(
@@ -46,6 +47,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
+    if args.debug_preview_worker:
+        from spritelens.web.debug_preview import run_worker
+        return run_worker()
     try:
         log_directory = logs_dir()
         logger = setup_logger(log_directory, debug=args.debug)
@@ -84,13 +88,14 @@ def _run_smoke_test() -> int:
     """逐组件导入 + 协议管线自检；环境缺 Npcap/scapy 时不视为失败。"""
     from spritelens.recording import replay as replay_mod
     from spritelens.repositories.settings import SettingsRepository
-    from spritelens.services.monitor_service import MonitorService
-    from spritelens.capture import key_store
-    from spritelens.protocol import crypto, frames, records, schema, wire
+    # 以下导入不被引用是有意的：smoke 只验证模块可导入，不执行其内部逻辑。
+    from spritelens.services.monitor_service import MonitorService  # noqa: F401
+    from spritelens.capture import key_store  # noqa: F401
+    from spritelens.protocol import crypto, frames, records, schema, wire  # noqa: F401
 
     print(f"[smoke] spritelens {spritelens.__version__}")
-    print(f"[smoke] 协议层模块: frames/crypto/records/wire/schema 导入正常")
-    print(f"[smoke] 服务层: MonitorService 导入正常")
+    print("[smoke] 协议层模块: frames/crypto/records/wire/schema 导入正常")
+    print("[smoke] 服务层: MonitorService 导入正常")
     print(f"[smoke] 录制回放: {replay_mod.__name__} 导入正常")
 
     settings = SettingsRepository(spritelens.paths.config_path())
@@ -138,6 +143,10 @@ def _smoke_check_assets() -> int:
 
     if not (spritelens.paths.static_dir() / "pet_media.json").is_file():
         failures.append("精灵图片映射缺失: pet_media.json")
+    # 附近页的「NPC 配置 → 物种」映射只在运行时用显式表：漏带时野生 NPC 名字
+    # 全部退化成「未收录精灵 · 配置 N」，而源码态有表，只有打包产物会踩。
+    if not (spritelens.paths.static_dir() / "scene_npc_pets.json").is_file():
+        failures.append("附近精灵映射缺失: scene_npc_pets.json")
 
     if spritelens.paths.project_root() != Path(__file__).resolve().parent.parent:
         print(f"[smoke] 冻结态资源根: {spritelens.paths.project_root()}")

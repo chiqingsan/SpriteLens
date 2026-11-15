@@ -21,7 +21,9 @@ from collections import defaultdict
 
 def run_diagnose(seconds: float = 20.0) -> int:
     """宽抓全部 TCP 流量并按会话聚合统计；返回进程退出码。"""
-    from scapy.all import AsyncSniffer  # 延迟导入（缺 scapy 时给出可读错误）
+    # 与采集入口一致，只注册以太网及 IPv4/IPv6 协议层。
+    from scapy.layers import l2, inet, inet6  # noqa: F401
+    from scapy.sendrecv import AsyncSniffer  # 延迟导入（缺 scapy 时给出可读错误）
 
     # 会话 → [上行字节, 下行字节, 包数]；会话键为 (local, remote) 归一化对
     flows: dict[tuple, list[int]] = defaultdict(lambda: [0, 0, 0])

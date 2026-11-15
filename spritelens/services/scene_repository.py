@@ -51,6 +51,11 @@ class SceneSnapshot:
     coverage: CoverageSnapshot | None = None
     coverage_paused: bool = False
     coverage_error: str | None = None
+    # 当前世界的所有者 uid；0 表示自己的世界。覆盖按它与地图分桶。
+    world_owner: int = 0
+    # 主控朝向（0.1°，0° 指 +x、顺时针为正），取移动请求的 to_rot.z；
+    # 与 position 同一次请求更新，None 表示本次观察周期还没有朝向样本。
+    player_heading: int | None = None
 
 
 class SceneRepository:
@@ -77,6 +82,8 @@ class SceneRepository:
         self._max_distance_raw = max(1, int(max_distance_raw))
         self._version = 0
         self._observation_id = 0
+        # 当前世界的所有者 uid；0 表示自己的世界，其他 uid 表示正在访问的他人世界。
+        self._world_owner = 0
         self._retired_sessions: deque[str] = deque(maxlen=256)
         self._clear("awaiting_identity")
 
@@ -88,6 +95,7 @@ class SceneRepository:
         self._instance: int | None = None
         self._position: tuple[int | None, int | None, int | None] | None = None
         self._position_source: str | None = None
+        self._heading: int | None = None
         self._last_position_sample = 0
         self._last_move_sample = 0
         self._battle_id: int | None = None
@@ -108,6 +116,9 @@ class SceneRepository:
             if uid:
                 self._account.select_loaded(uid)
                 self._coverage.select_account(uid)
+                self._world_owner = 0
+            self._coverage.select_owner(0)
+            self._world_owner = 0
             self._retired_sessions.clear()
             self._clear(phase)
 
@@ -127,6 +138,8 @@ class SceneRepository:
         self._account = AccountTracker()
         self._account.note_loaded(uid)
         self._coverage.select_account(uid)
+        self._coverage.select_owner(0)
+        self._world_owner = 0
         self._phase = RESUMED_STALE
         self._session = checkpoint.flow_id
         self._scene = checkpoint.scene_id
@@ -167,6 +180,8 @@ class SceneRepository:
             self._clear_checkpoint_locked(uid, session_id)
             self._account = AccountTracker()
             self._account.note_loaded(uid)
+            self._world_owner = 0
+            self._coverage.select_owner(0)
             self._clear("disconnected")
 
     def advance(self, now: float | None = None) -> None:
@@ -178,6 +193,15 @@ class SceneRepository:
         """
         with self._lock:
             self._advance_motion(time.time() if now is None else now)
+
+    def _set_world_owner(self, owner: int | None) -> None:
+        """切换当前世界所有者；覆盖层随之换桶，0 表示自己的世界。"""
+        if type(owner) is not int or owner < 0 or owner == self._world_owner:
+            return
+        self._world_owner = owner
+        self._coverage.select_owner(owner)
+        # 让推送与在途请求看到新世界，避免前端把旧世界进度当作当前进度。
+        self._version += 1
 
     def reset_coverage(self, uid: int, resource_id: int, observation_id: int) -> bool:
         """清空当前地图的已探索足迹。
@@ -202,7 +226,7 @@ class SceneRepository:
                 self._scene, self._resource, self._instance, self._position, self._updated_at, self._position_source,
                 tuple(self._actors.values()), self._unresolved, self._rejected, self._coverage.snapshot(self._resource),
                 not self._coverage_enabled, self._coverage.error or self._coverage.unavailable_reason(self._resource)
-                or (self._coverage_store.error if self._coverage_store else None))
+                or (self._coverage_store.error if self._coverage_store else None), self._world_owner, self._heading)
 
     def _add(self, node: dict, event: PacketEvent) -> None:
         value, invalid = actor(node, event)
@@ -323,6 +347,8 @@ class SceneRepository:
                 previous_uid = self._account.display_uid
                 switched = self._account.observe(identity)
                 self._coverage.select_account(identity.uid)
+                self._coverage.select_owner(0)
+                self._world_owner = 0
                 if switched or self._session != event.session_id:
                     previous = self._session
                     if switched or (previous and previous != event.session_id):
@@ -346,6 +372,10 @@ class SceneRepository:
                     self._scene = scene
                     request_time = integer(fs, 1)
                     target = position(children(fs, 2))
+                    # 朝向与位置取自同一条移动请求；请求无效时不更新，避免留下过期朝向。
+                    heading = integer(children(fs, 3), 3, signed=True)
+                    if target is not None and heading is not None:
+                        self._heading = heading
                     # 连续移动请求本身是走过位置的证据；只有与上一条请求相容才记格。
                     self._record_move_sample(target, request_time)
                     self._position = target
@@ -394,6 +424,9 @@ class SceneRepository:
                     self._clear("observing")
                     self._session = event.session_id
                 self._scene, self._resource, self._instance = scene, resource, instance
+                if event.opcode == 0x0152:
+                    # 进场响应自带世界所有者：0 是自己的世界，他人 uid 是对方的。
+                    self._set_world_owner(integer(fs, 7))
                 landing = None
                 if event.opcode == 0x015C:
                     self._position = position(children(children(fs, 14), 1))
@@ -409,6 +442,14 @@ class SceneRepository:
                 # 用残留的客户端目标坐标会把未确认的位置当成已记录区域。
                 if landing is not None:
                     self._coverage.record(self._resource, landing)
+            elif event.opcode == 0x039D:
+                # 拜访信息同步：field 1 是当前世界所有者，0 表示自己的世界。
+                # 进出他人世界时由该通知显式给出，退出时推 0（见真实日志 16:49:40/48）。
+                self._set_world_owner(integer(fs, 1))
+            elif event.opcode == 0x0160:
+                # 自己的人物全量同步会带上当前世界所有者；它只在人物同步时刷新，
+                # 不能当作进出他人的世界的即时信号（真实日志里重新进入他人世界时没有该包）。
+                self._set_world_owner(integer(children(fs, 2), 14))
             elif event.opcode in (4886, 4908, 4909):
                 if event.opcode == 4908 and self._battle_id is not None:
                     if integer(children(fs, 1), 19) != self._battle_id:

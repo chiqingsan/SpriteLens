@@ -19,9 +19,9 @@ version = ""
 file_version = ""
 
 # 打包产物名称模板。可用变量：app_display_name、app_name、version、timestamp。
-# 例：小洛探探_SpriteLens_1.0.0_1234.exe
+# 例：小洛探探_SpriteLens_1.0.0_10291234.exe
 output_name_template = "{app_display_name}_{app_name}_{version}_{timestamp}"
-# timestamp 为当前 Unix 时间戳秒数的后四位，例如 1234。
+# timestamp 为本地日期 MMDD + Unix 时间戳秒数的后四位，共八位，例如 10291234。
 
 # GUI 程序：隐藏控制台窗口。
 windowed = true
@@ -34,13 +34,21 @@ uac_admin = true
 onefile = true
 standalone = true
 
-remove_output = true
+# 保留 main.build / main.dist。发版构建本来就接近全量（Nuitka 的 __helpers.h 一变，
+# 570+ 个翻译单元的 ccache manifest 同时失配），删掉省不下编译时间；留着才能在下次
+# 构建前后对比 __helpers.h / __constants.h 定位失效来源，也省掉约 1.3GB 的删除重建 I/O。
+# 磁盘吃紧时手动清 build\main.build、build\main.dist 即可。
+remove_output = false
 assume_yes_for_downloads = true
 mingw64 = true
 
 # Nuitka onefile 外层启动器在部分构建链上可能带入 GFNI 指令；关闭该指令
 # 可避免部分 AMD CPU 在程序入口阶段触发非法指令崩溃，同时保留其它指令集能力。
-backend_c_flags = ["-mno-gfni"]
+# 末尾的 -O2 覆盖 Nuitka 自带的 -O3（gcc 取最后一个 -O 生效，实测命令行为
+# "-O3 -mno-gfni -D_NUITKA_..."）：生成的 C 是 CPython C-API 胶水代码，-O3 的
+# 向量化几乎无收益，却让 scapy 巨型翻译单元单文件编译到 360~482 秒，是全量构建
+# 的主要拖尾。注意：改这里会让 ccache 全量失效一次。
+backend_c_flags = ["-mno-gfni", "-O2"]
 
 show_progress = true
 show_memory = false
@@ -93,6 +101,9 @@ include_data_files = [
   "data/static/natures.json=data/static/natures.json",
   "data/static/pet_media.json=data/static/pet_media.json",
   "data/static/pet_media_manifest.json=data/static/pet_media_manifest.json",
+  # 附近页的「NPC 配置 → 物种」显式映射：漏带时野生 NPC 名字全部退化成
+  # 「未收录精灵 · 配置 N」，源码态有表所以只有发布包会踩。
+  "data/static/scene_npc_pets.json=data/static/scene_npc_pets.json",
   "data/static/skills.json=data/static/skills.json",
   "data/static/specialities.json=data/static/specialities.json",
   "data/static/species.json=data/static/species.json",

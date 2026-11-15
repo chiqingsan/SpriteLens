@@ -142,12 +142,12 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
 p { margin: 0; }
 /* 数据数字统一等宽数字：滚动/轮询更新时字宽稳定，不左右抖动 */
 :where(.point-metrics, .status-pill, .count-badge, .box-teams, .box-total,
-  .ui-table, .ui-kpi, .account-uid-row, .detail-stats, .hb-stat) {
+  .ui-table, .ui-kpi, .account-uid-row, .detail-stats) {
   font-variant-numeric: tabular-nums;
 }
 
 /* ── 动效层：交互组件统一过渡；hover 抬升、active 按压、focus 描边 ── */
-button, .nav-item, .chip, .hb-card, .filter-tag, .account-option, .theme-choice,
+button, .nav-item, .chip, .filter-tag, .account-option, .theme-choice,
 .status-pill, input, select, summary, .point-pet, .bl-nature {
   transition:
     transform var(--motion-fast) var(--motion-ease),
@@ -157,7 +157,7 @@ button, .nav-item, .chip, .hb-card, .filter-tag, .account-option, .theme-choice,
     color var(--motion-base) var(--motion-ease),
     opacity var(--motion-fast) var(--motion-ease);
 }
-:is(.hb-card, .bl-nature, .point-pet):not(:disabled):hover {
+:is(.bl-nature, .point-pet):not(:disabled):hover {
   transform: var(--motion-lift);
 }
 button:not(.nav-item):not(:disabled):active { transform: scale(.97); }
@@ -766,46 +766,6 @@ input[type="password"]:focus, select:focus, textarea:focus {
 .positive { color: var(--positive); }
 .negative { color: var(--negative); }
 
-/* ══════════════ 图鉴卡片 ══════════════ */
-.hb-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
-  gap: var(--space-3); padding: var(--space-4);
-}
-.hb-card {
-  border: 1px solid var(--hairline); border-radius: var(--radius-lg);
-  background: var(--panel); padding: var(--space-4);
-  display: grid; gap: var(--space-2); cursor: pointer;
-}
-.hb-card:hover { border-color: color-mix(in srgb, var(--teal) 40%, var(--hairline)); box-shadow: var(--shadow-2); }
-.hb-card.active { border-color: var(--teal); background: var(--teal-soft); }
-.hb-card.uncollected .hb-art { opacity: .72; }
-.hb-head { display: flex; align-items: center; gap: var(--space-3); }
-.hb-head > div { min-width: 0; overflow-wrap: anywhere; }
-.hb-key {
-  width: auto; min-width: 30px; height: 30px; padding: 0 var(--space-1); border-radius: var(--radius-sm); flex: none;
-  display: grid; place-items: center; font-size: var(--fs-3xs); font-weight: 600;
-  background: var(--surface-3); color: var(--ink-soft); font-variant-numeric: tabular-nums;
-}
-/* 图鉴立绘：与图鉴号并排，无图回退首字 */
-.hb-art {
-  width: 34px; height: 34px; border-radius: var(--radius-sm); flex: none;
-  display: grid; place-items: center; position: relative; overflow: hidden;
-  background: var(--surface-3); color: var(--muted-2); font-size: var(--fs-lg); font-weight: 700;
-}
-.hb-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 2px; }
-.hb-head strong { font-size: var(--fs-sm); display: block; }
-.hb-head small { font-size: var(--fs-3xs); color: var(--muted); }
-.hb-meta { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
-.hb-sum { font-size: var(--fs-3xs); color: var(--muted); font-variant-numeric: tabular-nums; }
-.hb-badge {
-  font-size: var(--fs-3xs); font-weight: 600; border-radius: 999px; padding: 1px var(--space-2);
-  background: var(--teal-soft); color: var(--teal-dark);
-}
-.hb-badge.none { background: var(--surface-3); color: var(--muted-2); }
-.hb-evo { font-size: var(--fs-3xs); color: var(--muted); }
-.hb-evo b { color: var(--ink-soft); font-weight: 600; }
-.hb-more { grid-column: 1 / -1; display: flex; justify-content: center; padding: var(--space-2) 0 0; }
 
 /* ══════════════ 背包自定义视图卡片（游戏箱位见 ui.css） ══════════════ */
 .pet-grid {

@@ -17,6 +17,7 @@ from dataclasses import dataclass, replace
 from spritelens.domain.identity import PlayerIdentity, extract_identity
 from spritelens.domain.pets import Pet, extract_pets
 from spritelens.domain.pet_medals import extract_medals
+from spritelens.domain.pet_partner_marks import extract_partner_marks
 from spritelens.domain.pet_locations import Backpack, PetBox, PetLocation, update_backpack
 from spritelens.repositories.pet_store import PetStore
 from spritelens.services.account_tracker import AccountTracker
@@ -76,7 +77,9 @@ class PetRepository:
                 self._store.put_account(identity.uid, identity.name, identity.level, identity.avatar_url)
 
         medal_update = extract_medals(event)
+        mark_updates = extract_partner_marks(event)
         changed_medals: list[Pet] = []
+        changed_marks: list[Pet] = []
         with self._lock:
             if medal_update is not None:
                 if medal_update.collection is not None:
@@ -103,9 +106,23 @@ class PetRepository:
                 self._backpack = backpack
                 self._locations = backpack.locations()
                 self._version += 1
+            # 伙伴标记增量：只有已观测到的宠物才更新（完整数据未到的 gid
+            # 由后续分页包补齐，不能凭空插入缺少 conf_id 的行）
+            if mark_updates:
+                for gid, mark in mark_updates.items():
+                    pet = self._pets.get(gid)
+                    if pet is None or pet.partner_mark == mark:
+                        continue
+                    pet = replace(pet, partner_mark=mark)
+                    self._pets[gid] = pet
+                    changed_marks.append(pet)
+                if changed_marks:
+                    self._version += 1
             uid = self._account.uid
         if changed_medals and self._store is not None and uid > 0:
             self._store.put(uid, changed_medals)
+        if changed_marks and self._store is not None and uid > 0:
+            self._store.put(uid, changed_marks)
         if backpack is not None and self._store is not None and uid > 0:
             self._store.put_backpack(uid, backpack)
         if not pets:

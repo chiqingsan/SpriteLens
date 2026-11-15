@@ -17,7 +17,7 @@ from types import SimpleNamespace
 import spritelens
 from spritelens.app_context import build_app_context
 from spritelens.logs import get_logger, setup_logger
-from spritelens.paths import logs_dir, project_root
+from spritelens.paths import data_root, logs_dir, project_root
 from spritelens.paths import config_path
 from spritelens.repositories.settings import SettingsRepository
 from spritelens.system.runtime_session import read_runtime
@@ -29,7 +29,7 @@ from spritelens.system.single_instance import (
 
 logger = get_logger("web_run")
 
-WINDOW_TITLE = f"{spritelens.APP_DISPLAY_NAME} {spritelens.APP_NAME}"
+WINDOW_TITLE = f"{spritelens.APP_DISPLAY_NAME} {spritelens.APP_NAME} v{spritelens.__version__}"
 WEBVIEW2_HINT = (
     "无法创建 WebView2 窗口：系统可能缺少 WebView2 运行时。\n"
     "请安装 Microsoft Edge WebView2 Runtime 后重试：\n"
@@ -90,7 +90,8 @@ def run_web(*, open_browser: bool = False, ui_only: bool = False) -> int:
                 exit_code = 1
 
             if exit_code == 0:
-                server = LocalServer(context)
+                # ext API 发现文件（端口/独立 token）：docs/EXT_API.md
+                server = LocalServer(context, ext_runtime_path=data_root() / "ext-runtime.json")
                 try:
                     server.start()
                 except Exception as exc:  # noqa: BLE001 - 端口/绑定失败直接给出可读提示

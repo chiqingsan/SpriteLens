@@ -3,7 +3,7 @@
 数据来源（本机解包与公开静态资源，均非云服务依赖）：
 - 精灵头像/立绘：由 sync_pet_media.py 从官方资源导入
 - 系别图标：蛋神助手包内 assets/reference/roco-helper-v3.8.1/TypeIcon（雪碧图 + CSS）
-- 图鉴元数据：蛋神助手包内 assets/catalog/petBaseData.json（图鉴号/蛋组/性别比/体型区间/进化链）
+- 图鉴元数据：蛋神助手包内 assets/catalog/petBaseData.json（图鉴号/蛋组/性别比/体型区间）
 - 系别克制表：rocom-helper 数据包 data/game/type_chart.json
 
 用法：
@@ -123,7 +123,7 @@ def import_handbook_meta(danshen: Path | None) -> dict:
         }
         entry["height_range"] = [base.get("heightLow"), base.get("heightHigh")]
         entry["weight_range"] = [base.get("weightLow"), base.get("weightHigh")]
-        entry["chain_members"] = [int(c) for c in (base.get("chainMembers") or []) if isinstance(c, int)]
+        # 进化链不从蛋神导入：链以 Wiki 进化表为准，由 sync_wiki_chains.py 维护
         entry["has_shiny"] = bool(base.get("hasShiny"))
         if base.get("displayName") and base["displayName"] != entry.get("name"):
             entry["display_name"] = str(base["displayName"])

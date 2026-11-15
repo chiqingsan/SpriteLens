@@ -273,4 +273,7 @@
   <circle cx="18" cy="5" r="2" />
   <path d="M8 19h8.5a3.5 3.5 0 0 0 0 -7h-9a3.5 3.5 0 0 1 0 -7h6.5" />
 </symbol>
+<symbol id="player-heading" viewBox="0 0 24 24" fill="currentColor">
+  <path d="M22 12 4 4.4 9 12 4 19.6Z" />
+</symbol>
 </svg>

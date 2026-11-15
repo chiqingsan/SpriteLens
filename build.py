@@ -13,7 +13,6 @@ import argparse
 import ast
 import os
 import re
-import shutil
 import subprocess
 import sys
 import time
@@ -166,9 +165,9 @@ def windows_version_string(version: str) -> str:
 
 
 def build_timestamp(*, now_seconds: int | None = None) -> str:
-    """取 Unix 时间戳秒数的后四位，保持产物名短且固定四位。"""
+    """本地日期 MMDD + Unix 时间戳秒数后四位，固定八位。"""
     seconds = int(time.time()) if now_seconds is None else int(now_seconds)
-    return f"{seconds % 10000:04d}"
+    return f"{time.strftime('%m%d', time.localtime(seconds))}{seconds % 10000:04d}"
 
 
 def build_output_name(
@@ -420,8 +419,11 @@ def main(argv: list[str] | None = None) -> int:
         print("[build] --dry-run：未执行编译")
         return 0
 
-    print("[build] 开始编译（首次运行需下载 MinGW 编译器，耗时较长）...")
+    print(f"[build] 编译缓存: {env['NUITKA_CACHE_DIR']}")
+    print("[build] 开始编译（首次运行需下载 MinGW 编译器，耗时较长）...", flush=True)
+    started = time.perf_counter()
     proc = subprocess.run(command, cwd=PROJECT_ROOT, env=env)
+    print(f"[build] 编译耗时: {time.perf_counter() - started:.1f} 秒")
     if proc.returncode != 0:
         print(f"[build] 失败，退出码 {proc.returncode}")
         return proc.returncode

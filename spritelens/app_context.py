@@ -189,7 +189,7 @@ def build_app_context(*, autostart: bool = True) -> AppContext:
 
 def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
     _created = created.append
-    settings = SettingsRepository(config_path())
+    settings = SettingsRepository.for_application(config_path(), database_path())
     game_automation = GameCaptureAutomation(settings)
     load_library(schema_dir())
     static_data = load_static_data(static_dir())
@@ -316,7 +316,6 @@ def _build_app_context_inner(created: list, *, autostart: bool) -> AppContext:
         scene_coverage_radius_raw=coverage_radius_raw,
         scene_coverage_map_bounds=coverage_map_bounds,
         scene_coverage_store=scene_coverage_store,
-        selection_explicit=selection_explicit,
     )
     monitor.add_packet_listener(account_sessions.handle_packet)
     monitor.add_session_close_listener(account_sessions.session_closed)

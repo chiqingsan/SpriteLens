@@ -12,5 +12,7 @@ export default defineConfig({
       preserveEntrySignatures: 'strict',
     },
   },
-  test: { environment: 'jsdom', include: ['src/**/*.test.ts'] },
+  // jsdom 每文件重建是主要开销（35 个文件 ≈ 74s 聚合）；vmThreads 让每个 worker 只建一次
+  // 环境、仍保留文件级隔离。改动只影响 `npm test`，不影响 vite build 产物。
+  test: { environment: 'jsdom', include: ['src/**/*.test.ts'], pool: 'vmThreads' },
 })

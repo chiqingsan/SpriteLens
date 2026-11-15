@@ -2,12 +2,13 @@
 import json
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from spritelens.repositories.scene_coverage_store import SceneCoverageStore
-from spritelens.services.scene_coverage import SceneCoverage
+from spritelens.services.scene_coverage import EXTERNAL_WORLD_TTL_SECONDS, SceneCoverage
 
 
 class CoverageStoreTest(unittest.TestCase):
@@ -20,7 +21,7 @@ class CoverageStoreTest(unittest.TestCase):
                 coverage.record(10003, point)
                 rows = coverage.snapshot(10003).rows
                 decoded = {(gy, gx) for gy, start, length in rows for gx in range(start, start + length)}
-                self.assertEqual(decoded, coverage._cells[10003])
+                self.assertEqual(decoded, coverage._cells[(0, 10003)])
             store.flush()
             expected = coverage.snapshot(10003).rows
             coverage.select_account(2)
@@ -29,11 +30,11 @@ class CoverageStoreTest(unittest.TestCase):
             self.assertEqual(coverage.snapshot(10003).rows, expected)
             coverage.record(10003, (8000, 0))
             rows = coverage.snapshot(10003).rows
-            self.assertEqual({(gy, gx) for gy, start, length in rows for gx in range(start, start + length)}, coverage._cells[10003])
+            self.assertEqual({(gy, gx) for gy, start, length in rows for gx in range(start, start + length)}, coverage._cells[(0, 10003)])
             coverage.clear(10003)
             coverage.record(10003, (20000, 20000))
             rows = coverage.snapshot(10003).rows
-            self.assertEqual({(gy, gx) for gy, start, length in rows for gx in range(start, start + length)}, coverage._cells[10003])
+            self.assertEqual({(gy, gx) for gy, start, length in rows for gx in range(start, start + length)}, coverage._cells[(0, 10003)])
             store.close()
 
     def test_restart_isolates_accounts_maps_and_clear(self):
@@ -153,6 +154,84 @@ class CoverageStoreTest(unittest.TestCase):
             reopened = SceneCoverageStore(path)
             self.assertIsNone(reopened.load(1, 10003))
             reopened.close()
+
+    def test_world_owner_buckets_isolate_and_persist(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "coverage.json"
+            store = SceneCoverageStore(path)
+            coverage = SceneCoverage(radius_raw=500, store=store)
+            coverage.select_account(1)
+            coverage.record(10003, (500, 500))
+            own = coverage.snapshot(10003)
+            self.assertEqual(own.owner, 0)
+            # 他人世界是另一份进度：看不到也写不进自己的桶。
+            self.assertTrue(coverage.select_owner(369460069))
+            self.assertIsNone(coverage.snapshot(10003))
+            coverage.record(10003, (100500, 500))
+            external = coverage.snapshot(10003)
+            self.assertEqual(external.owner, 369460069)
+            self.assertNotEqual(external.rows, own.rows)
+            # 切回自己的世界，原进度不变。
+            coverage.select_owner(0)
+            self.assertEqual(coverage.snapshot(10003).rows, own.rows)
+            store.flush()
+            store.close()
+
+            store = SceneCoverageStore(path)
+            restored = SceneCoverage(enabled=False, store=store)
+            restored.select_account(1)
+            self.assertEqual(restored.snapshot(10003).cells, own.cells)
+            restored.select_owner(369460069)
+            self.assertEqual(restored.snapshot(10003).cells, external.cells)
+            store.close()
+
+    def test_external_world_progress_expires_three_days_after_first_record(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "coverage.json"
+            now = time.time()
+            # 关键：保留期从开始记录时间算，最近才写入也不会延长。
+            row = {"coordinate_version": 1, "cell_size": 2000, "radius": 500,
+                   "updated_at": now - 60, "started_at": now - EXTERNAL_WORLD_TTL_SECONDS - 60,
+                   "rows": [[0, 0, 2]]}
+            store = SceneCoverageStore(path)
+            store.put(1, 10003, dict(row), owner=369460069)
+            store.put(1, 10003, dict(row), owner=0)
+            # 启动清理：从开始记录算已满 3 天的他人世界记录被删掉，自己的世界长期保留。
+            SceneCoverage(radius_raw=500, store=store)
+            store.flush()
+            self.assertIsNone(store.load(1, 10003, 369460069))
+            self.assertIsNotNone(store.load(1, 10003, 0))
+
+            # 运行中：从开始记录算满 3 天即清除，之后重新记录会重新计时。
+            coverage = SceneCoverage(radius_raw=500, store=store)
+            coverage.select_account(1)
+            coverage.select_owner(369460069)
+            coverage.record(10003, (500, 500))
+            started = coverage._started[(369460069, 10003)]
+            self.assertIsNotNone(coverage.snapshot(10003))
+            self.assertEqual(coverage.purge_expired(now=started + EXTERNAL_WORLD_TTL_SECONDS - 60), 0)
+            # 继续记录不延长保留期。
+            coverage.record(10003, (9000, 9000))
+            self.assertEqual(coverage.purge_expired(now=started + EXTERNAL_WORLD_TTL_SECONDS + 1), 1)
+            self.assertIsNone(coverage.snapshot(10003))
+            store.flush()
+            self.assertIsNone(store.load(1, 10003, 369460069))
+            self.assertIsNotNone(store.load(1, 10003, 0))
+            self.assertTrue(coverage.record(10003, (500, 500)))
+            self.assertGreater(coverage.snapshot(10003).cells, 0)
+            self.assertGreater(coverage._started[(369460069, 10003)], started)
+            store.close()
+
+    def test_version_one_file_loads_as_own_world(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "coverage.json"
+            path.write_text(json.dumps({"version": 1, "records": [{"uid": 1, "map_id": 10003,
+                "coordinate_version": 1, "cell_size": 2000, "radius": 500, "updated_at": 1,
+                "rows": [[0, 0, 2]]}]}), encoding="utf-8")
+            store = SceneCoverageStore(path)
+            self.assertIsNotNone(store.load(1, 10003, 0))
+            self.assertIsNone(store.load(1, 10003, 369460069))
+            store.close()
 
     def test_bad_existing_file_is_never_overwritten(self):
         with tempfile.TemporaryDirectory() as tmp:

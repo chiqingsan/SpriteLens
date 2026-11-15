@@ -15,9 +15,10 @@ it('快捷保存失败保留勾选并可重试，重置只恢复默认快捷项'
     await wrapper.get('.quick-filter-head .text-button').trigger('click')
     expect((wrapper.findAll('label').find(item => item.text() === '大块头')!.get('input').element as HTMLInputElement).checked).toBe(true)
     await wrapper.findAll('label').find(item => item.text() === '雌性')!.get('input').setValue(true)
-    await wrapper.get('footer button').trigger('click'); await flushPromises()
+    // 弹窗底部是「取消 / 保存设置」，保存取最后一个按钮。
+    await wrapper.get('footer button:last-child').trigger('click'); await flushPromises()
     expect(wrapper.get('[role="alert"]').text()).toContain('合成保存失败')
-    await wrapper.get('footer button').trigger('click'); await flushPromises()
+    await wrapper.get('footer button:last-child').trigger('click'); await flushPromises()
     expect(persist.mock.calls[1]![0]).toEqual([...defaultPetShortcuts, { name: '雌性', filters: { gender: 2 } }])
     expect(wrapper.find('dialog').exists()).toBe(false)
     await wrapper.findAll('.quick-filter-head .text-button')[1]!.trigger('click'); await flushPromises()

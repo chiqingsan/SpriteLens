@@ -31,6 +31,15 @@ class SettingsRepository:
         self._cache: dict[str, Any] = {}
         self._loaded = False
 
+    @classmethod
+    def for_application(cls, path: Path, database: Path) -> SettingsRepository:
+        """在创建业务文件前记录全新安装的待引导状态。"""
+        is_new_install = not path.exists() and not database.exists()
+        settings = cls(path)
+        if is_new_install:
+            settings.set_checked("onboarding.pending", True)
+        return settings
+
     def _load(self) -> dict[str, Any]:
         if self._loaded:
             return self._cache

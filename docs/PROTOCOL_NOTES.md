@@ -3,6 +3,16 @@
 本文记录「已确认可用」之外的观察，供未来排障与版本变更时参考。
 主协议结论见 `ARCHITECTURE.md`，此处只记边角信息与教训。
 
+## 场景 actor 归属字段（2026-11-09 修订）
+
+状态：已接入 `NavigationScene` 快照（`creator_id` 每行一个、`self_actor_id` 与 `player_actor_ids` 在顶层），Meow 侧据此排除非本人奇遇。
+
+- 判据是 `npc_base.create_avatar_id`（field 19，uint64），值为创建者 avatar 的 `actor_id`；同一节点的 `create_avatar_name`（field 34）就是游戏界面上的「拥有者 XXX」。实测 `eventlog_20261109_p10` 中 actor `9230175863813782801`（cfg 29401、带 293015）的 `create_avatar_name` 为「持青伞」、`create_avatar_id` 为 `8079477309776592896`，与当时截图里的「拥有者 持青伞」一致。
+- **`ActorInfo_Base.owner_id`（field 6）不能判归属**：同一批数据里它恒为当前账号自己的 `8077254359191126016`（127 条 actor 中 117 条，含上面那个别人创建的奇遇），语义更接近位面/场景归属。2026-11-08 曾按它做过滤，因此完全没有效果。
+- 自身身份取 `self_info.avatar.base.actor_id`：`0x0152`（`ZoneEnterSceneRsp`，field 11）与 `0x015C`（`ZoneSceneTeleportNotify`，field 21）都携带。两者都是大包，ext 通道常被 `decoded_omitted` 清空，但 `ExtEventHub` 在校验前已把它交给 `NavigationScene`，所以快照可用。
+- 自身身份未知时的兜底：快照的 `player_actor_ids` 列出场景里可见的其他玩家 avatar（`ActorInfo.no=12` 的 `actor_id`），若某奇遇的 `creator_id` 命中该集合，即可判定是别人的。
+- 失败分支：`creator_id` 为 0 或缺失、自身身份未知且 `creator_id` 不在可见玩家集合、或两字段都缺失时都不作判断，退回原行为（走过去、到达后没有交互选项再拉黑）。
+
 ## 蛋仓来源字段（2026-10-28）
 
 状态：已接入协议提取、账号内持久化与详情展示；字段位置依据当前 `PetEggBrief` schema，
@@ -56,7 +66,7 @@
 
 1. 本机真实事件日志 `%LOCALAPPDATA%\SpriteLens\eventlog\eventlog_2026*.jsonl`（10-10 至 10-24 十个会话）：`partner_mark` 节点出现在 2,097 条消息、27,044 条 `PetData` 记录、4,268 个 gid 上，取值只有 `0/1/3/4/5/6/7/14/15`，是有限枚举而不是任意数值。
 2. 洛克助手（小洛克精灵工具箱 1.0.0）的 .NET 抓包服务反编译 `roco_capture_service.cs`：`Put(dictionary, "partner_mark", Proto.UInt32(fields, 78));`，与 `wear_medal_conf_id`(73)、`medal_complete_cnt`(74)、`speciality_id`(82) 在同一解码块。
-3. 同族工具的采集器 `roco_collector.py`（本地 `D:\code_resources\roco_resources`）：`78: 'partner_mark'`；`archive\dumps\d_mod.txt`：`const[139] = 'partner_mark'`；协议逆向笔记：`| 78 | partner_mark | 82 | speciality_id |`。
+3. 同族工具的采集器 `roco_collector.py`（本地解包目录 `<ROCO_RESOURCES>`）：`78: 'partner_mark'`；`archive\dumps\d_mod.txt`：`const[139] = 'partner_mark'`；协议逆向笔记：`| 78 | partner_mark | 82 | speciality_id |`。
 4. 社区 schema 库 `data/schemas/messages/all.json`：`"78": {"name": "partner_mark", "type": "enum"}`。
 
 易混字段：94 `activity_partner_pet_data`（活动搭档子消息，不是标记 ID）、80 `custom_medal_conf_id`、73/74 奖牌相关。
@@ -64,6 +74,24 @@
 本机库 `pets.partner_mark` 在 2026-10-24 之前全为 0，是「该字段此前未实现、加列时默认填 0」的结果，**不能反推游戏里没有标记**。按上述流量以 gid 取最新值回填后：1,308 只展示宠物中 638 只有标记（分布 `0:670、1:479、3:2、4:34、5:8、6:12、7:2、14:4、15:97`）；另有 81 个 `is_trial_pet`/`is_mirror_pet` 行不在流量里，保持 0 且本就不参与展示。
 
 口径：同一 gid 在不同时刻出现过 `0 → X` 或 `X → 0` 共 15 例（游戏内可更换/摘除标记），按最新观测值处理，不跨会话合并；8 号标记在当前账号流量里未出现，但资源与映射保留，未列出的 ID 一律不渲染。
+
+### 伙伴标记实时更新（2026-10-29）
+
+游戏内改标记不会下发完整 `PetData`，只有一条专用回执，因此此前界面要等重开宠物背包（`0x1346`）才刷新：
+
+```
+c2s 0x0402 ZoneUpdatePetCollectTagReq
+    collection_info{3: partner_mark, 1: pet_gid}, 2: 1
+s2c 0x0403 ZoneUpdatePetCollectTagRsp（34 字节）
+    ret_info{1: ret_code, 4: goods_change_info{1: changes{...}, 2: pet_data_vesion, 3: bag_data_vesion}}
+        changes 展平后：{1: type=39, 2: op=2, 3: num=新标记值, 5: id=0, 14: gid, 15: coro_id}
+```
+
+实测样本（`eventlog_20261029*.jsonl`，17:24–17:25 三次）：`partner_mark=4` 对应 `type=39, num=4, gid=100781 / 100592 / 100769`；回放该日全部 76,992 条事件后三个 gid 的标记均变为 4（修复前一直是 0）。`type=39` 是伙伴标记资源类型，`num` 即标记 ID，与 c2s 请求值一致。
+
+实现：[pet_partner_marks.py](../spritelens/domain/pet_partner_marks.py) 的 `extract_partner_marks` 按字段号取值，兼容展平与嵌套容器两种 repeated 形状；`PetRepository.handle_packet` 把新值合并到已观测宠物，`_version += 1` 并落库，界面靠既有 `pets_version` 推送自动刷新。未观测到的 gid 不凭空插入（缺少 `conf_id`，等分页包补齐）。
+
+未取证部分：摘除标记（`partner_mark=0`）的真实回执结构未采集，当前按「`num` 缺失视为 0」处理；`op` 字段语义未确认，不据此判断增删。
 
 ## 双开重启续解（M01，2026-10-24）
 

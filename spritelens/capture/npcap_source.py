@@ -110,7 +110,9 @@ class NpcapCaptureSource:
         if self.has_unfinished_sniffer():
             raise SourceError("上一会话的嗅探器尚未停止，暂不能重新开始采集")
         try:
-            from scapy.all import AsyncSniffer  # 延迟导入，见模块 docstring
+            # 注册实际采集所需的协议层；scapy.all 会让 Nuitka 收集全部协议层。
+            from scapy.layers import l2, inet, inet6  # noqa: F401
+            from scapy.sendrecv import AsyncSniffer  # 延迟导入，见模块 docstring
         except Exception as exc:  # noqa: BLE001 - scapy/npcap 环境问题统一转 SourceError
             raise SourceError(f"scapy/npcap 环境不可用: {exc}") from exc
         self.dropped_chunks = 0
@@ -458,7 +460,8 @@ class NpcapCaptureSource:
     @staticmethod
     def list_ifaces() -> list[tuple[str, str]]:
         try:
-            from scapy.all import conf
+            from scapy import arch  # noqa: F401 - 初始化平台网卡提供者
+            from scapy.config import conf
 
             return [
                 (iface.name, getattr(iface, "description", "") or "")

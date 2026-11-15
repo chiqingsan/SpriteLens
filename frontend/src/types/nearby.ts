@@ -7,6 +7,8 @@ export interface NearbyActor {
   actor_id: string; config_id: number | null; base_id: number | null
   name: string; icon_url: string; type_names: string[]; level: number | null
   height: number | null; weight: number | null; voice: number | null; updated_at: number
+  /** 参考范围比例（0..1）：身高/体重来自物种范围，声音用家园页同口径；旧包缺失按未知处理。 */
+  height_pct?: number | null; weight_pct?: number | null; voice_pct?: number | null
   chain_names: string[]
   /** 场景帧原始外观字段，旧壳层/旧缓存可能没有；mutation 第 4 位即炫彩。 */
   mutation?: number | null; glass_type?: number | null; glass_value?: number | null
@@ -27,6 +29,8 @@ export function nearbyAttentionTone(actorId: string): number {
 export interface NearbyCoverage {
   uid: string
   map_id: string
+  /** 这桶覆盖所属的世界所有者；'0' 是自己的世界，其他 uid 是正在访问的他人世界。 */
+  owner: string
   layer: 'visit'
   scope: 'session' | 'history'
   revision: number
@@ -42,6 +46,8 @@ export interface NearbySnapshot extends NearbySummary {
   /** 缺失字段按 null 处理：没有有效覆盖时后端下发 null，前端不得用旧包填充。 */
   coverage?: NearbyCoverage | null
   player_position: (number | null)[] | null; position_source: string | null
+  /** 主控朝向：0.1° 整数，0° 指 +x、顺时针为正；null 表示尚无朝向样本。 */
+  player_heading: number | null
   debug_coordinates: boolean
   resource_id: string | null; instance_id: string | null
   scene_id: number | null; updated_at: number | null; complete: false
@@ -53,6 +59,8 @@ export interface NearbySnapshot extends NearbySummary {
 function record(v: unknown): v is Record<string, unknown> { return !!v && typeof v === 'object' }
 function integer(v: unknown): v is number { return Number.isSafeInteger(v) }
 function optional(v: unknown): v is number | null { return v === null || integer(v) }
+/** 参考范围比例只接受 0..1 的有限数；null/缺省表示未知（旧包与无物种范围的精灵）。 */
+function optionalRatio(v: unknown): v is number | null { return v === null || typeof v === 'number' && Number.isFinite(v) }
 // 64 位实例号按字符串下发；旧壳层/旧测试缺字段时按 null 处理，不阻断附近观察。
 function optionalId(v: unknown): v is string | null | undefined { return v === undefined || v === null || typeof v === 'string' && /^\d+$/.test(v) }
 function position(v: unknown): v is (number | null)[] | null { return v === null || Array.isArray(v) && v.length === 3 && v.every(optional) }
@@ -87,6 +95,8 @@ function parseActor(v: unknown): NearbyActor {
     || !Array.isArray(v.type_names) || !v.type_names.every(t => typeof t === 'string')
     || (v.chain_names !== undefined && (!Array.isArray(v.chain_names) || !v.chain_names.every(name => typeof name === 'string')))
     || !optional(v.level) || !optional(v.height) || !optional(v.weight) || !optional(v.voice)
+    || (v.height_pct !== undefined && !optionalRatio(v.height_pct)) || (v.weight_pct !== undefined && !optionalRatio(v.weight_pct))
+    || (v.voice_pct !== undefined && !optionalRatio(v.voice_pct))
     || (v.stale !== undefined && typeof v.stale !== 'boolean')
     || (v.mutation !== undefined && !optional(v.mutation)) || (v.glass_type !== undefined && !optional(v.glass_type))
     || (v.glass_value !== undefined && !optional(v.glass_value)) || (v.colorful !== undefined && typeof v.colorful !== 'boolean')
@@ -120,12 +130,15 @@ function parseCoverage(v: unknown): NearbyCoverage | null {
     rows.push([row[0] as number, row[1] as number, row[2] as number])
   }
   if (cells !== v.cells) throw Error('地图观察区域格式无效')
-  return { uid: v.uid, map_id: v.map_id, layer: 'visit', scope: v.scope, revision: v.revision, cell_size: v.cell_size, cells: v.cells, rows, updated_at: v.updated_at === undefined ? null : v.updated_at as number | null, radius_raw: v.radius_raw === undefined ? 0 : v.radius_raw as number }
+  // 旧壳层没有 owner 字段时按自己的世界处理，不阻断附近观察。
+  const owner = typeof v.owner === 'string' && /^\d+$/.test(v.owner) ? v.owner : '0'
+  return { uid: v.uid, map_id: v.map_id, owner, layer: 'visit', scope: v.scope, revision: v.revision, cell_size: v.cell_size, cells: v.cells, rows, updated_at: v.updated_at === undefined ? null : v.updated_at as number | null, radius_raw: v.radius_raw === undefined ? 0 : v.radius_raw as number }
 }
 export function parseNearby(v: unknown): NearbySnapshot {
   const summary = parseNearbySummary(v)
   if (!record(v) || v.complete !== false || v.source !== 'observed_partial' || !optional(v.scene_id)
     || !position(v.player_position) || !(v.position_source === null || typeof v.position_source === 'string')
+    || !(v.player_heading === undefined || optional(v.player_heading))
     || !(v.debug_coordinates === undefined || typeof v.debug_coordinates === 'boolean')
     || !optionalId(v.resource_id) || !optionalId(v.instance_id)
     || !(v.updated_at === null || typeof v.updated_at === 'number' && Number.isFinite(v.updated_at))
@@ -140,6 +153,7 @@ export function parseNearby(v: unknown): NearbySnapshot {
   return { ...summary, scene_id: v.scene_id, updated_at: v.updated_at, complete: false,
     coverage: parseCoverage(v.coverage), coverage_paused: v.coverage_paused === true, coverage_error: v.coverage_error ?? null,
     player_position: v.player_position, position_source: v.position_source, debug_coordinates: v.debug_coordinates === true,
+    player_heading: typeof v.player_heading === 'number' ? v.player_heading : null,
     resource_id: typeof v.resource_id === 'string' ? v.resource_id : null,
     instance_id: typeof v.instance_id === 'string' ? v.instance_id : null,
     unresolved_updates: v.unresolved_updates, rejected_actors: v.rejected_actors,

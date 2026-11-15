@@ -280,6 +280,11 @@ const projection = computed(() => {
   }
   return { range: range.value, rows: renderedRows, labels, total: visibleRows.length }
 })
+// 主控朝向：后端下发 0.1° 整数（0° 指 +x、顺时针为正），雷达投影 y 轴与之同向，直接按度旋转。
+const heading = computed(() => {
+  const value = props.data?.player_heading
+  return typeof value === 'number' && Number.isFinite(value) ? value / 10 : null
+})
 // 调试坐标：仅当后端按环境变量打开时显示原始 x/y，供现场地标校准；不参与雷达投影。
 // 只显示二维 x/y：校准用不到高度 z，少一行文案也能让窄窗圆盘保留可见高度。
 const debugPosition = computed(() => {
@@ -325,7 +330,7 @@ const debugPosition = computed(() => {
           <g v-for="label in projection.labels" :key="`label-${label.id}`" class="radar-label" :class="{ selected: label.selected }" aria-hidden="true">
             <rect class="radar-label-bg" :x="label.rect.x" :y="label.rect.y" :width="label.rect.width" :height="label.rect.height" rx="3" /><text class="radar-target-label" :x="label.x" :y="label.y" :text-anchor="label.anchor">{{ label.text }}</text>
           </g>
-          <g class="radar-center"><circle cx="200" cy="200" r="8" class="radar-player" /><UiIcon name="current-location" x="193" y="193" width="14" height="14" class="radar-player-icon" /><text v-if="!compact" x="200" y="220" text-anchor="middle" class="radar-self-label">{{ data?.position_source === 'client_target' ? '你的移动目标' : '你的位置' }}</text></g>
+          <g class="radar-center"><g class="radar-heading" :transform="`rotate(${heading ?? 0} 200 200)`"><UiIcon name="player-heading" x="187" y="187" width="26" height="26" class="radar-heading-icon" /></g><text v-if="!compact" x="200" y="220" text-anchor="middle" class="radar-self-label">{{ data?.position_source === 'client_target' ? '你的移动目标' : '你的位置' }}</text></g>
         </g>
         <text v-else x="200" y="200" text-anchor="middle">等待玩家位置</text>
       </svg>
@@ -374,8 +379,9 @@ const debugPosition = computed(() => {
 .radar-legend-dot.is-marked { background: var(--amber); }
 .radar-legend-dot.is-double { width: 11px; height: 11px; background: var(--danger); border: 1px solid var(--danger-ink); }
 /* 炫彩图例直接用游戏内彩虹星标，与点位徽章同一素材。 */
-.radar-player { fill: var(--teal-deep); stroke: var(--panel); stroke-width: 3; }
-.radar-player-icon { color: var(--panel); width: 14px; height: 14px; }
+/* 主控朝向：游戏中同类箭头是「亮色填充 + 面板色粗描边」，这里用琥珀填充保证浅底可见。 */
+.radar-heading { pointer-events: none; }
+.radar-heading-icon { color: var(--amber); stroke: var(--panel); stroke-width: .9; stroke-linejoin: round; width: 26px; height: 26px; filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, .32)); }
 .scene-radar .radar-self-label { fill: var(--panel); font-size: var(--fs-3xs); font-weight: 700; paint-order: stroke; stroke: var(--teal-deep); stroke-width: 4; stroke-linejoin: round; }
 .radar-target { cursor: pointer; outline: none; }
 .radar-label { pointer-events: none; }
@@ -426,7 +432,7 @@ const debugPosition = computed(() => {
 .scene-radar.is-overlay .radar-colorful-well { fill: color-mix(in srgb, var(--colorful-soft) 32%, var(--radar-overlay-bg)); }
 .scene-radar.is-overlay .radar-colorful-point { stroke: var(--radar-overlay-bg); }
 .scene-radar.is-overlay .radar-colorful-badge { filter: drop-shadow(0 0 2px rgba(0, 0, 0, .6)); }
-.is-overlay .radar-player { fill: var(--radar-overlay-ink); stroke: var(--radar-overlay-bg); }
+.is-overlay .radar-heading-icon { color: var(--amber-bright); stroke: var(--radar-overlay-bg); }
 .is-overlay .radar-player-cross { stroke: var(--radar-overlay-ink); }
 /* 悬浮雷达紧凑窗只在调试图标开启时多显示一行原始坐标，供游戏内就地记录地标。 */
 .is-overlay .radar-debug { margin-top: var(--space-1); text-align: center; color: var(--radar-overlay-ink); }

@@ -4,7 +4,6 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
 
 from spritelens.capture.base import StreamChunk
 from spritelens.capture.key_store import KeyStore
@@ -76,7 +75,6 @@ class ExtractPetsTest(unittest.TestCase):
     def test_unnamed_tree_yields_nothing(self):
         """无 schema 时字段是 field_N 占位名，指纹不命中且不抛错。"""
         payload = _page_rsp([_brief(1, 2, b"x", 3)])
-        from spritelens.protocol import wire
 
         tree = [
             {"no": f.no, "name": f.display_name(), "type": "", "value": f.display_value(),
